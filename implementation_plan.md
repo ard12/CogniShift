@@ -30,18 +30,15 @@ Phases 1 through 3 are **100% complete** and pushed to GitHub. Do not rebuild th
 
 ---
 
-## 3. Team Division & Alternating Workflow
+## 3. Team Sequence & Workflow
 
-Because you are working alternatingly, the workflow is:
-1. **Sitanshu** builds a phase on branch `dev/sitanshu`, tests it, and merges to `main`.
-2. **Rohit** pulls `main`, his AI reads the new code, builds the next phase on `dev/rohit`, tests it, and merges to `main`.
+To avoid merge conflicts and the need for mock functions, the team will work **sequentially**:
 
-### The Split
+1. **Step 1 (Rohit's Turn):** Rohit and his AI build Phase 4 (Knowledge Pipeline) and Phase 6 (Tools & Approvals). They merge to `main`.
+2. **Step 2 (Sitanshu's Turn):** Sitanshu pulls `main`. Sitanshu and his AI build Phase 5 (Execution Engine), which natively imports and uses Rohit's completed RAG and Tool functions. Sitanshu then builds Phase 7 (Multimodal Vision).
+3. **Step 3:** Both devs collaborate on the final UI and integration testing.
 
-| Developer | AI Focus Area | Responsibilities |
-| :--- | :--- | :--- |
-| **Sitanshu (GPU)** | **The Brain** | Phase 5 (Execution Engine), Phase 7 (Multimodal Vision). |
-| **Rohit (CPU)** | **The Platform** | Phase 4 (Knowledge/RAG Pipeline), Phase 6 (Tools & Approvals), Web UI. |
+See `AGENTS.md` for strict AI-to-AI handoff contracts.
 
 ---
 

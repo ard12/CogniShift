@@ -80,7 +80,7 @@ async def process_pdf(file_path: str, workspace_id: int, source_id: int, filenam
     # Run FastEmbed off the main event loop
     def _embed() -> List[List[float]]:
         generator = embedding_model.embed(chunks)
-        return [list(e) for e in generator]
+        return [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in generator]
 
     embeddings = await asyncio.to_thread(_embed)
 
@@ -129,9 +129,13 @@ async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str
         return ""
 
     try:
-        query_embeddings = await asyncio.to_thread(lambda: list(embedding_model.embed([query])))
+        def _get_q_emb():
+            raw = list(embedding_model.embed([query]))[0]
+            return raw.tolist() if hasattr(raw, "tolist") else [float(x) for x in raw]
+            
+        q_vec = await asyncio.to_thread(_get_q_emb)
         results = collection.query(
-            query_embeddings=[list(query_embeddings[0])],
+            query_embeddings=[q_vec],
             n_results=effective_k
         )
     except Exception:

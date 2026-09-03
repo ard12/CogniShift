@@ -19,6 +19,7 @@ from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import RunResponse, RunEventResponse
 from cognishift.core.retriever import retrieve_context
+from cognishift.core.graph_memory import query_graph_context
 from cognishift.core.tools import execute_tool
 from cognishift.core.providers import get_provider
 
@@ -198,35 +199,51 @@ async def execute_agent_run(
         await log_event(db, run_id, "run_started", f"Run initiated for agent '{agent['name']}'", {"agent_id": agent_id, "user_id": user_id})
 
         try:
-            # 4. Domain-Specific RAG Retrieval
-            await log_event(db, run_id, "retrieval_started", "Searching local knowledge base for relevant manuals...")
+            # 4. Domain-Specific RAG Retrieval & Graph Memory
+            await log_event(db, run_id, "retrieval_started", "Searching local knowledge base and plant topology graph...")
             context_str = await retrieve_context(workspace_id=workspace_id, query=input_text, top_k=3)
-            
+            graph_context = await query_graph_context(workspace_id=workspace_id, query_text=input_text, max_hops=2)
+
+            combined_context_parts = []
+            if context_str:
+                combined_context_parts.append(context_str)
+            if graph_context:
+                combined_context_parts.append(graph_context)
+
+            combined_context = "\n\n".join(combined_context_parts)
+
             # Extract citations if present
             citations = []
             if context_str:
                 citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", context_str)))
                 sources_used = ", ".join(citations) if citations else "Local Knowledge Base"
-                await log_event(
-                    db,
-                    run_id,
-                    "retrieval_completed",
-                    f"Retrieved relevant excerpts ({len(citations)} citations found)",
-                    {"citations": citations, "context_preview": context_str[:250]}
-                )
             else:
                 sources_used = "None (No matching manual found)"
-                await log_event(db, run_id, "retrieval_completed", "No matching excerpts found in knowledge base.")
+
+            if graph_context:
+                sources_used += " + Plant Topology Graph"
+
+            await log_event(
+                db,
+                run_id,
+                "retrieval_completed",
+                f"Retrieved context ({len(citations)} manual citations, graph topology: {'yes' if graph_context else 'none'})",
+                {
+                    "citations": citations,
+                    "manual_preview": context_str[:200] if context_str else "",
+                    "graph_preview": graph_context[:200] if graph_context else ""
+                }
+            )
 
             # 5. Model Inference Call
-            system_prompt = build_system_prompt(agent.get("system_instructions", ""), available_tools, context_str)
+            system_prompt = build_system_prompt(agent.get("system_instructions", ""), available_tools, combined_context)
             await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {agent['model_name']}")
 
             provider = get_provider()
             model_response = await provider.generate_text(
                 prompt=input_text,
                 system_prompt=system_prompt,
-                context=context_str
+                context=combined_context
             )
 
             await log_event(db, run_id, "model_response", "Model reasoning received", {"text": model_response.text})

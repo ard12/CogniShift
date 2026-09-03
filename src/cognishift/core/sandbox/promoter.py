@@ -69,11 +69,15 @@ async def validate_and_promote_outputs(
 
     for item in items:
         # 1. Reject directories and special filesystem objects (symlinks, junctions, fifos)
-        if item.is_symlink() or not item.is_file():
-            logger.warning(f"Rejecting non-regular/symlinked output file: {item.name}")
+        try:
+            if item.is_symlink() or not item.is_file():
+                logger.warning(f"Rejecting non-regular/symlinked output file: {item.name}")
+                continue
+            file_size = item.stat().st_size
+        except OSError as e:
+            logger.warning(f"Rejecting inaccessible/symlinked output item {item.name}: {e}")
             continue
 
-        file_size = item.stat().st_size
         if file_size > settings.sandbox_max_output_file_bytes:
             logger.warning(
                 f"Rejecting oversized output file {item.name}: {file_size} bytes exceeds limit of {settings.sandbox_max_output_file_bytes}."

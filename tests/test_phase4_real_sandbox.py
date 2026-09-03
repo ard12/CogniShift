@@ -267,7 +267,7 @@ async def test_real_sandbox_writable_output_mount(tmp_path):
     (staging_dir / "input").mkdir()
     (staging_dir / "output").mkdir()
 
-    code = '''with open("/workspace/output/result.csv", "w") as f:
+    code = r'''with open("/workspace/output/result.csv", "w") as f:
     f.write("Sensor,Calculated\nPT-101,102.5\n")
 print("OUTPUT_WRITE_SUCCESS")
 '''
@@ -469,25 +469,41 @@ for p in procs:
 # -----------------------------------------------------------------------------
 # 13. OUTPUT SYMLINK REJECTION
 # -----------------------------------------------------------------------------
+@requires_container_runtime
 @pytest.mark.asyncio
 async def test_real_sandbox_output_symlink_rejection(tmp_path):
-    out_dir = tmp_path / "output"
-    out_dir.mkdir()
-    target_file = tmp_path / "target.txt"
-    target_file.write_text("SECRET", encoding="utf-8")
+    backend = DockerPodmanBackend()
+    staging_dir = tmp_path / "staging"
+    staging_dir.mkdir()
+    (staging_dir / "source").mkdir()
+    (staging_dir / "input").mkdir()
+    (staging_dir / "output").mkdir()
 
-    # Attempt symlink creation if OS supports it
-    try:
-        sym = out_dir / "symlink.txt"
-        sym.symlink_to(target_file)
-    except OSError:
-        pytest.skip("Symlink creation not permitted on this host OS without admin")
+    # Create symlink inside container in /workspace/output/
+    code = '''import os
+os.symlink("/etc/passwd", "/workspace/output/symlink.txt")
+print("SYMLINK_CREATED")
+'''
+    (staging_dir / "source" / "main.py").write_text(code, encoding="utf-8")
+
+    req = CodeExecutionRequest(
+        execution_id="real_sym_01",
+        workspace_id=1,
+        run_id=1,
+        code=code,
+        entrypoint="main.py",
+        timeout_seconds=15
+    )
+
+    res = await backend.execute(req, staging_dir)
+    assert res.exit_code == 0
+    assert "SYMLINK_CREATED" in res.stdout
 
     promoted_names, promoted_ids = await validate_and_promote_outputs(
         workspace_id=1,
         run_id=1,
         execution_id="sbx_sym_01",
-        output_dir=out_dir
+        output_dir=staging_dir / "output"
     )
     assert "symlink.txt" not in promoted_names
 

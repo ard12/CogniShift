@@ -79,12 +79,16 @@ class DockerPodmanBackend(SandboxBackend):
         input_dir = staging_dir / "input"
         output_dir = staging_dir / "output"
         container_name = f"cognishift-sbx-{request.execution_id}"
-        image_ref = settings.sandbox_image_digest or settings.sandbox_image
+        if settings.sandbox_image_digest:
+            image_ref = f"{settings.sandbox_image}@{settings.sandbox_image_digest}"
+        else:
+            image_ref = settings.sandbox_image
 
         # Construct explicit argument vector (NEVER shell=True)
         argv = [
             self.runtime_bin, "run",
             "--rm",
+            "--pull", "never",
             "--network", "none",
             "--read-only",
             "--user", "10001:10001",
@@ -126,6 +130,18 @@ class DockerPodmanBackend(SandboxBackend):
                 stdout_clean = stdout_bytes[:settings.sandbox_stdout_limit].decode("utf-8", errors="replace")
                 stderr_clean = stderr_bytes[:settings.sandbox_stderr_limit].decode("utf-8", errors="replace")
 
+                # Check if execution failed due to image missing locally (--pull=never)
+                if exit_code != 0 and (
+                    "unable to find image" in stderr_clean.lower()
+                    or "pull access denied" in stderr_clean.lower()
+                    or "image is not available" in stderr_clean.lower()
+                    or "repository does not exist" in stderr_clean.lower()
+                    or "no such image" in stderr_clean.lower()
+                ):
+                    raise SandboxUnavailableError(
+                        f"Sandbox image '{image_ref}' is not available locally. Automated image pulling is prohibited by security policy."
+                    )
+
                 # Determine status
                 if exit_code == 0:
                     status = SandboxStatus.SUCCESS
@@ -166,6 +182,8 @@ class DockerPodmanBackend(SandboxBackend):
                     error_message=f"Timeout limit of {request.timeout_seconds}s exceeded."
                 )
 
+        except SandboxUnavailableError:
+            raise
         except Exception as e:
             duration_ms = int((time.perf_counter() - start_time) * 1000)
             return CodeExecutionResult(

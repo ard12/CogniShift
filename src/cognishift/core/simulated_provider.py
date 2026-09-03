@@ -3,9 +3,16 @@ from cognishift.core.providers import ModelProvider, ModelResponse
 class SimulatedProvider(ModelProvider):
     """A simulated model provider for development and testing."""
     
-    async def generate_text(self, prompt: str, system_prompt: str = "", context: str = "") -> ModelResponse:
+    async def generate_text(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        context: str = "",
+        model_name: str = None
+    ) -> ModelResponse:
         """Return a simulated text response."""
         short_prompt = prompt[:50]
+        chosen_model = model_name or "simulated-text"
         text = (
             f"[SIMULATED RESPONSE] Based on the provided context about {short_prompt}... "
             "The system would analyze this query using the configured local model. "
@@ -13,7 +20,7 @@ class SimulatedProvider(ModelProvider):
         )
         return ModelResponse(
             text=text,
-            model_name="simulated-text",
+            model_name=chosen_model,
             provider="simulated",
             is_simulated=True
         )

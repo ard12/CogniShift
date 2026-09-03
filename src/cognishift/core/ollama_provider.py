@@ -17,8 +17,15 @@ class OllamaProvider(ModelProvider):
         self.text_model = settings.text_model
         self.vision_model = settings.vision_model
 
-    async def generate_text(self, prompt: str, system_prompt: str = "", context: str = "") -> ModelResponse:
-        """Generate text from a prompt using the local Ollama text model."""
+    async def generate_text(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        context: str = "",
+        model_name: Optional[str] = None
+    ) -> ModelResponse:
+        """Generate text from a prompt using the specified or default local Ollama model."""
+        target_model = model_name or self.text_model
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -30,7 +37,7 @@ class OllamaProvider(ModelProvider):
         messages.append({"role": "user", "content": user_content})
 
         payload = {
-            "model": self.text_model,
+            "model": target_model,
             "messages": messages,
             "stream": False
         }
@@ -44,7 +51,7 @@ class OllamaProvider(ModelProvider):
                 tokens = data.get("eval_count", None)
                 return ModelResponse(
                     text=text,
-                    model_name=self.text_model,
+                    model_name=target_model,
                     provider="ollama",
                     tokens_used=tokens,
                     is_simulated=False,

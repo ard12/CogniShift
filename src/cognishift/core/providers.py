@@ -29,7 +29,13 @@ class ModelProvider(ABC):
     """Abstract interface for LLM providers. All providers must implement this."""
     
     @abstractmethod
-    async def generate_text(self, prompt: str, system_prompt: str = "", context: str = "") -> ModelResponse:
+    async def generate_text(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        context: str = "",
+        model_name: Optional[str] = None
+    ) -> ModelResponse:
         """Generate text from a prompt with optional system instructions and context."""
         ...
     

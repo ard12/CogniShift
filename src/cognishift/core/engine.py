@@ -23,6 +23,7 @@ from cognishift.core.retriever import retrieve_context
 from cognishift.core.graph_memory import query_graph_context
 from cognishift.core.tools import execute_tool
 from cognishift.core.providers import get_provider
+from cognishift.core.model_router import classify_task, route_model
 
 logger = logging.getLogger("cognishift.engine")
 
@@ -223,6 +224,29 @@ async def execute_agent_run(
 
         await log_event(db, run_id, "run_started", f"Run initiated for agent '{agent['name']}'", {"agent_id": agent_id, "user_id": user_id, "input_type": input_type})
 
+        # --- PHASE 1: AUTOMATIC HARDWARE-AWARE MODEL ROUTING ---
+        task_info = classify_task(input_text, has_image=bool(input_image_path and Path(input_image_path).exists()))
+        await log_event(db, run_id, "task_classified", f"Classified task as '{task_info.task_type}'", task_info.model_dump())
+
+        routing = route_model(task_info, available_vram_mb=6000)
+        await log_event(
+            db,
+            run_id,
+            "model_candidates_evaluated",
+            f"Evaluated {len(routing.candidate_evaluations)} local models against 6GB VRAM budget",
+            {k: v.model_dump() for k, v in routing.candidate_evaluations.items()}
+        )
+        await log_event(
+            db,
+            run_id,
+            "model_selected",
+            f"Selected {routing.selected_model_name} for execution",
+            {"selected_model": routing.selected_model, "reason": routing.selection_reason}
+        )
+        selected_model_id = routing.selected_model
+        await db.execute("UPDATE agent_runs SET model_name = ? WHERE id = ?", (selected_model_id, run_id))
+        await db.commit()
+
         try:
             # 4. Multimodal Vision Inspection (if image provided)
             vision_analysis = ""
@@ -295,17 +319,18 @@ async def execute_agent_run(
 
             # 5. Model Inference Call
             system_prompt = build_system_prompt(agent.get("system_instructions", ""), available_tools, combined_context)
-            await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {agent['model_name']}")
+            await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {selected_model_id}")
 
             provider = get_provider()
             try:
                 model_response = await provider.generate_text(
                     prompt=input_text,
                     system_prompt=system_prompt,
-                    context=combined_context
+                    context=combined_context,
+                    model_name=selected_model_id
                 )
             except Exception as e:
-                err_msg = f"Model provider failure ({agent['model_name']}): {str(e)}"
+                err_msg = f"Model provider failure ({selected_model_id}): {str(e)}"
                 logger.error(err_msg)
                 await log_event(db, run_id, "run_failed", err_msg, {"error": str(e)})
                 await db.execute(

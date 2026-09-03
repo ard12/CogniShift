@@ -24,6 +24,12 @@ from cognishift.core.graph_memory import query_graph_context
 from cognishift.core.tools import execute_tool
 from cognishift.core.providers import get_provider
 from cognishift.core.model_router import classify_task, route_model
+from cognishift.core.tool_schemas import (
+    parse_agent_action,
+    validate_proposed_tool_call,
+    ToolCallProposal,
+    FinalAnswer
+)
 
 logger = logging.getLogger("cognishift.engine")
 
@@ -50,12 +56,29 @@ def parse_tool_call(
     allowed_tools: List[str],
     user_prompt: str = ""
 ) -> Tuple[bool, Optional[str], Dict[str, Any], str]:
-    """Parse tool call from model response text or prompt keywords.
+    """Parse tool call from model response text using structured validation with fallback.
     
     Returns:
         (is_tool, tool_name, parameters, reason)
     """
     allowed_map = {t.lower(): t for t in allowed_tools}
+    
+    # 1. Primary: Strict Structured Action Protocol (Phase 2A)
+    action = parse_agent_action(response_text)
+    if isinstance(action, ToolCallProposal) and action.tool_name:
+        tool_name_clean = action.tool_name.lower().strip()
+        if tool_name_clean in allowed_map:
+            resolved_tool = allowed_map[tool_name_clean]
+            val_result = validate_proposed_tool_call(
+                tool_name=resolved_tool,
+                raw_parameters=action.parameters,
+                allowed_tools=allowed_tools
+            )
+            if val_result.valid:
+                return True, resolved_tool, val_result.validated_parameters or action.parameters, action.reason
+            else:
+                # Return with raw parameters so caller can report validation error
+                return True, resolved_tool, action.parameters, action.reason
     
     # 1. Look for markdown code blocks containing JSON
     json_blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
@@ -368,7 +391,26 @@ async def execute_agent_run(
 
             if is_tool and tool_name in tools_by_name:
                 tool_def = tools_by_name[tool_name]
-                requires_approval = bool(tool_def.get("requires_approval", 0) or agent.get("approval_required", 0))
+                val_result = validate_proposed_tool_call(
+                    tool_name=tool_name,
+                    raw_parameters=parameters,
+                    allowed_tools=allowed_tool_names
+                )
+                if not val_result.valid:
+                    await log_event(
+                        db, run_id, "tool_validation_failed",
+                        f"Proposed tool '{tool_name}' parameters invalid: {val_result.error_message}",
+                        {"parameters": parameters, "error": val_result.error_message}
+                    )
+                else:
+                    parameters = val_result.validated_parameters or parameters
+
+                # Deterministic Central Risk Policy enforcement
+                requires_approval = bool(
+                    val_result.requires_approval or
+                    tool_def.get("requires_approval", 0) or
+                    agent.get("approval_required", 0)
+                )
 
                 if requires_approval:
                     # --- HIGH RISK ACTION: PAUSE FOR SUPERVISOR APPROVAL ---

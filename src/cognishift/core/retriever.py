@@ -108,7 +108,8 @@ async def process_pdf(file_path: str, workspace_id: int, source_id: int, filenam
         batch_embs = embeddings[i:i + BATCH_SIZE]
         batch_meta = metadatas[i:i + BATCH_SIZE]
         batch_ids = ids[i:i + BATCH_SIZE]
-        collection.upsert(
+        await asyncio.to_thread(
+            collection.upsert,
             documents=batch_docs,
             embeddings=batch_embs,
             metadatas=batch_meta,
@@ -125,12 +126,13 @@ async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str
     collection_name = f"workspace_{workspace_id}"
     try:
         collection = chroma_client.get_collection(name=collection_name)
-        if collection.count() == 0:
+        count = await asyncio.to_thread(collection.count)
+        if count == 0:
             return ""
     except Exception:
         return ""
 
-    effective_k = min(top_k, collection.count())
+    effective_k = min(top_k, count)
     if effective_k <= 0:
         return ""
 
@@ -140,7 +142,8 @@ async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str
             return raw.tolist() if hasattr(raw, "tolist") else [float(x) for x in raw]
             
         q_vec = await asyncio.to_thread(_get_q_emb)
-        results = collection.query(
+        results = await asyncio.to_thread(
+            collection.query,
             query_embeddings=[q_vec],
             n_results=effective_k
         )

@@ -79,8 +79,20 @@ def parse_tool_call(
         except json.JSONDecodeError:
             continue
     
+    # 2.5 Structured text pattern: "Action: <tool>\nParameters: {JSON}"
+    action_json_match = re.search(r"(?:ACTION|TOOL):\s*(\w+)\s*(?:PARAMETERS|PARAMS)?:\s*(\{.*?\})", response_text, re.IGNORECASE | re.DOTALL)
+    if action_json_match:
+        tool_candidate = action_json_match.group(1).lower()
+        if tool_candidate in allowed_map:
+            try:
+                parsed_params = json.loads(action_json_match.group(2))
+                reason = parsed_params.pop("reason", "Action called by model")
+                return True, allowed_map[tool_candidate], parsed_params, reason
+            except json.JSONDecodeError:
+                pass
+
     # 3. Text pattern fallback (e.g. "TOOL: check_pressure(sensor_id=PT-101)")
-    match = re.search(r"(?:TOOL|CALL):\s*(\w+)(?:\((.*?)\))?", response_text, re.IGNORECASE)
+    match = re.search(r"(?:TOOL|CALL|ACTION):\s*(\w+)(?:\((.*?)\))?", response_text, re.IGNORECASE)
     if match:
         tool_name = match.group(1).lower()
         if tool_name in allowed_map:
@@ -89,6 +101,16 @@ def parse_tool_call(
             for param_pair in re.findall(r"(\w+)=['\"]?([^,'\"\)]+)['\"]?", raw_args):
                 params[param_pair[0]] = param_pair[1]
             return True, allowed_map[tool_name], params, "Extracted from text pattern"
+
+    # 3.5 Direct invocation syntax: "restart_component(component_id='Motor-M101')"
+    for tool_lower, original_name in allowed_map.items():
+        direct_call = re.search(rf"\b{re.escape(tool_lower)}\s*\((.*?)\)", response_text, re.IGNORECASE)
+        if direct_call:
+            raw_args = direct_call.group(1) or ""
+            params = {}
+            for param_pair in re.findall(r"(\w+)=['\"]?([^,'\"\)]+)['\"]?", raw_args):
+                params[param_pair[0]] = param_pair[1]
+            return True, original_name, params, "Extracted from direct invocation"
 
     # 4. Fallback for SimulatedProvider / Keyword testing:
     # If the user prompt specifically tests an allowed tool, trigger it deterministically.

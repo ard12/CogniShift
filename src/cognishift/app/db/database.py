@@ -6,6 +6,8 @@ async def init_db() -> None:
     """Initialize the database by creating all required tables."""
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA synchronous=NORMAL")
+        await db.execute("PRAGMA busy_timeout=30000")
         
         await db.execute('''
             CREATE TABLE IF NOT EXISTS workspaces (
@@ -156,5 +158,7 @@ async def get_db():
     """Context manager that yields an aiosqlite connection with Row factory."""
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute("PRAGMA foreign_keys = ON;")
+        await db.execute("PRAGMA busy_timeout = 30000;")
+        await db.execute("PRAGMA synchronous = NORMAL;")
         db.row_factory = aiosqlite.Row
         yield db

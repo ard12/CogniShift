@@ -83,7 +83,8 @@ async def init_db() -> None:
                 confidence REAL, 
                 started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
                 completed_at TIMESTAMP, 
-                error_message TEXT
+                error_message TEXT,
+                structured_plan TEXT
             )
         ''')
         
@@ -150,6 +151,11 @@ async def init_db() -> None:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        try:
+            await db.execute("ALTER TABLE agent_runs ADD COLUMN structured_plan TEXT")
+        except Exception:
+            pass
         
         await db.commit()
 

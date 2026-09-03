@@ -1,6 +1,7 @@
 import base64
 import httpx
 from typing import Optional
+from cognishift.app.config import settings
 from cognishift.core.providers import (
     ModelProvider,
     ModelResponse,

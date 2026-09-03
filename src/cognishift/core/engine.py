@@ -30,6 +30,14 @@ from cognishift.core.tool_schemas import (
     ToolCallProposal,
     FinalAnswer
 )
+from cognishift.core.planner import (
+    create_initial_plan,
+    format_plan_for_prompt,
+    serialize_plan,
+    deserialize_plan,
+    AgentPlan,
+    PlanStep
+)
 
 logger = logging.getLogger("cognishift.engine")
 
@@ -270,6 +278,19 @@ async def execute_agent_run(
         await db.execute("UPDATE agent_runs SET model_name = ? WHERE id = ?", (selected_model_id, run_id))
         await db.commit()
 
+        # --- PHASE 2B: BOUNDED STRUCTURED PLAN CREATION ---
+        plan = create_initial_plan(goal=input_text, task_type=task_info.task_type)
+        plan_json = serialize_plan(plan)
+        await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (plan_json, run_id))
+        await db.commit()
+        await log_event(
+            db,
+            run_id,
+            "plan_created",
+            f"Constructed structured execution plan with {len(plan.steps)} bounded steps",
+            {"goal": plan.goal, "steps": [s.model_dump() for s in plan.steps]}
+        )
+
         try:
             # 4. Multimodal Vision Inspection (if image provided)
             vision_analysis = ""
@@ -422,12 +443,19 @@ async def execute_agent_run(
                     )
                     await cursor.fetchone()
                     
+                    current_step = plan.get_current_step()
+                    if current_step:
+                        current_step.status = "waiting_for_approval"
+                        current_step.tool_name = tool_name
+                        current_step.tool_parameters = parameters
+                    saved_plan_json = serialize_plan(plan)
+
                     pause_msg = f"Action paused awaiting supervisor approval: {tool_name}. Reason: {reason}"
                     cursor = await db.execute(
                         """UPDATE agent_runs
-                           SET status = 'paused', result_text = ?, sources_used = ?
+                           SET status = 'paused', result_text = ?, sources_used = ?, structured_plan = ?
                            WHERE id = ? RETURNING *""",
-                        (pause_msg, sources_used, run_id)
+                        (pause_msg, sources_used, saved_plan_json, run_id)
                     )
                     updated_run = await cursor.fetchone()
                     await db.commit()
@@ -531,16 +559,38 @@ async def resume_agent_run(run_id: int) -> RunResponse:
             raise ValueError(f"Approval request {approval['id']} is still pending supervisor decision.")
 
         if approval["status"] == "approved":
-            # --- SUPERVISOR APPROVED ---
+            # --- SUPERVISOR APPROVED: EXECUTE TOOL AND PROGRESS PLAN ---
             tool_name = approval["tool_name"]
             try:
                 params = json.loads(approval.get("parameters") or "{}")
             except (json.JSONDecodeError, TypeError):
                 params = {}
 
+            # Restore plan state
+            plan = deserialize_plan(run.get("structured_plan"))
+            active_step = None
+            if plan:
+                for step in plan.steps:
+                    if step.status == "waiting_for_approval":
+                        active_step = step
+                        active_step.status = "running"
+                        break
+
             await log_event(db, run_id, "tool_executing", f"Executing supervisor-approved tool: {tool_name}", {"parameters": params})
-            tool_output = await execute_tool(tool_name, params)
-            await log_event(db, run_id, "tool_executed", f"Approved tool output received: {tool_output}", {"output": tool_output})
+            try:
+                tool_output = await execute_tool(tool_name, params)
+                await log_event(db, run_id, "tool_executed", f"Approved tool output received: {tool_output}", {"output": tool_output})
+                if active_step:
+                    active_step.status = "completed"
+                    active_step.observation = tool_output
+                    plan.advance_to_next_step()
+            except Exception as e:
+                err_msg = f"Tool execution failed: {str(e)}"
+                await log_event(db, run_id, "tool_failed", err_msg, {"error": str(e)})
+                if active_step:
+                    active_step.status = "failed"
+                    active_step.error_message = str(e)
+                tool_output = err_msg
 
             # Synthesize final response
             provider = get_provider()
@@ -556,11 +606,12 @@ async def resume_agent_run(run_id: int) -> RunResponse:
             final_response = await provider.generate_text(prompt=synth_prompt, system_prompt=sys_prompt)
             final_text = final_response.text
 
+            updated_plan_json = serialize_plan(plan) if plan else run.get("structured_plan")
             cursor = await db.execute(
                 """UPDATE agent_runs
-                   SET status = 'completed', result_text = ?, completed_at = CURRENT_TIMESTAMP
+                   SET status = 'completed', result_text = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
                    WHERE id = ? RETURNING *""",
-                (final_text, run_id)
+                (final_text, updated_plan_json, run_id)
             )
             updated_run = await cursor.fetchone()
             await db.commit()
@@ -573,11 +624,20 @@ async def resume_agent_run(run_id: int) -> RunResponse:
             tool_name = approval["tool_name"]
             reject_text = f"Action '{tool_name}' was reviewed and REJECTED by supervisor ({approval.get('reviewed_by', 'supervisor')}). Execution halted safely."
 
+            plan = deserialize_plan(run.get("structured_plan"))
+            if plan:
+                for step in plan.steps:
+                    if step.status == "waiting_for_approval":
+                        step.status = "blocked"
+                        step.error_message = f"Rejected by supervisor: {approval.get('reviewed_by', 'supervisor')}"
+                        break
+            updated_plan_json = serialize_plan(plan) if plan else run.get("structured_plan")
+
             cursor = await db.execute(
                 """UPDATE agent_runs
-                   SET status = 'completed', result_text = ?, completed_at = CURRENT_TIMESTAMP
+                   SET status = 'completed', result_text = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
                    WHERE id = ? RETURNING *""",
-                (reject_text, run_id)
+                (reject_text, updated_plan_json, run_id)
             )
             updated_run = await cursor.fetchone()
             await db.commit()

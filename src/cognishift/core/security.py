@@ -13,10 +13,37 @@ class SecurityError(Exception):
     pass
 
 
+STANDARD_WORKSPACE_SUBDIRS = [
+    "uploads",
+    "documents",
+    "generated",
+    "code",
+    "temporary",
+    "knowledge",
+]
+
+
 def get_workspace_root(workspace_id: int) -> Path:
     """Get canonical directory root for a workspace, ensuring it exists."""
     root = (settings.data_dir / "workspaces" / str(workspace_id)).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def ensure_workspace_layout(workspace_id: int) -> Path:
+    """
+    Ensures that the standardized directory hierarchy exists for workspace_id:
+    data/workspaces/<workspace_id>/
+    ├── uploads/
+    ├── documents/
+    ├── generated/
+    ├── code/
+    ├── temporary/
+    └── knowledge/
+    """
+    root = get_workspace_root(workspace_id)
+    for subdir in STANDARD_WORKSPACE_SUBDIRS:
+        (root / subdir).mkdir(parents=True, exist_ok=True)
     return root
 
 

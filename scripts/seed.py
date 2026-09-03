@@ -35,7 +35,14 @@ async def seed_data():
             (4, 'emergency_pressure_relief', 'Emergency Pressure Relief', 'service_interrupting', 1, 'emergency_pressure_relief'),
             (5, 'restart_component', 'Restart System Component', 'sensitive', 1, 'restart_component'),
             (6, 'check_network', 'Check Network Status', 'read_only', 0, 'check_network'),
-            (7, 'restart_service', 'Restart Network Service', 'low_risk', 1, 'restart_service')
+            (7, 'restart_service', 'Restart Network Service', 'low_risk', 1, 'restart_service'),
+            (8, 'file_list', 'List Workspace Files', 'read_only', 0, 'file_list'),
+            (9, 'file_read', 'Read Workspace File', 'read_only', 0, 'file_read'),
+            (10, 'file_write', 'Write Workspace File', 'low_risk', 0, 'file_write'),
+            (11, 'directory_create', 'Create Workspace Directory', 'low_risk', 0, 'directory_create'),
+            (12, 'generate_docx', 'Generate DOCX Report', 'low_risk', 0, 'generate_docx'),
+            (13, 'generate_xlsx', 'Generate XLSX Telemetry Workbook', 'low_risk', 0, 'generate_xlsx'),
+            (14, 'generate_pptx', 'Generate PPTX Slide Presentation', 'low_risk', 0, 'generate_pptx')
         ]
         
         for t in tools:

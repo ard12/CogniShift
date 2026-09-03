@@ -152,3 +152,22 @@ class KnowledgeSourceResponse(BaseModel):
     chunk_count: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class ArtifactResponse(BaseModel):
+    id: int
+    workspace_id: int
+    run_id: Optional[int] = None
+    filename: str
+    relative_path: str
+    artifact_type: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    file_size: int
+    sha256_hash: str
+    metadata: Optional[str] = "{}"
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class ArtifactListResponse(BaseModel):
+    total: int
+    artifacts: List[ArtifactResponse]

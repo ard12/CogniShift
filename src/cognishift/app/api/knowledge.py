@@ -9,7 +9,7 @@ from typing import List, Optional
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import KnowledgeSourceResponse
 from cognishift.app.config import settings
-from cognishift.core.retriever import process_pdf, chroma_client
+from cognishift.core.retriever import process_pdf, chroma_client, purge_knowledge_source
 from cognishift.core.security import resolve_workspace_path
 from cognishift.app.core.auth import get_current_user, verify_workspace_access, User
 from fastapi import Depends
@@ -145,22 +145,29 @@ async def delete_knowledge_source(
         verify_workspace_access(workspace_id, user)
         local_path = row["local_path"]
 
-        # 1. Purge vectors from ChromaDB
-        collection_name = f"workspace_{workspace_id}"
-        try:
-            collection = chroma_client.get_collection(name=collection_name)
-            collection.delete(where={"source_id": source_id})
-        except Exception:
-            pass
+        # 1. Mark status as 'deleting' in SQLite
+        await db.execute("UPDATE knowledge_sources SET processing_status = 'deleting' WHERE id = ?", (source_id,))
+        await db.commit()
 
-        # 2. Remove physical file from disk
+        # 2. Purge vectors from ChromaDB
+        try:
+            await purge_knowledge_source(workspace_id=workspace_id, source_id=source_id)
+        except Exception as e:
+            await db.execute("UPDATE knowledge_sources SET processing_status = 'deletion_failed' WHERE id = ?", (source_id,))
+            await db.commit()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to purge vector embeddings from ChromaDB: {str(e)}. Source marked as deletion_failed."
+            )
+
+        # 3. Remove physical file from disk
         if local_path and os.path.exists(local_path):
             try:
                 os.remove(local_path)
             except OSError:
                 pass
 
-        # 3. Delete database record
+        # 4. Delete database record
         await db.execute("DELETE FROM knowledge_sources WHERE id = ?", (source_id,))
         await db.commit()
 

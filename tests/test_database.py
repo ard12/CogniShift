@@ -79,4 +79,4 @@ async def test_seed_data(mock_db_path):
         # Verify tools
         cursor = await db.execute("SELECT COUNT(*) as count FROM tool_definitions")
         row = await cursor.fetchone()
-        assert row['count'] == 7
+        assert row['count'] == 14

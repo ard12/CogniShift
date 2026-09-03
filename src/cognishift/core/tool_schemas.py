@@ -4,7 +4,7 @@ import re
 import logging
 from typing import Dict, Any, Optional, List, Literal, Union, Type
 from typing_extensions import Annotated
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, AfterValidator
 
 logger = logging.getLogger(__name__)
 
@@ -112,29 +112,93 @@ class RestartServiceArgs(BaseModel):
     service_name: ServiceNameIdentifier
 
 
-# Workspace File & Artifact Tool Schemas (Used in Phase 3 & 4)
+def validate_safe_relative_path(v: str) -> str:
+    if not v or not v.strip():
+        raise ValueError("Relative path cannot be empty.")
+    v = v.strip()
+    if v.startswith("/") or v.startswith("\\"):
+        raise ValueError("Leading slash forbidden in relative path.")
+    if ".." in v or "//" in v or "\\\\" in v or "\x00" in v:
+        raise ValueError("Path traversal sequences forbidden in relative path.")
+    if not re.match(r"^[A-Za-z0-9_.\-\/]+$", v):
+        raise ValueError("Invalid characters in relative path.")
+    return v
+
+
+RelativeWorkspacePath = Annotated[
+    str,
+    AfterValidator(validate_safe_relative_path),
+    Field(
+        min_length=1,
+        max_length=256,
+        description="Safe relative path inside workspace"
+    )
+]
+
+
 class FileListArgs(BaseModel):
-    directory: str = Field(default="", description="Relative directory inside workspace")
+    directory: Optional[RelativeWorkspacePath] = Field(default=".", description="Relative directory inside workspace")
 
 
 class FileReadArgs(BaseModel):
-    path: str = Field(..., description="Relative workspace path to read")
+    file_path: RelativeWorkspacePath = Field(..., description="Relative workspace path to read")
+    max_bytes: int = Field(default=65536, ge=1, le=1048576, description="Maximum bytes to read (ceiling 1MB)")
 
 
 class FileWriteArgs(BaseModel):
-    path: str = Field(..., description="Relative workspace path to write")
-    content: str = Field(..., description="Text or script content to write")
+    file_path: RelativeWorkspacePath = Field(..., description="Relative workspace path to write")
+    content: str = Field(..., max_length=500000, description="Text content to write (max 500KB)")
+    overwrite: bool = Field(default=False, description="Explicit overwrite flag (default: False)")
 
 
-class GenerateApprovalNoteArgs(BaseModel):
-    title: str = Field(..., description="Formal title for the approval document")
-    findings: List[str] = Field(..., description="Bullet point inspection findings")
-    recommendation: str = Field(..., description="Final engineering recommendation")
+class DirectoryCreateArgs(BaseModel):
+    directory_path: RelativeWorkspacePath = Field(..., description="Relative directory path to create")
 
 
-class RunSandboxScriptArgs(BaseModel):
-    script_filename: str = Field(..., description="Script filename inside workspace code/ folder")
-    input_files: List[str] = Field(default_factory=list, description="Approved input files to stage")
+class DocxTable(BaseModel):
+    headers: List[str] = Field(..., min_length=1, max_length=15, description="Table column headers")
+    rows: List[List[str]] = Field(..., min_length=1, max_length=100, description="Table rows")
+
+
+class DocxSection(BaseModel):
+    heading: str = Field(..., min_length=1, max_length=200, description="Section heading")
+    level: int = Field(default=1, ge=1, le=3, description="Heading level 1-3")
+    paragraphs: List[str] = Field(default_factory=list, max_length=30, description="Paragraphs in section")
+    table: Optional[DocxTable] = Field(None, description="Optional structured table")
+
+
+class GenerateDocxArgs(BaseModel):
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.docx$", description="Target filename (must end in .docx)")
+    title: str = Field(..., min_length=1, max_length=200, description="Document title")
+    sections: List[DocxSection] = Field(..., min_length=1, max_length=50, description="Document sections")
+
+
+class XlsxRow(BaseModel):
+    cells: List[Union[str, int, float, bool]] = Field(..., max_length=30, description="Row cells")
+
+
+class XlsxSheet(BaseModel):
+    name: str = Field(..., min_length=1, max_length=31, pattern=r"^[A-Za-z0-9_ \-]+$", description="Sheet tab name")
+    headers: List[str] = Field(..., min_length=1, max_length=30, description="Column headers")
+    rows: List[XlsxRow] = Field(..., min_length=1, max_length=500, description="Data rows")
+
+
+class GenerateXlsxArgs(BaseModel):
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.xlsx$", description="Target filename (must end in .xlsx)")
+    title: str = Field(..., min_length=1, max_length=200, description="Workbook title")
+    sheets: List[XlsxSheet] = Field(..., min_length=1, max_length=10, description="Workbook sheets")
+
+
+class PptxSlide(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200, description="Slide title")
+    bullet_points: List[str] = Field(..., min_length=1, max_length=10, description="Slide bullet points")
+
+
+class GeneratePptxArgs(BaseModel):
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.pptx$", description="Target filename (must end in .pptx)")
+    title: str = Field(..., min_length=1, max_length=200, description="Presentation title")
+    subtitle: Optional[str] = Field(None, max_length=200, description="Optional subtitle")
+    slides: List[PptxSlide] = Field(..., min_length=1, max_length=25, description="Presentation slides")
 
 
 # Tool Name -> Pydantic Schema mapping
@@ -149,8 +213,10 @@ TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "file_list": FileListArgs,
     "file_read": FileReadArgs,
     "file_write": FileWriteArgs,
-    "generate_approval_note": GenerateApprovalNoteArgs,
-    "run_sandbox_script": RunSandboxScriptArgs,
+    "directory_create": DirectoryCreateArgs,
+    "generate_docx": GenerateDocxArgs,
+    "generate_xlsx": GenerateXlsxArgs,
+    "generate_pptx": GeneratePptxArgs,
 }
 
 

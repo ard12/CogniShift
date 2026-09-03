@@ -36,7 +36,12 @@ def load_refinery_topology() -> Dict[str, Any]:
     return _load_json(TOPOLOGY_PATH) or {}
 
 
-async def execute_tool(tool_name: str, parameters: dict) -> str:
+async def execute_tool(
+    tool_name: str,
+    parameters: dict,
+    workspace_id: Optional[int] = None,
+    run_id: Optional[int] = None
+) -> str:
     """
     Executes tool logic grounded in authentic industrial datasets:
     - Tennessee Eastman Process (TEP) dynamic telemetry
@@ -158,6 +163,154 @@ async def execute_tool(tool_name: str, parameters: dict) -> str:
     elif tool_name == "restart_service":
         service_name = parameters.get("service_name", "modbus_telemetry_collector")
         return f"Industrial daemon '{service_name}' restarted cleanly under supervisor PID 1842."
+
+    # Phase 3 Safe File and Document Tools
+    elif tool_name == "file_list":
+        from cognishift.core.security import resolve_workspace_path
+        directory = parameters.get("directory", ".")
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            target_path = resolve_workspace_path(ws_id, directory, purpose="read")
+            if not target_path.exists():
+                return f"Directory '{directory}' does not exist in workspace {ws_id}."
+            if not target_path.is_dir():
+                return f"Path '{directory}' is a file, not a directory."
+            entries = []
+            for item in sorted(target_path.iterdir()):
+                entries.append({
+                    "name": item.name,
+                    "type": "directory" if item.is_dir() else "file",
+                    "size": item.stat().st_size if item.is_file() else 0
+                })
+            return json.dumps(entries, indent=2)
+        except Exception as e:
+            return f"Error listing directory '{directory}': {str(e)}"
+
+    elif tool_name == "file_read":
+        from cognishift.core.security import resolve_workspace_path
+        file_path = parameters.get("file_path", "")
+        max_bytes = min(int(parameters.get("max_bytes", 65536)), 1048576)
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            target_path = resolve_workspace_path(ws_id, file_path, purpose="read")
+            if not target_path.exists():
+                return f"File '{file_path}' does not exist in workspace {ws_id}."
+            if not target_path.is_file():
+                return f"Path '{file_path}' is a directory, not a readable file."
+            with open(target_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read(max_bytes)
+            return content
+        except Exception as e:
+            return f"Error reading file '{file_path}': {str(e)}"
+
+    elif tool_name == "file_write":
+        from cognishift.core.security import resolve_workspace_path
+        from cognishift.app.db.database import get_db
+        file_path = parameters.get("file_path", "")
+        content = parameters.get("content", "")
+        overwrite = bool(parameters.get("overwrite", False))
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            target_path = resolve_workspace_path(ws_id, file_path, purpose="write", allow_create_parent=True)
+            # Immutability Check: generic file_write must NEVER overwrite a registered artifact
+            norm_rel_path = file_path.replace("\\", "/").lstrip("./")
+            async with get_db() as db:
+                c = await db.execute(
+                    "SELECT id FROM workspace_artifacts WHERE workspace_id = ? AND (relative_path = ? OR relative_path = ?)",
+                    (ws_id, file_path, norm_rel_path)
+                )
+                if await c.fetchone():
+                    return f"Security Error: Cannot overwrite registered immutable artifact '{file_path}' through generic file_write."
+
+            if target_path.exists() and not overwrite:
+                return f"Error: File '{file_path}' already exists and overwrite is set to False."
+
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return f"Successfully wrote {len(content)} characters to '{file_path}'."
+        except Exception as e:
+            return f"Error writing file '{file_path}': {str(e)}"
+
+    elif tool_name == "directory_create":
+        from cognishift.core.security import resolve_workspace_path
+        directory_path = parameters.get("directory_path", "")
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            target_path = resolve_workspace_path(ws_id, directory_path, purpose="write", allow_create_parent=True)
+            target_path.mkdir(parents=True, exist_ok=True)
+            return f"Directory '{directory_path}' successfully created in workspace {ws_id}."
+        except Exception as e:
+            return f"Error creating directory '{directory_path}': {str(e)}"
+
+    elif tool_name == "generate_docx":
+        from cognishift.core.artifact_generators import create_and_register_artifact, generate_docx_document
+        filename = parameters.get("filename", "report.docx")
+        title = parameters.get("title", "Plant Engineering Report")
+        sections = parameters.get("sections", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="docx",
+                generator_fn=lambda p: generate_docx_document(p, title, sections),
+                title=title,
+                description="Generated DOCX Engineering Report",
+                run_id=run_id
+            )
+            return (
+                f"Successfully generated and registered DOCX artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating DOCX artifact: {str(e)}"
+
+    elif tool_name == "generate_xlsx":
+        from cognishift.core.artifact_generators import create_and_register_artifact, generate_xlsx_workbook
+        filename = parameters.get("filename", "telemetry.xlsx")
+        title = parameters.get("title", "Plant Telemetry Workbook")
+        sheets = parameters.get("sheets", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="xlsx",
+                generator_fn=lambda p: generate_xlsx_workbook(p, title, sheets),
+                title=title,
+                description="Generated XLSX Telemetry Workbook",
+                run_id=run_id
+            )
+            return (
+                f"Successfully generated and registered XLSX artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating XLSX artifact: {str(e)}"
+
+    elif tool_name == "generate_pptx":
+        from cognishift.core.artifact_generators import create_and_register_artifact, generate_pptx_presentation
+        filename = parameters.get("filename", "briefing.pptx")
+        title = parameters.get("title", "Plant Operations Briefing")
+        subtitle = parameters.get("subtitle")
+        slides = parameters.get("slides", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="pptx",
+                generator_fn=lambda p: generate_pptx_presentation(p, title, subtitle, slides),
+                title=title,
+                description="Generated PPTX Executive Presentation",
+                run_id=run_id
+            )
+            return (
+                f"Successfully generated and registered PPTX artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating PPTX artifact: {str(e)}"
 
     # Generic fallback
     return f"Tool '{tool_name}' executed successfully with parameters: {json.dumps(parameters)}"

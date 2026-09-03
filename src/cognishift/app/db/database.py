@@ -152,6 +152,24 @@ async def init_db() -> None:
             )
         ''')
         
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS workspace_artifacts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                run_id INTEGER REFERENCES agent_runs(id),
+                filename TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                artifact_type TEXT NOT NULL,
+                title TEXT,
+                description TEXT,
+                file_size INTEGER NOT NULL,
+                sha256_hash TEXT NOT NULL,
+                metadata TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(workspace_id, relative_path)
+            )
+        ''')
+        
         try:
             await db.execute("ALTER TABLE agent_runs ADD COLUMN structured_plan TEXT")
         except Exception:

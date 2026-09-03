@@ -251,9 +251,39 @@ async def execute_agent_run(
                     logger.error(f"Vision analysis error: {e}")
 
             # 5. Domain-Specific RAG Retrieval & Graph Memory
-            await log_event(db, run_id, "retrieval_started", "Searching local knowledge base and plant topology graph...")
+            # Phase 3.0: Enforce server-side agent knowledge boundary & workspace ownership
+            raw_ks_ids = []
+            if agent.get("knowledge_source_ids"):
+                try:
+                    loaded = json.loads(agent["knowledge_source_ids"])
+                    if isinstance(loaded, list):
+                        raw_ks_ids = [int(x) for x in loaded if str(x).isdigit()]
+                except Exception:
+                    raw_ks_ids = []
+
+            # Validate workspace ownership against SQLite
+            allowed_source_ids = []
+            if raw_ks_ids:
+                placeholders = ",".join("?" for _ in raw_ks_ids)
+                c_sources = await db.execute(
+                    f"SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND id IN ({placeholders})",
+                    (workspace_id, *raw_ks_ids)
+                )
+                rows = await c_sources.fetchall()
+                allowed_source_ids = [r["id"] for r in rows]
+
+            await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids}) and plant topology graph...")
             retrieval_query = f"{input_text} {vision_analysis}".strip() if vision_analysis else input_text
-            context_str = await retrieve_context(workspace_id=workspace_id, query=retrieval_query, top_k=3)
+            
+            # Fail-closed: If agent has no authorized workspace sources, do NOT retrieve unrestricted
+            context_str = ""
+            if allowed_source_ids:
+                context_str = await retrieve_context(
+                    workspace_id=workspace_id,
+                    query=retrieval_query,
+                    top_k=3,
+                    allowed_source_ids=allowed_source_ids
+                )
             graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
             combined_context_parts = []
@@ -495,7 +525,7 @@ async def execute_agent_run(
                     else:
                         # Safe simulated tool: execute and record observation
                         await log_event(db, run_id, "tool_executing", f"Executing safe tool: {resolved_tool}", {"parameters": validated_params})
-                        tool_output = await execute_tool(resolved_tool, validated_params)
+                        tool_output = await execute_tool(resolved_tool, validated_params, workspace_id=workspace_id, run_id=run_id)
                         await log_event(db, run_id, "tool_executed", f"Tool output received: {tool_output}", {"output": tool_output})
 
                         current_step.status = "completed"
@@ -645,7 +675,7 @@ async def resume_agent_run(run_id: int) -> RunResponse:
 
             await log_event(db, run_id, "tool_executing", f"Executing supervisor-approved tool: {tool_name}", {"parameters": params})
             try:
-                tool_output = await execute_tool(tool_name, params)
+                tool_output = await execute_tool(tool_name, params, workspace_id=run["workspace_id"], run_id=run_id)
                 await log_event(db, run_id, "tool_executed", f"Approved tool output received: {tool_output}", {"output": tool_output})
                 if active_step:
                     active_step.status = "completed"

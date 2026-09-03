@@ -26,6 +26,8 @@ async def create_workspace(
         )
         row = await cursor.fetchone()
         await db.commit()
+        from cognishift.core.security import ensure_workspace_layout
+        ensure_workspace_layout(row["id"])
         return dict(row)
 
 @router.get('', response_model=List[WorkspaceResponse])

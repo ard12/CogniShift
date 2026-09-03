@@ -101,13 +101,19 @@ async def process_pdf(file_path: str, workspace_id: int, source_id: int, filenam
         for i in range(len(chunks))
     ]
 
-    # Idempotent upsert
-    collection.upsert(
-        documents=chunks,
-        embeddings=embeddings,
-        metadatas=metadatas,
-        ids=ids
-    )
+    # Safe batch upsert into ChromaDB to prevent SQLite variable overflow on massive documents
+    BATCH_SIZE = 250
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch_docs = chunks[i:i + BATCH_SIZE]
+        batch_embs = embeddings[i:i + BATCH_SIZE]
+        batch_meta = metadatas[i:i + BATCH_SIZE]
+        batch_ids = ids[i:i + BATCH_SIZE]
+        collection.upsert(
+            documents=batch_docs,
+            embeddings=batch_embs,
+            metadatas=batch_meta,
+            ids=batch_ids
+        )
 
     return len(chunks)
 

@@ -290,8 +290,15 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
         except Exception:
             return None
 
-    # Non-strict prose fallback: require meaningful prose (not markup or braces)
-    if not strict and len(clean_text) >= 10 and not clean_text.startswith("<") and not clean_text.startswith("{"):
+    # Non-strict prose fallback: require meaningful prose (not code blocks, JSON, markup)
+    if (
+        not strict
+        and len(clean_text) >= 15
+        and not clean_text.startswith("<")
+        and not clean_text.startswith("{")
+        and not clean_text.startswith("`")
+        and '"action"' not in clean_text
+    ):
         citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", clean_text)))
         return FinalAnswer(content=clean_text, citations=citations)
 

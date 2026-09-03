@@ -432,8 +432,6 @@ async def execute_agent_run(
                     tool_def = tools_by_name[resolved_tool]
 
                     raw_params = dict(action.parameters)
-                    if "reason" not in raw_params and action.reason:
-                        raw_params["reason"] = action.reason
 
                     val_result = validate_proposed_tool_call(
                         tool_name=resolved_tool,

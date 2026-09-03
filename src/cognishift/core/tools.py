@@ -21,6 +21,21 @@ def _load_json(file_path: Path) -> Optional[Dict[str, Any]]:
     return None
 
 
+def load_tep_telemetry() -> Dict[str, Any]:
+    """Load dynamic Tennessee Eastman SCADA telemetry."""
+    return _load_json(TELEMETRY_PATH) or {}
+
+
+def load_maintenance_orders() -> Dict[str, Any]:
+    """Load SAP S/4HANA PM maintenance orders."""
+    return _load_json(MAINTENANCE_PATH) or {}
+
+
+def load_refinery_topology() -> Dict[str, Any]:
+    """Load ISO 15926 refinery equipment topology."""
+    return _load_json(TOPOLOGY_PATH) or {}
+
+
 async def execute_tool(tool_name: str, parameters: dict) -> str:
     """
     Executes tool logic grounded in authentic industrial datasets:

@@ -49,74 +49,19 @@ embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 async def process_pdf(file_path: str, workspace_id: int, source_id: int, filename: str = "") -> int:
     """
-    Reads a PDF, splits text into overlapping chunks per page, and stores embeddings in ChromaDB.
+    Reads a PDF, applies Phase 5 multimodal processing (native text triage, local OCR fallback),
+    splits text into page-aware chunks, and stores embeddings with provenance in ChromaDB.
     Returns the total number of chunks processed.
     """
-    def _extract_and_chunk() -> List[Tuple[str, int, int]]:
-        reader = PdfReader(file_path)
-        chunks_with_meta = []
-        chunk_counter = 0
-        for page_idx, page in enumerate(reader.pages, start=1):
-            page_text = page.extract_text()
-            if not page_text or not page_text.strip():
-                continue
-            page_chunks = text_splitter.split_text(page_text)
-            for chunk in page_chunks:
-                clean_chunk = chunk.strip()
-                if clean_chunk:
-                    chunks_with_meta.append((clean_chunk, page_idx, chunk_counter))
-                    chunk_counter += 1
-        return chunks_with_meta
-
-    # Run extraction off the main asyncio event loop thread
-    chunks_with_meta = await asyncio.to_thread(_extract_and_chunk)
-    if not chunks_with_meta:
-        return 0
-
-    chunks = [item[0] for item in chunks_with_meta]
-    pages = [item[1] for item in chunks_with_meta]
-    chunk_indices = [item[2] for item in chunks_with_meta]
-
-    # Run FastEmbed off the main event loop
-    def _embed() -> List[List[float]]:
-        generator = embedding_model.embed(chunks)
-        return [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in generator]
-
-    embeddings = await asyncio.to_thread(_embed)
-
-    # Store in ChromaDB under a collection specific to the workspace
-    collection_name = f"workspace_{workspace_id}"
-    collection = chroma_client.get_or_create_collection(name=collection_name)
-
-    doc_name = filename or Path(file_path).name
-    ids = [f"doc_{source_id}_chunk_{idx}" for idx in chunk_indices]
-    metadatas = [
-        {
-            "source_id": source_id,
-            "workspace_id": workspace_id,
-            "filename": doc_name,
-            "page": pages[i],
-            "chunk_idx": chunk_indices[i]
-        }
-        for i in range(len(chunks))
-    ]
-
-    # Safe batch upsert into ChromaDB to prevent SQLite variable overflow on massive documents
-    BATCH_SIZE = 250
-    for i in range(0, len(chunks), BATCH_SIZE):
-        batch_docs = chunks[i:i + BATCH_SIZE]
-        batch_embs = embeddings[i:i + BATCH_SIZE]
-        batch_meta = metadatas[i:i + BATCH_SIZE]
-        batch_ids = ids[i:i + BATCH_SIZE]
-        await asyncio.to_thread(
-            collection.upsert,
-            documents=batch_docs,
-            embeddings=batch_embs,
-            metadatas=batch_meta,
-            ids=batch_ids
-        )
-
-    return len(chunks)
+    from cognishift.core.document_processing.service import DocumentProcessingService
+    service = DocumentProcessingService()
+    result = await service.process_document(
+        workspace_id=workspace_id,
+        source_id=source_id,
+        file_path=Path(file_path),
+        filename=filename
+    )
+    return result.get("chunk_count", 0)
 
 
 async def purge_knowledge_source(workspace_id: int, source_id: int) -> bool:

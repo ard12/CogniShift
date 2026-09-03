@@ -174,6 +174,46 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE agent_runs ADD COLUMN structured_plan TEXT")
         except Exception:
             pass
+
+        try:
+            await db.execute("ALTER TABLE knowledge_sources ADD COLUMN active_processing_version TEXT")
+        except Exception:
+            pass
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS document_processing_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id INTEGER NOT NULL REFERENCES knowledge_sources(id) ON DELETE CASCADE,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                processing_version TEXT NOT NULL,
+                status TEXT NOT NULL,
+                total_pages INTEGER NOT NULL DEFAULT 0,
+                native_pages INTEGER NOT NULL DEFAULT 0,
+                ocr_pages INTEGER NOT NULL DEFAULT 0,
+                vision_pages INTEGER NOT NULL DEFAULT 0,
+                failed_pages INTEGER NOT NULL DEFAULT 0,
+                error_code TEXT,
+                error_message TEXT,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP
+            )
+        ''')
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS document_pages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_id INTEGER NOT NULL REFERENCES knowledge_sources(id) ON DELETE CASCADE,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                processing_version TEXT NOT NULL,
+                page_number INTEGER NOT NULL,
+                extraction_method TEXT NOT NULL,
+                ocr_confidence REAL,
+                text_content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(source_id, processing_version, page_number)
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_doc_pages_source ON document_pages(source_id, processing_version)")
         
         await db.commit()
 

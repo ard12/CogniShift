@@ -1,3 +1,4 @@
+from typing import Optional
 from cognishift.core.providers import ModelProvider, ModelResponse
 
 class SimulatedProvider(ModelProvider):
@@ -88,8 +89,14 @@ class SimulatedProvider(ModelProvider):
         )
         return ModelResponse(text=text, model_name=chosen_model, provider="simulated", is_simulated=True)
 
-    async def analyze_image(self, image_bytes: bytes, prompt: str = "Describe this image in detail.") -> ModelResponse:
+    async def analyze_image(
+        self,
+        image_bytes: bytes,
+        prompt: str = "Describe this image in detail.",
+        model_name: Optional[str] = None
+    ) -> ModelResponse:
         """Return a simulated image analysis response."""
+        chosen = model_name or "simulated-vision"
         text = (
             "[SIMULATED VISION] Image analysis would be performed by the local vision model. "
             "The model would describe the contents of the uploaded image, identify equipment, "
@@ -97,9 +104,10 @@ class SimulatedProvider(ModelProvider):
         )
         return ModelResponse(
             text=text,
-            model_name="simulated-vision",
+            model_name=chosen,
             provider="simulated",
-            is_simulated=True
+            is_simulated=True,
+            success=True
         )
 
     async def health_check(self) -> bool:

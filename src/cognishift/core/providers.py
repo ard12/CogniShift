@@ -40,7 +40,12 @@ class ModelProvider(ABC):
         ...
     
     @abstractmethod
-    async def analyze_image(self, image_bytes: bytes, prompt: str = "Describe this image in detail.") -> ModelResponse:
+    async def analyze_image(
+        self,
+        image_bytes: bytes,
+        prompt: str = "Describe this image in detail.",
+        model_name: Optional[str] = None
+    ) -> ModelResponse:
         """Analyze an image and return a text description."""
         ...
     

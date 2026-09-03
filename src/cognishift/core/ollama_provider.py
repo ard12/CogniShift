@@ -65,11 +65,17 @@ class OllamaProvider(ModelProvider):
         except Exception as e:
             raise ProviderError(f"Ollama inference error: {e}")
 
-    async def analyze_image(self, image_bytes: bytes, prompt: str = "Describe this image in detail.") -> ModelResponse:
+    async def analyze_image(
+        self,
+        image_bytes: bytes,
+        prompt: str = "Describe this image in detail.",
+        model_name: Optional[str] = None
+    ) -> ModelResponse:
         """Analyze an image using the local Ollama vision model."""
+        target_model = model_name or self.vision_model
         b64_img = base64.b64encode(image_bytes).decode('utf-8')
         payload = {
-            "model": self.vision_model,
+            "model": target_model,
             "messages": [{"role": "user", "content": prompt, "images": [b64_img]}],
             "stream": False
         }
@@ -82,16 +88,19 @@ class OllamaProvider(ModelProvider):
                 text = data.get("message", {}).get("content", "")
                 return ModelResponse(
                     text=text,
-                    model_name=self.vision_model,
+                    model_name=target_model,
                     provider="ollama",
-                    is_simulated=False
+                    is_simulated=False,
+                    success=True
                 )
         except (httpx.ConnectError, httpx.TimeoutException, Exception) as e:
             return ModelResponse(
-                text=f"Error communicating with Ollama vision model: {str(e)}",
-                model_name=self.vision_model,
+                text=f"[VISION ERROR: {e}]",
+                model_name=target_model,
                 provider="ollama",
-                is_simulated=False
+                is_simulated=False,
+                success=False,
+                error_message=str(e)
             )
 
     async def health_check(self) -> bool:

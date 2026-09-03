@@ -150,6 +150,35 @@ class KnowledgeSourceResponse(BaseModel):
     processing_status: str
     checksum: Optional[str] = None
     chunk_count: int
+    active_processing_version: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class DocumentProcessingJobResponse(BaseModel):
+    id: int
+    source_id: int
+    workspace_id: int
+    processing_version: str
+    status: str
+    total_pages: int = 0
+    native_pages: int = 0
+    ocr_pages: int = 0
+    vision_pages: int = 0
+    failed_pages: int = 0
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class DocumentPageResponse(BaseModel):
+    id: int
+    source_id: int
+    workspace_id: int
+    processing_version: str
+    page_number: int
+    extraction_method: str
+    ocr_confidence: Optional[float] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

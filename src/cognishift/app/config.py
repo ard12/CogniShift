@@ -36,6 +36,23 @@ class Settings(BaseSettings):
     sandbox_max_output_files: int = 10
     sandbox_max_output_file_bytes: int = 10485760
 
+    # Phase 5 Multimodal Document Ingestion, OCR & Vision Configuration
+    ocr_enabled: bool = True
+    ocr_engine: str = "rapidocr"  # 'rapidocr', 'tesseract', or 'simulated'
+    ocr_low_confidence_threshold: float = 0.60
+    ocr_normal_confidence_threshold: float = 0.75
+    max_pdf_pages: int = 200
+    max_input_image_dimension: int = 4096
+    max_input_image_pixels: int = 16_000_000
+    max_rendered_page_dimension: int = 2048
+    max_rendered_page_pixels: int = 4_194_304
+    max_raster_dpi: int = 150
+    max_concurrent_ocr: int = 2
+    max_concurrent_vision: int = 1
+    ocr_page_timeout: int = 60
+    document_processing_timeout: int = 300
+    vision_max_pages_per_doc: int = 5
+
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

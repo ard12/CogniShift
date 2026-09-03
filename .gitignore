@@ -10,3 +10,8 @@ dist/
 build/
 .pytest_cache/
 .ruff_cache/
+data/
+data/private/
+*.auth.json
+auth_store.json
+.env.local

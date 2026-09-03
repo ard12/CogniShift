@@ -216,9 +216,10 @@ async def test_resume_after_rejection():
 
 def test_runs_api_endpoints():
     """Test full HTTP REST endpoints for Runs API."""
+    from tests.conftest import TEST_OPERATOR_TOKEN
     client = TestClient(app)
 
-    auth_headers = {"Authorization": "Bearer token-operator-01"}
+    auth_headers = {"Authorization": f"Bearer {TEST_OPERATOR_TOKEN}"}
 
     # 1. Trigger a Run via POST /api/v1/runs
     post_res = client.post(

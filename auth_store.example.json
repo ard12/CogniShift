@@ -1,0 +1,35 @@
+{
+  "": "CogniShift Sovereign Local Authentication Store Template. DO NOT commit production credentials.",
+  "users": [
+    {
+      "user_id": "operator_sample",
+      "role": "operator",
+      "allowed_workspace_ids": [
+        1
+      ],
+      "credential_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "enabled": true
+    },
+    {
+      "user_id": "supervisor_sample",
+      "role": "supervisor",
+      "allowed_workspace_ids": [
+        1,
+        2
+      ],
+      "credential_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "enabled": true
+    },
+    {
+      "user_id": "admin_sample",
+      "role": "administrator",
+      "allowed_workspace_ids": [
+        1,
+        2,
+        3
+      ],
+      "credential_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "enabled": true
+    }
+  ]
+}

@@ -90,7 +90,7 @@ def parse_tool_call(
             if val_result.valid:
                 return True, resolved_tool, val_result.validated_parameters or action.parameters, action.reason
             else:
-                return True, resolved_tool, action.parameters, f"Validation failed: {val_result.error_message}"
+                return False, None, {}, f"Validation failed: {val_result.error_message}"
     
     # If not a valid ToolCallProposal in allowed tools, tool execution is IMPOSSIBLE
     return False, None, {}, ""
@@ -374,10 +374,49 @@ async def execute_agent_run(
                     cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
                     return RunResponse.model_validate(dict(await cursor.fetchone()))
 
-                await log_event(db, run_id, "model_response", f"Step #{current_step.id} reasoning received", {"text": model_response.text})
+                raw_output = model_response.text or ""
+                clean_output = raw_output.strip()
 
-                # Strict Action Parsing (P0-1 & P0-2: ONLY parse_agent_action, ZERO prompt inspection fallback)
-                action = parse_agent_action(model_response.text)
+                # Blocker 6: Empty or whitespace response must FAIL rather than complete
+                if not clean_output:
+                    err_msg = f"Model protocol failure on step #{current_step.id}: Empty response returned by {selected_model_id}."
+                    logger.warning(err_msg)
+                    current_step.status = "failed"
+                    current_step.error_message = err_msg
+                    await log_event(db, run_id, "model_protocol_failure", err_msg, {"step_id": current_step.id, "error": "empty_output"})
+                    saved_plan_json = serialize_plan(plan)
+                    await db.execute(
+                        """UPDATE agent_runs
+                           SET status = 'failed', error_message = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                           WHERE id = ?""",
+                        (err_msg, saved_plan_json, run_id)
+                    )
+                    await db.commit()
+                    cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                    return RunResponse.model_validate(dict(await cursor.fetchone()))
+
+                await log_event(db, run_id, "model_response", f"Step #{current_step.id} reasoning received", {"text": raw_output})
+
+                # Strict Action Parsing (Blocker 6: Valid AgentAction schema or verified readable prose only)
+                action = parse_agent_action(clean_output, strict=False)
+
+                if action is None:
+                    # ModelProtocolFailure: Output is unparseable (e.g. malformed JSON, truncated tokens, invalid action type)
+                    err_msg = f"Model protocol failure on step #{current_step.id}: Unparseable or malformed output from {selected_model_id}."
+                    logger.warning(err_msg)
+                    current_step.status = "failed"
+                    current_step.error_message = err_msg
+                    await log_event(db, run_id, "model_protocol_failure", err_msg, {"step_id": current_step.id, "preview": clean_output[:150]})
+                    saved_plan_json = serialize_plan(plan)
+                    await db.execute(
+                        """UPDATE agent_runs
+                           SET status = 'failed', error_message = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                           WHERE id = ?""",
+                        (err_msg, saved_plan_json, run_id)
+                    )
+                    await db.commit()
+                    cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                    return RunResponse.model_validate(dict(await cursor.fetchone()))
 
                 if isinstance(action, ToolCallProposal) and action.tool_name:
                     tool_name_clean = action.tool_name.lower().strip()
@@ -402,6 +441,7 @@ async def execute_agent_run(
                         allowed_tools=allowed_tool_names
                     )
                     if not val_result.valid:
+                        # Blocker 4: Validation failure MUST produce zero tool execution
                         current_step.status = "failed"
                         current_step.error_message = val_result.error_message
                         current_step.observation = f"Validation error: {val_result.error_message}"
@@ -421,7 +461,7 @@ async def execute_agent_run(
                     )
 
                     if requires_approval:
-                        # High-risk action: PAUSE FOR SUPERVISOR APPROVAL
+                        # High-risk simulated action: PAUSE FOR SUPERVISOR APPROVAL
                         cursor = await db.execute(
                             """INSERT INTO approval_requests
                                (run_id, tool_id, status, request_reason, parameters, risk_level)
@@ -455,7 +495,7 @@ async def execute_agent_run(
                         return RunResponse.model_validate(dict(updated_run))
 
                     else:
-                        # Safe tool: execute and record observation
+                        # Safe simulated tool: execute and record observation
                         await log_event(db, run_id, "tool_executing", f"Executing safe tool: {resolved_tool}", {"parameters": validated_params})
                         tool_output = await execute_tool(resolved_tool, validated_params)
                         await log_event(db, run_id, "tool_executed", f"Tool output received: {tool_output}", {"output": tool_output})
@@ -482,12 +522,11 @@ async def execute_agent_run(
                     final_text = action.content
                     break
 
-                else:
-                    # Natural language prose
+                elif isinstance(action, ClarificationRequest):
                     current_step.status = "completed"
-                    current_step.observation = model_response.text
-                    final_text = model_response.text
-                    plan.advance_to_next_step()
+                    current_step.observation = f"Clarification requested: {action.question}"
+                    final_text = f"Clarification required from operator: {action.question}"
+                    break
 
             # Synthesize final response if not explicitly provided
             if not final_text:

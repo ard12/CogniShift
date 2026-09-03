@@ -59,6 +59,7 @@ graph_app = typer.Typer(help="Query ISO 15926 / ISA-95 Plant Topology Knowledge 
 telemetry_app = typer.Typer(help="Inspect SCADA telemetry and SAP PM work orders")
 run_app = typer.Typer(help="Execute reasoning loops and view execution timelines")
 approvals_app = typer.Typer(help="Review and authorize Four-Eyes HITL safety requests")
+auth_app = typer.Typer(help="Manage local sovereign authentication credentials")
 
 app.add_typer(workspace_app, name="workspace")
 app.add_typer(agent_app, name="agent")
@@ -67,6 +68,7 @@ app.add_typer(graph_app, name="graph")
 app.add_typer(telemetry_app, name="telemetry")
 app.add_typer(run_app, name="run")
 app.add_typer(approvals_app, name="approvals")
+app.add_typer(auth_app, name="auth")
 
 
 # -----------------------------------------------------------------------------
@@ -699,62 +701,89 @@ def list_approvals():
 @approvals_app.command("approve")
 def approve_action(
     request_id: int = typer.Argument(..., help="Approval Request ID"),
-    token: str = typer.Option("token-supervisor-01", "--token", "-t", help="Supervisor Authentication Token"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help="Supervisor Authentication Token (or prompted securely)"),
 ):
     """Sign off and authorize a high-risk action, automatically resuming execution."""
     async def _approve():
-        from cognishift.app.core.auth import LOCAL_CREDENTIAL_STORE
-        if token not in LOCAL_CREDENTIAL_STORE:
+        from cognishift.app.core.auth import authenticate_token, verify_four_eyes_approval, verify_workspace_access
+
+        nonlocal token
+        if not token:
+            token = os.environ.get("COGNISHIFT_TOKEN")
+        if not token:
+            token = typer.prompt("Enter Supervisor Token", hide_input=True)
+
+        approver = authenticate_token(token)
+        if not approver:
             console.print("[bold red]Authentication Error: Invalid or unrecognized authentication token.[/bold red]")
             return
-        approver = LOCAL_CREDENTIAL_STORE[token]
+
         if approver.role not in ["supervisor", "administrator"]:
-            console.print(f"[bold red]Permission Denied: User '{approver.user_id}' has role '{approver.role}', requires supervisor.[/bold red]")
+            console.print(f"[bold red]Permission Denied: User '{approver.user_id}' has role '{approver.role}', requires supervisor or administrator.[/bold red]")
             return
 
         async with get_db() as db:
             cursor = await db.execute(
-                "SELECT * FROM approval_requests WHERE id = ? AND status = 'pending'",
+                "SELECT * FROM approval_requests WHERE id = ?",
                 (request_id,),
             )
             req = await cursor.fetchone()
             if not req:
-                console.print(f"[bold red]Error: Pending approval request #{request_id} not found.[/bold red]")
+                console.print(f"[bold red]Error: Approval request #{request_id} not found.[/bold red]")
                 return
 
             run_id = req["run_id"]
-            cursor_run = await db.execute("SELECT user_id FROM agent_runs WHERE id = ?", (run_id,))
+            cursor_run = await db.execute("SELECT user_id, workspace_id, status FROM agent_runs WHERE id = ?", (run_id,))
             run_row = await cursor_run.fetchone()
-            requester_id = run_row["user_id"] if run_row else "operator"
+            if not run_row:
+                console.print(f"[bold red]Error: Associated run #{run_id} not found.[/bold red]")
+                return
 
-            if approver.user_id.lower().strip() == requester_id.lower().strip():
-                console.print(
-                    f"[bold red]Four-Eyes Policy Violation: Requester '{requester_id}' cannot approve their own request! "
-                    "Independent supervisor sign-off is mandatory.[/bold red]"
+            # Check workspace access
+            try:
+                verify_workspace_access(run_row["workspace_id"], approver)
+            except Exception as e:
+                console.print(f"[bold red]Workspace Access Denied: {e}[/bold red]")
+                return
+
+            requester_id = run_row["user_id"] or "operator"
+
+            # Enforce Four-Eyes Separation of Duties
+            try:
+                verify_four_eyes_approval(requester_id=requester_id, approver=approver)
+            except Exception as e:
+                console.print(f"[bold red]{e}[/bold red]")
+                return
+
+            # Reconcilable update: mark approved if pending
+            if req["status"] == "pending":
+                cursor_up = await db.execute(
+                    """UPDATE approval_requests
+                       SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+                       WHERE id = ? AND status = 'pending' RETURNING id""",
+                    (approver.user_id, request_id),
                 )
+                if not await cursor_up.fetchone():
+                    console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                    return
+                await db.commit()
+            elif req["status"] != "approved":
+                console.print(f"[bold red]Error: Request #{request_id} cannot be approved from status '{req['status']}'.[/bold red]")
                 return
-
-            cursor_up = await db.execute(
-                """UPDATE approval_requests
-                   SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
-                   WHERE id = ? AND status = 'pending' RETURNING id""",
-                (approver.user_id, request_id),
-            )
-            if not await cursor_up.fetchone():
-                console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
-                return
-            await db.commit()
 
         console.print(f"[bold green][OK] Request #{request_id} APPROVED by {approver.user_id}. Resuming Run #{run_id}...[/bold green]")
-        resp = await resume_agent_run(run_id)
-        console.print(
-            Panel(
-                f"[bold green]Action Executed Successfully![/bold green]\n\n"
-                f"{resp.result_text}",
-                title=f"Run #{run_id} Restored & Resolved",
-                border_style="green",
+        try:
+            resp = await resume_agent_run(run_id)
+            console.print(
+                Panel(
+                    f"[bold green]Action Executed Successfully![/bold green]\n\n"
+                    f"{resp.result_text}",
+                    title=f"Run #{run_id} Restored & Resolved",
+                    border_style="green",
+                )
             )
-        )
+        except Exception as e:
+            console.print(f"[bold red]Error resuming run: {e}[/bold red]")
 
     run_async(_approve())
 
@@ -762,39 +791,60 @@ def approve_action(
 @approvals_app.command("reject")
 def reject_action(
     request_id: int = typer.Argument(..., help="Approval Request ID"),
-    token: str = typer.Option("token-supervisor-01", "--token", "-t", help="Supervisor Authentication Token"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help="Supervisor Authentication Token (or prompted securely)"),
 ):
     """Reject a hazardous action and abort tool execution."""
     async def _reject():
-        from cognishift.app.core.auth import LOCAL_CREDENTIAL_STORE
-        if token not in LOCAL_CREDENTIAL_STORE:
+        from cognishift.app.core.auth import authenticate_token, verify_four_eyes_approval, verify_workspace_access
+
+        nonlocal token
+        if not token:
+            token = os.environ.get("COGNISHIFT_TOKEN")
+        if not token:
+            token = typer.prompt("Enter Supervisor Token", hide_input=True)
+
+        approver = authenticate_token(token)
+        if not approver:
             console.print("[bold red]Authentication Error: Invalid or unrecognized authentication token.[/bold red]")
             return
-        approver = LOCAL_CREDENTIAL_STORE[token]
+
         if approver.role not in ["supervisor", "administrator"]:
-            console.print(f"[bold red]Permission Denied: User '{approver.user_id}' has role '{approver.role}', requires supervisor.[/bold red]")
+            console.print(f"[bold red]Permission Denied: User '{approver.user_id}' has role '{approver.role}', requires supervisor or administrator.[/bold red]")
             return
 
         async with get_db() as db:
             cursor = await db.execute(
-                "SELECT * FROM approval_requests WHERE id = ? AND status = 'pending'",
+                "SELECT * FROM approval_requests WHERE id = ?",
                 (request_id,),
             )
             req = await cursor.fetchone()
             if not req:
-                console.print(f"[bold red]Error: Pending approval request #{request_id} not found.[/bold red]")
+                console.print(f"[bold red]Error: Approval request #{request_id} not found.[/bold red]")
+                return
+
+            if req["status"] != "pending":
+                console.print(f"[bold red]Error: Request #{request_id} is already '{req['status']}'.[/bold red]")
                 return
 
             run_id = req["run_id"]
-            cursor_run = await db.execute("SELECT user_id FROM agent_runs WHERE id = ?", (run_id,))
+            cursor_run = await db.execute("SELECT user_id, workspace_id FROM agent_runs WHERE id = ?", (run_id,))
             run_row = await cursor_run.fetchone()
-            requester_id = run_row["user_id"] if run_row else "operator"
+            if not run_row:
+                console.print(f"[bold red]Error: Associated run #{run_id} not found.[/bold red]")
+                return
 
-            if approver.user_id.lower().strip() == requester_id.lower().strip():
-                console.print(
-                    f"[bold red]Four-Eyes Policy Violation: Requester '{requester_id}' cannot reject their own request! "
-                    "Independent supervisor sign-off is mandatory.[/bold red]"
-                )
+            try:
+                verify_workspace_access(run_row["workspace_id"], approver)
+            except Exception as e:
+                console.print(f"[bold red]Workspace Access Denied: {e}[/bold red]")
+                return
+
+            requester_id = run_row["user_id"] or "operator"
+
+            try:
+                verify_four_eyes_approval(requester_id=requester_id, approver=approver)
+            except Exception as e:
+                console.print(f"[bold red]{e}[/bold red]")
                 return
 
             cursor_up = await db.execute(
@@ -806,15 +856,15 @@ def reject_action(
             if not await cursor_up.fetchone():
                 console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
                 return
-            await db.execute(
-                """UPDATE agent_runs
-                   SET status = 'cancelled', result_text = 'Action rejected by supervisor.', completed_at = CURRENT_TIMESTAMP
-                   WHERE id = ?""",
-                (run_id,),
-            )
             await db.commit()
 
-        console.print(f"[bold yellow][REJECTED] Request #{request_id} REJECTED by {reviewer}. Run #{run_id} cancelled safely.[/bold yellow]")
+        try:
+            resp = await resume_agent_run(run_id)
+            console.print(f"[bold yellow][HALTED] Request #{request_id} rejected. {resp.result_text}[/bold yellow]")
+        except Exception as e:
+            console.print(f"[bold red]Error during run termination: {e}[/bold red]")
+
+        console.print(f"[bold yellow][REJECTED] Request #{request_id} REJECTED by {approver.user_id}. Run #{run_id} cancelled safely.[/bold yellow]")
 
     run_async(_reject())
 
@@ -919,6 +969,37 @@ def interactive_chat(
         except (KeyboardInterrupt, EOFError):
             console.print("\n[yellow]Session interrupted. Goodbye![/yellow]")
             break
+
+
+# -----------------------------------------------------------------------------
+# 10. LOCAL AUTHENTICATION PROVISIONING
+# -----------------------------------------------------------------------------
+@auth_app.command("create-user")
+def create_user_command(
+    user_id: str = typer.Option(..., "--user-id", "-u", help="Unique user identifier"),
+    role: str = typer.Option("operator", "--role", "-r", help="Role: operator, supervisor, administrator"),
+    workspaces: str = typer.Option("1", "--workspaces", "-w", help="Comma-separated workspace IDs"),
+):
+    """Provision a new local sovereign user and generate a secure authentication token."""
+    import secrets
+    from cognishift.app.core.auth import User, register_local_credential, save_credential_store
+
+    ws_ids = [int(w.strip()) for w in workspaces.split(",") if w.strip().isdigit()]
+    raw_token = f"cog_{role[:3]}_{secrets.token_urlsafe(24)}"
+    user = User(user_id=user_id, role=role, allowed_workspace_ids=ws_ids)
+    register_local_credential(raw_token, user)
+    save_credential_store()
+
+    console.print(Panel(
+        f"[bold green]User Provisioned Successfully![/bold green]\n\n"
+        f"[bold]User ID:[/bold] {user_id}\n"
+        f"[bold]Role:[/bold] {role}\n"
+        f"[bold]Workspaces:[/bold] {ws_ids}\n"
+        f"[bold yellow]Secret Token:[/bold yellow] [bold white]{raw_token}[/bold white]\n\n"
+        f"[dim]WARNING: Store this token securely. Only its SHA-256 hash is saved.[/dim]",
+        title="Local Credential Generated",
+        border_style="green"
+    ))
 
 
 @app.callback(invoke_without_command=True)

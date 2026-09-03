@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     database_path: Path = PROJECT_ROOT / "data" / "cognishift.db"
     chroma_path: Path = PROJECT_ROOT / "data" / "chroma"
     upload_dir: Path = PROJECT_ROOT / "data" / "uploads"
+    auth_store_path: Path = PROJECT_ROOT / "data" / "private" / "auth_store.json"
     max_upload_size_mb: int = 50
     log_level: str = "INFO"
 
@@ -23,7 +24,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Ensure all paths are absolute relative to project root if they were loaded as relative from .env
-for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir']:
+for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir', 'auth_store_path']:
     path_val = getattr(settings, field)
     if not path_val.is_absolute():
         setattr(settings, field, PROJECT_ROOT / path_val)

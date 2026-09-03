@@ -44,6 +44,15 @@ async def approve_request(
         if not row:
             raise HTTPException(status_code=404, detail="Approval request not found")
         if row["status"] != "pending":
+            if row["status"] == "approved":
+                run_id = row["run_id"]
+                cursor_run = await db.execute("SELECT user_id, workspace_id, status FROM agent_runs WHERE id = ?", (run_id,))
+                run_row = await cursor_run.fetchone()
+                if run_row and run_row["status"] == "paused":
+                    verify_workspace_access(run_row["workspace_id"], approver)
+                    verify_four_eyes_approval(requester_id=run_row["user_id"] or "operator", approver=approver)
+                    await resume_agent_run(run_id)
+                    return ApprovalResponse.model_validate(dict(row))
             raise HTTPException(status_code=400, detail=f"Request is already {row['status']}")
 
         run_id = row["run_id"]

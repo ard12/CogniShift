@@ -1,7 +1,13 @@
-"""Role-Based Access Control and Verified Local Authentication for CogniShift."""
+import os
+import json
+import hashlib
+import secrets
+from pathlib import Path
 from typing import Optional, List, Literal, Dict
 from fastapi import Request, HTTPException, Security, status
 from pydantic import BaseModel, Field
+
+from cognishift.app.config import settings
 
 UserRole = Literal["operator", "supervisor", "administrator"]
 
@@ -13,36 +19,96 @@ class User(BaseModel):
     allowed_workspace_ids: List[int] = Field(default_factory=lambda: [1])
 
 
+class CredentialRecord(BaseModel):
+    """Secure credential entry storing only cryptographic hashes and authorization scopes."""
+    credential_hash: str
+    user_id: str
+    role: UserRole
+    allowed_workspace_ids: List[int] = Field(default_factory=lambda: [1])
+    enabled: bool = True
+
+
 # -----------------------------------------------------------------------------
-# SERVER-SIDE LOCAL CREDENTIAL STORE (Zero Cloud / Sovereign Verification)
+# SERVER-SIDE LOCAL CREDENTIAL STORE (Zero Cloud / Cryptographically Verified)
 # -----------------------------------------------------------------------------
-LOCAL_CREDENTIAL_STORE: Dict[str, User] = {
-    "token-operator-01": User(
-        user_id="operator_sam",
-        role="operator",
-        allowed_workspace_ids=[1]
-    ),
-    "token-supervisor-01": User(
-        user_id="supervisor_jane",
-        role="supervisor",
-        allowed_workspace_ids=[1, 2]
-    ),
-    "token-admin-01": User(
-        user_id="admin_rohit",
-        role="administrator",
-        allowed_workspace_ids=[1, 2, 3]
-    ),
-    "token-tenant2-operator": User(
-        user_id="operator_tenant2",
-        role="operator",
-        allowed_workspace_ids=[2]
+LOCAL_CREDENTIAL_STORE: Dict[str, CredentialRecord] = {}
+
+
+def hash_token(raw_token: str) -> str:
+    """Compute deterministic SHA-256 hash of raw authentication token."""
+    return hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
+
+
+def load_credential_store(store_path: Optional[Path] = None) -> int:
+    """Load user credentials from external local configuration file."""
+    global LOCAL_CREDENTIAL_STORE
+    path = store_path or getattr(settings, "auth_store_path", None)
+    if not path or not Path(path).exists():
+        return 0
+
+    try:
+        content = Path(path).read_text(encoding="utf-8")
+        data = json.loads(content)
+        users = data.get("users", [])
+        loaded = 0
+        for u in users:
+            record = CredentialRecord.model_validate(u)
+            LOCAL_CREDENTIAL_STORE[record.credential_hash] = record
+            loaded += 1
+        return loaded
+    except Exception:
+        return 0
+
+
+def save_credential_store(store_path: Optional[Path] = None) -> bool:
+    """Persist the current credential store to an uncommitted local JSON file."""
+    path = store_path or getattr(settings, "auth_store_path", None)
+    if not path:
+        return False
+
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "$comment": "CogniShift Local Sovereign Credential Store. Excluded from Git.",
+        "users": [rec.model_dump() for rec in LOCAL_CREDENTIAL_STORE.values()]
+    }
+    p.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return True
+
+
+def register_local_credential(raw_token: str, user: User, enabled: bool = True) -> str:
+    """Register or update a local credential. Stores only the SHA-256 hash."""
+    c_hash = hash_token(raw_token)
+    record = CredentialRecord(
+        credential_hash=c_hash,
+        user_id=user.user_id,
+        role=user.role,
+        allowed_workspace_ids=user.allowed_workspace_ids,
+        enabled=enabled
     )
-}
+    LOCAL_CREDENTIAL_STORE[c_hash] = record
+    return c_hash
 
 
-def register_local_credential(token: str, user: User) -> None:
-    """Register or update a local credential in the server-side store."""
-    LOCAL_CREDENTIAL_STORE[token] = user
+def authenticate_token(raw_token: str) -> Optional[User]:
+    """Verify raw token against stored cryptographic hashes using constant-time comparison."""
+    if not raw_token:
+        return None
+    incoming_hash = hash_token(raw_token)
+    for stored_hash, record in LOCAL_CREDENTIAL_STORE.items():
+        if secrets.compare_digest(stored_hash, incoming_hash):
+            if not record.enabled:
+                return None
+            return User(
+                user_id=record.user_id,
+                role=record.role,
+                allowed_workspace_ids=record.allowed_workspace_ids
+            )
+    return None
+
+
+# Initial load from local config if available
+load_credential_store()
 
 
 async def get_current_user(request: Request) -> User:
@@ -63,14 +129,22 @@ async def get_current_user(request: Request) -> User:
     elif api_key:
         token = api_key
 
-    if not token or token not in LOCAL_CREDENTIAL_STORE:
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authentication credentials. Provide a valid Bearer token or X-API-Key.",
+            detail="Missing authentication credentials. Provide a Bearer token or X-API-Key.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    return LOCAL_CREDENTIAL_STORE[token]
+    user = authenticate_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or unrecognized authentication token.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    return user
 
 
 def verify_workspace_access(workspace_id: int, user: User) -> None:

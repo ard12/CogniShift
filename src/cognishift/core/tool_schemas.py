@@ -3,13 +3,57 @@ import json
 import re
 import logging
 from typing import Dict, Any, Optional, List, Literal, Union, Type
+from typing_extensions import Annotated
 from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-# 1. AGENT ACTION DEFINITIONS (The LLM Proposes, Deterministic Policy Decides)
+# 1. CONSTRAINED DOMAIN FIELD TYPES (Strict Industrial Boundary Validation)
+# -----------------------------------------------------------------------------
+EquipmentIdentifier = Annotated[
+    str,
+    Field(
+        min_length=2,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_.:-]+$",
+        description="Valid plant equipment identifier (alphanumeric, dash, underscore, dot, colon)"
+    )
+]
+
+OperationalReason = Annotated[
+    str,
+    Field(
+        min_length=5,
+        max_length=500,
+        description="Operational justification for industrial action (min 5 chars, max 500 chars)"
+    )
+]
+
+NetworkHostIdentifier = Annotated[
+    str,
+    Field(
+        min_length=3,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_.-]+$",
+        description="Valid internal hostname or IP address"
+    )
+]
+
+ServiceNameIdentifier = Annotated[
+    str,
+    Field(
+        min_length=2,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_.-]+$",
+        description="Valid internal system service name"
+    )
+]
+
+
+# -----------------------------------------------------------------------------
+# 2. AGENT ACTION DEFINITIONS (The LLM Proposes, Deterministic Policy Decides)
 # -----------------------------------------------------------------------------
 class ToolCallProposal(BaseModel):
     """The agent proposes to call a registered tool with parameters."""
@@ -36,36 +80,36 @@ AgentAction = Union[ToolCallProposal, FinalAnswer, ClarificationRequest]
 
 
 # -----------------------------------------------------------------------------
-# 2. PER-TOOL PYDANTIC ARGUMENT SCHEMAS
+# 3. PER-TOOL PYDANTIC ARGUMENT SCHEMAS (Strict Bound & Regex Checked)
 # -----------------------------------------------------------------------------
 class CheckPressureArgs(BaseModel):
-    sensor_id: str = Field(..., description="Sensor equipment identifier, e.g. 'PT-101'")
+    sensor_id: EquipmentIdentifier
 
 
 class CheckTemperatureArgs(BaseModel):
-    sensor_id: str = Field(..., description="Temperature sensor identifier, e.g. 'TT-101'")
+    sensor_id: EquipmentIdentifier
 
 
 class RunDiagnosticArgs(BaseModel):
-    equipment_id: str = Field(..., description="Equipment tag identifier, e.g. 'P-101A'")
+    equipment_id: EquipmentIdentifier
 
 
 class EmergencyPressureReliefArgs(BaseModel):
-    chamber_id: str = Field(..., description="Pressure vessel or chamber identifier, e.g. 'V-102'")
-    reason: str = Field(..., description="Operational hazard justification for venting")
+    chamber_id: EquipmentIdentifier
+    reason: OperationalReason
 
 
 class RestartComponentArgs(BaseModel):
-    component_id: str = Field(..., description="Component or pump tag identifier, e.g. 'P-101A'")
-    reason: str = Field(..., description="Root cause justification for restarting equipment")
+    component_id: EquipmentIdentifier
+    reason: OperationalReason
 
 
 class CheckNetworkArgs(BaseModel):
-    target_host: str = Field(..., description="Internal network host or IP to ping")
+    target_host: NetworkHostIdentifier
 
 
 class RestartServiceArgs(BaseModel):
-    service_name: str = Field(..., description="Internal system service name to restart")
+    service_name: ServiceNameIdentifier
 
 
 # Workspace File & Artifact Tool Schemas (Used in Phase 3 & 4)
@@ -191,14 +235,14 @@ def validate_proposed_tool_call(
 # -----------------------------------------------------------------------------
 # 4. ROBUST JSON ACTION PARSER
 # -----------------------------------------------------------------------------
-def parse_agent_action(model_text: str) -> AgentAction:
+def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentAction]:
     """
     Extracts and validates a structured AgentAction from model text output.
-    Looks for JSON objects or markdown ```json ... ``` blocks.
-    Falls back cleanly to FinalAnswer if pure prose is returned.
+    Returns ToolCallProposal, FinalAnswer, or ClarificationRequest.
+    Returns None if output is empty, whitespace, malformed, or unparseable.
     """
     if not model_text or not model_text.strip():
-        return FinalAnswer(content="No response generated.", citations=[])
+        return None
 
     clean_text = model_text.strip()
 
@@ -219,6 +263,8 @@ def parse_agent_action(model_text: str) -> AgentAction:
                 action = data.get("action", "")
                 if action == "tool_call":
                     tool_name = str(data.get("tool_name") or data.get("tool") or "").strip()
+                    if not tool_name:
+                        return None
                     return ToolCallProposal(
                         action="tool_call",
                         tool_name=tool_name,
@@ -226,9 +272,12 @@ def parse_agent_action(model_text: str) -> AgentAction:
                         reason=data.get("reason", "Autonomous plan execution")
                     )
                 elif action == "final_answer":
+                    content = data.get("content", "")
+                    if not content and strict:
+                        return None
                     return FinalAnswer(
                         action="final_answer",
-                        content=data.get("content", ""),
+                        content=content,
                         citations=data.get("citations", [])
                     )
                 elif action == "clarification_request":
@@ -236,10 +285,14 @@ def parse_agent_action(model_text: str) -> AgentAction:
                         action="clarification_request",
                         question=data.get("question", "")
                     )
+                else:
+                    return None
         except Exception:
-            pass
+            return None
 
-    # Default fallback: Treat as FinalAnswer text
-    # Extract citations if present in brackets [Source | Page X]
-    citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", clean_text)))
-    return FinalAnswer(content=clean_text, citations=citations)
+    # Non-strict prose fallback: require meaningful prose (not markup or braces)
+    if not strict and len(clean_text) >= 10 and not clean_text.startswith("<") and not clean_text.startswith("{"):
+        citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", clean_text)))
+        return FinalAnswer(content=clean_text, citations=citations)
+
+    return None

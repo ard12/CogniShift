@@ -17,14 +17,14 @@ async def seed_data():
         # Seed Agents
         await db.execute('''
             INSERT INTO agent_definitions (id, workspace_id, name, description, system_instructions, model_name, approval_required, allowed_tool_ids)
-            VALUES (1, 1, 'Maintenance Assistant', 'Assists with industrial equipment maintenance', 'System instructions for industrial equipment maintenance', 'llama3.2:3b', 1, '[1, 2, 3, 4, 5]')
-            ON CONFLICT DO NOTHING
+            VALUES (1, 1, 'Maintenance Assistant', 'Assists with industrial equipment maintenance', 'System instructions for industrial equipment maintenance', 'llama3.2:3b', 0, '[1, 2, 3, 4, 5]')
+            ON CONFLICT(id) DO UPDATE SET allowed_tool_ids = excluded.allowed_tool_ids, approval_required = excluded.approval_required
         ''')
         
         await db.execute('''
             INSERT INTO agent_definitions (id, workspace_id, name, description, system_instructions, model_name, approval_required, allowed_tool_ids)
             VALUES (2, 1, 'IT Helpdesk Agent', 'Assists with IT support', 'System instructions for IT support', 'llama3.2:3b', 0, '[6, 7]')
-            ON CONFLICT DO NOTHING
+            ON CONFLICT(id) DO UPDATE SET allowed_tool_ids = excluded.allowed_tool_ids, approval_required = excluded.approval_required
         ''')
         
         # Seed Tools

@@ -2,6 +2,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+class ProviderError(Exception):
+    """Base exception for model provider errors."""
+    pass
+
+class ProviderConnectionError(ProviderError):
+    """Raised when the provider endpoint cannot be reached."""
+    pass
+
+class ProviderTimeoutError(ProviderError):
+    """Raised when inference times out."""
+    pass
+
 @dataclass
 class ModelResponse:
     """Standard response from any model provider."""
@@ -10,6 +22,8 @@ class ModelResponse:
     provider: str  # 'ollama', 'simulated', etc.
     tokens_used: Optional[int] = None
     is_simulated: bool = False
+    success: bool = True
+    error_message: Optional[str] = None
 
 class ModelProvider(ABC):
     """Abstract interface for LLM providers. All providers must implement this."""

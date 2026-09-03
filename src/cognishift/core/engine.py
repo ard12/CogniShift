@@ -298,11 +298,39 @@ async def execute_agent_run(
             await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {agent['model_name']}")
 
             provider = get_provider()
-            model_response = await provider.generate_text(
-                prompt=input_text,
-                system_prompt=system_prompt,
-                context=combined_context
-            )
+            try:
+                model_response = await provider.generate_text(
+                    prompt=input_text,
+                    system_prompt=system_prompt,
+                    context=combined_context
+                )
+            except Exception as e:
+                err_msg = f"Model provider failure ({agent['model_name']}): {str(e)}"
+                logger.error(err_msg)
+                await log_event(db, run_id, "run_failed", err_msg, {"error": str(e)})
+                await db.execute(
+                    """UPDATE agent_runs
+                       SET status = 'failed', error_message = ?, completed_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (err_msg, run_id)
+                )
+                await db.commit()
+                cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                return RunResponse.model_validate(dict(await cursor.fetchone()))
+
+            if not getattr(model_response, "success", True):
+                err_msg = model_response.error_message or "Model generation failed."
+                logger.error(err_msg)
+                await log_event(db, run_id, "run_failed", err_msg, {"error": err_msg})
+                await db.execute(
+                    """UPDATE agent_runs
+                       SET status = 'failed', error_message = ?, completed_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (err_msg, run_id)
+                )
+                await db.commit()
+                cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                return RunResponse.model_validate(dict(await cursor.fetchone()))
 
             await log_event(db, run_id, "model_response", "Model reasoning received", {"text": model_response.text})
 

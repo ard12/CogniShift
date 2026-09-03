@@ -1,8 +1,13 @@
 import base64
 import httpx
 from typing import Optional
-from cognishift.app.config import settings
-from cognishift.core.providers import ModelProvider, ModelResponse
+from cognishift.core.providers import (
+    ModelProvider,
+    ModelResponse,
+    ProviderConnectionError,
+    ProviderTimeoutError,
+    ProviderError,
+)
 
 class OllamaProvider(ModelProvider):
     """Implementation of ModelProvider for local Ollama instances."""
@@ -42,15 +47,15 @@ class OllamaProvider(ModelProvider):
                     model_name=self.text_model,
                     provider="ollama",
                     tokens_used=tokens,
-                    is_simulated=False
+                    is_simulated=False,
+                    success=True
                 )
-        except (httpx.ConnectError, httpx.TimeoutException, Exception) as e:
-            return ModelResponse(
-                text=f"Error communicating with Ollama: {str(e)}",
-                model_name=self.text_model,
-                provider="ollama",
-                is_simulated=False
-            )
+        except httpx.ConnectError as e:
+            raise ProviderConnectionError(f"Cannot connect to local Ollama server at {self.base_url}: {e}")
+        except httpx.TimeoutException as e:
+            raise ProviderTimeoutError(f"Inference timed out after 120s: {e}")
+        except Exception as e:
+            raise ProviderError(f"Ollama inference error: {e}")
 
     async def analyze_image(self, image_bytes: bytes, prompt: str = "Describe this image in detail.") -> ModelResponse:
         """Analyze an image using the local Ollama vision model."""

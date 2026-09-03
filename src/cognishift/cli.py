@@ -714,6 +714,17 @@ def approve_action(
                 return
 
             run_id = req["run_id"]
+            cursor_run = await db.execute("SELECT user_id FROM agent_runs WHERE id = ?", (run_id,))
+            run_row = await cursor_run.fetchone()
+            requester_id = run_row["user_id"] if run_row else "operator"
+
+            if reviewer.lower().strip() == requester_id.lower().strip():
+                console.print(
+                    f"[bold red]Four-Eyes Policy Violation: Requester '{requester_id}' cannot approve their own request! "
+                    "Independent supervisor sign-off is mandatory.[/bold red]"
+                )
+                return
+
             await db.execute(
                 """UPDATE approval_requests
                    SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
@@ -754,6 +765,17 @@ def reject_action(
                 return
 
             run_id = req["run_id"]
+            cursor_run = await db.execute("SELECT user_id FROM agent_runs WHERE id = ?", (run_id,))
+            run_row = await cursor_run.fetchone()
+            requester_id = run_row["user_id"] if run_row else "operator"
+
+            if reviewer.lower().strip() == requester_id.lower().strip():
+                console.print(
+                    f"[bold red]Four-Eyes Policy Violation: Requester '{requester_id}' cannot reject their own request! "
+                    "Independent supervisor sign-off is mandatory.[/bold red]"
+                )
+                return
+
             await db.execute(
                 """UPDATE approval_requests
                    SET status = 'rejected', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP

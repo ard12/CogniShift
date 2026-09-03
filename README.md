@@ -103,13 +103,32 @@ copy .env.example .env
 python scripts/seed.py
 ```
 
-### 4. Running the Workbench
+### 4. Running the Workbench Server
 ```bash
 python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 * **Operator Console:** [http://127.0.0.1:8000](http://127.0.0.1:8000) (auto-redirects to `/static/index.html`)
 * **Interactive API Docs (Swagger):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 * **System Privacy & Sovereignty Status:** [http://127.0.0.1:8000/api/v1/system/privacy-status](http://127.0.0.1:8000/api/v1/system/privacy-status)
+
+### 5. Running the Terminal CLI Workbench
+CogniShift provides a standalone, rich terminal CLI supporting every system feature without requiring a browser:
+
+```bash
+# Launch interactive operator chat shell (REPL)
+python cli.py chat
+
+# Direct command examples
+python cli.py status                               # System health & GPU diagnostics
+python cli.py telemetry stream                     # Live SCADA sensor telemetry
+python cli.py telemetry orders                     # SAP S/4HANA PM work orders
+python cli.py graph query Pump-101A                # ISO 15926 topology multi-hop query
+python cli.py knowledge search "MAWP limits"       # Vector RAG search with citations
+python cli.py run execute "Check pressure on PT-101" # Autonomous agent run
+python cli.py run execute "Inspect gauge" --image "data/vision_test/gauge_pressure_nominal_105psi.png" # Multimodal VLM
+python cli.py approvals list                      # Four-Eyes HITL safety gate
+python cli.py approvals approve <req_id>          # Supervisor digital sign-off
+```
 
 ---
 

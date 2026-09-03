@@ -21,22 +21,23 @@
 
 ---
 
-## 2. Current State (What is already built on `main`)
+## 2. Current State (Phases 1, 2, 3, 4, and 6 are COMPLETE)
 
-Phases 1 through 3 are **100% complete** and pushed to GitHub. Do not rebuild these.
-*   **Foundation:** FastAPI server (`src/cognishift/app/main.py`), Pydantic settings (`config.py`).
-*   **Database:** Async SQLite using `aiosqlite`. All tables (`workspaces`, `agent_definitions`, `tool_definitions`, `agent_runs`, etc.) are already created in `database.py`. All Pydantic schemas exist in `models.py`.
-*   **Providers:** `src/cognishift/core/providers.py` and `ollama_provider.py` exist and expose a clean async interface (`generate_text`, `health_check`).
+The following phases are **100% complete, verified, and merged into `main`**:
+*   ✅ **Phase 1 (Foundation):** FastAPI server (`src/cognishift/app/main.py`), Pydantic settings (`config.py`).
+*   ✅ **Phase 2 (Database Layer):** Async SQLite (`database.py`, `models.py`) with all 8 tables, WAL mode, foreign key enforcement, and workspace/agent CRUD APIs.
+*   ✅ **Phase 3 (Providers):** `providers.py`, `ollama_provider.py`, and `simulated_provider.py` implementing sovereign local and mock LLM interfaces.
+*   ✅ **Phase 4 (Knowledge Pipeline - Rohit):** Page-aware PDF ingestion, FastEmbed embeddings, ChromaDB vector store, and `/api/v1/knowledge` CRUD in `retriever.py` and `knowledge.py`.
+*   ✅ **Phase 6 (Tools & Approvals - Rohit):** Deterministic MRPL industrial tool simulations (`tools.py`) and supervisor approval inbox (`approvals.py`).
+*   ✅ **Operator Console UI:** Interactive web operator console in `app/static/index.html`.
 
 ---
 
-## 3. Team Sequence & Workflow
+## 3. Team Sequence & Active Focus
 
-To avoid merge conflicts and the need for mock functions, the team will work **sequentially**:
-
-1. **Step 1 (Rohit's Turn):** Rohit and his AI build Phase 4 (Knowledge Pipeline) and Phase 6 (Tools & Approvals). They merge to `main`.
-2. **Step 2 (Sitanshu's Turn):** Sitanshu pulls `main`. Sitanshu and his AI build Phase 5 (Execution Engine), which natively imports and uses Rohit's completed RAG and Tool functions. Sitanshu then builds Phase 7 (Multimodal Vision).
-3. **Step 3:** Both devs collaborate on the final UI and integration testing.
+1. **Step 1 (Rohit's Turn - DONE):** Built Phase 4 (Knowledge Pipeline) and Phase 6 (Tools & Approvals) and merged to `main`.
+2. **Step 2 (Sitanshu's Turn - ACTIVE):** Sitanshu and his AI build Phase 5 (Execution Engine: `engine.py` & `runs.py`) on GPU, directly importing Rohit's `retrieve_context` and `execute_tool`. Sitanshu then implements Phase 7 (Multimodal Vision).
+3. **Step 3 (Final Polish):** Full team integration and UI polish.
 
 See `AGENTS.md` for strict AI-to-AI handoff contracts.
 

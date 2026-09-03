@@ -1,111 +1,81 @@
-# CogniShift — Master System Specification & Sync Plan
+# CogniShift — Master System Specification & Implementation Plan
 
-> **ATTENTION AI ASSISTANTS:** This document is the ultimate source of truth for the CogniShift project. Two human developers (Sitanshu and Rohit) are using separate AI assistants to build this system. You must strictly adhere to the boundaries, interfaces, and constraints defined here to ensure the code you generate integrates flawlessly with the other team's code.
-
----
-
-## 1. Project Context & Non-Negotiable Constraints
-
-**Target:** SIH26117 — Sovereign On-Premise Agentic AI Workbench for Mangalore Refinery and Petrochemicals Limited (MRPL).
-**Core Purpose:** An industrial helpdesk/agentic platform where users can query manuals and safely execute simulated industrial actions.
-
-### 🚫 Strict Security & Hardware Constraints
-1. **Air-Gapped / Sovereign:** The system must operate 100% offline. External APIs (OpenAI, Gemini, Groq) are strictly prohibited in the final pipeline. The `Operating_Mode` config strictly enforces this.
-2. **Local LLMs Only:** Inference is handled locally via Ollama. 
-   - Text Model: `llama3.2:3b`
-   - Vision Model: `moondream`
-3. **No Arbitrary Code Execution:** You must NEVER use `subprocess.run`, `os.system`, `exec()`, or `eval()`. All tools must be strictly predefined Python functions (simulations).
-4. **Hardware Split:** 
-   - **Sitanshu** has an RTX 3050 (6GB VRAM) GPU and will handle all Ollama/Engine inference tasks.
-   - **Rohit** has CPU only, and will handle RAG (FastEmbed runs on CPU), DB CRUD, and UI.
+> **SIH26117 Master Blueprint:** Tracks architecture, component interfaces, completed milestones, and delivery phases for the Sovereign On-Premise Agentic AI Workbench.
 
 ---
 
-## 2. Current State (Phases 1, 2, 3, 4, 5, and 6 are COMPLETE)
+## 1. Project Context & Constraints
 
-The following phases are **100% complete, verified, and merged into `main`**:
-*   ✅ **Phase 1 (Foundation):** FastAPI server (`src/cognishift/app/main.py`), Pydantic settings (`config.py`).
-*   ✅ **Phase 2 (Database Layer):** Async SQLite (`database.py`, `models.py`) with all 8 tables, WAL mode, foreign key enforcement, and workspace/agent CRUD APIs.
-*   ✅ **Phase 3 (Providers):** `providers.py`, `ollama_provider.py`, and `simulated_provider.py` implementing sovereign local and mock LLM interfaces.
-*   ✅ **Phase 4 (Knowledge Pipeline - Rohit):** Page-aware PDF ingestion, FastEmbed embeddings, ChromaDB vector store, and `/api/v1/knowledge` CRUD in `retriever.py` and `knowledge.py`.
-*   ✅ **Phase 6 (Tools & Approvals - Rohit):** Deterministic MRPL industrial tool simulations (`tools.py`) and supervisor approval inbox (`approvals.py`).
-*   ✅ **Phase 5 (Execution Engine - Sitanshu):** State-machine agent execution loop (`core/engine.py`), `/api/v1/runs` endpoints (`api/runs.py`), safe auto-run, HITL approval pausing, and event-sourced timeline logging (`run_events`).
-*   ✅ **Operator Console UI:** Interactive web operator console in `app/static/index.html`.
+* **Host Organization:** Mangalore Refinery and Petrochemicals Limited (MRPL).
+* **Mission:** Deliver an air-gapped, zero-cloud agentic AI workbench allowing refinery board operators and field technicians to troubleshoot equipment, query technical SOPs, and safely actuate permitted plant actions.
+* **Security Directives:**
+  * Zero external cloud egress (100% local Ollama inference on NVIDIA GPU).
+  * Zero dynamic shell execution (`subprocess`, `os.system`, `eval`).
+  * Non-bypassable Human-in-the-Loop (HITL) Four-Eyes safety gate for sensitive actions.
 
 ---
 
-## 3. Team Sequence & Active Focus
+## 2. Phase Delivery Matrix
 
-1. **Step 1 (Rohit's Turn - DONE):** Built Phase 4 (Knowledge Pipeline) and Phase 6 (Tools & Approvals) and merged to `main`.
-2. **Step 2 (Sitanshu's Turn - Engine DONE):** Completed Phase 5 (Execution Engine: `engine.py` & `runs.py`). Now moving to Phase 7 (Multimodal Vision: Moondream image analysis for equipment inspections).
-3. **Step 3 (Final Polish):** Full team integration, UI polish, and live demo rehearsal for college qualifiers.
-
-See `AGENTS.md` for strict AI-to-AI handoff contracts.
-
----
-
-## 4. Deep-Dive Implementation Contracts
-
-To ensure Sitanshu's AI and Rohit's AI don't break each other's code, here are the strict interfaces you must build toward.
-
-### Phase 4: Knowledge Pipeline (Owner: Rohit & Rohit's AI)
-**Goal:** Ingest PDFs, chunk them, and store embeddings so the Engine can search them.
-**Dependencies:** Use `pypdf` for extraction, `fastembed` for CPU-based local embeddings, and `chromadb` for vector storage.
-**Contract Interface:** Rohit's AI must create `src/cognishift/core/retriever.py` with this exact async function signature so Sitanshu's Engine can call it:
-```python
-# src/cognishift/core/retriever.py
-async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str:
-    """
-    Searches ChromaDB for the given query within the workspace.
-    Returns a formatted string of the retrieved chunks and their sources.
-    If nothing is found, returns an empty string.
-    """
-```
-**API Endpoints required:** 
-- `POST /api/v1/knowledge/upload` (accepts `UploadFile`, workspace_id)
-- `GET /api/v1/knowledge?workspace_id=X`
-
-### Phase 5: Execution Engine (Owner: Sitanshu & Sitanshu's AI)
-**Goal:** The LangChain/LangGraph orchestration loop.
-**Dependencies:** LangChain Core. Must import `retrieve_context` from Rohit's `retriever.py` (mock it if Rohit hasn't built it yet).
-**Contract Interface:** Sitanshu's AI must create `src/cognishift/core/engine.py` with this exact signature:
-```python
-# src/cognishift/core/engine.py
-async def execute_agent_run(run_id: int, agent_id: int, workspace_id: int, user_prompt: str) -> dict:
-    """
-    1. Fetches Agent config from DB.
-    2. Calls `await retrieve_context(workspace_id, user_prompt)`.
-    3. Prompts the OllamaProvider.
-    4. Detects if tool execution is requested. If yes, pauses run for Approval (Phase 6).
-    5. Returns final text or tool request state.
-    """
-```
-**API Endpoints required:**
-- `POST /api/v1/runs` (creates a run in the DB and triggers `execute_agent_run`)
-- `GET /api/v1/runs/{run_id}/events` (fetches the timeline)
-
-### Phase 6: Tools & Approvals (Owner: Rohit & Rohit's AI)
-**Goal:** Simulated industrial actions and a human-in-the-loop approval pause.
-**Dependencies:** Reads from `tool_definitions` table.
-**Contract Interface:** Rohit's AI must expose a tool registry in `src/cognishift/core/tools.py`:
-```python
-# src/cognishift/core/tools.py
-async def execute_tool(tool_name: str, parameters: dict) -> str:
-    """Simulates the tool execution and returns a status string."""
-```
-**API Endpoints required:**
-- `GET /api/v1/approvals` (list pending tool requests)
-- `POST /api/v1/approvals/{request_id}/approve` (resumes the paused Engine run)
-- `POST /api/v1/approvals/{request_id}/reject` 
-
-### Phase 7: Multimodal Vision (Owner: Sitanshu & Sitanshu's AI)
-**Goal:** Allow users to upload photos of broken equipment.
-**Contract:** Sitanshu's AI will update `ollama_provider.py` to accept base64 image strings and send them to the `moondream` model to generate text descriptions before passing them to the main Engine.
+| Phase | Description | Key Modules | Status |
+|:---:|:---|:---|:---:|
+| **Phase 1** | Foundation & Air-Gap Verification | `main.py`, `config.py`, `.env` | ✅ **Complete** |
+| **Phase 2** | Database Layer & Relational Schemas | `database.py`, `models.py`, `workspaces.py`, `agents.py` | ✅ **Complete** |
+| **Phase 3** | Provider Layer & Sovereign Inference | `providers.py`, `ollama_provider.py`, `simulated_provider.py` | ✅ **Complete** |
+| **Phase 4** | Knowledge Pipeline & Vector RAG | `retriever.py`, `knowledge.py`, FastEmbed, ChromaDB | ✅ **Complete** |
+| **Phase 6** | Industrial Tool Registry & HITL Approvals | `tools.py`, `approvals.py`, `approval_requests` | ✅ **Complete** |
+| **Phase 5** | Autonomous Reasoning Engine & Event Ledger | `engine.py`, `runs.py`, `run_events` timeline | ✅ **Complete** |
+| **Phase 7** | Multimodal Vision & Gauge OCR | `moondream` integration, Bourdon dial analysis, nameplate OCR | ✅ **Complete** |
+| **Phase 8** | Enterprise Polish & Demonstration | Full system integration, qualifier scenarios | 🎯 **In Progress** |
 
 ---
 
-## 5. Synchronization Checklist for AIs
-Before generating code, AIs should ALWAYS:
-1. Use file viewing tools to read `src/cognishift/app/db/models.py` and `database.py` to understand the current schema. Do NOT hallucinate database columns.
-2. Respect the boundaries. If you are Sitanshu's AI, do not write the PDF extraction logic. If you are Rohit's AI, do not write the Ollama generation logic. 
-3. If you need a function from the other developer's domain, write a "mock" function with the agreed-upon signature so your code can compile, and leave a `# TODO: Wait for Dev X` comment.
+## 3. Deep-Dive Phase Specifications
+
+### Phase 1: Foundation & Air-Gap Enforcement
+* Centralized Pydantic v2 `Settings` class loading from `.env`.
+* Startup lifespan handler that ensures local data directory hierarchies exist.
+* `/api/v1/system/privacy-status` endpoint verifying that external network egress is blocked.
+
+### Phase 2: Relational Database Layer
+* Async SQLite (`aiosqlite`) configured with Write-Ahead Logging (`PRAGMA journal_mode = WAL`) and runtime foreign key enforcement (`PRAGMA foreign_keys = ON`).
+* 10 fully normalized tables:
+  `workspaces`, `agent_definitions`, `knowledge_sources`, `tool_definitions`, `agent_runs`, `run_events`, `approval_requests`, `audit_events`, `graph_nodes`, `graph_edges`.
+
+### Phase 3: Model Provider Layer
+* Abstract base class `ModelProvider` with standard `ModelResponse` dataclass.
+* `OllamaProvider` connecting via `httpx.AsyncClient` to `http://localhost:11434` with 120-second timeout resilience.
+* `SimulatedProvider` enabling mock CPU testing without active GPU models.
+
+### Phase 4: Knowledge Pipeline (Vector RAG)
+* Page-aware PDF parsing using `pypdf`.
+* Chunking with 800-character windows and 150-character overlaps preserving `[Filename | Page X]` metadata citations.
+* Local CPU embeddings using `fastembed` (`BAAI/bge-small-en-v1.5`) stored in persistent ChromaDB collections.
+* Stress-tested successfully on a 500-page mega-manual corpus (787 vector chunks indexed).
+
+### Phase 5: Autonomous Execution Engine
+* Reasoning state machine in `src/cognishift/core/engine.py`.
+* Ingests Vector RAG context and Plant Topology Graph memory simultaneously.
+* Parses model tool-calling intents with JSON extraction and fallback regex parsing.
+* Intercepts high-risk actions (`service_interrupting`, `sensitive`) and halts execution in `paused` state.
+* Full event sourcing logging each transition (`run_started`, `retrieval_started`, `model_prompt`, `hitl_paused`, `tool_executed`, `completed`) into `run_events`.
+
+### Phase 6: Tools & Safety Approvals
+* Deterministic tool simulations in `src/cognishift/core/tools.py` wired to authentic industrial datasets:
+  * Dynamic Tennessee Eastman Process SCADA telemetry (`telemetry_stream_tep.json`).
+  * SAP S/4HANA PM work orders and ISO 14224 FMEA damage records (`maintenance_orders_sap_pm.json`).
+* Supervisor approval inbox in `src/cognishift/app/api/approvals.py` allowing digital sign-off (`approve`/`reject`) to resume paused runs.
+
+### Phase 7: Multimodal Vision & Industrial OCR
+* Ingestion of image artifacts (`input_image_path`) in `execute_agent_run`.
+* Direct local VLM inference using `moondream:latest` on NVIDIA RTX 3050 GPU.
+* Inspection of analog Bourdon pressure dials (extracting tag name `PT-101`, dial reading, and red-zone trip state).
+* OCR on stamped metallic equipment rating plates (extracting `P-101A`, Sulzer BB2 model, and API 682 Plan 53A specs).
+* Grounded against ISO 15926 Plant Topology Knowledge Graph.
+
+---
+
+## 4. Benchmark Validation Summary
+* **Industrial Workflow Suite:** 5/5 tests passing (`scratch/test_industrial_data_workflow.py`).
+* **Multimodal Vision & OCR Suite:** 3/3 scenarios passing (`scratch/test_multimodal_vision_pipeline.py`).
+* **Unit & Schema Suite:** 10/10 tests passing (`pytest -v`).

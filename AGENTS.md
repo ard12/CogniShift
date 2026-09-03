@@ -1,57 +1,79 @@
-# Agentic Alignment Guide (AI to AI Handoff)
+# Agentic Alignment Guide (AI to AI Handoff & Synchronization)
 
-> **HELLO FELLOW AI ASSISTANT!** 👋
-> If you are reading this, you are likely assisting Rohit in building the next phase of the CogniShift platform. I am the AI assistant helping Sitanshu. To make sure our code integrates perfectly, please read this situation report carefully.
+> **HELLO FELLOW AI ASSISTANT!** 👋  
+> This document governs technical alignment between developer agents assisting **Sitanshu** and **Rohit**. Read this guide carefully to preserve all architectural contracts and avoid breaking changes.
 
 ---
 
-## 1. Our Situation & Constraints
+## 1. Operating Constraints (Non-Negotiable)
 
 We are building a **Sovereign On-Premise Agentic AI Workbench** (SIH26117).
-*   **Zero Cloud:** The system must operate 100% offline. Do not add code that requires external APIs like OpenAI or Gemini.
-*   **Security:** Do not use `subprocess.run` or arbitrary command execution anywhere.
-*   **What is done:** I have already built the FastAPI backend, the async SQLite database, the agent CRUD routes, and the local `OllamaProvider`. Check `src/cognishift/app/db/models.py` and `database.py` to see the current schema.
-
-## 2. The Game Plan
-
-Because Sitanshu has a GPU, he (and I) will build the AI Execution Engine loop that runs inference. Because Rohit has a CPU, you two will build the Platform APIs (which only require CPU).
-
-We are working sequentially. **It is your turn first.**
-
-You need to build the Knowledge Pipeline and the Tool Approval endpoints. Once you push your code to `main`, I will read it and build the Engine that imports your functions.
+* **Zero Cloud:** The system must operate 100% offline. Never introduce external endpoints (OpenAI, Gemini, Anthropic, HuggingFace Hub downloads at runtime).
+* **Zero Arbitrary Execution:** Never use `subprocess.run`, `os.system`, `exec()`, or `eval()`.
+* **Hardware Specialization:**
+  * **Sitanshu (NVIDIA RTX 3050 GPU):** Runs local LLM (`llama3.2:3b`) and VLM (`moondream:latest`) inference, Autonomous Execution Engine (`engine.py`), Multimodal Vision, and Industrial Benchmark suites.
+  * **Rohit (CPU Host):** Focuses on Platform APIs, FastEmbed document ingestion, SQLite relational queries, and Operator Console UI.
 
 ---
 
-## 3. Your Specific Tasks (What you must build)
+## 2. Completed Milestones & Current Standing
 
-Please execute the following tasks. Do not build the Execution Engine (Phase 5) — leave that for me.
+All foundational and core reasoning phases are **100% complete and passing on `main`**:
+1. **Phase 1 (Foundation):** Lifespan handler, configuration singleton, air-gap status endpoints.
+2. **Phase 2 (Database):** Async SQLite (`aiosqlite`) with 10 tables including `graph_nodes`, `graph_edges`, and `run_events`.
+3. **Phase 3 (Providers):** Local `OllamaProvider` with 120s timeout resilience and `SimulatedProvider` dev fallback.
+4. **Phase 4 (Knowledge Pipeline):** Page-aware PyPDF extraction, CPU-friendly FastEmbed, and ChromaDB vector store (`retriever.py`).
+5. **Phase 6 (Tools & Approvals):** Data-driven tool execution (`tools.py`) and supervisor approval management (`approvals.py`).
+6. **Phase 5 (Execution Engine):** State machine agent reasoning loop (`engine.py`) with automatic Four-Eyes HITL pausing.
+7. **Phase 7 (Multimodal Vision):** Moondream integration for analog pressure gauge dial readings and stamped metallic nameplate OCR.
 
-### Task A: Phase 4 (Knowledge Pipeline)
-1. **Dependencies:** Use `pypdf` for text extraction, `fastembed` for CPU-based local embeddings, and `chromadb` for local vector storage.
-2. **Endpoints:** Build `POST /api/v1/knowledge/upload` (accepts PDF and `workspace_id`) and `GET /api/v1/knowledge` in `src/cognishift/app/api/knowledge.py`.
-3. **The Contract:** You MUST export the following async function in `src/cognishift/core/retriever.py` so that I can call it later:
-   ```python
-   async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str:
-       """
-       Searches ChromaDB for the given query within the workspace.
-       Returns a formatted string containing the text chunks and source citations.
-       """
-   ```
+---
 
-### Task B: Phase 6 (Tools & Approvals)
-1. **Endpoints:** Build the Human-in-the-Loop API in `src/cognishift/app/api/approvals.py`. You need endpoints to list pending `approval_requests`, and `POST` endpoints to approve/reject them.
-2. **The Contract:** You MUST export a tool registry in `src/cognishift/core/tools.py` so my Engine knows what tools exist:
-   ```python
-   async def execute_tool(tool_name: str, parameters: dict) -> str:
-       """
-       Simulates the execution of the tool (e.g. check_pressure) and returns a text result.
-       """
-   ```
+## 3. Public Contracts & Interfaces (Do Not Break!)
 
-## 4. Current Status: Handoff Received! 🤝
+### A. Vector RAG Contract (`src/cognishift/core/retriever.py`)
+```python
+async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str:
+    \"\"\"Searches ChromaDB for the given query within the workspace.
+    Returns a formatted string containing chunk text and [Filename | Page X] citations.
+    \"\"\"
+```
 
-**Rohit and his AI assistant have successfully completed Task A (Phase 4) and Task B (Phase 6)!**
-- Commit `26a8c60` merged cleanly.
-- `retrieve_context` and `execute_tool` contracts verified.
-- **Sitanshu and his AI assistant are now actively building Phase 5 (The Execution Engine in `core/engine.py` and `app/api/runs.py`).**
+### B. Plant Topology Graph Memory Contract (`src/cognishift/core/graph_memory.py`)
+```python
+async def query_graph_context(workspace_id: int, query_text: str, max_hops: int = 2) -> str:
+    \"\"\"Traverses SQLite graph_nodes and graph_edges matching physical equipment in query_text.
+    Returns structured relationship strings (e.g. Pump-101A --(FEEDS_INTO)--> Reactor-B).
+    \"\"\"
+```
 
+### C. Industrial Tool Registry Contract (`src/cognishift/core/tools.py`)
+```python
+async def execute_tool(tool_name: str, parameters: dict) -> str:
+    \"\"\"Executes data-driven tool logic against Tennessee Eastman Process telemetry
+    and SAP S/4HANA PM work orders without arbitrary shell commands.
+    \"\"\"
+```
+
+### D. Autonomous Engine Execution Contract (`src/cognishift/core/engine.py`)
+```python
+async def execute_agent_run(
+    workspace_id: int,
+    agent_id: int,
+    input_text: str,
+    user_id: str = "operator",
+    input_image_path: Optional[str] = None
+) -> RunResponse:
+    \"\"\"Executes end-to-end reasoning loop. If input_image_path is provided, analyzes
+    with local Moondream VLM before RAG retrieval. If high-risk action is detected,
+    safely pauses run in approval_requests.
+    \"\"\"
+
+async def resume_agent_run(run_id: int) -> RunResponse:
+    \"\"\"Resumes execution of a paused run once the supervisor signs off in approval_requests.\"\"\"
+```
+
+---
+
+## 4. Current Work: Phase 8 (Integration & Qualifier Rehearsal)
+With all core AI, database, RAG, tool, graph, and vision modules complete and verified, our next joint step is preparing the final demonstration flows and ensuring flawless presentation timing for SIH qualifiers.

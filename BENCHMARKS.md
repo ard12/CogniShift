@@ -54,7 +54,7 @@ Dataset: ISO 15926 Topology + TEP Telemetry + SAP PM FMEA + HAZOP SOP
 3. **Dynamic SCADA Telemetry & SAP PM:**
    * Nominal telemetry on `PT-101`: `105.5 PSI [GOOD]`.
    * TEP Overpressure surge (`IDV 6`) on `PT-101`: `495.2 PSI [CRITICAL OVERPRESSURE]`.
-   * SAP PM work order query: Retreived Order `#400829104` with ISO 14224 `DMG-SEAL-02` code.
+   * SAP PM work order query: Retrieved Order `#400829104` with ISO 14224 `DMG-SEAL-02` code.
 4. **Autonomous Reasoning & Four-Eyes Interlock:**
    * Agent reasoning loop detected critical overpressure via local `llama3.2:3b` GPU inference.
    * State machine intercepted `emergency_pressure_relief` and paused in **0.84 seconds**, issuing Approval Request `#22`.

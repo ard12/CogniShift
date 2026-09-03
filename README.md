@@ -87,7 +87,7 @@ cd CogniShift
 
 # Create and activate virtual environment
 python -m venv .venv
-.venv\\Scripts\\activate   # Windows PowerShell
+.venv\Scripts\activate   # Windows PowerShell
 # source .venv/bin/activate  # Linux / macOS
 
 # Install dependencies

@@ -34,25 +34,25 @@ All foundational and core reasoning phases are **100% complete and passing on `m
 ### A. Vector RAG Contract (`src/cognishift/core/retriever.py`)
 ```python
 async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str:
-    \"\"\"Searches ChromaDB for the given query within the workspace.
+    """Searches ChromaDB for the given query within the workspace.
     Returns a formatted string containing chunk text and [Filename | Page X] citations.
-    \"\"\"
+    """
 ```
 
 ### B. Plant Topology Graph Memory Contract (`src/cognishift/core/graph_memory.py`)
 ```python
 async def query_graph_context(workspace_id: int, query_text: str, max_hops: int = 2) -> str:
-    \"\"\"Traverses SQLite graph_nodes and graph_edges matching physical equipment in query_text.
+    """Traverses SQLite graph_nodes and graph_edges matching physical equipment in query_text.
     Returns structured relationship strings (e.g. Pump-101A --(FEEDS_INTO)--> Reactor-B).
-    \"\"\"
+    """
 ```
 
 ### C. Industrial Tool Registry Contract (`src/cognishift/core/tools.py`)
 ```python
 async def execute_tool(tool_name: str, parameters: dict) -> str:
-    \"\"\"Executes data-driven tool logic against Tennessee Eastman Process telemetry
+    """Executes data-driven tool logic against Tennessee Eastman Process telemetry
     and SAP S/4HANA PM work orders without arbitrary shell commands.
-    \"\"\"
+    """
 ```
 
 ### D. Autonomous Engine Execution Contract (`src/cognishift/core/engine.py`)
@@ -64,13 +64,13 @@ async def execute_agent_run(
     user_id: str = "operator",
     input_image_path: Optional[str] = None
 ) -> RunResponse:
-    \"\"\"Executes end-to-end reasoning loop. If input_image_path is provided, analyzes
+    """Executes end-to-end reasoning loop. If input_image_path is provided, analyzes
     with local Moondream VLM before RAG retrieval. If high-risk action is detected,
     safely pauses run in approval_requests.
-    \"\"\"
+    """
 
 async def resume_agent_run(run_id: int) -> RunResponse:
-    \"\"\"Resumes execution of a paused run once the supervisor signs off in approval_requests.\"\"\"
+    """Resumes execution of a paused run once the supervisor signs off in approval_requests."""
 ```
 
 ---

@@ -81,7 +81,7 @@ Is Action High Risk?
                   ▼
          Queue in approval_requests
                   │
-        Supervisor Review (Web / Console)
+         Supervisor Review (Web / CLI / API)
          ├── REJECT ──► [CANCELLED]
          └── APPROVE ─► [RESUME_RUN] ──► [EXECUTE_TOOL] ──► [COMPLETE]
 ```
@@ -91,7 +91,19 @@ Is Action High Risk?
 ## 4. Multimodal Computer Vision & Industrial OCR Pipeline
 
 Field technicians can inspect equipment visually without manual typing:
-1. **Image Input:** Analog Bourdon gauge photos or metallic rating plates uploaded via `/api/v1/runs`.
+1. **Image Input:** Analog Bourdon gauge photos or metallic rating plates uploaded via `/api/v1/runs` or `python cli.py run execute --image`.
 2. **Local Vision Inference:** `moondream:latest` (1.86B parameter VLM) analyzes image on local GPU.
 3. **Telemetry Extraction:** Identifies pointer needle angle, dial units (PSI), operating status, and stamped equipment tags (`PT-101`, `P-101A`).
 4. **Knowledge Fusing:** Injects visual findings into the LLM prompt alongside RAG manuals and plant topology graph.
+
+---
+
+## 5. Terminal CLI Workbench
+
+CogniShift provides a standalone terminal interface (`cli.py`) built with Typer + Rich for headless edge server deployments and SSH-based operator sessions:
+- **8 Command Groups:** `workspace`, `agent`, `knowledge`, `graph`, `telemetry`, `run`, `approvals`, and `chat`.
+- **Interactive REPL:** Persistent operator chat session with `/image`, `/status`, `/approvals`, `/telemetry`, `/approve`, and `/clear` slash commands.
+- **Full Feature Parity:** Every REST API endpoint has a corresponding CLI command with identical data access.
+- **Supervisor Review:** Four-Eyes approval can be performed via the web console (`/static/index.html`), Swagger API (`/docs`), or the terminal CLI (`python cli.py approvals approve <id>`).
+
+See **[CLI.md](CLI.md)** for the complete command reference.

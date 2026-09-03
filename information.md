@@ -7,7 +7,7 @@
 
 ## Table of Contents
 1. [What is CogniShift? (The Big Picture)](#1-what-is-cognishift-the-big-picture)
-2. [How It Works (The 6 Core Stations)](#2-how-it-works-the-6-core-stations)
+2. [How It Works (The 7 Core Stations)](#2-how-it-works-the-7-core-stations)
 3. [File-by-File Technical Guide](#3-file-by-file-technical-guide)
 4. [Real-World Operational Scenarios](#4-real-world-operational-scenarios)
 5. [Presentation Pitch & FAQ Cheat Sheet](#5-presentation-pitch--faq-cheat-sheet)
@@ -33,7 +33,7 @@ CogniShift is a **sovereign, air-gapped agentic workbench** built directly for t
 
 ---
 
-## 2. How It Works (The 6 Core Stations)
+## 2. How It Works (The 7 Core Stations)
 
 ```
 +-------------------------------------------------------------------------------+
@@ -69,6 +69,12 @@ CogniShift is a **sovereign, air-gapped agentic workbench** built directly for t
 |  6. THE TOOLBOX & SAFETY GATE (core/tools.py & approvals.py)                  |
 |     Safe sensor checks run immediately. High-risk actions (valve actuation)   |
 |     pause the system until a human supervisor clicks [APPROVE].               |
++---------------------------------------+---------------------------------------+
+                                        |
++---------------------------------------v---------------------------------------+
+|  7. THE TERMINAL WORKBENCH (cli.py / Typer + Rich)                            |
+|     Full-featured CLI for headless edge servers and SSH sessions. 8 command   |
+|     groups, interactive REPL, multimodal vision, and Four-Eyes approvals.    |
 +-------------------------------------------------------------------------------+
 ```
 
@@ -95,7 +101,12 @@ CogniShift is a **sovereign, air-gapped agentic workbench** built directly for t
 10. **`src/cognishift/core/engine.py`:** The central autonomous reasoning loop. Fuses visual telemetry, vector RAG, and graph topology; detects tool calling; and manages the Four-Eyes HITL pause/resume lifecycle.
 11. **`src/cognishift/core/tools.py`:** Deterministic industrial tool registry connected to Tennessee Eastman SCADA telemetry and SAP PM maintenance records.
 
-### E. Datasets & Test Scenarios
+### F. Terminal CLI Workbench
+12. **`src/cognishift/cli.py`:** Full-featured terminal CLI built with Typer and Rich. Provides 8 command groups (`workspace`, `agent`, `knowledge`, `graph`, `telemetry`, `run`, `approvals`, `chat`) with interactive REPL mode, multimodal `--image` support, and Four-Eyes supervisor sign-off — all without a browser.
+13. **`cli.py`:** Root entry point that adds `src/` to `sys.path` and launches the CLI.
+14. **`src/cognishift/__main__.py`:** Enables `python -m cognishift` module invocation.
+
+### G. Datasets & Test Scenarios
 12. **`data/refinery_topology_iso15926.json`:** P&ID equipment specifications and physical safety relief connections.
 13. **`data/telemetry_stream_tep.json`:** Dynamic time-series SCADA sensor stream with nominal baseline and overpressure surge fault injection.
 14. **`data/maintenance_orders_sap_pm.json`:** SAP S/4HANA PM maintenance orders with ISO 14224 FMEA damage coding.

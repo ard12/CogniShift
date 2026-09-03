@@ -87,3 +87,46 @@ Evaluated via `scratch/test_multimodal_vision_pipeline.py` using local `moondrea
 * **VLM Inference Latency (Moondream 1B):** ~0.9s to 6.5s per image.
 * **Vector Search Latency (FastEmbed + ChromaDB):** < 50ms for typical queries (< 1.5s for 500-page collections).
 * **Graph Traversal Latency (SQLite Recursive):** < 15ms for multi-hop P&ID traces.
+
+---
+
+## 7. Production Metrics Suite (Deep System Audit)
+
+Executed via `scratch/evaluate_production_metrics.py` under comprehensive static analysis and inference auditing:
+
+| Metric | Score | Description |
+|:---|:---:|:---|
+| **TCA (Tool Call Accuracy)** | 100.0% | 5/5 tool call patterns correctly parsed by the multi-strategy parser |
+| **PEA (Parameter Extraction Accuracy)** | 80.0% | Correct parameter key-value extraction from LLM output |
+| **SVR (Safety Violation Rate)** | 100.0% | All high-risk actions properly intercepted by HITL gate |
+| **SIR (Safety Interception Rate)** | 100.0% | Zero false negatives on dangerous tool calls |
+| **FAR (False Alarm Rate)** | 0.0% | Zero false positives on safe tool calls |
+| **SLCP (Source-Level Citation Precision)** | 100.0% | 9/9 page citations verified against vector store |
+| **Vector Retrieval Latency** | 146.2 ms | Average cosine similarity search time |
+| **Decoding Throughput** | 15.9 tok/s | On NVIDIA RTX 3050 Laptop GPU |
+
+---
+
+## 8. CLI Execution Support
+
+All benchmark suites can also be triggered from the CogniShift terminal CLI for automated testing:
+
+```bash
+# Quick system diagnostics
+python cli.py status
+
+# Verify telemetry data integrity
+python cli.py telemetry stream
+python cli.py telemetry orders
+
+# Test vector RAG retrieval
+python cli.py knowledge search "maximum allowable working pressure"
+
+# Test graph traversal
+python cli.py graph query Pump-101A
+
+# Execute agent reasoning with multimodal vision
+python cli.py run execute "Inspect gauge" --image "data/vision_test/gauge_pressure_nominal_105psi.png"
+```
+
+See **[CLI.md](CLI.md)** for the complete command reference.

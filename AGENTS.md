@@ -26,6 +26,7 @@ All foundational and core reasoning phases are **100% complete and passing on `m
 5. **Phase 6 (Tools & Approvals):** Data-driven tool execution (`tools.py`) and supervisor approval management (`approvals.py`).
 6. **Phase 5 (Execution Engine):** State machine agent reasoning loop (`engine.py`) with automatic Four-Eyes HITL pausing.
 7. **Phase 7 (Multimodal Vision):** Moondream integration for analog pressure gauge dial readings and stamped metallic nameplate OCR.
+8. **Phase 8 (Terminal CLI Workbench):** Full 891-line Typer + Rich terminal interface (`cli.py`) with 8 command groups, interactive REPL, multimodal `--image` support, and supervisor Four-Eyes sign-off. Documented in [`CLI.md`](CLI.md).
 
 ---
 
@@ -75,5 +76,17 @@ async def resume_agent_run(run_id: int) -> RunResponse:
 
 ---
 
-## 4. Current Work: Phase 8 (Integration & Qualifier Rehearsal)
-With all core AI, database, RAG, tool, graph, and vision modules complete and verified, our next joint step is preparing the final demonstration flows and ensuring flawless presentation timing for SIH qualifiers.
+## 4. Operator Interfaces
+
+CogniShift provides three operator access methods — all functionally equivalent:
+
+| Interface | Entry Point | Use Case |
+|:---|:---|:---|
+| **Web Console** | `http://127.0.0.1:8000/static/index.html` | Browser-based dashboard with upload, runs, and approvals |
+| **REST API** | `http://127.0.0.1:8000/docs` (Swagger) | Programmatic integration and automated scripts |
+| **Terminal CLI** | `python cli.py [command]` | Headless edge servers, SSH sessions, and SIH demonstrations |
+
+---
+
+## 5. Current Work: SIH Qualifier Rehearsal
+With all core AI, database, RAG, tool, graph, vision, and CLI modules complete and verified (17/17 pytest, 5/5 industrial workflow, 3/3 VLM vision, 100% TCA/SIR/SLCP), our next joint step is preparing the final demonstration flows and ensuring flawless presentation timing for SIH qualifiers.

@@ -36,6 +36,7 @@
 ```mermaid
 graph TD
     UI["Operator Console / Field Terminal"] --> API["FastAPI Application (cognishift.app)"]
+    CLI["Terminal CLI (cli.py / Typer + Rich)"] --> API
 
     subgraph "Core Workbench Services"
         API --> WORKSPACES["Workspaces API (/api/v1/workspaces)"]
@@ -140,7 +141,7 @@ CogniShift includes an extensive test suite verifying mathematical correctness, 
 ```bash
 pytest -v
 ```
-*Validates database schema, WAL journaling, model providers, and API response serialization (10/10 passing).*
+*Validates database schema, WAL journaling, model providers, engine state machine, and API response serialization (17/17 passing).*
 
 ### 2. End-to-End Industrial Workflow Benchmark
 ```bash
@@ -192,12 +193,13 @@ python scratch/test_multimodal_vision_pipeline.py
 | **Phase 6** | Tool Registry & Four-Eyes Approvals | Deterministic simulations, HITL inbox | ✅ **Complete** |
 | **Phase 5** | Autonomous Execution Engine | State Machine, Event Sourcing (`run_events`) | ✅ **Complete** |
 | **Phase 7** | Multimodal Vision & Gauge OCR | Moondream 1B, Bourdon dial analysis | ✅ **Complete** |
-| **Phase 8** | Enterprise Polish & Qualifier Demo | Full stack integration & scenario rehearsal | 🎯 **In Progress** |
+| **Phase 8** | Terminal CLI Workbench & Enterprise Polish | Typer, Rich, Interactive REPL, `cli.py` | ✅ **Complete** |
 
 ---
 
 ## Detailed Documentation Suite
 
+* **[CLI.md](CLI.md):** Complete terminal CLI command reference, arguments, options, and output examples.
 * **[ARCHITECTURE.md](ARCHITECTURE.md):** Industrial Purdue model, ISO 15926 ontology, and TEP data models.
 * **[BENCHMARKS.md](BENCHMARKS.md):** Performance metrics, 500-page RAG stress tests, and VLM evaluation.
 * **[information.md](information.md):** Complete Plain-English encyclopedia and operator walkthroughs.

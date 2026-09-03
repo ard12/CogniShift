@@ -1,12 +1,46 @@
-﻿import os
+import os
 import asyncio
 from pathlib import Path
 from typing import List, Tuple
 import chromadb
 from fastembed import TextEmbedding
 from pypdf import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from cognishift.app.config import settings
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except Exception:
+    class RecursiveCharacterTextSplitter:
+        """Zero-dependency pure-Python recursive text splitter."""
+        def __init__(self, chunk_size: int = 500, chunk_overlap: int = 80):
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+
+        def split_text(self, text: str) -> List[str]:
+            if not text:
+                return []
+            chunks = []
+            start = 0
+            while start < len(text):
+                end = start + self.chunk_size
+                if end >= len(text):
+                    chunks.append(text[start:].strip())
+                    break
+                split_at = -1
+                for sep in ['\n\n', '\n', '. ', ' ']:
+                    idx = text.rfind(sep, start, end)
+                    if idx != -1:
+                        split_at = idx + len(sep)
+                        break
+                if split_at == -1 or split_at <= start:
+                    split_at = end
+                chunk = text[start:split_at].strip()
+                if chunk:
+                    chunks.append(chunk)
+                start = max(start + 1, split_at - self.chunk_overlap)
+            return [c for c in chunks if c]
+
+# Industrial-grade recursive text splitter with overlap
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
 
 # Initialize ChromaDB locally
 chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path))
@@ -14,8 +48,6 @@ chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path))
 # Initialize FastEmbed locally (CPU optimized)
 embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
-# Industrial-grade recursive text splitter with overlap
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
 
 async def process_pdf(file_path: str, workspace_id: int, source_id: int, filename: str = "") -> int:
     """

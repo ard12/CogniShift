@@ -13,6 +13,7 @@ import json
 import re
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 
 from cognishift.app.config import settings
@@ -151,9 +152,10 @@ async def execute_agent_run(
     workspace_id: int,
     agent_id: int,
     input_text: str,
-    user_id: str = "operator"
+    user_id: str = "operator",
+    input_image_path: Optional[str] = None
 ) -> RunResponse:
-    """Execute an end-to-end agent reasoning run."""
+    """Execute an end-to-end agent reasoning run with text and multimodal vision support."""
     async with get_db() as db:
         # 1. Fetch Agent Definition
         cursor = await db.execute("SELECT * FROM agent_definitions WHERE id = ?", (agent_id,))
@@ -186,25 +188,56 @@ async def execute_agent_run(
 
         # 3. Create initial Run Record
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        input_type = "multimodal" if input_image_path else "text"
         cursor = await db.execute(
             """INSERT INTO agent_runs 
-               (workspace_id, agent_id, user_id, input_text, input_type, status, model_name, operating_mode, started_at)
-               VALUES (?, ?, ?, ?, 'text', 'running', ?, ?, ?) RETURNING *""",
-            (workspace_id, agent_id, user_id, input_text, agent["model_name"], settings.operating_mode, now_str)
+               (workspace_id, agent_id, user_id, input_text, input_type, input_image_path, status, model_name, operating_mode, started_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?) RETURNING *""",
+            (workspace_id, agent_id, user_id, input_text, input_type, input_image_path, agent["model_name"], settings.operating_mode, now_str)
         )
         run_record = await cursor.fetchone()
         await db.commit()
         run_id = run_record["id"]
 
-        await log_event(db, run_id, "run_started", f"Run initiated for agent '{agent['name']}'", {"agent_id": agent_id, "user_id": user_id})
+        await log_event(db, run_id, "run_started", f"Run initiated for agent '{agent['name']}'", {"agent_id": agent_id, "user_id": user_id, "input_type": input_type})
 
         try:
-            # 4. Domain-Specific RAG Retrieval & Graph Memory
+            # 4. Multimodal Vision Inspection (if image provided)
+            vision_analysis = ""
+            if input_image_path and Path(input_image_path).exists():
+                await log_event(db, run_id, "vision_started", f"Analyzing image {Path(input_image_path).name} with local vision model...")
+                try:
+                    with open(input_image_path, "rb") as f:
+                        img_bytes = f.read()
+                    provider = get_provider()
+                    vlm_res = await provider.analyze_image(
+                        img_bytes,
+                        prompt="Analyze this industrial image. Describe the equipment tag, instrument type, gauge reading with units, or rating plate specifications in detail."
+                    )
+                    vision_analysis = vlm_res.text.strip()
+                    await log_event(
+                        db,
+                        run_id,
+                        "vision_completed",
+                        f"Visual inspection completed ({len(vision_analysis)} chars)",
+                        {"analysis": vision_analysis, "model": provider.vision_model}
+                    )
+                except Exception as e:
+                    logger.error(f"Vision analysis error: {e}")
+
+            # 5. Domain-Specific RAG Retrieval & Graph Memory
             await log_event(db, run_id, "retrieval_started", "Searching local knowledge base and plant topology graph...")
-            context_str = await retrieve_context(workspace_id=workspace_id, query=input_text, top_k=3)
-            graph_context = await query_graph_context(workspace_id=workspace_id, query_text=input_text, max_hops=2)
+            retrieval_query = f"{input_text} {vision_analysis}".strip() if vision_analysis else input_text
+            context_str = await retrieve_context(workspace_id=workspace_id, query=retrieval_query, top_k=3)
+            graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
             combined_context_parts = []
+            if vision_analysis:
+                combined_context_parts.append(
+                    f"--- VISUAL INSPECTION TELEMETRY (LOCAL VLM ANALYSIS) ---\n"
+                    f"Image Artifact: {Path(input_image_path).name}\n"
+                    f"Inspection Telemetry: {vision_analysis}"
+                )
             if context_str:
                 combined_context_parts.append(context_str)
             if graph_context:
@@ -222,16 +255,19 @@ async def execute_agent_run(
 
             if graph_context:
                 sources_used += " + Plant Topology Graph"
+            if vision_analysis:
+                sources_used += " + Local VLM Inspection"
 
             await log_event(
                 db,
                 run_id,
                 "retrieval_completed",
-                f"Retrieved context ({len(citations)} manual citations, graph topology: {'yes' if graph_context else 'none'})",
+                f"Retrieved context ({len(citations)} manual citations, graph topology: {'yes' if graph_context else 'none'}, visual input: {'yes' if vision_analysis else 'none'})",
                 {
                     "citations": citations,
-                    "manual_preview": context_str[:200] if context_str else "",
-                    "graph_preview": graph_context[:200] if graph_context else ""
+                    "has_graph": bool(graph_context),
+                    "has_vision": bool(vision_analysis),
+                    "manual_preview": context_str[:200] if context_str else ""
                 }
             )
 

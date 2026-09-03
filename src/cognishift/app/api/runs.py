@@ -22,7 +22,8 @@ async def create_run(run_req: RunCreate):
             workspace_id=run_req.workspace_id,
             agent_id=run_req.agent_id,
             input_text=run_req.input_text or "",
-            user_id=run_req.user_id or "operator"
+            user_id=run_req.user_id or "operator",
+            input_image_path=run_req.input_image_path
         )
         return run_res
     except ValueError as ve:

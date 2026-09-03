@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime
 
@@ -84,6 +84,7 @@ class RunCreate(BaseModel):
     agent_id: int
     input_text: Optional[str] = None
     input_type: str = 'text'
+    input_image_path: Optional[str] = None
     user_id: str = 'operator'
 
 class RunResponse(BaseModel):
@@ -93,6 +94,7 @@ class RunResponse(BaseModel):
     user_id: str
     input_text: Optional[str] = None
     input_type: str
+    input_image_path: Optional[str] = None
     status: str
     model_name: Optional[str] = None
     operating_mode: Optional[str] = None

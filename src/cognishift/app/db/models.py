@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+﻿from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime
 
@@ -49,6 +49,24 @@ class AgentUpdate(BaseModel):
     knowledge_source_ids: Optional[List[int]] = None
     status: Optional[str] = None
 
+class ToolDefinitionCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    risk_level: str = 'read_only'
+    requires_approval: bool = False
+    enabled: bool = True
+    implementation_key: str
+    input_schema: str = '{}'
+
+class ToolDefinitionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    risk_level: Optional[str] = None
+    requires_approval: Optional[bool] = None
+    enabled: Optional[bool] = None
+    implementation_key: Optional[str] = None
+    input_schema: Optional[str] = None
+
 class ToolDefinitionResponse(BaseModel):
     id: int
     name: str
@@ -57,6 +75,8 @@ class ToolDefinitionResponse(BaseModel):
     requires_approval: bool
     enabled: bool
     implementation_key: str
+    input_schema: Optional[str] = None
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class RunCreate(BaseModel):
@@ -115,5 +135,18 @@ class AuditEventResponse(BaseModel):
     resource_id: Optional[int] = None
     details: Optional[str] = None
     result: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class KnowledgeSourceResponse(BaseModel):
+    id: int
+    workspace_id: int
+    name: str
+    source_type: str
+    original_filename: Optional[str] = None
+    local_path: Optional[str] = None
+    processing_status: str
+    checksum: Optional[str] = None
+    chunk_count: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

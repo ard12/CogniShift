@@ -1,8 +1,11 @@
-import os
+﻿import os
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any
 import httpx
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 from cognishift.app.config import settings
 from cognishift import __version__
 
@@ -18,7 +21,6 @@ def create_directories():
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan handler for FastAPI."""
@@ -26,8 +28,16 @@ async def lifespan(app: FastAPI):
     # Initialize database tables
     from cognishift.app.db.database import init_db
     await init_db()
+    
+    # Ensure a default workspace exists for the UI
+    from cognishift.app.db.database import get_db
+    async with get_db() as db:
+        cursor = await db.execute("SELECT id FROM workspaces WHERE id = 1")
+        if not await cursor.fetchone():
+            await db.execute("INSERT INTO workspaces (id, name, description) VALUES (1, 'Main Refinery Workspace', 'Default workspace')")
+            await db.commit()
+            
     yield
-    # Cleanup on shutdown
 
 app = FastAPI(
     title="CogniShift API",
@@ -36,40 +46,50 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Attempt to include routers, ignoring errors if they don't exist yet
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 try:
     from cognishift.app.api import workspaces
     app.include_router(workspaces.router)
-except ImportError:
-    pass
+except ImportError: pass
 
 try:
     from cognishift.app.api import agents
     app.include_router(agents.router)
-except ImportError:
-    pass
+except ImportError: pass
 
 try:
     from cognishift.app.api import knowledge
     app.include_router(knowledge.router)
-except ImportError:
-    pass
+except ImportError: pass
 
 try:
     from cognishift.app.api import runs
     app.include_router(runs.router)
-except ImportError:
-    pass
+except ImportError: pass
 
 try:
     from cognishift.app.api import approvals
     app.include_router(approvals.router)
-except ImportError:
-    pass
+except ImportError: pass
 
+# Setup Static UI
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/static/index.html")
 
 async def check_ollama() -> tuple[bool, List[Dict[str, Any]]]:
-    """Check if Ollama is available and return models."""
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
             response = await client.get(f"{settings.ollama_base_url}/api/tags")
@@ -81,9 +101,7 @@ async def check_ollama() -> tuple[bool, List[Dict[str, Any]]]:
 
 @app.get("/api/v1/system/status")
 async def system_status():
-    """Get system status."""
     ollama_available, available_models = await check_ollama()
-    # Simple check if DB file exists (for now)
     db_initialized = settings.database_path.exists()
     return {
         "operating_mode": settings.operating_mode,
@@ -95,17 +113,14 @@ async def system_status():
 
 @app.get("/api/v1/system/privacy-status")
 async def privacy_status():
-    """Get privacy and data location status."""
     external_blocked = settings.operating_mode == "local"
     return {
         "operating_mode": settings.operating_mode,
         "external_apis_blocked": external_blocked,
-        "data_directory": str(settings.data_dir.absolute()),
-        "explanation": "In local mode, all external API calls are blocked. Data is stored on-premise." if external_blocked else "External APIs may be used."
+        "data_directory": str(settings.data_dir.absolute())
     }
 
 @app.get("/api/v1/system/models")
 async def list_models():
-    """List available local models from Ollama."""
     _, available_models = await check_ollama()
     return available_models

@@ -19,6 +19,23 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 50
     log_level: str = "INFO"
 
+    # Phase 4 Sandbox Configuration
+    sandbox_enabled: bool = True
+    sandbox_runtime: str = "docker"  # 'docker' or 'podman'
+    sandbox_image: str = "cognishift/sandbox-python:3.12-v1"
+    sandbox_image_digest: str = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    sandbox_cpu_limit: float = 1.0
+    sandbox_memory_mb: int = 512
+    sandbox_pid_limit: int = 64
+    sandbox_default_timeout: int = 30
+    sandbox_max_timeout: int = 120
+    sandbox_stdout_limit: int = 65536
+    sandbox_stderr_limit: int = 65536
+    sandbox_max_input_files: int = 10
+    sandbox_max_input_bytes: int = 10485760
+    sandbox_max_output_files: int = 10
+    sandbox_max_output_file_bytes: int = 10485760
+
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

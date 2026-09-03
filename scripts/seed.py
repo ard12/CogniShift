@@ -42,7 +42,8 @@ async def seed_data():
             (11, 'directory_create', 'Create Workspace Directory', 'low_risk', 0, 'directory_create'),
             (12, 'generate_docx', 'Generate DOCX Report', 'low_risk', 0, 'generate_docx'),
             (13, 'generate_xlsx', 'Generate XLSX Telemetry Workbook', 'low_risk', 0, 'generate_xlsx'),
-            (14, 'generate_pptx', 'Generate PPTX Slide Presentation', 'low_risk', 0, 'generate_pptx')
+            (14, 'generate_pptx', 'Generate PPTX Slide Presentation', 'low_risk', 0, 'generate_pptx'),
+            (15, 'execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 0, 'execute_code')
         ]
         
         for t in tools:

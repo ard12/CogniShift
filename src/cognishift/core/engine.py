@@ -523,21 +523,64 @@ async def execute_agent_run(
                         return RunResponse.model_validate(dict(updated_run))
 
                     else:
-                        # Safe simulated tool: execute and record observation
+                        # Safe / authorized tool execution: execute and record observation
                         await log_event(db, run_id, "tool_executing", f"Executing safe tool: {resolved_tool}", {"parameters": validated_params})
                         tool_output = await execute_tool(resolved_tool, validated_params, workspace_id=workspace_id, run_id=run_id)
                         await log_event(db, run_id, "tool_executed", f"Tool output received: {tool_output}", {"output": tool_output})
 
-                        current_step.status = "completed"
-                        current_step.tool_name = resolved_tool
-                        current_step.tool_parameters = validated_params
-                        current_step.observation = tool_output
+                        is_code_failure = (
+                            resolved_tool == "execute_code" and
+                            ("Sandbox execution failed" in tool_output or "Sandbox execution TIMED OUT" in tool_output or "Error" in tool_output)
+                        )
 
-                        saved_plan_json = serialize_plan(plan)
-                        await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
-                        await db.commit()
+                        if is_code_failure and current_step.retry_count < 2:
+                            current_step.retry_count += 1
+                            current_step.status = "running"
+                            current_step.tool_name = resolved_tool
+                            current_step.tool_parameters = validated_params
+                            current_step.observation = (
+                                f"[Execution Attempt #{current_step.retry_count} Failed - Debug Feedback]\n"
+                                f"{tool_output}\n"
+                                f"Analyze the error/traceback above and propose a corrected code implementation."
+                            )
+                            await log_event(
+                                db, run_id, "sandbox_retry_triggered",
+                                f"Step #{current_step.id} retry {current_step.retry_count}/2 triggered after runtime failure.",
+                                {"step_id": current_step.id, "retry_count": current_step.retry_count}
+                            )
+                            saved_plan_json = serialize_plan(plan)
+                            await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                            await db.commit()
+                            # Do NOT advance to next step, allowing agent to attempt self-correction
+                            continue
 
-                        plan.advance_to_next_step()
+                        elif is_code_failure and current_step.retry_count >= 2:
+                            current_step.status = "failed"
+                            current_step.tool_name = resolved_tool
+                            current_step.tool_parameters = validated_params
+                            current_step.observation = tool_output
+                            current_step.error_message = f"Sandbox code execution failed after {1 + current_step.retry_count} total attempts (retry budget exhausted)."
+                            await log_event(
+                                db, run_id, "sandbox_retry_exhausted",
+                                f"Step #{current_step.id} failed: Maximum code correction attempts exhausted.",
+                                {"step_id": current_step.id, "total_attempts": 1 + current_step.retry_count}
+                            )
+                            saved_plan_json = serialize_plan(plan)
+                            await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                            await db.commit()
+                            plan.advance_to_next_step()
+
+                        else:
+                            current_step.status = "completed"
+                            current_step.tool_name = resolved_tool
+                            current_step.tool_parameters = validated_params
+                            current_step.observation = tool_output
+
+                            saved_plan_json = serialize_plan(plan)
+                            await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                            await db.commit()
+
+                            plan.advance_to_next_step()
 
                 elif isinstance(action, FinalAnswer):
                     current_step.status = "completed"

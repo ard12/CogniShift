@@ -340,5 +340,55 @@ async def execute_tool(
         except Exception as e:
             return f"Error generating PPTX artifact: {str(e)}"
 
+    elif tool_name == "execute_code":
+        from cognishift.core.sandbox.schemas import CodeExecutionRequest, SandboxInputFile, SandboxStatus
+        from cognishift.core.sandbox.service import execute_sandbox_code
+        
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        r_id = run_id or parameters.get("run_id", 1)
+        code = parameters.get("code", "")
+        entrypoint = parameters.get("entrypoint", "main.py")
+        timeout_seconds = parameters.get("timeout_seconds", 30)
+        promote = parameters.get("promote_outputs_to_artifacts", False)
+        
+        input_refs = []
+        for inp in parameters.get("input_files", []):
+            if isinstance(inp, dict):
+                input_refs.append(SandboxInputFile(source_path=inp.get("source_path", ""), dest_name=inp.get("dest_name", "")))
+            elif hasattr(inp, "source_path"):
+                input_refs.append(inp)
+
+        req = CodeExecutionRequest(
+            execution_id="",
+            workspace_id=ws_id,
+            run_id=r_id,
+            code=code,
+            entrypoint=entrypoint,
+            input_files=input_refs,
+            timeout_seconds=timeout_seconds,
+            promote_outputs=promote
+        )
+        
+        try:
+            exec_res = await execute_sandbox_code(ws_id, r_id, req)
+            if exec_res.status == SandboxStatus.SUCCESS:
+                out_msg = f"Sandbox execution succeeded (exit code 0, {exec_res.duration_ms}ms)."
+                if exec_res.stdout:
+                    out_msg += f"\nSTDOUT:\n{exec_res.stdout}"
+                if exec_res.promoted_artifact_ids:
+                    out_msg += f"\nPromoted {len(exec_res.promoted_artifact_ids)} artifacts: {exec_res.output_files}"
+                return out_msg
+            elif exec_res.status == SandboxStatus.TIMEOUT:
+                return f"Sandbox execution TIMED OUT after {timeout_seconds}s. Process was killed."
+            else:
+                err_msg = f"Sandbox execution failed with {exec_res.status.value} (exit code {exec_res.exit_code}, {exec_res.duration_ms}ms)."
+                if exec_res.stderr:
+                    err_msg += f"\nSTDERR:\n{exec_res.stderr[:2000]}"
+                if exec_res.stdout:
+                    err_msg += f"\nSTDOUT:\n{exec_res.stdout[:1000]}"
+                return err_msg
+        except Exception as e:
+            return f"Sandbox Execution Error: {str(e)}"
+
     # Generic fallback
     return f"Tool '{tool_name}' executed successfully with parameters: {json.dumps(parameters)}"

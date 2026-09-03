@@ -25,6 +25,7 @@ class PlanStep(BaseModel):
     tool_parameters: Optional[Dict[str, Any]] = None
     observation: Optional[str] = None
     error_message: Optional[str] = None
+    retry_count: int = 0
 
 
 class AgentPlan(BaseModel):

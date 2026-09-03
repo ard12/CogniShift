@@ -201,6 +201,19 @@ class GeneratePptxArgs(BaseModel):
     slides: List[PptxSlide] = Field(..., min_length=1, max_length=25, description="Presentation slides")
 
 
+class SandboxInputReference(BaseModel):
+    source_path: str = Field(..., description="Workspace-relative path to input file in documents/ or uploads/")
+    dest_name: str = Field(..., pattern=r"^[A-Za-z0-9_.-]+$", description="Destination filename inside sandbox")
+
+
+class ExecuteCodeArgs(BaseModel):
+    code: str = Field(..., min_length=1, max_length=100000, description="Python code to execute inside isolated container")
+    entrypoint: str = Field(default="main.py", pattern=r"^[A-Za-z0-9_.-]+\.py$", description="Script entrypoint filename")
+    timeout_seconds: int = Field(default=30, ge=5, le=120, description="Execution timeout in seconds")
+    input_files: List[SandboxInputReference] = Field(default_factory=list, max_length=10, description="Optional input files")
+    promote_outputs_to_artifacts: bool = Field(default=False, description="Promote outputs to permanent artifacts")
+
+
 # Tool Name -> Pydantic Schema mapping
 TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "check_pressure": CheckPressureArgs,
@@ -217,6 +230,7 @@ TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "generate_docx": GenerateDocxArgs,
     "generate_xlsx": GenerateXlsxArgs,
     "generate_pptx": GeneratePptxArgs,
+    "execute_code": ExecuteCodeArgs,
 }
 
 
@@ -227,6 +241,17 @@ HIGH_RISK_TOOLS = {
     "emergency_pressure_relief": "service_interrupting",
     "restart_component": "sensitive",
     "restart_service": "service_interrupting"
+}
+
+TOOL_RISK_LEVELS = {
+    **HIGH_RISK_TOOLS,
+    "execute_code": "sensitive",
+    "file_write": "low_risk",
+    "directory_create": "low_risk",
+    "generate_docx": "low_risk",
+    "generate_xlsx": "low_risk",
+    "generate_pptx": "low_risk",
+    "run_diagnostic": "low_risk"
 }
 
 
@@ -288,7 +313,7 @@ def validate_proposed_tool_call(
 
     # 4. Central Risk Policy evaluation (Deterministic HITL interception)
     is_high_risk = tool_name in HIGH_RISK_TOOLS
-    risk_level = HIGH_RISK_TOOLS.get(tool_name, "read_only")
+    risk_level = TOOL_RISK_LEVELS.get(tool_name, "read_only")
 
     return ToolValidationResult(
         valid=True,

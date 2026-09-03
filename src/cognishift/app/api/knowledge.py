@@ -101,8 +101,12 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
 
 @router.get("", response_model=List[KnowledgeSourceResponse])
-async def list_knowledge_sources(workspace_id: int = Query(...)):
-    """List all knowledge sources for a workspace."""
+async def list_knowledge_sources(
+    workspace_id: int = Query(...),
+    user: User = Depends(get_current_user)
+):
+    """List all knowledge sources for an authorized workspace."""
+    verify_workspace_access(workspace_id, user)
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT * FROM knowledge_sources WHERE workspace_id = ? ORDER BY created_at DESC", 
@@ -112,18 +116,25 @@ async def list_knowledge_sources(workspace_id: int = Query(...)):
         return [KnowledgeSourceResponse.model_validate(dict(row)) for row in rows]
 
 @router.get("/{source_id}", response_model=KnowledgeSourceResponse)
-async def get_knowledge_source(source_id: int):
-    """Retrieve details for a single knowledge source."""
+async def get_knowledge_source(
+    source_id: int,
+    user: User = Depends(get_current_user)
+):
+    """Retrieve details for a single knowledge source with workspace authorization check."""
     async with get_db() as db:
         cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
         row = await cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Knowledge source not found.")
+        verify_workspace_access(row["workspace_id"], user)
         return KnowledgeSourceResponse.model_validate(dict(row))
 
 @router.delete("/{source_id}")
-async def delete_knowledge_source(source_id: int):
-    """Delete a document, its physical file, and its vectors from ChromaDB."""
+async def delete_knowledge_source(
+    source_id: int,
+    user: User = Depends(get_current_user)
+):
+    """Delete a document, its physical file, and its vectors from ChromaDB with authorization check."""
     async with get_db() as db:
         cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
         row = await cursor.fetchone()
@@ -131,6 +142,7 @@ async def delete_knowledge_source(source_id: int):
             raise HTTPException(status_code=404, detail="Knowledge source not found.")
         
         workspace_id = row["workspace_id"]
+        verify_workspace_access(workspace_id, user)
         local_path = row["local_path"]
 
         # 1. Purge vectors from ChromaDB

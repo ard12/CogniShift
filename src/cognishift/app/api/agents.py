@@ -1,8 +1,9 @@
 import json
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends, status
 from typing import List, Optional
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import AgentCreate, AgentResponse, AgentUpdate
+from cognishift.app.core.auth import get_current_user, verify_workspace_access, User
 
 router = APIRouter(prefix='/api/v1/agents', tags=['Agents'])
 
@@ -22,8 +23,12 @@ def row_to_agent(row) -> dict:
     return d
 
 @router.post('', response_model=AgentResponse)
-async def create_agent(agent: AgentCreate):
-    """Create a new agent definition."""
+async def create_agent(
+    agent: AgentCreate,
+    user: User = Depends(get_current_user)
+):
+    """Create a new agent definition with workspace authorization check."""
+    verify_workspace_access(agent.workspace_id, user)
     allowed_tools_json = json.dumps(agent.allowed_tool_ids)
     knowledge_sources_json = json.dumps(agent.knowledge_source_ids)
     async with get_db() as db:
@@ -39,29 +44,56 @@ async def create_agent(agent: AgentCreate):
         return row_to_agent(row)
 
 @router.get('', response_model=List[AgentResponse])
-async def list_agents(workspace_id: Optional[int] = Query(None)):
-    """List all agents, optionally filtered by workspace_id."""
+async def list_agents(
+    workspace_id: Optional[int] = Query(None),
+    user: User = Depends(get_current_user)
+):
+    """List agents authorized for the current user."""
     async with get_db() as db:
         if workspace_id is not None:
+            verify_workspace_access(workspace_id, user)
             cursor = await db.execute('SELECT * FROM agent_definitions WHERE workspace_id = ?', (workspace_id,))
         else:
-            cursor = await db.execute('SELECT * FROM agent_definitions')
+            if user.role == "administrator":
+                cursor = await db.execute('SELECT * FROM agent_definitions')
+            else:
+                placeholders = ",".join("?" for _ in user.allowed_workspace_ids)
+                if not placeholders:
+                    return []
+                cursor = await db.execute(
+                    f'SELECT * FROM agent_definitions WHERE workspace_id IN ({placeholders})',
+                    tuple(user.allowed_workspace_ids)
+                )
         rows = await cursor.fetchall()
         return [row_to_agent(row) for row in rows]
 
 @router.get('/{agent_id}', response_model=AgentResponse)
-async def get_agent(agent_id: int):
-    """Get a specific agent by ID."""
+async def get_agent(
+    agent_id: int,
+    user: User = Depends(get_current_user)
+):
+    """Get a specific agent by ID with workspace authorization check."""
     async with get_db() as db:
         cursor = await db.execute('SELECT * FROM agent_definitions WHERE id = ?', (agent_id,))
         row = await cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail='Agent not found')
+        verify_workspace_access(row["workspace_id"], user)
         return row_to_agent(row)
 
 @router.patch('/{agent_id}', response_model=AgentResponse)
-async def update_agent(agent_id: int, agent: AgentUpdate):
-    """Update agent fields."""
+async def update_agent(
+    agent_id: int,
+    agent: AgentUpdate,
+    user: User = Depends(get_current_user)
+):
+    """Update agent fields with workspace authorization check."""
+    async with get_db() as db:
+        cursor = await db.execute('SELECT * FROM agent_definitions WHERE id = ?', (agent_id,))
+        existing = await cursor.fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail='Agent not found')
+        verify_workspace_access(existing["workspace_id"], user)
     update_data = agent.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")

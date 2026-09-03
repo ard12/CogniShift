@@ -218,9 +218,10 @@ def parse_agent_action(model_text: str) -> AgentAction:
             if isinstance(data, dict):
                 action = data.get("action", "")
                 if action == "tool_call":
+                    tool_name = str(data.get("tool_name") or data.get("tool") or "").strip()
                     return ToolCallProposal(
                         action="tool_call",
-                        tool_name=data.get("tool_name", ""),
+                        tool_name=tool_name,
                         parameters=data.get("parameters", {}),
                         reason=data.get("reason", "Autonomous plan execution")
                     )

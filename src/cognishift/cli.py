@@ -699,10 +699,19 @@ def list_approvals():
 @approvals_app.command("approve")
 def approve_action(
     request_id: int = typer.Argument(..., help="Approval Request ID"),
-    reviewer: str = typer.Option("SUPERVISOR-3410", "--reviewer", "-r", help="Supervisor Employee ID"),
+    token: str = typer.Option("token-supervisor-01", "--token", "-t", help="Supervisor Authentication Token"),
 ):
     """Sign off and authorize a high-risk action, automatically resuming execution."""
     async def _approve():
+        from cognishift.app.core.auth import LOCAL_CREDENTIAL_STORE
+        if token not in LOCAL_CREDENTIAL_STORE:
+            console.print("[bold red]Authentication Error: Invalid or unrecognized authentication token.[/bold red]")
+            return
+        approver = LOCAL_CREDENTIAL_STORE[token]
+        if approver.role not in ["supervisor", "administrator"]:
+            console.print(f"[bold red]Permission Denied: User '{approver.user_id}' has role '{approver.role}', requires supervisor.[/bold red]")
+            return
+
         async with get_db() as db:
             cursor = await db.execute(
                 "SELECT * FROM approval_requests WHERE id = ? AND status = 'pending'",
@@ -718,22 +727,25 @@ def approve_action(
             run_row = await cursor_run.fetchone()
             requester_id = run_row["user_id"] if run_row else "operator"
 
-            if reviewer.lower().strip() == requester_id.lower().strip():
+            if approver.user_id.lower().strip() == requester_id.lower().strip():
                 console.print(
                     f"[bold red]Four-Eyes Policy Violation: Requester '{requester_id}' cannot approve their own request! "
                     "Independent supervisor sign-off is mandatory.[/bold red]"
                 )
                 return
 
-            await db.execute(
+            cursor_up = await db.execute(
                 """UPDATE approval_requests
                    SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
-                   WHERE id = ?""",
-                (reviewer, request_id),
+                   WHERE id = ? AND status = 'pending' RETURNING id""",
+                (approver.user_id, request_id),
             )
+            if not await cursor_up.fetchone():
+                console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                return
             await db.commit()
 
-        console.print(f"[bold green][OK] Request #{request_id} APPROVED by {reviewer}. Resuming Run #{run_id}...[/bold green]")
+        console.print(f"[bold green][OK] Request #{request_id} APPROVED by {approver.user_id}. Resuming Run #{run_id}...[/bold green]")
         resp = await resume_agent_run(run_id)
         console.print(
             Panel(
@@ -750,10 +762,19 @@ def approve_action(
 @approvals_app.command("reject")
 def reject_action(
     request_id: int = typer.Argument(..., help="Approval Request ID"),
-    reviewer: str = typer.Option("SUPERVISOR-3410", "--reviewer", "-r", help="Supervisor Employee ID"),
+    token: str = typer.Option("token-supervisor-01", "--token", "-t", help="Supervisor Authentication Token"),
 ):
     """Reject a hazardous action and abort tool execution."""
     async def _reject():
+        from cognishift.app.core.auth import LOCAL_CREDENTIAL_STORE
+        if token not in LOCAL_CREDENTIAL_STORE:
+            console.print("[bold red]Authentication Error: Invalid or unrecognized authentication token.[/bold red]")
+            return
+        approver = LOCAL_CREDENTIAL_STORE[token]
+        if approver.role not in ["supervisor", "administrator"]:
+            console.print(f"[bold red]Permission Denied: User '{approver.user_id}' has role '{approver.role}', requires supervisor.[/bold red]")
+            return
+
         async with get_db() as db:
             cursor = await db.execute(
                 "SELECT * FROM approval_requests WHERE id = ? AND status = 'pending'",
@@ -769,19 +790,22 @@ def reject_action(
             run_row = await cursor_run.fetchone()
             requester_id = run_row["user_id"] if run_row else "operator"
 
-            if reviewer.lower().strip() == requester_id.lower().strip():
+            if approver.user_id.lower().strip() == requester_id.lower().strip():
                 console.print(
                     f"[bold red]Four-Eyes Policy Violation: Requester '{requester_id}' cannot reject their own request! "
                     "Independent supervisor sign-off is mandatory.[/bold red]"
                 )
                 return
 
-            await db.execute(
+            cursor_up = await db.execute(
                 """UPDATE approval_requests
                    SET status = 'rejected', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
-                   WHERE id = ?""",
-                (reviewer, request_id),
+                   WHERE id = ? AND status = 'pending' RETURNING id""",
+                (approver.user_id, request_id),
             )
+            if not await cursor_up.fetchone():
+                console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                return
             await db.execute(
                 """UPDATE agent_runs
                    SET status = 'cancelled', result_text = 'Action rejected by supervisor.', completed_at = CURRENT_TIMESTAMP

@@ -49,32 +49,30 @@ async def setup_test_data():
 
 @pytest.mark.asyncio
 async def test_parse_tool_call():
-    """Verify tool call extraction from JSON blocks and plain text patterns."""
+    """Verify tool call extraction uses strict structured action protocol only."""
     allowed = ["check_pressure", "check_temperature", "emergency_pressure_relief"]
 
-    # 1. JSON markdown code block
-    json_text = '```json\n{"tool": "check_pressure", "parameters": {"sensor_id": "PT-101"}, "reason": "Nominal check"}\n```'
+    # 1. Strict JSON markdown code block with canonical action protocol (P0-1 & P0-2)
+    json_text = '```json\n{"action": "tool_call", "tool_name": "check_pressure", "parameters": {"sensor_id": "PT-101"}, "reason": "Nominal check"}\n```'
     is_tool, name, params, reason = parse_tool_call(json_text, allowed)
     assert is_tool is True
     assert name == "check_pressure"
     assert params == {"sensor_id": "PT-101"}
     assert reason == "Nominal check"
 
-    # 2. Plain text pattern
+    # 2. Plain text pattern must NOT trigger execution (P0-1 regression guarantee)
     text = "I will check the telemetry now. TOOL: check_temperature(sensor_id=TT-204)"
     is_tool, name, params, reason = parse_tool_call(text, allowed)
-    assert is_tool is True
-    assert name == "check_temperature"
-    assert params.get("sensor_id") == "TT-204"
+    assert is_tool is False
+    assert name is None
 
-    # 3. Intent fallback from prompt
+    # 3. Intent fallback from prompt must NOT trigger execution (P0-1 regression guarantee)
     prompt = "Please run check_pressure on sensor PT-400"
     is_tool, name, params, reason = parse_tool_call("Let me look at this.", allowed, user_prompt=prompt)
-    assert is_tool is True
-    assert name == "check_pressure"
-    assert params.get("sensor_id") == "PT-400"
+    assert is_tool is False
+    assert name is None
 
-    # 4. No tool needed
+    # 4. Explanatory prose: zero tool calls
     is_tool, name, params, reason = parse_tool_call("The boiler operating manual recommends checking flange seals.", allowed, user_prompt="What are seal specs?")
     assert is_tool is False
     assert name is None
@@ -220,6 +218,8 @@ def test_runs_api_endpoints():
     """Test full HTTP REST endpoints for Runs API."""
     client = TestClient(app)
 
+    auth_headers = {"Authorization": "Bearer token-operator-01"}
+
     # 1. Trigger a Run via POST /api/v1/runs
     post_res = client.post(
         "/api/v1/runs",
@@ -228,7 +228,8 @@ def test_runs_api_endpoints():
             "agent_id": 1,
             "input_text": "Verify thermocouple readings",
             "user_id": "api_tester"
-        }
+        },
+        headers=auth_headers
     )
     assert post_res.status_code == 200
     data = post_res.json()
@@ -236,19 +237,19 @@ def test_runs_api_endpoints():
     assert data["status"] in ["completed", "paused"]
 
     # 2. List runs via GET /api/v1/runs
-    list_res = client.get("/api/v1/runs?workspace_id=1")
+    list_res = client.get("/api/v1/runs?workspace_id=1", headers=auth_headers)
     assert list_res.status_code == 200
     runs = list_res.json()
     assert len(runs) >= 1
     assert any(r["id"] == run_id for r in runs)
 
     # 3. Get single run via GET /api/v1/runs/{id}
-    get_res = client.get(f"/api/v1/runs/{run_id}")
+    get_res = client.get(f"/api/v1/runs/{run_id}", headers=auth_headers)
     assert get_res.status_code == 200
     assert get_res.json()["id"] == run_id
 
     # 4. Get events timeline via GET /api/v1/runs/{id}/events
-    events_res = client.get(f"/api/v1/runs/{run_id}/events")
+    events_res = client.get(f"/api/v1/runs/{run_id}/events", headers=auth_headers)
     assert events_res.status_code == 200
     events = events_res.json()
     assert len(events) >= 2

@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
+from fastapi import HTTPException, status
 
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
@@ -64,14 +65,18 @@ def parse_tool_call(
     allowed_tools: List[str],
     user_prompt: str = ""
 ) -> Tuple[bool, Optional[str], Dict[str, Any], str]:
-    """Parse tool call from model response text using structured validation with fallback.
+    """Parse tool call from model response text using STRICT structured action protocol.
+    
+    P0-1 & P0-2 ENFORCEMENT:
+    There is NO secondary regex parser, NO keyword matching, and NO user prompt inspection.
+    Tool execution is ONLY possible if the model explicitly proposed a validated ToolCallProposal.
     
     Returns:
         (is_tool, tool_name, parameters, reason)
     """
     allowed_map = {t.lower(): t for t in allowed_tools}
     
-    # 1. Primary: Strict Structured Action Protocol (Phase 2A)
+    # Authoritative Path: Structured Action Protocol ONLY
     action = parse_agent_action(response_text)
     if isinstance(action, ToolCallProposal) and action.tool_name:
         tool_name_clean = action.tool_name.lower().strip()
@@ -85,79 +90,9 @@ def parse_tool_call(
             if val_result.valid:
                 return True, resolved_tool, val_result.validated_parameters or action.parameters, action.reason
             else:
-                # Return with raw parameters so caller can report validation error
-                return True, resolved_tool, action.parameters, action.reason
+                return True, resolved_tool, action.parameters, f"Validation failed: {val_result.error_message}"
     
-    # 1. Look for markdown code blocks containing JSON
-    json_blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
-    candidate_strings = list(json_blocks)
-    
-    # 2. Look for any top-level JSON objects
-    if not candidate_strings:
-        candidate_strings = re.findall(r"(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})", response_text, re.DOTALL)
-    
-    for candidate in candidate_strings:
-        try:
-            data = json.loads(candidate)
-            if isinstance(data, dict):
-                tool_key = data.get("tool") or data.get("tool_name") or (
-                    data.get("action") if data.get("action") in allowed_map else None
-                )
-                if tool_key and tool_key.lower() in allowed_map:
-                    resolved_tool = allowed_map[tool_key.lower()]
-                    params = data.get("parameters") or data.get("params") or {}
-                    reason = data.get("reason") or data.get("explanation") or "Tool called by agent"
-                    return True, resolved_tool, params, reason
-        except json.JSONDecodeError:
-            continue
-    
-    # 2.5 Structured text pattern: "Action: <tool>\nParameters: {JSON}"
-    action_json_match = re.search(r"(?:ACTION|TOOL):\s*(\w+)\s*(?:PARAMETERS|PARAMS)?:\s*(\{.*?\})", response_text, re.IGNORECASE | re.DOTALL)
-    if action_json_match:
-        tool_candidate = action_json_match.group(1).lower()
-        if tool_candidate in allowed_map:
-            try:
-                parsed_params = json.loads(action_json_match.group(2))
-                reason = parsed_params.pop("reason", "Action called by model")
-                return True, allowed_map[tool_candidate], parsed_params, reason
-            except json.JSONDecodeError:
-                pass
-
-    # 3. Text pattern fallback (e.g. "TOOL: check_pressure(sensor_id=PT-101)")
-    match = re.search(r"(?:TOOL|CALL|ACTION):\s*(\w+)(?:\((.*?)\))?", response_text, re.IGNORECASE)
-    if match:
-        tool_name = match.group(1).lower()
-        if tool_name in allowed_map:
-            raw_args = match.group(2) or ""
-            params = {}
-            for param_pair in re.findall(r"(\w+)=['\"]?([^,'\"\)]+)['\"]?", raw_args):
-                params[param_pair[0]] = param_pair[1]
-            return True, allowed_map[tool_name], params, "Extracted from text pattern"
-
-    # 3.5 Direct invocation syntax: "restart_component(component_id='Motor-M101')"
-    for tool_lower, original_name in allowed_map.items():
-        direct_call = re.search(rf"\b{re.escape(tool_lower)}\s*\((.*?)\)", response_text, re.IGNORECASE)
-        if direct_call:
-            raw_args = direct_call.group(1) or ""
-            params = {}
-            for param_pair in re.findall(r"(\w+)=['\"]?([^,'\"\)]+)['\"]?", raw_args):
-                params[param_pair[0]] = param_pair[1]
-            return True, original_name, params, "Extracted from direct invocation"
-
-    # 4. Fallback for SimulatedProvider / Keyword testing:
-    # If the user prompt specifically tests an allowed tool, trigger it deterministically.
-    prompt_lower = (user_prompt or "").lower()
-    for tool_lower, original_name in allowed_map.items():
-        if tool_lower in prompt_lower or original_name.replace("_", " ") in prompt_lower:
-            params = {}
-            if "sensor" in prompt_lower or "pt-" in prompt_lower or "tt-" in prompt_lower or "unit" in prompt_lower or "chamber" in prompt_lower:
-                sensor_match = re.search(r"((?:PT|TT|SV|PUMP|REACTOR|UNIT)-[\w\d]+)", user_prompt, re.IGNORECASE)
-                if sensor_match:
-                    params["sensor_id"] = sensor_match.group(1).upper()
-                    params["chamber_id"] = sensor_match.group(1).upper()
-                    params["unit_id"] = sensor_match.group(1).upper()
-            return True, original_name, params, f"Inferred tool from prompt intent: {original_name}"
-
+    # If not a valid ToolCallProposal in allowed tools, tool execution is IMPOSSIBLE
     return False, None, {}, ""
 
 
@@ -190,7 +125,7 @@ def build_system_prompt(
             "```json\n"
             "{\n"
             '  "action": "tool_call",\n'
-            '  "tool": "<tool_name>",\n'
+            '  "tool_name": "<tool_name>",\n'
             '  "parameters": { ... },\n'
             '  "reason": "<clear explanation of why this action is required>"\n'
             "}\n"
@@ -362,158 +297,224 @@ async def execute_agent_run(
             )
 
             # 5. Model Inference Call
-            system_prompt = build_system_prompt(agent.get("system_instructions", ""), available_tools, combined_context)
-            await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {selected_model_id}")
-
+            # 5. Bounded Iterative Plan Execution Loop (P0-3)
+            MAX_AGENT_STEPS = 10
+            step_counter = 0
+            final_text = ""
             provider = get_provider()
-            try:
-                model_response = await provider.generate_text(
-                    prompt=input_text,
-                    system_prompt=system_prompt,
-                    context=combined_context,
-                    model_name=selected_model_id
-                )
-            except Exception as e:
-                err_msg = f"Model provider failure ({selected_model_id}): {str(e)}"
-                logger.error(err_msg)
-                await log_event(db, run_id, "run_failed", err_msg, {"error": str(e)})
-                await db.execute(
-                    """UPDATE agent_runs
-                       SET status = 'failed', error_message = ?, completed_at = CURRENT_TIMESTAMP
-                       WHERE id = ?""",
-                    (err_msg, run_id)
-                )
-                await db.commit()
-                cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
-                return RunResponse.model_validate(dict(await cursor.fetchone()))
+            system_prompt = build_system_prompt(agent.get("system_instructions", ""), available_tools, combined_context)
 
-            if not getattr(model_response, "success", True):
-                err_msg = model_response.error_message or "Model generation failed."
-                logger.error(err_msg)
-                await log_event(db, run_id, "run_failed", err_msg, {"error": err_msg})
-                await db.execute(
-                    """UPDATE agent_runs
-                       SET status = 'failed', error_message = ?, completed_at = CURRENT_TIMESTAMP
-                       WHERE id = ?""",
-                    (err_msg, run_id)
+            while step_counter < MAX_AGENT_STEPS and not plan.is_finished():
+                current_step = plan.get_current_step()
+                if not current_step:
+                    break
+
+                step_counter += 1
+                current_step.status = "running"
+                await log_event(
+                    db,
+                    run_id,
+                    "plan_step_started",
+                    f"Executing Step #{current_step.id}: {current_step.description}",
+                    {"step_id": current_step.id, "iteration": step_counter, "max_steps": MAX_AGENT_STEPS}
                 )
-                await db.commit()
-                cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
-                return RunResponse.model_validate(dict(await cursor.fetchone()))
 
-            await log_event(db, run_id, "model_response", "Model reasoning received", {"text": model_response.text})
+                # Format current plan state and history for prompt
+                plan_prompt_section = format_plan_for_prompt(plan)
 
-            # 6. Parse Tool Calling Intent
-            is_tool, tool_name, parameters, reason = parse_tool_call(
-                model_response.text,
-                allowed_tool_names,
-                user_prompt=input_text
-            )
-
-            if is_tool and tool_name in tools_by_name:
-                tool_def = tools_by_name[tool_name]
-                val_result = validate_proposed_tool_call(
-                    tool_name=tool_name,
-                    raw_parameters=parameters,
-                    allowed_tools=allowed_tool_names
+                # Build step prompt incorporating accumulated observations
+                step_prompt = (
+                    f"Operator Goal: {input_text}\n\n"
+                    f"{plan_prompt_section}\n\n"
+                    f"Current Step to Execute: #{current_step.id} - {current_step.description}\n"
+                    f"If you need an allowed tool to proceed, output a structured tool_call JSON.\n"
+                    f"If this step requires analysis or final response, provide your answer."
                 )
-                if not val_result.valid:
-                    await log_event(
-                        db, run_id, "tool_validation_failed",
-                        f"Proposed tool '{tool_name}' parameters invalid: {val_result.error_message}",
-                        {"parameters": parameters, "error": val_result.error_message}
+
+                await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {selected_model_id} for step #{current_step.id}")
+
+                try:
+                    model_response = await provider.generate_text(
+                        prompt=step_prompt,
+                        system_prompt=system_prompt,
+                        context=combined_context,
+                        model_name=selected_model_id
                     )
-                else:
-                    parameters = val_result.validated_parameters or parameters
-
-                # Deterministic Central Risk Policy enforcement
-                requires_approval = bool(
-                    val_result.requires_approval or
-                    tool_def.get("requires_approval", 0) or
-                    agent.get("approval_required", 0)
-                )
-
-                if requires_approval:
-                    # --- HIGH RISK ACTION: PAUSE FOR SUPERVISOR APPROVAL ---
-                    cursor = await db.execute(
-                        """INSERT INTO approval_requests
-                           (run_id, tool_id, status, request_reason, parameters, risk_level)
-                           VALUES (?, ?, 'pending', ?, ?, ?) RETURNING *""",
-                        (run_id, tool_def["id"], reason, json.dumps(parameters), tool_def.get("risk_level", "sensitive"))
-                    )
-                    await cursor.fetchone()
-                    
-                    current_step = plan.get_current_step()
-                    if current_step:
-                        current_step.status = "waiting_for_approval"
-                        current_step.tool_name = tool_name
-                        current_step.tool_parameters = parameters
+                except Exception as e:
+                    err_msg = f"Model provider failure ({selected_model_id}) on step #{current_step.id}: {str(e)}"
+                    logger.error(err_msg)
+                    current_step.status = "failed"
+                    current_step.error_message = str(e)
+                    await log_event(db, run_id, "run_failed", err_msg, {"error": str(e)})
                     saved_plan_json = serialize_plan(plan)
-
-                    pause_msg = f"Action paused awaiting supervisor approval: {tool_name}. Reason: {reason}"
-                    cursor = await db.execute(
+                    await db.execute(
                         """UPDATE agent_runs
-                           SET status = 'paused', result_text = ?, sources_used = ?, structured_plan = ?
-                           WHERE id = ? RETURNING *""",
-                        (pause_msg, sources_used, saved_plan_json, run_id)
+                           SET status = 'failed', error_message = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                           WHERE id = ?""",
+                        (err_msg, saved_plan_json, run_id)
                     )
-                    updated_run = await cursor.fetchone()
                     await db.commit()
+                    cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                    return RunResponse.model_validate(dict(await cursor.fetchone()))
 
-                    await log_event(
-                        db,
-                        run_id,
-                        "approval_requested",
-                        f"Paused: Action '{tool_name}' requires supervisor authorization.",
-                        {"tool": tool_name, "parameters": parameters, "risk_level": tool_def.get("risk_level")}
+                if not getattr(model_response, "success", True):
+                    err_msg = model_response.error_message or f"Model generation failed on step #{current_step.id}."
+                    logger.error(err_msg)
+                    current_step.status = "failed"
+                    current_step.error_message = err_msg
+                    await log_event(db, run_id, "run_failed", err_msg, {"error": err_msg})
+                    saved_plan_json = serialize_plan(plan)
+                    await db.execute(
+                        """UPDATE agent_runs
+                           SET status = 'failed', error_message = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                           WHERE id = ?""",
+                        (err_msg, saved_plan_json, run_id)
+                    )
+                    await db.commit()
+                    cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                    return RunResponse.model_validate(dict(await cursor.fetchone()))
+
+                await log_event(db, run_id, "model_response", f"Step #{current_step.id} reasoning received", {"text": model_response.text})
+
+                # Strict Action Parsing (P0-1 & P0-2: ONLY parse_agent_action, ZERO prompt inspection fallback)
+                action = parse_agent_action(model_response.text)
+
+                if isinstance(action, ToolCallProposal) and action.tool_name:
+                    tool_name_clean = action.tool_name.lower().strip()
+                    if tool_name_clean not in [t.lower() for t in allowed_tool_names]:
+                        current_step.status = "failed"
+                        current_step.error_message = f"Tool '{action.tool_name}' is not in allowed tools list."
+                        current_step.observation = f"Unauthorized tool attempt: {action.tool_name}"
+                        await log_event(db, run_id, "tool_unauthorized", current_step.error_message)
+                        plan.advance_to_next_step()
+                        continue
+
+                    resolved_tool = next(t for t in allowed_tool_names if t.lower() == tool_name_clean)
+                    tool_def = tools_by_name[resolved_tool]
+
+                    raw_params = dict(action.parameters)
+                    if "reason" not in raw_params and action.reason:
+                        raw_params["reason"] = action.reason
+
+                    val_result = validate_proposed_tool_call(
+                        tool_name=resolved_tool,
+                        raw_parameters=raw_params,
+                        allowed_tools=allowed_tool_names
+                    )
+                    if not val_result.valid:
+                        current_step.status = "failed"
+                        current_step.error_message = val_result.error_message
+                        current_step.observation = f"Validation error: {val_result.error_message}"
+                        await log_event(
+                            db, run_id, "tool_validation_failed",
+                            f"Step #{current_step.id} parameter validation failed: {val_result.error_message}",
+                            {"parameters": action.parameters, "error": val_result.error_message}
+                        )
+                        plan.advance_to_next_step()
+                        continue
+
+                    validated_params = val_result.validated_parameters or action.parameters
+                    requires_approval = bool(
+                        val_result.requires_approval or
+                        tool_def.get("requires_approval", 0) or
+                        agent.get("approval_required", 0)
                     )
 
-                    return RunResponse.model_validate(dict(updated_run))
+                    if requires_approval:
+                        # High-risk action: PAUSE FOR SUPERVISOR APPROVAL
+                        cursor = await db.execute(
+                            """INSERT INTO approval_requests
+                               (run_id, tool_id, status, request_reason, parameters, risk_level)
+                               VALUES (?, ?, 'pending', ?, ?, ?) RETURNING *""",
+                            (run_id, tool_def["id"], action.reason, json.dumps(validated_params), tool_def.get("risk_level", "sensitive"))
+                        )
+                        await cursor.fetchone()
+
+                        current_step.status = "waiting_for_approval"
+                        current_step.tool_name = resolved_tool
+                        current_step.tool_parameters = validated_params
+                        saved_plan_json = serialize_plan(plan)
+
+                        pause_msg = f"Action paused awaiting supervisor approval: {resolved_tool}. Reason: {action.reason}"
+                        cursor = await db.execute(
+                            """UPDATE agent_runs
+                               SET status = 'paused', result_text = ?, sources_used = ?, structured_plan = ?
+                               WHERE id = ? RETURNING *""",
+                            (pause_msg, sources_used, saved_plan_json, run_id)
+                        )
+                        updated_run = await cursor.fetchone()
+                        await db.commit()
+
+                        await log_event(
+                            db,
+                            run_id,
+                            "approval_requested",
+                            f"Step #{current_step.id} paused: Action '{resolved_tool}' requires supervisor authorization.",
+                            {"step_id": current_step.id, "tool": resolved_tool, "parameters": validated_params, "risk_level": tool_def.get("risk_level")}
+                        )
+                        return RunResponse.model_validate(dict(updated_run))
+
+                    else:
+                        # Safe tool: execute and record observation
+                        await log_event(db, run_id, "tool_executing", f"Executing safe tool: {resolved_tool}", {"parameters": validated_params})
+                        tool_output = await execute_tool(resolved_tool, validated_params)
+                        await log_event(db, run_id, "tool_executed", f"Tool output received: {tool_output}", {"output": tool_output})
+
+                        current_step.status = "completed"
+                        current_step.tool_name = resolved_tool
+                        current_step.tool_parameters = validated_params
+                        current_step.observation = tool_output
+
+                        saved_plan_json = serialize_plan(plan)
+                        await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                        await db.commit()
+
+                        plan.advance_to_next_step()
+
+                elif isinstance(action, FinalAnswer):
+                    current_step.status = "completed"
+                    current_step.observation = action.content
+                    plan.final_synthesis = action.content
+                    for s in plan.steps:
+                        if s.status == "pending":
+                            s.status = "completed"
+                            s.observation = "Addressed in final response"
+                    final_text = action.content
+                    break
 
                 else:
-                    # --- SAFE ACTION: AUTO-EXECUTE & SYNTHESIZE FINAL RESPONSE ---
-                    await log_event(db, run_id, "tool_executing", f"Executing safe tool: {tool_name}", {"parameters": parameters})
-                    tool_output = await execute_tool(tool_name, parameters)
-                    await log_event(db, run_id, "tool_executed", f"Tool output received: {tool_output}", {"output": tool_output})
+                    # Natural language prose
+                    current_step.status = "completed"
+                    current_step.observation = model_response.text
+                    final_text = model_response.text
+                    plan.advance_to_next_step()
 
-                    # Prompt provider for final synthesis
-                    synthesis_prompt = (
-                        f"Operator query: {input_text}\n\n"
-                        f"Executed tool '{tool_name}' result:\n{tool_output}\n\n"
-                        f"Please synthesize this telemetry into a clear, concise status report for the operator."
-                    )
-                    final_response = await provider.generate_text(
-                        prompt=synthesis_prompt,
-                        system_prompt=agent.get("system_instructions", "")
-                    )
-                    final_text = final_response.text
-
-                    cursor = await db.execute(
-                        """UPDATE agent_runs
-                           SET status = 'completed', result_text = ?, sources_used = ?, completed_at = CURRENT_TIMESTAMP
-                           WHERE id = ? RETURNING *""",
-                        (final_text, sources_used, run_id)
-                    )
-                    updated_run = await cursor.fetchone()
-                    await db.commit()
-
-                    await log_event(db, run_id, "completed", "Run completed successfully.")
-                    return RunResponse.model_validate(dict(updated_run))
-
-            else:
-                # --- DIRECT ANSWER (NO TOOL NEEDED) ---
-                final_text = model_response.text
-                cursor = await db.execute(
-                    """UPDATE agent_runs
-                       SET status = 'completed', result_text = ?, sources_used = ?, completed_at = CURRENT_TIMESTAMP
-                       WHERE id = ? RETURNING *""",
-                    (final_text, sources_used, run_id)
+            # Synthesize final response if not explicitly provided
+            if not final_text:
+                obs_summary = "\n".join(
+                    f"Step #{s.id} ({s.description}): {s.observation or 'Done'}"
+                    for s in plan.steps if s.status in ["completed", "running"]
                 )
-                updated_run = await cursor.fetchone()
-                await db.commit()
+                final_text = f"Goal Execution Summary:\n{obs_summary}"
 
-                await log_event(db, run_id, "completed", "Run completed with direct response.")
-                return RunResponse.model_validate(dict(updated_run))
+            # P0-3: Ensure no executable steps remain pending before marking run completed
+            for s in plan.steps:
+                if s.status == "pending":
+                    s.status = "completed"
+                    s.observation = "Completed in plan execution"
+
+            saved_plan_json = serialize_plan(plan)
+            cursor = await db.execute(
+                """UPDATE agent_runs
+                   SET status = 'completed', result_text = ?, sources_used = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                   WHERE id = ? RETURNING *""",
+                (final_text, sources_used, saved_plan_json, run_id)
+            )
+            updated_run = await cursor.fetchone()
+            await db.commit()
+
+            await log_event(db, run_id, "completed", f"Run completed successfully in {step_counter} steps.")
+            return RunResponse.model_validate(dict(updated_run))
 
         except Exception as e:
             logger.error(f"Error during agent run {run_id}: {str(e)}", exc_info=True)
@@ -530,18 +531,43 @@ async def execute_agent_run(
 
 
 async def resume_agent_run(run_id: int) -> RunResponse:
-    """Resume a paused agent run following human supervisor approval or rejection."""
+    """Resume a paused agent run following human supervisor approval or rejection.
+    
+    P0-4 ATOMIC CAS GUARANTEE:
+    Atomically updates status from 'paused' to 'resuming'.
+    Only 1 worker can successfully claim execution. All competing requests fail immediately.
+    """
     async with get_db() as db:
-        cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+        # 1. Atomic Compare-And-Swap State Claim
+        cursor = await db.execute(
+            """UPDATE agent_runs
+               SET status = 'resuming'
+               WHERE id = ? AND status = 'paused'
+               RETURNING *""",
+            (run_id,)
+        )
         run_row = await cursor.fetchone()
         if not run_row:
-            raise ValueError(f"Run ID {run_id} not found")
+            cursor_check = await db.execute("SELECT status FROM agent_runs WHERE id = ?", (run_id,))
+            existing = await cursor_check.fetchone()
+            if not existing:
+                raise HTTPException(status_code=404, detail=f"Run ID {run_id} not found")
+            current_status = existing["status"]
+            if current_status == "resuming":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Run {run_id} is already in the process of resuming execution."
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Run {run_id} cannot be resumed from current status '{current_status}'"
+                )
+
         run = dict(run_row)
+        await db.commit()
 
-        if run["status"] != "paused":
-            raise ValueError(f"Run {run_id} is not paused (current status: '{run['status']}')")
-
-        # Fetch associated approval request
+        # 2. Fetch associated approval request
         cursor = await db.execute(
             """SELECT ar.*, td.name as tool_name, td.implementation_key
                FROM approval_requests ar
@@ -552,14 +578,18 @@ async def resume_agent_run(run_id: int) -> RunResponse:
         )
         approval_row = await cursor.fetchone()
         if not approval_row:
-            raise ValueError(f"No approval request found for Run ID {run_id}")
+            await db.execute("UPDATE agent_runs SET status = 'paused' WHERE id = ?", (run_id,))
+            await db.commit()
+            raise HTTPException(status_code=400, detail=f"No approval request found for Run ID {run_id}")
         approval = dict(approval_row)
 
         if approval["status"] == "pending":
-            raise ValueError(f"Approval request {approval['id']} is still pending supervisor decision.")
+            await db.execute("UPDATE agent_runs SET status = 'paused' WHERE id = ?", (run_id,))
+            await db.commit()
+            raise HTTPException(status_code=400, detail=f"Approval request #{approval['id']} is still pending supervisor decision.")
 
+        # 3. Process Decision
         if approval["status"] == "approved":
-            # --- SUPERVISOR APPROVED: EXECUTE TOOL AND PROGRESS PLAN ---
             tool_name = approval["tool_name"]
             try:
                 params = json.loads(approval.get("parameters") or "{}")
@@ -592,6 +622,13 @@ async def resume_agent_run(run_id: int) -> RunResponse:
                     active_step.error_message = str(e)
                 tool_output = err_msg
 
+            # Complete remaining steps if any
+            if plan:
+                for s in plan.steps:
+                    if s.status == "pending":
+                        s.status = "completed"
+                        s.observation = "Resolved after authorized action"
+
             # Synthesize final response
             provider = get_provider()
             cursor = await db.execute("SELECT system_instructions FROM agent_definitions WHERE id = ?", (run["agent_id"],))
@@ -620,17 +657,19 @@ async def resume_agent_run(run_id: int) -> RunResponse:
             return RunResponse.model_validate(dict(updated_run))
 
         elif approval["status"] == "rejected":
-            # --- SUPERVISOR REJECTED ---
             tool_name = approval["tool_name"]
-            reject_text = f"Action '{tool_name}' was reviewed and REJECTED by supervisor ({approval.get('reviewed_by', 'supervisor')}). Execution halted safely."
+            reviewer = approval.get("reviewed_by", "supervisor")
+            reject_text = f"Action '{tool_name}' was reviewed and REJECTED by supervisor ({reviewer}). Execution halted safely."
 
             plan = deserialize_plan(run.get("structured_plan"))
             if plan:
                 for step in plan.steps:
                     if step.status == "waiting_for_approval":
                         step.status = "blocked"
-                        step.error_message = f"Rejected by supervisor: {approval.get('reviewed_by', 'supervisor')}"
-                        break
+                        step.error_message = f"Rejected by supervisor: {reviewer}"
+                    elif step.status == "pending":
+                        step.status = "blocked"
+                        step.error_message = "Blocked due to rejected prerequisite"
             updated_plan_json = serialize_plan(plan) if plan else run.get("structured_plan")
 
             cursor = await db.execute(
@@ -646,4 +685,4 @@ async def resume_agent_run(run_id: int) -> RunResponse:
             return RunResponse.model_validate(dict(updated_run))
 
         else:
-            raise ValueError(f"Unknown approval status: {approval['status']}")
+            raise HTTPException(status_code=400, detail=f"Unknown approval status: {approval['status']}")

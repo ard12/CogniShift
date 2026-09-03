@@ -26,7 +26,7 @@
 | **Phase 6** | Industrial Tool Registry & HITL Approvals | `tools.py`, `approvals.py`, `approval_requests` | ✅ **Complete** |
 | **Phase 5** | Autonomous Reasoning Engine & Event Ledger | `engine.py`, `runs.py`, `run_events` timeline | ✅ **Complete** |
 | **Phase 7** | Multimodal Vision & Gauge OCR | `moondream` integration, Bourdon dial analysis, nameplate OCR | ✅ **Complete** |
-| **Phase 8** | Terminal CLI Workbench & Enterprise Polish | `cli.py`, Typer, Rich, interactive REPL | ✅ **Complete** |
+| **Phase 8** | Enterprise Polish & Demonstration | Full system integration, qualifier scenarios | 🎯 **In Progress** |
 
 ---
 
@@ -73,18 +73,9 @@
 * OCR on stamped metallic equipment rating plates (extracting `P-101A`, Sulzer BB2 model, and API 682 Plan 53A specs).
 * Grounded against ISO 15926 Plant Topology Knowledge Graph.
 
-### Phase 8: Terminal CLI Workbench & Enterprise Polish
-* Full-featured terminal interface built with Typer + Rich in `src/cognishift/cli.py` (891 lines).
-* 8 command groups: `workspace`, `agent`, `knowledge`, `graph`, `telemetry`, `run`, `approvals`, and `chat` (interactive REPL).
-* Multimodal support via `--image` flag on `run execute` for local VLM gauge inspection.
-* Four-Eyes supervisor sign-off via `approvals approve` / `approvals reject` with audit trail.
-* UTF-8 safe on Windows consoles with automatic `stdout` reconfiguration.
-* Documented in [`CLI.md`](CLI.md) with complete command reference and terminal output examples.
-
 ---
 
 ## 4. Benchmark Validation Summary
 * **Industrial Workflow Suite:** 5/5 tests passing (`scratch/test_industrial_data_workflow.py`).
 * **Multimodal Vision & OCR Suite:** 3/3 scenarios passing (`scratch/test_multimodal_vision_pipeline.py`).
-* **Unit & Schema Suite:** 17/17 tests passing (`pytest -v`).
-* **Production Metrics Suite:** TCA 100%, SIR 100%, SLCP 100%, FAR 0% (`scratch/evaluate_production_metrics.py`).
+* **Unit & Schema Suite:** 10/10 tests passing (`pytest -v`).

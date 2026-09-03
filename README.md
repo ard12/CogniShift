@@ -137,7 +137,11 @@ pytest -v
 | `GET` | `/api/v1/approvals` | View pending high-risk tool authorizations | Phase 6 |
 | `POST` | `/api/v1/approvals/{id}/approve` | Supervisor authorization to resume execution | Phase 6 |
 | `POST` | `/api/v1/approvals/{id}/reject` | Supervisor rejection of risky action | Phase 6 |
-| `POST` | `/api/v1/runs` | Trigger agent reasoning and execution loop | **Phase 5 (Next)** |
+| `POST` | `/api/v1/runs` | Trigger agent reasoning and execution loop | Phase 5 |
+| `GET` | `/api/v1/runs` | List past execution runs | Phase 5 |
+| `GET` | `/api/v1/runs/{id}` | Retrieve specific run status and telemetry result | Phase 5 |
+| `GET` | `/api/v1/runs/{id}/events` | Stream step-by-step reasoning timeline events | Phase 5 |
+| `POST` | `/api/v1/runs/{id}/resume` | Resume execution after supervisor approval | Phase 5 |
 
 ---
 
@@ -159,8 +163,8 @@ pytest -v
 | **Phase 3** | Provider Abstraction (Ollama / Sim) | Sitanshu & AI | Complete |
 | **Phase 4** | Knowledge Pipeline (PDF RAG + ChromaDB) | Rohit & AI | Complete |
 | **Phase 6** | Industrial Tools and HITL Approvals | Rohit & AI | Complete |
-| **Phase 5** | AI Execution Engine (`engine.py`, `runs.py`) | Sitanshu & AI | **In Progress** |
-| **Phase 7** | Multimodal Vision Integration (Moondream) | Sitanshu & AI | Queued |
+| **Phase 5** | AI Execution Engine (`engine.py`, `runs.py`) | Sitanshu & AI | ✅ Complete |
+| **Phase 7** | Multimodal Vision Integration (Moondream) | Sitanshu & AI | 🚀 **In Progress** |
 | **Phase 8** | Enterprise UI and Full Integration Test | Team Collaboration | Target Sept 6-7 |
 
 ---

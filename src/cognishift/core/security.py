@@ -47,6 +47,60 @@ def ensure_workspace_layout(workspace_id: int) -> Path:
     return root
 
 
+GENERIC_WRITABLE_ROOTS = {"documents"}
+GENERIC_READABLE_ROOTS = {"documents", "uploads"}
+INTERNAL_SUBSYSTEM_ROOTS = {"generated", "temporary", "knowledge", "code"}
+
+
+def validate_workspace_filesystem_policy(
+    workspace_id: int,
+    target_path: Path,
+    operation: str
+) -> None:
+    """
+    Deterministic Central Workspace Filesystem Policy.
+    Enforces strict subsystem directory ownership and boundaries:
+    - documents/ : Allowed generic workspace area for agent/user documents.
+    - uploads/   : Ingestion subsystem; read/list allowed, generic write/mkdir denied.
+    - generated/ : Artifact subsystem ONLY. Generic write/mkdir strictly denied.
+    - temporary/ : Internal staging ONLY. Generic list/read/write/mkdir strictly denied.
+    - knowledge/ : Knowledge/RAG subsystem ONLY. Generic list/read/write/mkdir strictly denied.
+    - code/      : Reserved for Phase 4 sandbox. Generic list/read/write/mkdir strictly denied.
+    """
+    workspace_root = get_workspace_root(workspace_id)
+    try:
+        rel = target_path.resolve().relative_to(workspace_root)
+    except ValueError:
+        raise SecurityError(f"Access denied: Path '{target_path}' resolves outside workspace boundary.")
+
+    parts = rel.parts
+    if not parts or str(rel) == ".":
+        if operation in ["write", "mkdir"]:
+            raise SecurityError(f"Filesystem Policy Violation: Direct '{operation}' on workspace root is forbidden.")
+        return
+
+    top_dir = parts[0].lower()
+
+    if operation in ["write", "mkdir"]:
+        if top_dir not in GENERIC_WRITABLE_ROOTS:
+            if top_dir == "generated":
+                raise SecurityError(
+                    f"Security Error: Cannot overwrite registered immutable artifact or write to '{top_dir}/' through generic tools. "
+                    f"Access to 'generated/' is strictly restricted to the artifact subsystem."
+                )
+            raise SecurityError(
+                f"Filesystem Policy Violation: Generic '{operation}' is forbidden in subsystem directory '{top_dir}/'. "
+                f"Generic writes are strictly restricted to 'documents/'."
+            )
+
+    elif operation in ["read", "list"]:
+        if top_dir in INTERNAL_SUBSYSTEM_ROOTS:
+            raise SecurityError(
+                f"Filesystem Policy Violation: Generic '{operation}' is forbidden in internal subsystem directory '{top_dir}/'. "
+                f"Access is strictly restricted to authorized subsystems."
+            )
+
+
 def resolve_workspace_path(
     workspace_id: int,
     relative_path: str,

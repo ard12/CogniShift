@@ -137,7 +137,7 @@ RelativeWorkspacePath = Annotated[
 
 
 class FileListArgs(BaseModel):
-    directory: Optional[RelativeWorkspacePath] = Field(default=".", description="Relative directory inside workspace")
+    directory: Optional[RelativeWorkspacePath] = Field(default="documents", description="Relative directory inside workspace (defaults to 'documents')")
 
 
 class FileReadArgs(BaseModel):
@@ -260,8 +260,8 @@ def validate_proposed_tool_call(
             error_message=f"Unknown tool '{tool_name}'. Available tools: {list(TOOL_SCHEMAS.keys())}"
         )
 
-    # 2. Permission check
-    if allowed_tools and tool_name not in allowed_tools:
+    # 2. Permission check (Strict fail-closed allowlist)
+    if allowed_tools is not None and (tool_name not in allowed_tools or len(allowed_tools) == 0):
         return ToolValidationResult(
             valid=False,
             requires_approval=False,

@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 from pathlib import Path
@@ -166,17 +167,28 @@ async def execute_tool(
 
     # Phase 3 Safe File and Document Tools
     elif tool_name == "file_list":
-        from cognishift.core.security import resolve_workspace_path
-        directory = parameters.get("directory", ".")
+        from cognishift.core.security import (
+            resolve_workspace_path,
+            validate_workspace_filesystem_policy,
+            get_workspace_root,
+            INTERNAL_SUBSYSTEM_ROOTS
+        )
+        directory = parameters.get("directory", "documents")
         ws_id = workspace_id or parameters.get("workspace_id", 1)
         try:
             target_path = resolve_workspace_path(ws_id, directory, purpose="read")
+            validate_workspace_filesystem_policy(ws_id, target_path, operation="list")
             if not target_path.exists():
                 return f"Directory '{directory}' does not exist in workspace {ws_id}."
             if not target_path.is_dir():
                 return f"Path '{directory}' is a file, not a directory."
+            ws_root = get_workspace_root(ws_id)
+            is_root = (target_path.resolve() == ws_root.resolve())
             entries = []
             for item in sorted(target_path.iterdir()):
+                # Hide internal subsystem directories when listing workspace root
+                if is_root and item.name.lower() in INTERNAL_SUBSYSTEM_ROOTS:
+                    continue
                 entries.append({
                     "name": item.name,
                     "type": "directory" if item.is_dir() else "file",
@@ -187,12 +199,19 @@ async def execute_tool(
             return f"Error listing directory '{directory}': {str(e)}"
 
     elif tool_name == "file_read":
-        from cognishift.core.security import resolve_workspace_path
+        from cognishift.core.security import resolve_workspace_path, validate_workspace_filesystem_policy
         file_path = parameters.get("file_path", "")
-        max_bytes = min(int(parameters.get("max_bytes", 65536)), 1048576)
+        raw_mb = parameters.get("max_bytes", 65536)
+        try:
+            parsed_mb = int(raw_mb)
+        except (ValueError, TypeError):
+            parsed_mb = 65536
+        # Defense-in-depth: Strictly clamp between 1 and 1,048,576
+        max_bytes = max(1, min(parsed_mb, 1048576))
         ws_id = workspace_id or parameters.get("workspace_id", 1)
         try:
             target_path = resolve_workspace_path(ws_id, file_path, purpose="read")
+            validate_workspace_filesystem_policy(ws_id, target_path, operation="read")
             if not target_path.exists():
                 return f"File '{file_path}' does not exist in workspace {ws_id}."
             if not target_path.is_file():
@@ -204,7 +223,11 @@ async def execute_tool(
             return f"Error reading file '{file_path}': {str(e)}"
 
     elif tool_name == "file_write":
-        from cognishift.core.security import resolve_workspace_path
+        from cognishift.core.security import (
+            resolve_workspace_path,
+            validate_workspace_filesystem_policy,
+            get_workspace_root
+        )
         from cognishift.app.db.database import get_db
         file_path = parameters.get("file_path", "")
         content = parameters.get("content", "")
@@ -212,15 +235,19 @@ async def execute_tool(
         ws_id = workspace_id or parameters.get("workspace_id", 1)
         try:
             target_path = resolve_workspace_path(ws_id, file_path, purpose="write", allow_create_parent=True)
-            # Immutability Check: generic file_write must NEVER overwrite a registered artifact
-            norm_rel_path = file_path.replace("\\", "/").lstrip("./")
+            # 1. Enforce Central Workspace Filesystem Policy (documents/ only for generic write)
+            validate_workspace_filesystem_policy(ws_id, target_path, operation="write")
+
+            # 2. Canonical OS Case-Normalized Immutability Check
+            ws_root = get_workspace_root(ws_id)
+            canonical_target = os.path.normcase(str(target_path.resolve()))
             async with get_db() as db:
-                c = await db.execute(
-                    "SELECT id FROM workspace_artifacts WHERE workspace_id = ? AND (relative_path = ? OR relative_path = ?)",
-                    (ws_id, file_path, norm_rel_path)
-                )
-                if await c.fetchone():
-                    return f"Security Error: Cannot overwrite registered immutable artifact '{file_path}' through generic file_write."
+                c = await db.execute("SELECT relative_path FROM workspace_artifacts WHERE workspace_id = ?", (ws_id,))
+                rows = await c.fetchall()
+                for r in rows:
+                    art_path = (ws_root / r["relative_path"]).resolve()
+                    if canonical_target == os.path.normcase(str(art_path)):
+                        return f"Security Error: Cannot overwrite registered immutable artifact '{file_path}' through generic file_write."
 
             if target_path.exists() and not overwrite:
                 return f"Error: File '{file_path}' already exists and overwrite is set to False."
@@ -232,11 +259,12 @@ async def execute_tool(
             return f"Error writing file '{file_path}': {str(e)}"
 
     elif tool_name == "directory_create":
-        from cognishift.core.security import resolve_workspace_path
+        from cognishift.core.security import resolve_workspace_path, validate_workspace_filesystem_policy
         directory_path = parameters.get("directory_path", "")
         ws_id = workspace_id or parameters.get("workspace_id", 1)
         try:
             target_path = resolve_workspace_path(ws_id, directory_path, purpose="write", allow_create_parent=True)
+            validate_workspace_filesystem_policy(ws_id, target_path, operation="mkdir")
             target_path.mkdir(parents=True, exist_ok=True)
             return f"Directory '{directory_path}' successfully created in workspace {ws_id}."
         except Exception as e:

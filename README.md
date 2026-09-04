@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-teal.svg)](https://fastapi.tiangolo.com/)
 [![Local AI](https://img.shields.io/badge/Ollama-Llama%203.2%20%7C%20Moondream-purple.svg)](https://ollama.com/)
-[![Tests](https://img.shields.io/badge/Tests-164%20Passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-196%20Passing-brightgreen.svg)]()
 
 CogniShift is a self-hosted agentic AI workbench designed for confidential industrial operations. It runs open-weight language and vision models on local hardware without requiring external cloud AI APIs.
 
@@ -122,8 +122,22 @@ All retrieved document text is passed through an untrusted data wrapper (`<docum
 | **Phase 3** | Model Provider Abstraction & Local Ollama Integration | Complete |
 | **Phase 4** | Knowledge Pipeline (ChromaDB) & Docker Code Sandbox | Complete (Verified in live Docker container) |
 | **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete & Verified (164 tests passing) |
-| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Planned (Not implemented yet) |
-| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Not implemented yet) |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Complete & Verified (196 tests passing) |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Awaiting Human Review) |
+
+---
+
+## Network Sovereignty & Egress Observation (Phase 6)
+
+CogniShift enforces strict network boundaries to prevent accidental or malicious data exfiltration:
+* **Strict Network Policy:** Operates in `NetworkPolicyMode.STRICT`. Only loopback communication to explicitly approved services (`127.0.0.1:11434`, `::1:11434` for Ollama; `127.0.0.1:8000`, `::1:8000` for FastAPI) is permitted.
+* **Pre-Socket Transport Guard:** Outbound HTTP calls pass through `SovereignAsyncTransport` and `SovereignTransport`. Public IP destinations, link-local addresses (`169.254.0.0/16`, `fe80::/10`), and unlisted RFC 1918 private networks are intercepted and blocked prior to establishing TCP handshakes.
+* **DNS & Redirect Interception:** Hostnames are resolved pre-connection. If any resolved IP is public or unapproved, the request fails closed. HTTP redirects (`301`, `302`, `307`, `308`) are intercepted with destinations re-evaluated against the policy.
+* **Offline Vector Cache:** FastEmbed embeddings operate 100% offline (`local_files_only=True`) using local model cache (`data/models/fastembed`). If assets are missing, the system fails closed without attempting online downloads.
+* **CDN-Free Frontend & Strict CSP:** The web dashboard (`/static/index.html`) contains zero external CDN dependencies (served via local `/static/app.css` and system fonts). All HTTP responses carry strict Content Security Policy (`default-src 'self'`, `frame-ancestors 'none'`, `connect-src 'self'`).
+* **Persistent Network Audit Ledger:** All network attempts are logged to the `network_events` SQLite table with metadata only (no prompt text, authorization headers, or response payloads are stored).
+* **Independent Host-Level Observer:** Sockets are monitored at the OS level via `scripts/observe_network.py` with an executable negative control to prove detection accuracy.
+* **Operator Firewall Scripts:** PowerShell scripts (`scripts/enable_strict_network_policy.ps1` and `scripts/disable_strict_network_policy.ps1`) configure process-scoped Windows Defender Firewall rules targeting the Python runtime.
 
 ---
 

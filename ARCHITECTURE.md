@@ -110,7 +110,61 @@ When agents generate Python code, it is not executed directly on the host operat
 
 ---
 
-## 6. Operator Interfaces
+## 6. Network Policy & Sovereignty Enforcement (Phase 6)
+
+CogniShift implements dual-layer network defense to guarantee operational confidentiality:
+
+```
++-------------------------------------------------------------------------------+
+| APPLICATION LAYER DEFENSE                                                     |
+|                                                                               |
+|   OllamaProvider / HTTP Clients                                               |
+|         │                                                                     |
+|         ▼                                                                     |
+|   get_sovereign_async_client() / get_sovereign_client()                       |
+|         │                                                                     |
+|         ▼                                                                     |
+|   SovereignAsyncTransport / SovereignTransport                                |
+|         │                                                                     |
+|         ├── Hostname Resolution & Classification (ipaddress module)           |
+|         ├── Policy Check (NetworkPolicy: STRICT mode)                         |
+|         │     ├── Loopback (127.0.0.1, ::1 on ports 11434, 8000) ──► ALLOW   |
+|         │     ├── Unapproved Loopback Ports / Private RFC 1918  ──► BLOCK   |
+|         │     └── Public Internet / Link-Local Metadata (169.254)──► BLOCK   |
+|         └── Audit Logging (network_events table: metadata only)               |
++-------------------------------------------------------------------------------+
+                                  │
+                                  ▼
++-------------------------------------------------------------------------------+
+| OS LAYER DEFENSE (Windows Defender Firewall)                                  |
+|                                                                               |
+|   Rule Group: CogniShift-Phase6                                               |
+|   • Allow Outbound Loopback (127.0.0.1, ::1) for target python.exe            |
+|   • Allow Inbound Loopback (port 8000) for FastAPI server                      |
+|   • Block Outbound Non-Loopback (WAN/LAN egress) for python.exe               |
++-------------------------------------------------------------------------------+
+                                  │
+                                  ▼
++-------------------------------------------------------------------------------+
+| INDEPENDENT HOST OBSERVER (scripts/observe_network.py)                        |
+|                                                                               |
+|   • Monitors OS socket table via psutil at regular polling intervals          |
+|   • Classifies active connections into loopback, private, and public          |
+|   • Validated via negative control (test loopback socket detection)           |
+|   • Confirms zero unauthorized external sockets during local workflows        |
++-------------------------------------------------------------------------------+
+```
+
+### 6.1. Content Security Policy (CSP) & Header Hardening
+All web server responses include:
+* `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';`
+* `X-Content-Type-Options: nosniff`
+* `X-Frame-Options: DENY`
+* `Referrer-Policy: no-referrer`
+
+---
+
+## 7. Operator Interfaces
 
 1. **Web Dashboard:** Browser-based interface at `http://127.0.0.1:8000/static/index.html`.
 2. **Terminal CLI:** Typer + Rich command-line application (`cli.py`) for headless edge servers and SSH sessions.

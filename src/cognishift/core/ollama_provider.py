@@ -2,6 +2,8 @@ import base64
 import httpx
 from typing import Optional
 from cognishift.app.config import settings
+from cognishift.core.network.client import get_sovereign_async_client
+from cognishift.core.network.schemas import NetworkPolicyViolation
 from cognishift.core.providers import (
     ModelProvider,
     ModelResponse,
@@ -44,7 +46,7 @@ class OllamaProvider(ModelProvider):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with get_sovereign_async_client(timeout=120.0, component="ollama_provider") as client:
                 response = await client.post(f"{self.base_url}/api/chat", json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -58,6 +60,8 @@ class OllamaProvider(ModelProvider):
                     is_simulated=False,
                     success=True
                 )
+        except NetworkPolicyViolation as e:
+            raise ProviderError(f"Network policy violation: {e}")
         except httpx.ConnectError as e:
             raise ProviderConnectionError(f"Cannot connect to local Ollama server at {self.base_url}: {e}")
         except httpx.TimeoutException as e:
@@ -81,7 +85,7 @@ class OllamaProvider(ModelProvider):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with get_sovereign_async_client(timeout=120.0, component="ollama_provider") as client:
                 response = await client.post(f"{self.base_url}/api/chat", json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -93,6 +97,15 @@ class OllamaProvider(ModelProvider):
                     is_simulated=False,
                     success=True
                 )
+        except NetworkPolicyViolation as e:
+            return ModelResponse(
+                text=f"[VISION POLICY VIOLATION: {e}]",
+                model_name=target_model,
+                provider="ollama",
+                is_simulated=False,
+                success=False,
+                error_message=str(e)
+            )
         except (httpx.ConnectError, httpx.TimeoutException, Exception) as e:
             return ModelResponse(
                 text=f"[VISION ERROR: {e}]",
@@ -106,7 +119,7 @@ class OllamaProvider(ModelProvider):
     async def health_check(self) -> bool:
         """Check if the local Ollama service is available."""
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with get_sovereign_async_client(timeout=5.0, component="ollama_provider") as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 return response.status_code == 200
         except (httpx.ConnectError, httpx.TimeoutException, Exception):
@@ -115,7 +128,7 @@ class OllamaProvider(ModelProvider):
     async def model_info(self) -> dict:
         """Return information about the available models on the local Ollama instance."""
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with get_sovereign_async_client(timeout=5.0, component="ollama_provider") as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 response.raise_for_status()
                 data = response.json()

@@ -88,6 +88,17 @@ CogniShift is an on-premise agentic AI workbench:
 * **`src/cognishift/core/engine.py`:** Agent execution loop, tool detection, and approval pause state machine.
 * **`src/cognishift/core/tools.py`:** Registered tool definitions and execution functions.
 
+### Network Sovereignty & Policy (Phase 6)
+* **`src/cognishift/core/network/schemas.py`:** Network destination models, policy modes (`STRICT`, `DEVELOPMENT`), and exceptions.
+* **`src/cognishift/core/network/resolver.py`:** Standard library IP classification (`ipaddress`), DNS resolution, and multi-IP rebinding protection.
+* **`src/cognishift/core/network/policy.py`:** Deterministic policy engine enforcing loopback allowlists and private/public isolation.
+* **`src/cognishift/core/network/guard.py`:** Custom `SovereignAsyncTransport` and `SovereignTransport` intercepting HTTP connections.
+* **`src/cognishift/core/network/client.py`:** Centralized factory `get_sovereign_async_client()` and `get_sovereign_client()`.
+* **`src/cognishift/core/network/events.py`:** SQLite audit ledger management with metadata logging and retention limits.
+* **`src/cognishift/core/network/preflight.py`:** Startup validation for local models, offline cache, OCR, Docker sandbox, and frontend CDN footprint.
+* **`scripts/observe_network.py`:** Independent host socket observer with negative control validation.
+* **`scripts/enable_strict_network_policy.ps1`:** Operator PowerShell script for Windows Defender Firewall enforcement.
+
 ### Terminal CLI
 * **`cli.py` & `src/cognishift/cli.py`:** Terminal interface built with Typer and Rich for managing workspaces, agents, knowledge, telemetry, runs, and approvals.
 

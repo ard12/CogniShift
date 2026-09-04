@@ -2,11 +2,12 @@ import os
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from cognishift.app.config import settings
+from cognishift.core.network.client import get_sovereign_async_client
 from cognishift import __version__
 
 # Create data directories on startup
@@ -59,8 +60,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Inject strict Content Security Policy and hardening headers."""
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
-from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts
+
+from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts, sovereignty
 
 app.include_router(workspaces.router)
 app.include_router(agents.router)
@@ -68,6 +87,7 @@ app.include_router(knowledge.router)
 app.include_router(runs.router)
 app.include_router(approvals.router)
 app.include_router(artifacts.router)
+app.include_router(sovereignty.router)
 
 # Setup Static UI
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -80,12 +100,12 @@ async def root():
 
 async def check_ollama() -> tuple[bool, List[Dict[str, Any]]]:
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with get_sovereign_async_client(timeout=2.0, component="system_status") as client:
             response = await client.get(f"{settings.ollama_base_url}/api/tags")
             response.raise_for_status()
             data = response.json()
             return True, data.get("models", [])
-    except (httpx.RequestError, httpx.HTTPStatusError):
+    except (httpx.RequestError, httpx.HTTPStatusError, Exception):
         return False, []
 
 @app.get("/api/v1/system/status")

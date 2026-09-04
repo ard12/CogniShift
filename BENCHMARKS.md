@@ -73,7 +73,31 @@ Evaluated using `scratch/test_multimodal_vision_pipeline.py` with local `moondre
 
 ---
 
-## 6. System Evaluation Metrics
+
+---
+
+## 6. Benchmark Suite 5: Network Sovereignty & Policy Enforcement
+
+Evaluated via the Phase 6 test suite (`tests/test_phase6_*.py`):
+
+| Test Category | Target / Condition | Result | Latency / Metric |
+|:---|:---|:---:|:---:|
+| **Policy Evaluation** | 19 IP classification & rebinding tests | Pass | < 0.2 ms per decision |
+| **Local Inference Egress** | Real Ollama query via sovereign transport | Pass | 200 OK, event logged as ALLOWED |
+| **Public Egress Interception** | Outbound request to 93.184.216.34:80 | Pass | Blocked prior to socket connection |
+| **LAN Egress Interception** | Outbound request to 192.168.1.1:8080 | Pass | Blocked prior to socket connection |
+| **FastEmbed Offline Mode** | Model loading with missing cache | Pass | Fails closed without downloading |
+| **Model Availability** | Requesting non-existent Ollama model | Pass | Fails closed without auto-pull |
+| **Sensitive Data Redaction** | Audit ledger inspection with injected tokens | Pass | 0 sensitive markers logged |
+| **Observer Negative Control** | Synthetic socket connection on port 19876 | Pass | Socket detected and logged |
+| **Observer Workflow Check** | Active Ollama inference & embedding generation | Pass | 0 unauthorized connections |
+| **Frontend Static Scan** | Inspection of index.html & static CSS | Pass | 0 external CDN links |
+
+Total Repository Automated Tests: **196 passed**, 0 failed, 0 skipped.
+
+---
+
+## 7. System Evaluation Metrics
 
 Measured via static analysis and test suite execution:
 
@@ -88,9 +112,9 @@ Measured via static analysis and test suite execution:
 
 ---
 
-## 7. Operational Limitations
+## 8. Operational Limitations
 
 * **Simulated Plant Environment:** SCADA telemetry streams and SAP PM maintenance orders are synthetic test datasets, not live plant systems.
 * **Handwriting:** Handwritten notes are parsed on a best-effort basis. Where OCR confidence is low, uncertainty is preserved.
 * **Model Size:** Local inference uses compact open-weight models (3B parameter LLM, 1.86B parameter VLM) to run on consumer-grade hardware. Complex reasoning can require prompt guidance.
-* **Network Boundaries:** Full platform-wide network egress enforcement is scheduled for Phase 6.
+* **Network Boundaries:** Phase 6 network policy and sovereignty enforcement is complete and verified with 196 tests passing.

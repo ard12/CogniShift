@@ -160,3 +160,32 @@ Launches an interactive operator session supporting slash commands:
 * `/telemetry`: Display simulated sensor stream.
 * `/clear`: Clear the terminal screen.
 * `/exit`: Exit the session.
+
+---
+
+## 4. Network Sovereignty & Observer Utilities
+
+### 4.1. Independent Network Observer
+```bash
+# Verify observer sensitivity with executable negative control
+python scripts/observe_network.py --test-negative-control
+
+# Observe current process network connections for 5 seconds
+python scripts/observe_network.py --duration 5
+
+# Observe a specific PID
+python scripts/observe_network.py --pid <PID> --duration 10
+```
+
+### 4.2. Windows Defender Firewall Management (Administrator)
+```powershell
+# Enable strict process-scoped firewall rules for CogniShift Python
+powershell -ExecutionPolicy Bypass -File scripts/enable_strict_network_policy.ps1
+
+# Disable firewall rules and restore default networking
+powershell -ExecutionPolicy Bypass -File scripts/disable_strict_network_policy.ps1
+```
+
+### 4.3. Sovereignty REST Endpoints
+* `GET /api/v1/system/sovereignty`: View active policy mode, allowed destinations, and preflight status.
+* `GET /api/v1/system/network-events`: View paginated network audit log entries with optional filtering (`?decision=BLOCKED`).

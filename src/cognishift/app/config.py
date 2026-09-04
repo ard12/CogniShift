@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
+from typing import Optional, List, TYPE_CHECKING, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from cognishift.core.network.schemas import NetworkDestination
 
 # Project root is two levels up from this file (src/cognishift/app/config.py -> project root)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -53,12 +57,21 @@ class Settings(BaseSettings):
     document_processing_timeout: int = 300
     vision_max_pages_per_doc: int = 5
 
+    # Phase 6 Network Sovereignty & Egress Observation Configuration
+    static_dir: Path = PROJECT_ROOT / "src" / "cognishift" / "app" / "static"
+    network_policy_mode: str = "strict"  # 'strict' or 'development'
+    network_allowed_destinations: Optional[List[Any]] = None
+    fastembed_offline: bool = True
+    fastembed_cache_dir: Path = PROJECT_ROOT / "data" / "models" / "fastembed"
+    network_audit_max_records: int = 5000
+    network_audit_retention_days: int = 7
+
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
 
 # Ensure all paths are absolute relative to project root if they were loaded as relative from .env
-for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir', 'auth_store_path']:
+for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir', 'auth_store_path', 'static_dir', 'fastembed_cache_dir']:
     path_val = getattr(settings, field)
     if not path_val.is_absolute():
         setattr(settings, field, PROJECT_ROOT / path_val)

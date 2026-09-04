@@ -215,6 +215,24 @@ async def init_db() -> None:
         ''')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_doc_pages_source ON document_pages(source_id, processing_version)")
         
+        # Phase 6 Bounded Network Audit Ledger
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS network_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                component TEXT NOT NULL,
+                method TEXT,
+                requested_host TEXT NOT NULL,
+                resolved_ip TEXT,
+                port INTEGER,
+                destination_class TEXT NOT NULL,
+                policy_decision TEXT NOT NULL,
+                reason TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_net_events_decision ON network_events(policy_decision)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_net_events_timestamp ON network_events(timestamp)")
+
         await db.commit()
 
 @asynccontextmanager

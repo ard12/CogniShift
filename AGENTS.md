@@ -27,8 +27,8 @@ The repository follows a sequential phase architecture:
 | **Phase 3** | Local Model Provider (`OllamaProvider`) & Simulated Fallback | Complete |
 | **Phase 4** | Knowledge Pipeline (ChromaDB + FastEmbed) & Docker Code Sandbox | Complete (Verified in live Docker container) |
 | **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete & Verified |
-| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Planned (Locked) |
-| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Locked) |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Complete & Verified (196 tests passing) |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Awaiting Human Review) |
 
 Do NOT begin Phase 6 or Phase 7 implementation until explicitly authorized.
 
@@ -94,6 +94,16 @@ class DocumentProcessingService:
 ```
 
 ---
+
+### F. Sovereign Client Contract (`src/cognishift/core/network/client.py`)
+```python
+from cognishift.core.network.client import get_sovereign_async_client, get_sovereign_client
+
+# All outbound HTTP calls in the application MUST use sovereign clients:
+async with get_sovereign_async_client(component="my_component") as client:
+    response = await client.get("http://localhost:11434/api/tags")
+    # Public, link-local, or unapproved private LAN calls raise NetworkPolicyViolation
+```
 
 ## 4. Operator Interfaces
 

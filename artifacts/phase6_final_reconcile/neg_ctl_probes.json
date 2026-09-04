@@ -1,24 +1,24 @@
 {
-  "timestamp": "2026-09-04T10:32:18.930515+00:00",
+  "timestamp": "2026-09-04T10:46:49.191145+00:00",
   "loopback": {
     "host": "127.0.0.1",
     "port": 11434,
     "connected": true,
     "error": null,
-    "elapsed_ms": 15.4
+    "elapsed_ms": 0.39
   },
   "public_80": {
     "host": "1.1.1.1",
     "port": 80,
     "connected": true,
     "error": null,
-    "elapsed_ms": 5.12
+    "elapsed_ms": 5.97
   },
   "public_443": {
     "host": "1.1.1.1",
     "port": 443,
     "connected": true,
     "error": null,
-    "elapsed_ms": 6.07
+    "elapsed_ms": 29.88
   }
 }

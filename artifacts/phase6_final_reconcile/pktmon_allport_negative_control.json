@@ -6,9 +6,30 @@
   "loopback_detected": true,
   "public_80_detected": true,
   "public_other_port_detected": true,
-  "captured_loopback_count": 2,
-  "captured_public_80_count": 2,
-  "captured_public_443_count": 2,
-  "raw_etl_sha256": null,
-  "decoded_trace_sha256": null
+  "captured_loopback_count": 1,
+  "captured_public_80_count": 72,
+  "captured_public_443_count": 117,
+  "sample_loopback": {
+    "raw_line": "Drop: ip: 127.0.0.1.61368 > 127.0.0.1.11434: Flags [.], ack 4097004144, win 255, length 0",
+    "src_ip": "127.0.0.1",
+    "src_port": 61368,
+    "dst_ip": "127.0.0.1",
+    "dst_port": 11434
+  },
+  "sample_public_80": {
+    "raw_line": "4C-49-6C-39-52-B5 > CC-2D-E0-CA-35-20, ethertype IPv4 (0x0800), length 66: 152.20.19.134.61369 > 1.1.1.1.80: Flags [S], seq 979545344, win 65535, options [mss 1460,nop,wscale 8,nop,nop,sackOK], length 0",
+    "src_ip": "152.20.19.134",
+    "src_port": 61369,
+    "dst_ip": "1.1.1.1",
+    "dst_port": 80
+  },
+  "sample_public_443": {
+    "raw_line": "4C-49-6C-39-52-B5 > CC-2D-E0-CA-35-20, ethertype IPv4 (0x0800), length 54: 152.20.19.134.54765 > 172.64.155.209.443: Flags [.], ack 103990187, win 255, length 0",
+    "src_ip": "152.20.19.134",
+    "src_port": 54765,
+    "dst_ip": "172.64.155.209",
+    "dst_port": 443
+  },
+  "raw_etl_sha256": "874a94c42cef799dcf6ffc0206934d6a3f6e4e5decf233c8e2610b5d37b1bec6",
+  "decoded_trace_sha256": "202858f64a714dccd3ea4a67fdc6c805c5893b926af7178c6254d39c68e97d03"
 }

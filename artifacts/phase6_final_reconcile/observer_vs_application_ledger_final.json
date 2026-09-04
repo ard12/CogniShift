@@ -1,13 +1,13 @@
 {
   "report": "Cross-Correlation: Independent All-Port PktMon Observer vs Application Audit Ledger",
-  "timestamp": "2026-09-04T10:31:44.616677+00:00",
-  "workflow_start": "2026-09-04T10:30:59.773066+00:00",
+  "timestamp": "2026-09-04T10:47:17.338681+00:00",
+  "workflow_start": "2026-09-04T10:46:52.856325+00:00",
   "application_ledger_total_events": 4,
   "application_ledger_allowed_loopback": 3,
   "application_ledger_blocked_public": 1,
   "application_ledger_events": [
     {
-      "timestamp": "2026-09-04T10:31:00.466351+00:00",
+      "timestamp": "2026-09-04T10:46:53.679204+00:00",
       "component": "ollama_provider",
       "requested_host": "localhost",
       "resolved_ip": "127.0.0.1",
@@ -17,7 +17,7 @@
       "reason": "Explicitly permitted local service at localhost:11434."
     },
     {
-      "timestamp": "2026-09-04T10:31:42.054347+00:00",
+      "timestamp": "2026-09-04T10:47:15.238011+00:00",
       "component": "ollama_provider",
       "requested_host": "localhost",
       "resolved_ip": "127.0.0.1",
@@ -27,7 +27,7 @@
       "reason": "Explicitly permitted local service at localhost:11434."
     },
     {
-      "timestamp": "2026-09-04T10:31:42.621490+00:00",
+      "timestamp": "2026-09-04T10:47:15.490222+00:00",
       "component": "ollama_provider",
       "requested_host": "localhost",
       "resolved_ip": "127.0.0.1",
@@ -37,7 +37,7 @@
       "reason": "Explicitly permitted local service at localhost:11434."
     },
     {
-      "timestamp": "2026-09-04T10:31:44.560940+00:00",
+      "timestamp": "2026-09-04T10:47:17.302668+00:00",
       "component": "core",
       "requested_host": "8.8.8.8",
       "resolved_ip": "8.8.8.8",

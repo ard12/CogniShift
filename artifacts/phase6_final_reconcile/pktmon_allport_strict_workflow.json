@@ -3,9 +3,9 @@
   "pktmon_command": "pktmon start --capture --pkt-size 128 -f pktmon_allport_strict_workflow.etl",
   "port_filter_present": false,
   "port_filter_value": null,
-  "raw_etl_sha256": null,
-  "decoded_trace_sha256": null,
-  "observed_loopback_count": 3,
+  "raw_etl_sha256": "70dc7dc93e88f3c1e619c7b31c3b546184009336da1e4015af92871120f946f2",
+  "decoded_trace_sha256": "71a4171d6f5ba6e4ca8a532e4c9155da8c3acc0498743757c2c16fd32086bee0",
+  "observed_loopback_count": 30,
   "observed_private_count": 0,
   "observed_link_local_count": 0,
   "observed_public_count": 0,
@@ -15,7 +15,7 @@
   "known_ollama_traffic_detected": true,
   "traffic_attribution": {
     "methodology": "Time-window and endpoint correlation separating CogniShift processes from background Windows OS traffic.",
-    "cognishift_authorized_loopback": 3,
+    "cognishift_authorized_loopback": 30,
     "cognishift_unauthorized_egress": 0,
     "background_host_traffic_filtered": true
   },

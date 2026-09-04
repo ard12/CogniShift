@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     chroma_path: Path = PROJECT_ROOT / "data" / "chroma"
     upload_dir: Path = PROJECT_ROOT / "data" / "uploads"
     auth_store_path: Path = PROJECT_ROOT / "data" / "private" / "auth_store.json"
+    cognishift_demo_mode: bool = False
+    demo_session_ttl_seconds: int = 1800
     max_upload_size_mb: int = 50
     log_level: str = "INFO"
 

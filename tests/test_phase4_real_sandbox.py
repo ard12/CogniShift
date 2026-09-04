@@ -26,12 +26,19 @@ from cognishift.core.sandbox.promoter import validate_and_promote_outputs
 
 
 def is_container_runtime_available() -> bool:
-    """Check if the configured container runtime (Docker or Podman) is available on the current host."""
+    """Check if the configured container runtime (Docker or Podman) is available and running on the current host."""
     runtime = settings.sandbox_runtime
     bin_path = shutil.which(runtime)
     if not bin_path:
         bin_path = shutil.which("docker") or shutil.which("podman")
-    return bin_path is not None
+    if not bin_path:
+        return False
+    import subprocess
+    try:
+        res = subprocess.run([bin_path, "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+        return res.returncode == 0
+    except Exception:
+        return False
 
 
 # Marker to skip real container tests when no daemon is installed on this host
@@ -39,6 +46,18 @@ requires_container_runtime = pytest.mark.skipif(
     not is_container_runtime_available(),
     reason="Docker/Podman container runtime is not installed or available on this host. Real sandbox gate requires container daemon."
 )
+
+
+@pytest.fixture(autouse=True)
+async def setup_sandbox_db():
+    await init_db()
+    async with get_db() as db:
+        await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Refinery-1', 'MRPL')")
+        await db.execute(
+            "INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (1, 1, 1, 'completed', 'operator_sam')"
+        )
+        await db.commit()
+
 
 
 # -----------------------------------------------------------------------------

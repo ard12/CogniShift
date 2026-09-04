@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-teal.svg)](https://fastapi.tiangolo.com/)
 [![Local AI](https://img.shields.io/badge/Ollama-Llama%203.2%20%7C%20Moondream-purple.svg)](https://ollama.com/)
-[![Tests](https://img.shields.io/badge/Tests-196%20Passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-219%20Passing-brightgreen.svg)]()
 
 CogniShift is a self-hosted agentic AI workbench designed for confidential industrial operations. It runs open-weight language and vision models on local hardware without requiring external cloud AI APIs.
 
@@ -121,9 +121,10 @@ All retrieved document text is passed through an untrusted data wrapper (`<docum
 | **Phase 2** | Database Layer (Async SQLite WAL, 10 tables) & CRUD Routers | Complete |
 | **Phase 3** | Model Provider Abstraction & Local Ollama Integration | Complete |
 | **Phase 4** | Knowledge Pipeline (ChromaDB) & Docker Code Sandbox | Complete (Verified in live Docker container) |
-| **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete & Verified (164 tests passing) |
-| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Complete & Verified (196 tests passing) |
-| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Awaiting Human Review) |
+| **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete and verified |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Complete and verified |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | Implemented and automated; operator acceptance remains |
+| **Auth remediation** | Local demo personas, live credential refresh, secure manual bearer login | Complete and verified |
 
 ---
 
@@ -184,6 +185,19 @@ python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000 --reload
 * **Operator Console:** [http://127.0.0.1:8000](http://127.0.0.1:8000) (redirects to `/static/index.html`)
 * **Interactive API Documentation (Swagger):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
+### Local SIH Demo Authentication
+
+Normal bearer authentication remains enabled in every mode. To add the local persona selector for an SIH rehearsal, opt in before starting the loopback-only server:
+
+```powershell
+$env:COGNISHIFT_DEMO_MODE='true'
+python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000/` and select Sam, Jane, or Rohit. The server returns a random short-lived credential held only in server memory and browser `sessionStorage`; it never exposes the long-lived API keys. Demo session creation returns 404 unless the flag is enabled in local operating mode, and 403 for non-loopback clients. Keep `COGNISHIFT_DEMO_MODE=false` (the default) for strict deployments.
+
+For manual bearer testing, run `python scripts/bootstrap_demo_auth.py`. Re-running it explicitly rotates the four demo credentials; the server automatically reloads the changed credential store, so a restart is not required. The Advanced / Manual Bearer Authentication section remains available in the auth console.
+
 ### Terminal CLI Workbench
 ```bash
 # Launch interactive operator chat shell
@@ -211,8 +225,10 @@ See **[CLI.md](CLI.md)** for the complete command reference.
 
 Run the full automated test suite:
 ```bash
-pytest -v
+pytest -v --basetemp .test-runtime
 ```
+
+The test harness redirects SQLite, ChromaDB, uploads, and credentials to disposable storage before importing the application. A test run must not change live `data/` row counts.
 
 Targeted test suites:
 ```bash
@@ -279,7 +295,7 @@ CogniShift/
 ## Known Limitations
 
 * **Simulated Industrial Environment:** Plant SCADA streams and SAP PM maintenance orders are synthetic test datasets for demonstration and evaluation. CogniShift is not connected to live physical control systems.
-* **Network Egress Enforcement:** Platform-wide network egress observation and kernel-level firewall enforcement are scheduled for Phase 6.
+* **Network Egress Enforcement:** Platform-wide network egress observation, socket-level blocking, and kernel-level firewall enforcement are formally proven and frozen in Phase 6.
 * **Handwriting Recognition:** Handwritten text in scanned documents is processed on a best-effort basis. Low-confidence outputs retain uncertainty indicators.
 * **Local Model Capacity:** Local inference uses compact models (`llama3.2:3b` and `moondream:1.86B`) suited for consumer GPUs. Complex multi-step reasoning can occasionally require prompt refinement.
 * **Integrity Checking:** Document and artifact hashes use SHA-256 for change detection, not cryptographic digital signatures.
@@ -290,7 +306,7 @@ CogniShift/
 ## Documentation Suite
 
 * **[ARCHITECTURE.md](ARCHITECTURE.md):** Industrial network model, topology graph, and security boundaries.
-* **[BENCHMARKS.md](BENCHMARKS.md):** Test results, retrieval latencies, and evaluation metrics.
+* **[BENCHMARKS.md](BENCHMARKS.md):** Test results and operational latencies. *(Note: Real-data benchmarking is paused until after SIH demo workflow validation. No benchmark results are currently claimed.)*
 * **[CLI.md](CLI.md):** Full terminal command-line reference and examples.
 * **[information.md](information.md):** Plain-English component walkthroughs and operational scenarios.
 * **[AGENTS.md](AGENTS.md):** Developer alignment guide and shared contracts.

@@ -1,5 +1,7 @@
 # CogniShift Phase 6: Human Operator Independent Verification Guide
 
+**Reviewed:** 2026-09-04. This remains the authoritative manual firewall causality check; current non-frontend automated regression baseline is 219 tests.
+
 This document contains the step-by-step commands to independently verify Windows Defender Firewall enforcement and OS-level network observation in an elevated Administrator session.
 
 ---
@@ -91,4 +93,4 @@ Get-Content artifacts/phase6_firewall_final/os_trace.txt | Select-Object -First 
 ```powershell
 python -m pytest -v
 ```
-*Expected:* `196 passed`
+*Expected:* `219 passed` for the non-frontend push, or `226 passed` in the complete local working tree

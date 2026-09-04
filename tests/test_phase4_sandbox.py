@@ -53,6 +53,20 @@ def ensure_simulated_mode(monkeypatch):
     monkeypatch.setattr(settings, "operating_mode", "simulated")
 
 
+@pytest.fixture(autouse=True)
+async def initialize_isolated_sandbox_database():
+    """Provide the minimum relational context without relying on live seed data."""
+    await init_db()
+    async with get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Sandbox Test', 'Isolated pytest workspace')"
+        )
+        await db.execute(
+            "INSERT OR IGNORE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (10, 1, 1, 'completed', 'test_operator')"
+        )
+        await db.commit()
+
+
 # -----------------------------------------------------------------------------
 # 1. STRICT SCHEMA BOUNDS TESTS
 # -----------------------------------------------------------------------------
@@ -292,6 +306,11 @@ async def test_execute_code_pauses_when_agent_requires_approval():
     await init_db()
     async with get_db() as db:
         await db.execute("""
+            INSERT OR REPLACE INTO tool_definitions
+            (id, name, description, risk_level, requires_approval, implementation_key)
+            VALUES (15, 'execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 0, 'execute_code')
+        """)
+        await db.execute("""
             INSERT OR REPLACE INTO agent_definitions 
             (id, workspace_id, name, model_name, allowed_tool_ids, approval_required, knowledge_source_ids)
             VALUES (96, 1, 'Supervised Coding Agent', 'llama3.2:3b', '[15]', 1, '[]')
@@ -325,6 +344,11 @@ async def test_execute_code_pauses_when_agent_requires_approval():
 async def test_coding_agent_retry_loop_bounded():
     await init_db()
     async with get_db() as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO tool_definitions
+            (id, name, description, risk_level, requires_approval, implementation_key)
+            VALUES (15, 'execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 0, 'execute_code')
+        """)
         await db.execute("""
             INSERT OR REPLACE INTO agent_definitions 
             (id, workspace_id, name, model_name, allowed_tool_ids, approval_required, knowledge_source_ids)

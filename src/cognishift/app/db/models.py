@@ -21,9 +21,9 @@ class AgentCreate(BaseModel):
     description: Optional[str] = None
     system_instructions: Optional[str] = None
     model_name: str = 'llama3.2:3b'
-    allowed_tool_ids: List[int] = []
+    allowed_tool_ids: List[Any] = []
     approval_required: bool = False
-    knowledge_source_ids: List[int] = []
+    knowledge_source_ids: List[Any] = []
 
 class AgentResponse(BaseModel):
     id: int
@@ -33,9 +33,9 @@ class AgentResponse(BaseModel):
     system_instructions: Optional[str] = None
     model_name: str
     status: str
-    allowed_tool_ids: List[int]
+    allowed_tool_ids: List[Any] = []
     approval_required: bool
-    knowledge_source_ids: List[int]
+    knowledge_source_ids: List[Any] = []
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -126,6 +126,9 @@ class ApprovalResponse(BaseModel):
     requested_at: datetime
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+    reviewed_by_2: Optional[str] = None
+    reviewed_at_2: Optional[datetime] = None
+    required_approvals: int = 1
     model_config = ConfigDict(from_attributes=True)
 
 class AuditEventResponse(BaseModel):
@@ -179,6 +182,7 @@ class DocumentPageResponse(BaseModel):
     page_number: int
     extraction_method: str
     ocr_confidence: Optional[float] = None
+    text_content: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

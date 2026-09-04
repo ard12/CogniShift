@@ -79,8 +79,9 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts, sovereignty
+from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts, sovereignty, sandbox, auth, audit
 
+app.include_router(auth.router)
 app.include_router(workspaces.router)
 app.include_router(agents.router)
 app.include_router(knowledge.router)
@@ -88,6 +89,8 @@ app.include_router(runs.router)
 app.include_router(approvals.router)
 app.include_router(artifacts.router)
 app.include_router(sovereignty.router)
+app.include_router(sandbox.router)
+app.include_router(audit.router)
 
 # Setup Static UI
 static_dir = os.path.join(os.path.dirname(__file__), "static")

@@ -351,18 +351,8 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
         try:
             data = json.loads(candidate_json)
             if isinstance(data, dict):
-                action = data.get("action", "")
-                if action == "tool_call":
-                    tool_name = str(data.get("tool_name") or data.get("tool") or "").strip()
-                    if not tool_name:
-                        return None
-                    return ToolCallProposal(
-                        action="tool_call",
-                        tool_name=tool_name,
-                        parameters=data.get("parameters", {}),
-                        reason=data.get("reason", "Autonomous plan execution")
-                    )
-                elif action == "final_answer":
+                action = str(data.get("action", "")).strip()
+                if action == "final_answer":
                     content = data.get("content", "")
                     if not content and strict:
                         return None
@@ -376,8 +366,41 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                         action="clarification_request",
                         question=data.get("question", "")
                     )
-                else:
-                    return None
+
+                # Tool call detection: explicit action="tool_call"/"tool",
+                # or presence of "tool"/"tool_name"/"function" keys
+                tool_candidate = (
+                    data.get("tool_name")
+                    or data.get("tool")
+                    or (data.get("function", {}).get("name") if isinstance(data.get("function"), dict) else None)
+                    or (data.get("name") if action in ("tool_call", "tool", "") else None)
+                )
+
+                if tool_candidate:
+                    tool_name = str(tool_candidate).strip()
+                    if tool_name:
+                        raw_params = (
+                            data.get("parameters")
+                            or data.get("arguments")
+                            or (data.get("function", {}).get("arguments") if isinstance(data.get("function"), dict) else None)
+                            or {}
+                        )
+                        if isinstance(raw_params, str):
+                            try:
+                                raw_params = json.loads(raw_params)
+                            except Exception:
+                                raw_params = {}
+                        if not isinstance(raw_params, dict):
+                            raw_params = {}
+
+                        reason = data.get("reason") or "Autonomous plan execution"
+                        return ToolCallProposal(
+                            action="tool_call",
+                            tool_name=tool_name,
+                            parameters=raw_params,
+                            reason=reason
+                        )
+                return None
         except Exception:
             return None
 

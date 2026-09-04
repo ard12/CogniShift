@@ -165,6 +165,10 @@ async def execute_tool(
         service_name = parameters.get("service_name", "modbus_telemetry_collector")
         return f"Industrial daemon '{service_name}' restarted cleanly under supervisor PID 1842."
 
+    elif tool_name == "check_interlock_status":
+        subsystem = parameters.get("subsystem", "P-101A Centrifugal Pump")
+        return f"Local tool 'check_interlock_status' executed successfully: Interlocks for {subsystem} are armed. Trip threshold: 450.0 PSI, Bearing temp threshold: 95.0 C."
+
     # Phase 3 Safe File and Document Tools
     elif tool_name == "file_list":
         from cognishift.core.security import (

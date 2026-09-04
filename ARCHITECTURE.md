@@ -2,6 +2,10 @@
 
 Technical architecture document for the on-premise agentic AI workbench.
 
+**Validated:** 2026-09-04 against the 219-test non-frontend regression suite and live Docker, RapidOCR, Ollama, and browser workflows. The complete local working tree has 226 passing checks.
+
+Authentication uses hashed long-lived bearer credentials plus optional loopback-only, process-memory demo sessions. Demo sessions require `COGNISHIFT_DEMO_MODE=true`, expire automatically, and never expose long-lived keys.
+
 ---
 
 ## 1. Network & Deployment Model (Industrial DMZ Concept)

@@ -13,7 +13,12 @@ from pathlib import Path
 src_dir = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
-from cognishift.app.core.auth import User, register_local_credential, save_credential_store
+from cognishift.app.core.auth import (
+    User,
+    register_local_credential,
+    remove_credentials_for_users,
+    save_credential_store,
+)
 from cognishift.app.config import settings
 
 def main():
@@ -39,6 +44,10 @@ def main():
             "tenant2": f"cog_op2_{secrets.token_urlsafe(24)}"
         }
 
+    rotated = remove_credentials_for_users([
+        "operator_sam", "supervisor_jane", "admin_rohit", "operator_tenant2"
+    ])
+
     register_local_credential(tokens["operator"], User(user_id="operator_sam", role="operator", allowed_workspace_ids=[1]))
     register_local_credential(tokens["supervisor"], User(user_id="supervisor_jane", role="supervisor", allowed_workspace_ids=[1, 2]))
     register_local_credential(tokens["administrator"], User(user_id="admin_rohit", role="administrator", allowed_workspace_ids=[1, 2, 3]))
@@ -46,15 +55,15 @@ def main():
 
     save_credential_store(store_path)
 
-    print("
-" + "="*60)
+    print("\n" + "="*60)
     print("COGNISHIFT SOVEREIGN LOCAL CREDENTIALS GENERATED")
     print("WARNING: Store these tokens securely. They will NOT be displayed again.")
+    print(f"ROTATION: Replaced {rotated} previous demo credential record(s).")
+    print("A running CogniShift server will detect and reload this credential store automatically.")
     print("="*60)
     for role, tok in tokens.items():
         print(f"  {role.upper():<15}: {tok}")
-    print("="*60 + "
-")
+    print("="*60 + "\n")
 
 if __name__ == "__main__":
     main()

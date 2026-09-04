@@ -110,7 +110,10 @@ async def init_db() -> None:
                 risk_level TEXT, 
                 requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
                 reviewed_by TEXT, 
-                reviewed_at TIMESTAMP
+                reviewed_at TIMESTAMP,
+                reviewed_by_2 TEXT,
+                reviewed_at_2 TIMESTAMP,
+                required_approvals INTEGER DEFAULT 1
             )
         ''')
         
@@ -230,8 +233,16 @@ async def init_db() -> None:
                 reason TEXT NOT NULL
             )
         ''')
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_net_events_decision ON network_events(policy_decision)")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_net_events_timestamp ON network_events(timestamp)")
+        # Phase 7 Safe Migration: Dual Four-Eyes Approval columns
+        for col, col_def in [
+            ("reviewed_by_2", "TEXT"),
+            ("reviewed_at_2", "TIMESTAMP"),
+            ("required_approvals", "INTEGER DEFAULT 1")
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE approval_requests ADD COLUMN {col} {col_def}")
+            except Exception:
+                pass
 
         await db.commit()
 

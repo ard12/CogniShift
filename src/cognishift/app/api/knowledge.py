@@ -7,7 +7,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from typing import List, Optional
 
 from cognishift.app.db.database import get_db
-from cognishift.app.db.models import KnowledgeSourceResponse, DocumentProcessingJobResponse
+from cognishift.app.db.models import KnowledgeSourceResponse, DocumentProcessingJobResponse, DocumentPageResponse
 from cognishift.app.config import settings
 from cognishift.core.retriever import process_pdf, chroma_client, purge_knowledge_source
 from cognishift.core.security import resolve_workspace_path
@@ -196,4 +196,25 @@ async def list_processing_jobs(
         )
         job_rows = await cursor.fetchall()
         return [DocumentProcessingJobResponse.model_validate(dict(r)) for r in job_rows]
+
+
+@router.get("/{source_id}/pages", response_model=List[DocumentPageResponse])
+async def list_document_pages(
+    source_id: int,
+    user: User = Depends(get_current_user)
+):
+    """List all extracted pages and OCR/Vision provenance for a knowledge source."""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT workspace_id FROM knowledge_sources WHERE id = ?", (source_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Knowledge source not found.")
+        verify_workspace_access(row["workspace_id"], user)
+
+        cursor = await db.execute(
+            "SELECT * FROM document_pages WHERE source_id = ? ORDER BY page_number ASC",
+            (source_id,)
+        )
+        page_rows = await cursor.fetchall()
+        return [DocumentPageResponse.model_validate(dict(r)) for r in page_rows]
 

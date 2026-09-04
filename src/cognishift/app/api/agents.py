@@ -12,13 +12,19 @@ def row_to_agent(row) -> dict:
     if 'allowed_tool_ids' in d and isinstance(d['allowed_tool_ids'], str):
         try:
             d['allowed_tool_ids'] = json.loads(d['allowed_tool_ids'])
-        except json.JSONDecodeError:
+        except Exception:
             d['allowed_tool_ids'] = []
+    if not isinstance(d.get('allowed_tool_ids'), list):
+        d['allowed_tool_ids'] = []
+
     if 'knowledge_source_ids' in d and isinstance(d['knowledge_source_ids'], str):
         try:
             d['knowledge_source_ids'] = json.loads(d['knowledge_source_ids'])
-        except json.JSONDecodeError:
+        except Exception:
             d['knowledge_source_ids'] = []
+    if not isinstance(d.get('knowledge_source_ids'), list):
+        d['knowledge_source_ids'] = []
+
     d['approval_required'] = bool(d.get('approval_required', 0))
     return d
 

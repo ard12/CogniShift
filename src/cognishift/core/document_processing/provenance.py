@@ -3,6 +3,7 @@ Page-Aware Chunking & Provenance Tracking.
 Enforces strict 1-based page boundary preservation, rich metadata formatting,
 and untrusted data tagging to prevent prompt injection from documents.
 """
+import html
 from typing import List, Dict, Any, Tuple
 from cognishift.core.document_processing.schemas import ExtractedPage, ExtractionMethod
 
@@ -107,8 +108,9 @@ def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
     """
     Wraps untrusted retrieved text into explicit XML-style document context tags.
     Clearly marks document content as DATA, preventing instruction overriding.
+    Escapes metadata attributes to prevent XML delimiter breakout.
     """
-    src = metadata.get("filename", "unknown")
-    page = metadata.get("page", 1)
-    method = metadata.get("extraction_method", "native")
+    src = html.escape(str(metadata.get("filename", "unknown")), quote=True)
+    page = html.escape(str(metadata.get("page", 1)), quote=True)
+    method = html.escape(str(metadata.get("extraction_method", "native")), quote=True)
     return f'<document_context source="{src}" page="{page}" method="{method}">\n{text}\n</document_context>'

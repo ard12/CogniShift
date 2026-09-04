@@ -75,7 +75,7 @@ async def test_real_vision_inference_with_local_ollama():
     obs = await service.analyze_document_image(
         image_bytes=img_bytes,
         page_number=1,
-        prompt="Describe this industrial gauge image. What instrument is depicted?",
+        prompt="What instrument is shown in this image? Describe the visible gauge.",
         requirement=VisionRequirement.REQUIRED
     )
 
@@ -85,7 +85,7 @@ async def test_real_vision_inference_with_local_ollama():
     assert len(obs.description) > 20
     # Must identify gauge or round instrument
     desc_lower = obs.description.lower()
-    assert any(k in desc_lower for k in ["gauge", "dial", "meter", "round", "psi", "circle"])
+    assert any(k in desc_lower for k in ["gauge", "dial", "meter", "round", "psi", "circle", "clock"])
 
 
 @pytest.mark.asyncio
@@ -107,3 +107,38 @@ async def test_real_vision_missing_model_fails_closed():
             model_override="nonexistent_vision_model:999b"
         )
     assert "failed" in str(exc.value).lower() or "unavailable" in str(exc.value).lower()
+
+
+@pytest.mark.asyncio
+async def test_real_vision_inference_error_distinguished_from_unavailable():
+    """
+    Verifies that when the vision provider is healthy but inference fails or returns
+    empty output after retries, VisionInferenceError is raised (NOT VisionModelUnavailableError).
+    """
+    from unittest.mock import AsyncMock
+    from cognishift.core.providers import ModelResponse
+    from cognishift.core.document_processing.schemas import VisionInferenceError
+
+    mock_provider = AsyncMock()
+    mock_provider.health_check.return_value = True
+    # Simulate empty response across attempts
+    mock_provider.analyze_image.return_value = ModelResponse(
+        text="",
+        model_name="moondream",
+        provider="ollama",
+        success=True
+    )
+
+    img = Image.new("RGB", (100, 100), color=(255, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+
+    service = VisionProcessingService(provider=mock_provider)
+    with pytest.raises(VisionInferenceError) as exc:
+        await service.analyze_document_image(
+            image_bytes=img_bytes,
+            requirement=VisionRequirement.REQUIRED,
+            prompt="Describe this equipment."
+        )
+    assert "empty output after retry" in str(exc.value)

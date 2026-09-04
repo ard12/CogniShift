@@ -70,6 +70,19 @@ class DocumentProcessingService:
         3. 100% ephemeral temporary file cleanup in finally: block.
         """
         doc_filename = filename or file_path.name
+
+        # 0. Validate knowledge source existence and workspace ownership before ANY side effects
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT workspace_id FROM knowledge_sources WHERE id = ?",
+                (source_id,)
+            )
+            row = await cursor.fetchone()
+            if not row or row["workspace_id"] != workspace_id:
+                raise PermissionError(
+                    f"Access denied: knowledge source {source_id} does not belong to workspace {workspace_id}."
+                )
+
         version = await create_processing_generation(workspace_id, source_id)
         
         # Ephemeral staging path under workspace temporary/

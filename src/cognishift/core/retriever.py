@@ -1,7 +1,7 @@
 import os
 import asyncio
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 import chromadb
 from fastembed import TextEmbedding
 from pypdf import PdfReader
@@ -98,7 +98,7 @@ async def retrieve_context(
     """
     Searches ChromaDB for the given query within the workspace.
     FAIL-CLOSED: If allowed_source_ids is an empty list, returns empty context immediately.
-    Server-side metadata filtering enforces agent knowledge boundary.
+    Server-side metadata filtering enforces agent knowledge boundary and active processing version.
     """
     if allowed_source_ids is not None and len(allowed_source_ids) == 0:
         return ""
@@ -116,13 +116,59 @@ async def retrieve_context(
     if effective_k <= 0:
         return ""
 
+    # Look up authoritative active processing versions from SQLite
+    version_map: Dict[int, Optional[str]] = {}
+    try:
+        from cognishift.app.db.database import get_db
+        async with get_db() as db:
+            query_sql = "SELECT id, active_processing_version FROM knowledge_sources WHERE workspace_id = ?"
+            params: list = [workspace_id]
+            if allowed_source_ids is not None:
+                placeholders = ",".join("?" for _ in allowed_source_ids)
+                query_sql += f" AND id IN ({placeholders})"
+                params.extend([int(sid) for sid in allowed_source_ids])
+            cursor = await db.execute(query_sql, params)
+            rows = await cursor.fetchall()
+            for r in rows:
+                if r["active_processing_version"]:
+                    version_map[r["id"]] = r["active_processing_version"]
+    except Exception:
+        pass
+
+    # Build Chroma where_filter enforcing active version pairs
     where_filter = None
     if allowed_source_ids is not None:
         clean_ids = [int(sid) for sid in allowed_source_ids]
-        if len(clean_ids) == 1:
-            where_filter = {"source_id": clean_ids[0]}
+        conditions: List[Dict[str, Any]] = []
+        for sid in clean_ids:
+            if sid in version_map:
+                conditions.append({
+                    "$and": [
+                        {"source_id": sid},
+                        {"processing_version": str(version_map[sid])}
+                    ]
+                })
+            else:
+                conditions.append({"source_id": sid})
+
+        if len(conditions) == 1:
+            where_filter = conditions[0]
+        elif len(conditions) > 1:
+            where_filter = {"$or": conditions}
+    elif version_map:
+        conditions = [
+            {
+                "$and": [
+                    {"source_id": sid},
+                    {"processing_version": str(v)}
+                ]
+            }
+            for sid, v in version_map.items()
+        ]
+        if len(conditions) == 1:
+            where_filter = conditions[0]
         else:
-            where_filter = {"source_id": {"$in": clean_ids}}
+            where_filter = {"$or": conditions}
 
     try:
         def _get_q_emb():
@@ -147,11 +193,16 @@ async def retrieve_context(
     if not results or not results.get('documents') or not results['documents'][0]:
         return ""
 
+    from cognishift.core.document_processing.provenance import (
+        wrap_document_data_for_prompt,
+        format_grounded_citation
+    )
+
     formatted_context = "--- RETRIEVED CONTEXT ---\n"
     for i, doc in enumerate(results['documents'][0]):
         meta = results['metadatas'][0][i] if results.get('metadatas') and len(results['metadatas']) > 0 else {}
-        src_name = meta.get('filename') or f"Source {meta.get('source_id', 'unknown')}"
-        page = meta.get('page', '?')
-        formatted_context += f"[{src_name} | Page {page}]\n{doc}\n\n"
+        citation = format_grounded_citation(meta)
+        wrapped_doc = wrap_document_data_for_prompt(doc, meta)
+        formatted_context += f"{citation}\n{wrapped_doc}\n\n"
 
     return formatted_context.strip()

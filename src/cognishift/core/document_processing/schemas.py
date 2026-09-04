@@ -56,7 +56,12 @@ class OCRUnavailableError(DocumentProcessingError):
 
 
 class VisionModelUnavailableError(DocumentProcessingError):
-    """Raised when required local vision model is unavailable."""
+    """Raised when required local vision model/daemon is missing or offline."""
+    pass
+
+
+class VisionInferenceError(DocumentProcessingError):
+    """Raised when vision model is available but inference fails or returns empty/invalid output."""
     pass
 
 

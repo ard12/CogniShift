@@ -108,9 +108,11 @@ def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
     """
     Wraps untrusted retrieved text into explicit XML-style document context tags.
     Clearly marks document content as DATA, preventing instruction overriding.
-    Escapes metadata attributes to prevent XML delimiter breakout.
+    Escapes both metadata attributes and body text to prevent XML delimiter breakout.
+    Defense-in-depth data demarcation only; deterministic authorization is enforced separately.
     """
     src = html.escape(str(metadata.get("filename", "unknown")), quote=True)
     page = html.escape(str(metadata.get("page", 1)), quote=True)
     method = html.escape(str(metadata.get("extraction_method", "native")), quote=True)
-    return f'<document_context source="{src}" page="{page}" method="{method}">\n{text}\n</document_context>'
+    safe_text = html.escape(text, quote=False)
+    return f'<document_context source="{src}" page="{page}" method="{method}">\n{safe_text}\n</document_context>'

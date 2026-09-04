@@ -1,38 +1,42 @@
-# Agentic Alignment Guide (AI to AI Handoff & Synchronization)
+# Developer Alignment Guide (AI to AI Handoff & Synchronization)
 
-> **HELLO FELLOW AI ASSISTANT!** 👋  
-> This document governs technical alignment between developer agents assisting **Sitanshu** and **Rohit**. Read this guide carefully to preserve all architectural contracts and avoid breaking changes.
-
----
-
-## 1. Operating Constraints (Non-Negotiable)
-
-We are building a **Sovereign On-Premise Agentic AI Workbench** (SIH26117).
-* **Zero Cloud:** The system must operate 100% offline. Never introduce external endpoints (OpenAI, Gemini, Anthropic, HuggingFace Hub downloads at runtime).
-* **Zero Arbitrary Execution:** Never use `subprocess.run`, `os.system`, `exec()`, or `eval()`.
-* **Hardware Specialization:**
-  * **Sitanshu (NVIDIA RTX 3050 GPU):** Runs local LLM (`llama3.2:3b`) and VLM (`moondream:latest`) inference, Autonomous Execution Engine (`engine.py`), Multimodal Vision, and Industrial Benchmark suites.
-  * **Rohit (CPU Host):** Focuses on Platform APIs, FastEmbed document ingestion, SQLite relational queries, and Operator Console UI.
+This document outlines technical alignment between developer assistants working on CogniShift. Read this guide to understand system contracts, active boundaries, and development status.
 
 ---
 
-## 2. Completed Milestones & Current Standing
+## 1. Operating Constraints
 
-All foundational and core reasoning phases are **100% complete and passing on `main`**:
-1. **Phase 1 (Foundation):** Lifespan handler, configuration singleton, air-gap status endpoints.
-2. **Phase 2 (Database):** Async SQLite (`aiosqlite`) with 10 tables including `graph_nodes`, `graph_edges`, and `run_events`.
-3. **Phase 3 (Providers):** Local `OllamaProvider` with 120s timeout resilience and `SimulatedProvider` dev fallback.
-4. **Phase 4 (Knowledge Pipeline):** Page-aware PyPDF extraction, CPU-friendly FastEmbed, and ChromaDB vector store (`retriever.py`).
-5. **Phase 6 (Tools & Approvals):** Data-driven tool execution (`tools.py`) and supervisor approval management (`approvals.py`).
-6. **Phase 5 (Execution Engine):** State machine agent reasoning loop (`engine.py`) with automatic Four-Eyes HITL pausing.
-7. **Phase 7 (Multimodal Vision):** Moondream integration for analog pressure gauge dial readings and stamped metallic nameplate OCR.
-8. **Phase 8 (Terminal CLI Workbench):** Full 891-line Typer + Rich terminal interface (`cli.py`) with 8 command groups, interactive REPL, multimodal `--image` support, and supervisor Four-Eyes sign-off. Documented in [`CLI.md`](CLI.md).
+CogniShift is an on-premise agentic AI workbench developed for problem statement SIH26117:
+* **Local Operation:** The system is designed to run locally without external cloud APIs (no OpenAI, Gemini, or Anthropic API dependencies at runtime).
+* **No Arbitrary Host Execution:** No direct execution of arbitrary shell commands via `subprocess.run`, `os.system`, `exec()`, or `eval()` on the host system. AI-generated code execution runs inside isolated Docker containers.
+* **Hardware Allocation:**
+  * **GPU Host:** Runs local LLM (`llama3.2:3b`) and vision (`moondream:latest`) inference via Ollama, agent reasoning loops, multimodal processing, and local integration tests.
+  * **CPU Host:** Runs FastAPI endpoints, SQLite relational queries, FastEmbed document ingestion, and the operator interface.
 
 ---
 
-## 3. Public Contracts & Interfaces (Do Not Break!)
+## 2. Project Status & Phases
 
-### A. Vector RAG Contract (`src/cognishift/core/retriever.py`)
+The repository follows a sequential phase architecture:
+
+| Phase | Description | Status |
+|:---|:---|:---:|
+| **Phase 0** | Base Security & Test Harness | Complete |
+| **Phase 1** | Foundation, Config & Local Lifespan | Complete |
+| **Phase 2** | Database Layer (aiosqlite WAL, 10 tables) & CRUD Routers | Complete |
+| **Phase 3** | Local Model Provider (`OllamaProvider`) & Simulated Fallback | Complete |
+| **Phase 4** | Knowledge Pipeline (ChromaDB + FastEmbed) & Docker Code Sandbox | Complete (Verified in live Docker container) |
+| **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete & Verified |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Planned (Locked) |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Locked) |
+
+Do NOT begin Phase 6 or Phase 7 implementation until explicitly authorized.
+
+---
+
+## 3. Core Contracts & Interfaces
+
+### A. Vector Retrieval Contract (`src/cognishift/core/retriever.py`)
 ```python
 async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str:
     """Searches ChromaDB for the given query within the workspace.
@@ -40,23 +44,23 @@ async def retrieve_context(workspace_id: int, query: str, top_k: int = 3) -> str
     """
 ```
 
-### B. Plant Topology Graph Memory Contract (`src/cognishift/core/graph_memory.py`)
+### B. Plant Topology Graph Query Contract (`src/cognishift/core/graph_memory.py`)
 ```python
 async def query_graph_context(workspace_id: int, query_text: str, max_hops: int = 2) -> str:
-    """Traverses SQLite graph_nodes and graph_edges matching physical equipment in query_text.
-    Returns structured relationship strings (e.g. Pump-101A --(FEEDS_INTO)--> Reactor-B).
+    """Traverses SQLite graph_nodes and graph_edges matching equipment mentioned in query_text.
+    Returns structured relationship text (e.g., Pump-101A --(FEEDS_INTO)--> Reactor-B).
     """
 ```
 
-### C. Industrial Tool Registry Contract (`src/cognishift/core/tools.py`)
+### C. Tool Registry Contract (`src/cognishift/core/tools.py`)
 ```python
 async def execute_tool(tool_name: str, parameters: dict) -> str:
-    """Executes data-driven tool logic against Tennessee Eastman Process telemetry
-    and SAP S/4HANA PM work orders without arbitrary shell commands.
+    """Executes registered tool functions against simulated plant telemetry
+    and synthetic maintenance records without running shell commands.
     """
 ```
 
-### D. Autonomous Engine Execution Contract (`src/cognishift/core/engine.py`)
+### D. Agent Execution Loop Contract (`src/cognishift/core/engine.py`)
 ```python
 async def execute_agent_run(
     workspace_id: int,
@@ -65,28 +69,47 @@ async def execute_agent_run(
     user_id: str = "operator",
     input_image_path: Optional[str] = None
 ) -> RunResponse:
-    """Executes end-to-end reasoning loop. If input_image_path is provided, analyzes
-    with local Moondream VLM before RAG retrieval. If high-risk action is detected,
-    safely pauses run in approval_requests.
+    """Executes the agent reasoning loop. If an image path is provided, it is analyzed
+    by the local vision model before context retrieval. If a tool requires approval,
+    the run transitions to 'paused' and records an approval request.
     """
 
 async def resume_agent_run(run_id: int) -> RunResponse:
-    """Resumes execution of a paused run once the supervisor signs off in approval_requests."""
+    """Resumes execution of a paused run once a supervisor has recorded an approval."""
+```
+
+### E. Document Processing Contract (`src/cognishift/core/document_processing/service.py`)
+```python
+class DocumentProcessingService:
+    async def process_document(
+        self,
+        workspace_id: int,
+        source_id: int,
+        file_path: Path,
+        preferred_method: str = "auto"
+    ) -> DocumentProcessingResult:
+        """Processes a PDF using native PDF text extraction, OCR, or vision interpretation
+        depending on document structure, while tracking page-level provenance.
+        """
 ```
 
 ---
 
 ## 4. Operator Interfaces
 
-CogniShift provides three operator access methods — all functionally equivalent:
+CogniShift provides three operator interfaces:
 
-| Interface | Entry Point | Use Case |
+| Interface | Access Point | Description |
 |:---|:---|:---|
-| **Web Console** | `http://127.0.0.1:8000/static/index.html` | Browser-based dashboard with upload, runs, and approvals |
-| **REST API** | `http://127.0.0.1:8000/docs` (Swagger) | Programmatic integration and automated scripts |
-| **Terminal CLI** | `python cli.py [command]` | Headless edge servers, SSH sessions, and SIH demonstrations |
+| **Web Console** | `http://127.0.0.1:8000/static/index.html` | Browser-based dashboard for uploads, agent runs, and approvals |
+| **REST API** | `http://127.0.0.1:8000/docs` (Swagger UI) | Interactive OpenAPI documentation and test client |
+| **Terminal CLI** | `python cli.py [command]` | Terminal interface built with Typer and Rich for headless setups |
 
 ---
 
-## 5. Current Work: SIH Qualifier Rehearsal
-With all core AI, database, RAG, tool, graph, vision, and CLI modules complete and verified (17/17 pytest, 5/5 industrial workflow, 3/3 VLM vision, 100% TCA/SIR/SLCP), our next joint step is preparing the final demonstration flows and ensuring flawless presentation timing for SIH qualifiers.
+## 5. Development Guidelines
+
+1. Run the test suite with `pytest -v` before committing. All tests must pass with 0 failures.
+2. Keep all external network requests disabled during testing.
+3. Validate workspace and source ownership server-side for every operation.
+4. Treat all extracted document text as untrusted data using the prompt delimiter wrapper.

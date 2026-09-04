@@ -1,109 +1,117 @@
-# CogniShift: Industrial Systems Architecture Specification
+# CogniShift: Systems Architecture Specification
 
-> **Technical Architecture Document for High-Consequence Petrochemical AI Deployment**  
-> **Standard Compliance:** ISA-95 | ISO 15926-14 | OISD-STD-105/106 | IEC 62443 | Purdue PERA  
+Technical architecture document for the on-premise agentic AI workbench.
 
 ---
 
-## 1. Industrial Zone Architecture (Purdue PERA Level 3.5 IDMZ)
+## 1. Network & Deployment Model (Industrial DMZ Concept)
 
-CogniShift is designed to sit at **Purdue Model Level 3.5 (Industrial Demilitarized Zone - IDMZ)**, serving as an intelligent advisory layer between Level 3 (Manufacturing Operations & Plant Historians) and Level 4 (Enterprise IT):
+CogniShift is designed for local on-premise deployment within an industrial network architecture (such as an Industrial Demilitarized Zone / Purdue Model Level 3.5), operating without external cloud connections:
 
 ```
 +-----------------------------------------------------------------------+
-|  LEVEL 4: ENTERPRISE IT NETWORK (ERP, SAP S/4HANA PM, Email)          |
+|  ENTERPRISE / BUSINESS NETWORK                                        |
+|  (Workstations, Office Network, Reporting)                            |
 +-----------------------------------------------------------------------+
                                    ▲
-                          Firewall / Air-Gap
+                          Firewall / DMZ Boundary
                                    ▼
 +-----------------------------------------------------------------------+
-|  LEVEL 3.5: COGNISHIFT SOVEREIGN WORKBENCH (IDMZ)                     |
-|  • Local NVIDIA GPU Inference (Llama 3.2 3B + Moondream 1B)          |
-|  • Local FastEmbed + ChromaDB Vector Store                            |
-|  • Plant Topology Knowledge Graph (ISO 15926 / SQLite WAL)            |
-|  • Four-Eyes Dual Authorization Safety Interlock                      |
+|  COGNISHIFT ON-PREMISE WORKBENCH (Local Server)                       |
+|  • Local Model Inference (Ollama: Llama 3.2 3B + Moondream 1.86B)     |
+|  • Local Vector Store (FastEmbed + ChromaDB)                          |
+|  • Plant Topology Graph Memory (SQLite WAL)                           |
+|  • Human-in-the-Loop Safety Interlocks                                |
+|  • Restricted Docker Code Execution Sandbox (--network none)          |
 +-----------------------------------------------------------------------+
                                    ▲
-                          Firewall / Data Diode
+                          Firewall / Plant Boundary
                                    ▼
 +-----------------------------------------------------------------------+
-|  LEVEL 3: PLANT OPERATIONS & SCADA (DCS, Plant Historian, Alarms)     |
-+-----------------------------------------------------------------------+
-                                   ▲
-                                   ▼
-+-----------------------------------------------------------------------+
-|  LEVEL 1 & 2: CONTROLLERS & SENSORS (PLCs, Bourdon Dials, Valves)     |
+|  SIMULATED INDUSTRIAL DATA SOURCES                                    |
+|  • Dynamic SCADA Telemetry Stream (Tennessee Eastman Process Model)   |
+|  • Plant Maintenance Work Orders (SAP PM / ISO 14224 Schema)          |
 +-----------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Knowledge Substrate: Hybrid GraphRAG
+## 2. Knowledge Substrate: Hybrid Search & Topology Graph
 
-Traditional Vector RAG retrieves isolated paragraphs but fails to grasp physical mechanical connections. CogniShift implements **Hybrid GraphRAG**:
+CogniShift combines unstructured document search with structured equipment topology:
 
-### 2.1. Vector Layer (Unstructured Knowledge)
-* Extracts text from operating procedures (`OISD-STD-106`, `API 610`, `HAZOP Study`).
-* FastEmbed (`BAAI/bge-small-en-v1.5`) generates 384-dimensional dense vectors on CPU.
-* ChromaDB performs cosine similarity search filtered by `workspace_id`.
+### 2.1. Vector Retrieval Layer (Unstructured Documents)
+* Ingests technical manuals and operating procedures.
+* Uses FastEmbed (`BAAI/bge-small-en-v1.5`) to generate 384-dimensional dense vectors on CPU.
+* Stores vector embeddings in local ChromaDB collections segregated by `workspace_id`.
+* Returns matching text snippets alongside source citations (`[Filename | Page X]`).
 
-### 2.2. Graph Layer (Physical Plant Topology - ISO 15926 / ISA-95)
-* Stored in SQLite relational tables:
+### 2.2. Graph Layer (Physical Equipment Topology)
+* Stored in local SQLite relational tables:
   * `graph_nodes (id, workspace_id, name, entity_type, properties)`
   * `graph_edges (id, workspace_id, source_node_id, relation_type, target_node_id, properties)`
-* Models physical relations:
+* Models physical connections between equipment:
   * `Pump-101A` $\xrightarrow{\text{FEEDS\_INTO}}$ `Reactor-B`
   * `Reactor-B` $\xrightarrow{\text{PROTECTED\_BY}}$ `SV-402`
   * `SV-402` $\xrightarrow{\text{DISCHARGES\_TO}}$ `Flare-Header`
   * `Pump-101A` $\xrightarrow{\text{HAS\_SENSOR}}$ `PT-101` (Discharge Pressure)
-  * `Pump-101A` $\xrightarrow{\text{HAS\_SENSOR}}$ `TT-204` (Bearing Metal Temperature)
-* Multi-hop traversal expands query entities to inject structural plant connections directly into the LLM prompt.
+  * `Pump-101A` $\xrightarrow{\text{HAS\_SENSOR}}$ `TT-204` (Bearing Temperature)
+* Multi-hop SQL queries traverse equipment relationships to supply structural context to the language model.
 
 ---
 
-## 3. Four-Eyes Dual Authorization Interlock (HITL)
+## 3. Human-in-the-Loop Safety Interlocks
 
-In compliance with **OISD-STD-106** and **IEC 62443**, autonomous execution of physical or service-interrupting actions is strictly prohibited.
+High-consequence plant operations require explicit human review. Tool definitions specify a risk level (`read_only`, `low_risk`, `sensitive`, `service_interrupting`):
 
 ### State Machine Lifecycle:
 ```
 [RUN_STARTED]
       │
-[RETRIEVAL] ──► (Vector RAG + Graph Topology + Visual Telemetry)
+[RETRIEVAL] ──► (Vector Search + Equipment Topology + Visual Input)
       │
 [MODEL_REASONING]
       │
       ▼
-Is Action High Risk?
+Does Proposed Action Require Approval?
  ├── NO  ──► [EXECUTE_TOOL] ──► [COMPLETE]
  └── YES ──► [TRANSITION TO PAUSED]
                   │
                   ▼
-         Queue in approval_requests
+         Queue in approval_requests table
                   │
-         Supervisor Review (Web / CLI / API)
+         Supervisor Review (Web Console / Terminal CLI / REST API)
          ├── REJECT ──► [CANCELLED]
          └── APPROVE ─► [RESUME_RUN] ──► [EXECUTE_TOOL] ──► [COMPLETE]
 ```
 
 ---
 
-## 4. Multimodal Computer Vision & Industrial OCR Pipeline
+## 4. Document Processing, OCR & Vision Pipeline
 
-Field technicians can inspect equipment visually without manual typing:
-1. **Image Input:** Analog Bourdon gauge photos or metallic rating plates uploaded via `/api/v1/runs` or `python cli.py run execute --image`.
-2. **Local Vision Inference:** `moondream:latest` (1.86B parameter VLM) analyzes image on local GPU.
-3. **Telemetry Extraction:** Identifies pointer needle angle, dial units (PSI), operating status, and stamped equipment tags (`PT-101`, `P-101A`).
-4. **Knowledge Fusing:** Injects visual findings into the LLM prompt alongside RAG manuals and plant topology graph.
+The pipeline handles three distinct types of document and image inputs:
+
+1. **Native PDF Extraction:** Reads digital text streams embedded directly in vector PDFs using `pypdf`. Fast and accurate for digitally created manuals.
+2. **Local OCR (RapidOCR):** Extracts text from scanned document pages and images where no digital text stream exists. Handwriting is processed on a best-effort basis, with OCR confidence scores retained.
+3. **Local Vision Model (Moondream):** Interprets visual features in images (e.g., analog pressure gauge needle positions or equipment rating plates) using the local `moondream:latest` model via Ollama.
+
+Extracted text is wrapped in prompt delimiters (`<document_context ...>`) with escaped special characters so the model recognizes it as untrusted input data.
 
 ---
 
-## 5. Terminal CLI Workbench
+## 5. Safe Code Execution (Docker Sandbox)
 
-CogniShift provides a standalone terminal interface (`cli.py`) built with Typer + Rich for headless edge server deployments and SSH-based operator sessions:
-- **8 Command Groups:** `workspace`, `agent`, `knowledge`, `graph`, `telemetry`, `run`, `approvals`, and `chat`.
-- **Interactive REPL:** Persistent operator chat session with `/image`, `/status`, `/approvals`, `/telemetry`, `/approve`, and `/clear` slash commands.
-- **Full Feature Parity:** Every REST API endpoint has a corresponding CLI command with identical data access.
-- **Supervisor Review:** Four-Eyes approval can be performed via the web console (`/static/index.html`), Swagger API (`/docs`), or the terminal CLI (`python cli.py approvals approve <id>`).
+When agents generate Python code, it is not executed directly on the host operating system:
+* Code runs inside a restricted Docker container.
+* Network access is disabled (`--network none`).
+* Memory and process limits are enforced (`--memory 512m`, `--pids-limit 64`).
+* The root filesystem is read-only (`--read-only`) with a temporary, bounded scratch volume for output.
+* The container runs as a non-root user.
 
-See **[CLI.md](CLI.md)** for the complete command reference.
+---
+
+## 6. Operator Interfaces
+
+1. **Web Dashboard:** Browser-based interface at `http://127.0.0.1:8000/static/index.html`.
+2. **Terminal CLI:** Typer + Rich command-line application (`cli.py`) for headless edge servers and SSH sessions.
+3. **REST API:** OpenAPI / Swagger documentation at `http://127.0.0.1:8000/docs`.

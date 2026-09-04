@@ -1,17 +1,18 @@
-# CogniShift — Master System Specification & Implementation Plan
+# CogniShift: Master System Specification & Implementation Plan
 
-> **SIH26117 Master Blueprint:** Tracks architecture, component interfaces, completed milestones, and delivery phases for the Sovereign On-Premise Agentic AI Workbench.
+Master architectural plan tracking system interfaces, completed milestones, and delivery phases for the CogniShift on-premise workbench (SIH26117).
 
 ---
 
 ## 1. Project Context & Constraints
 
-* **Host Organization:** Mangalore Refinery and Petrochemicals Limited (MRPL).
-* **Mission:** Deliver an air-gapped, zero-cloud agentic AI workbench allowing refinery board operators and field technicians to troubleshoot equipment, query technical SOPs, and safely actuate permitted plant actions.
-* **Security Directives:**
-  * Zero external cloud egress (100% local Ollama inference on NVIDIA GPU).
-  * Zero dynamic shell execution (`subprocess`, `os.system`, `eval`).
-  * Non-bypassable Human-in-the-Loop (HITL) Four-Eyes safety gate for sensitive actions.
+* **Problem Statement:** SIH26117 (Mangalore Refinery and Petrochemicals Limited).
+* **Objective:** Build an on-premise agentic AI workbench allowing plant operators and technicians to query technical manuals, inspect equipment visuals, and safely run permitted plant actions.
+* **Key Constraints:**
+  * Local model execution using open-weight models via Ollama.
+  * No direct host command execution (`subprocess`, `os.system`, `eval`).
+  * Policy-enforced human-in-the-loop approval gate for sensitive actions.
+  * Containerized execution for AI-generated code.
 
 ---
 
@@ -19,63 +20,68 @@
 
 | Phase | Description | Key Modules | Status |
 |:---:|:---|:---|:---:|
-| **Phase 1** | Foundation & Air-Gap Verification | `main.py`, `config.py`, `.env` | ✅ **Complete** |
-| **Phase 2** | Database Layer & Relational Schemas | `database.py`, `models.py`, `workspaces.py`, `agents.py` | ✅ **Complete** |
-| **Phase 3** | Provider Layer & Sovereign Inference | `providers.py`, `ollama_provider.py`, `simulated_provider.py` | ✅ **Complete** |
-| **Phase 4** | Knowledge Pipeline & Vector RAG | `retriever.py`, `knowledge.py`, FastEmbed, ChromaDB | ✅ **Complete** |
-| **Phase 6** | Industrial Tool Registry & HITL Approvals | `tools.py`, `approvals.py`, `approval_requests` | ✅ **Complete** |
-| **Phase 5** | Autonomous Reasoning Engine & Event Ledger | `engine.py`, `runs.py`, `run_events` timeline | ✅ **Complete** |
-| **Phase 7** | Multimodal Vision & Gauge OCR | `moondream` integration, Bourdon dial analysis, nameplate OCR | ✅ **Complete** |
-| **Phase 8** | Enterprise Polish & Demonstration | Full system integration, qualifier scenarios | 🎯 **In Progress** |
+| **Phase 0** | Base Security & Test Harness | Test suites, baseline validation | Complete |
+| **Phase 1** | Foundation, Config & Local Lifespan | `main.py`, `config.py`, `.env` | Complete |
+| **Phase 2** | Database Layer & Relational Schemas | `database.py`, `models.py`, `workspaces.py`, `agents.py` | Complete |
+| **Phase 3** | Local Model Provider & Simulated Fallback | `providers.py`, `ollama_provider.py`, `simulated_provider.py` | Complete |
+| **Phase 4** | Knowledge Pipeline & Docker Code Sandbox | `retriever.py`, ChromaDB, FastEmbed, Docker sandbox runner | Complete (Verified in live Docker container) |
+| **Phase 5** | Multimodal Document Processing | `document_processing/`, Native PDF, RapidOCR, Moondream Vision | Complete & Verified (164 tests passing) |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Network monitoring, egress policy enforcement | Planned (Locked) |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | End-to-end industrial scenario demonstrations | Planned (Locked) |
 
 ---
 
-## 3. Deep-Dive Phase Specifications
+## 3. Phase Specifications & Technical Details
 
-### Phase 1: Foundation & Air-Gap Enforcement
-* Centralized Pydantic v2 `Settings` class loading from `.env`.
-* Startup lifespan handler that ensures local data directory hierarchies exist.
-* `/api/v1/system/privacy-status` endpoint verifying that external network egress is blocked.
+### Phase 0: Base Security & Test Harness
+* Established automated testing framework with `pytest` and `pytest-asyncio`.
+* Configured SQLite in-memory and temporary database fixtures for isolated test runs.
+
+### Phase 1: Foundation & Configuration
+* Centralized Pydantic v2 `Settings` class loading configuration from `.env`.
+* FastAPI lifespan handler managing startup and shutdown of local resources.
+* Local status endpoints reporting system configuration and database health.
 
 ### Phase 2: Relational Database Layer
-* Async SQLite (`aiosqlite`) configured with Write-Ahead Logging (`PRAGMA journal_mode = WAL`) and runtime foreign key enforcement (`PRAGMA foreign_keys = ON`).
-* 10 fully normalized tables:
+* Async SQLite (`aiosqlite`) with Write-Ahead Logging (`PRAGMA journal_mode = WAL`) and runtime foreign keys (`PRAGMA foreign_keys = ON`).
+* 10 normalized tables:
   `workspaces`, `agent_definitions`, `knowledge_sources`, `tool_definitions`, `agent_runs`, `run_events`, `approval_requests`, `audit_events`, `graph_nodes`, `graph_edges`.
+* CRUD routers for workspace management and agent definitions with Pydantic validation schemas.
 
 ### Phase 3: Model Provider Layer
-* Abstract base class `ModelProvider` with standard `ModelResponse` dataclass.
-* `OllamaProvider` connecting via `httpx.AsyncClient` to `http://localhost:11434` with 120-second timeout resilience.
-* `SimulatedProvider` enabling mock CPU testing without active GPU models.
+* Abstract base class `ModelProvider` with dataclass `ModelResponse`.
+* `OllamaProvider` connecting via `httpx.AsyncClient` to `http://localhost:11434` with 120-second timeout handling.
+* `SimulatedProvider` enabling mock testing without an active GPU.
 
-### Phase 4: Knowledge Pipeline (Vector RAG)
-* Page-aware PDF parsing using `pypdf`.
-* Chunking with 800-character windows and 150-character overlaps preserving `[Filename | Page X]` metadata citations.
-* Local CPU embeddings using `fastembed` (`BAAI/bge-small-en-v1.5`) stored in persistent ChromaDB collections.
-* Stress-tested successfully on a 500-page mega-manual corpus (787 vector chunks indexed).
+### Phase 4: Knowledge Pipeline & Docker Code Sandbox
+* Vector retrieval using `fastembed` (`BAAI/bge-small-en-v1.5`) running on CPU with persistent ChromaDB vector storage.
+* Page-level citation tracking (`[Filename | Page X]`).
+* Docker code execution sandbox for generated Python code:
+  * Network isolation (`--network none`).
+  * Resource limits (512MB RAM, 64 PIDs).
+  * Read-only root filesystem with temporary scratch volume.
+  * Non-root user execution.
 
-### Phase 5: Autonomous Execution Engine
-* Reasoning state machine in `src/cognishift/core/engine.py`.
-* Ingests Vector RAG context and Plant Topology Graph memory simultaneously.
-* Parses model tool-calling intents with JSON extraction and fallback regex parsing.
-* Intercepts high-risk actions (`service_interrupting`, `sensitive`) and halts execution in `paused` state.
-* Full event sourcing logging each transition (`run_started`, `retrieval_started`, `model_prompt`, `hitl_paused`, `tool_executed`, `completed`) into `run_events`.
+### Phase 5: Multimodal Document Processing
+* `DocumentProcessingService` routing documents between:
+  * **Native PDF Extraction:** Uses `pypdf` to extract digital text directly.
+  * **Local OCR:** Uses `RapidOCR` on CPU for scanned documents and images. Handwriting is best-effort.
+  * **Local Vision:** Uses `moondream:latest` via Ollama for interpreting visual elements.
+* Provenance tracking: preserves page numbers and processing methods per chunk.
+* Untrusted prompt wrapper: wraps extracted text in `<document_context ...>` delimiters with character escaping.
 
-### Phase 6: Tools & Safety Approvals
-* Deterministic tool simulations in `src/cognishift/core/tools.py` wired to authentic industrial datasets:
-  * Dynamic Tennessee Eastman Process SCADA telemetry (`telemetry_stream_tep.json`).
-  * SAP S/4HANA PM work orders and ISO 14224 FMEA damage records (`maintenance_orders_sap_pm.json`).
-* Supervisor approval inbox in `src/cognishift/app/api/approvals.py` allowing digital sign-off (`approve`/`reject`) to resume paused runs.
+### Phase 6: Network Sovereignty Enforcement (Planned)
+* Network egress monitoring and verification.
+* Host firewall rules and observation logging to detect unexpected outbound traffic.
 
-### Phase 7: Multimodal Vision & Industrial OCR
-* Ingestion of image artifacts (`input_image_path`) in `execute_agent_run`.
-* Direct local VLM inference using `moondream:latest` on NVIDIA RTX 3050 GPU.
-* Inspection of analog Bourdon pressure dials (extracting tag name `PT-101`, dial reading, and red-zone trip state).
-* OCR on stamped metallic equipment rating plates (extracting `P-101A`, Sulzer BB2 model, and API 682 Plan 53A specs).
-* Grounded against ISO 15926 Plant Topology Knowledge Graph.
+### Phase 7: Flagship Industrial Demonstrations (Planned)
+* End-to-end operational workflows demonstrating multi-turn operator interactions.
+* Comprehensive industrial scenario rehearsals with synthetic SCADA streams and maintenance logs.
 
 ---
 
-## 4. Benchmark Validation Summary
-* **Industrial Workflow Suite:** 5/5 tests passing (`scratch/test_industrial_data_workflow.py`).
-* **Multimodal Vision & OCR Suite:** 3/3 scenarios passing (`scratch/test_multimodal_vision_pipeline.py`).
-* **Unit & Schema Suite:** 10/10 tests passing (`pytest -v`).
+## 4. Verification & Testing
+
+* **Full Regression Suite:** 164 tests passing with 0 failures (`pytest -v`).
+* **Real Container Sandbox:** 16 tests passing in live Docker engine (`tests/test_phase4_real_sandbox.py`).
+* **Real OCR & Vision Tests:** Verified against local RapidOCR and Ollama Moondream (`tests/test_phase5_real_ocr.py`, `tests/test_phase5_real_vision.py`).

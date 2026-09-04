@@ -1,140 +1,124 @@
-# CogniShift: Complete Team Guide & Project Encyclopedia
+# CogniShift: Project Guide & Technical Overview
 
-> **Welcome to the CogniShift Team Guide!**  
-> This guide explains **what this project is**, **why we are building it**, and **how every single file in the repository works** in plain, everyday language. Whether you are writing backend code, reviewing the architecture, or presenting to hackathon evaluators, this document gives you the complete picture without confusing jargon.
-
----
-
-## Table of Contents
-1. [What is CogniShift? (The Big Picture)](#1-what-is-cognishift-the-big-picture)
-2. [How It Works (The 7 Core Stations)](#2-how-it-works-the-7-core-stations)
-3. [File-by-File Technical Guide](#3-file-by-file-technical-guide)
-4. [Real-World Operational Scenarios](#4-real-world-operational-scenarios)
-5. [Presentation Pitch & FAQ Cheat Sheet](#5-presentation-pitch--faq-cheat-sheet)
+This guide explains what CogniShift is, why it was built, and how its components work together in plain, technical English.
 
 ---
 
-## 1. What is CogniShift? (The Big Picture)
+## 1. What is CogniShift?
 
-### The Real-World Problem (MRPL Petrochemical Refinery)
-**Mangalore Refinery and Petrochemicals Limited (MRPL)** operates complex chemical units (Crude Distillation, Hydrocrackers, Fluid Catalytic Cracking) that process flammable hydrocarbons at extreme pressures (up to 500 PSI) and temperatures (over 450 °C).
+### The Problem
+Industrial facilities like refineries and chemical plants handle complex, safety-critical equipment operating at high temperatures and pressures. When technicians and board operators troubleshoot issues:
+1. **Large Documentation Sets:** Equipment manuals, P&IDs (Piping and Instrumentation Diagrams), and operating procedures span hundreds or thousands of pages.
+2. **Confidentiality Requirements:** Plant schematics, maintenance histories, and operating data cannot be sent to public cloud AI services due to infrastructure security policies.
+3. **Safety Requirements:** An AI assistant must never have unverified authority to operate equipment or change operating setpoints. High-risk actions require explicit human approval.
 
-When field engineers and board operators manage these units:
-1. **Massive Manuals:** Standard operating procedures and HAZOP safety studies span thousands of pages. Searching them manually during an alarm cascade costs critical minutes.
-2. **Zero Cloud Tolerance:** Sending plant schematics, maintenance histories, or operational telemetry to commercial clouds (ChatGPT, Gemini, Anthropic) is strictly prohibited due to national critical infrastructure sovereignty and cybersecurity regulations.
-3. **Safety Handcuffs (Four-Eyes Principle):** An AI assistant must never have unvetted authority to actuate physical valves or restart high-voltage pump motors. High-risk actions must require a human supervisor's explicit digital sign-off.
-
-### The Solution: CogniShift
-CogniShift is a **sovereign, air-gapped agentic workbench** built directly for the plant:
-* **100% Offline AI:** Runs local open-weight models (`llama3.2:3b` for reasoning and `moondream` for vision) directly on the refinery's NVIDIA GPU workstations.
-* **Hybrid GraphRAG:** Combines page-accurate PDF manual search with a physical **Plant Topology Knowledge Graph** to understand how equipment connects (e.g. Pump P-101A feeds Reactor-B which is protected by Valve SV-402).
-* **Multimodal Visual Inspection:** Technicians can photograph analog pressure dials or corroded nameplates; local AI reads the dial and verifies it against the manual.
-* **Non-Bypassable Safety Gates:** If the AI determines that an emergency valve must be opened, it automatically pauses execution, creates an approval request, and notifies the Shift Superintendent.
+### The CogniShift Approach
+CogniShift is an on-premise agentic AI workbench:
+* **Local Model Execution:** Runs open-weight models (`llama3.2:3b` for reasoning and `moondream` for vision) locally via Ollama.
+* **Combined Document & Topology Search:** Searches PDF manuals with page-level citations and queries a local plant equipment graph to understand physical relationships.
+* **Visual Inspection:** Uses a local vision model to read analog pressure gauge dials and equipment nameplates from photos.
+* **Human Review for Sensitive Actions:** When a proposed tool action is classified as sensitive or service-interrupting, the system pauses execution and waits for a supervisor's approval.
+* **Isolated Code Execution:** AI-generated Python code runs inside a restricted Docker container with no network access.
 
 ---
 
-## 2. How It Works (The 7 Core Stations)
+## 2. Architecture & Data Flow
 
 ```
 +-------------------------------------------------------------------------------+
-|  1. THE FRONT DESK (FastAPI / main.py & api/)                                 |
-|     Receives requests from operator screens or terminals, verifies workspaces,|
-|     and routes to the appropriate agent.                                     |
+|  1. OPERATOR INTERFACES                                                       |
+|     Web Console (/static/index.html), Terminal CLI (cli.py), REST API (/docs) |
 +---------------------------------------+---------------------------------------+
                                         |
         +-------------------------------+-------------------------------+
         |                                                               |
 +-------v-------------------------------+       +-----------------------v-------+
-|  2. THE FILING CABINET                |       |  3. THE MANUALS LIBRARY       |
-|     (SQLite / database.py, models.py) |       |     (Vector RAG / retriever)  |
-|     Stores workspaces, agents, runs,  |       |     Indexes PDFs and returns  |
-|     and full event audit timelines.   |       |     exact page citations.     |
-+---------------------------------------+       +-------------------------------+
-        |                                                               |
+|  2. RELATIONAL DATABASE (aiosqlite)   |       |  3. VECTOR KNOWLEDGE BASE     |
+|     Stores workspaces, agent specs,   |       |     (ChromaDB + FastEmbed)    |
+|     runs, approvals, and event logs.  |       |     Indexes PDF manuals with  |
++---------------------------------------+       |     page-number citations.    |
+        |                                       +-------------------------------+
         +-------------------------------+-------------------------------+
                                         |
 +---------------------------------------v---------------------------------------+
-|  4. THE PHYSICAL PLANT GRAPH (core/graph_memory.py)                           |
-|     Tracks P&ID physical connections: which pump feeds which reactor, what    |
-|     sensor monitors it, and which safety relief valve protects it.            |
+|  4. PLANT TOPOLOGY GRAPH (SQLite: graph_nodes & graph_edges)                 |
+|     Tracks physical equipment connections (e.g., Pump-101A -> Reactor-B).     |
 +---------------------------------------+---------------------------------------+
                                         |
 +---------------------------------------v---------------------------------------+
-|  5. THE LOCAL BRAIN (core/providers.py & ollama_provider.py)                 |
-|     Runs Llama 3.2 3B (Reasoning) and Moondream 1B (Vision/OCR) locally on    |
-|     the workstation GPU with zero outbound internet traffic.                  |
+|  5. LOCAL MODEL INFERENCE (Ollama: Llama 3.2 3B + Moondream 1.86B)           |
+|     Performs text reasoning and visual inspection on local hardware.          |
 +---------------------------------------+---------------------------------------+
                                         |
 +---------------------------------------v---------------------------------------+
-|  6. THE TOOLBOX & SAFETY GATE (core/tools.py & approvals.py)                  |
-|     Safe sensor checks run immediately. High-risk actions (valve actuation)   |
-|     pause the system until a human supervisor clicks [APPROVE].               |
-+---------------------------------------+---------------------------------------+
-                                        |
-+---------------------------------------v---------------------------------------+
-|  7. THE TERMINAL WORKBENCH (cli.py / Typer + Rich)                            |
-|     Full-featured CLI for headless edge servers and SSH sessions. 8 command   |
-|     groups, interactive REPL, multimodal vision, and Four-Eyes approvals.    |
+|  6. TOOL EXECUTION & APPROVAL GATE                                            |
+|     Read-only tools run immediately. Sensitive actions pause the run until   |
+|     approved by a supervisor. Generated code runs in a Docker sandbox.       |
 +-------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 3. File-by-File Technical Guide
+## 3. Component Reference
 
-### A. Web Server & Configuration
-1. **`src/cognishift/app/main.py`:** Central FastAPI application. Configures the startup lifespan, mounts API routers, verifies local database initialization, and hosts the operator console.
-2. **`src/cognishift/app/config.py`:** Singleton settings module powered by Pydantic v2. Resolves absolute directory paths and enforces sovereign mode.
-3. **`src/cognishift/app/static/index.html`:** Clean, interactive operator dashboard for document uploads, agent runs, and approval management.
+### Web Server & Configuration
+* **`src/cognishift/app/main.py`:** Main FastAPI application setup, router mounting, and lifespan management.
+* **`src/cognishift/app/config.py`:** Settings configuration using Pydantic v2.
+* **`src/cognishift/app/static/index.html`:** Web operator console for document uploads, runs, and approvals.
 
-### B. Database & Schemas
-4. **`src/cognishift/app/db/database.py`:** Manages local SQLite connection pools using `aiosqlite`. Enforces Write-Ahead Logging (WAL) and foreign keys.
-5. **`src/cognishift/app/db/models.py`:** Pydantic models validating all request/response payloads (workspaces, agents, runs, approvals, multimodal image paths).
+### Database & Relational Storage
+* **`src/cognishift/app/db/database.py`:** Async SQLite connection management using `aiosqlite` with WAL mode enabled.
+* **`src/cognishift/app/db/models.py`:** Pydantic schemas for request and response validation.
 
-### C. Knowledge & Graph Memory Substrate
-6. **`src/cognishift/core/retriever.py`:** Ingests technical PDFs with `pypdf`, computes dense semantic embeddings using FastEmbed (`bge-small-en-v1.5`), and queries ChromaDB with page-number citations.
-7. **`src/cognishift/core/graph_memory.py`:** Persistent topological knowledge graph storing nodes (equipment, sensors, valves) and edges (`FEEDS_INTO`, `HAS_SENSOR`, `PROTECTED_BY`).
+### Knowledge & Context Retrieval
+* **`src/cognishift/core/retriever.py`:** Chunks and embeds documents into ChromaDB using FastEmbed on CPU, returning text with page citations.
+* **`src/cognishift/core/graph_memory.py`:** Queries equipment connection relationships from SQLite graph tables.
 
-### D. AI Model Providers & Execution Engine
-8. **`src/cognishift/core/providers.py`:** Abstract base class and factory pattern for model providers.
-9. **`src/cognishift/core/ollama_provider.py`:** Connects to local Ollama via `httpx.AsyncClient`. Handles text generation and base64 multimodal vision analysis.
-10. **`src/cognishift/core/engine.py`:** The central autonomous reasoning loop. Fuses visual telemetry, vector RAG, and graph topology; detects tool calling; and manages the Four-Eyes HITL pause/resume lifecycle.
-11. **`src/cognishift/core/tools.py`:** Deterministic industrial tool registry connected to Tennessee Eastman SCADA telemetry and SAP PM maintenance records.
+### Document Processing (Phase 5)
+* **`src/cognishift/core/document_processing/service.py`:** Routes document processing between native PDF extraction, RapidOCR, and Moondream vision.
+* **`src/cognishift/core/document_processing/native_pdf.py`:** Extracts text from digitally created PDFs using `pypdf`.
+* **`src/cognishift/core/document_processing/ocr_provider.py`:** Local CPU-based OCR using `RapidOCR` for scanned pages. Handwriting is best-effort.
+* **`src/cognishift/core/document_processing/vision_service.py`:** Local GPU-based visual analysis using `moondream`.
+* **`src/cognishift/core/document_processing/provenance.py`:** Page provenance tracking and untrusted data wrapping with delimiter escaping.
 
-### F. Terminal CLI Workbench
-12. **`src/cognishift/cli.py`:** Full-featured terminal CLI built with Typer and Rich. Provides 8 command groups (`workspace`, `agent`, `knowledge`, `graph`, `telemetry`, `run`, `approvals`, `chat`) with interactive REPL mode, multimodal `--image` support, and Four-Eyes supervisor sign-off — all without a browser.
-13. **`cli.py`:** Root entry point that adds `src/` to `sys.path` and launches the CLI.
-14. **`src/cognishift/__main__.py`:** Enables `python -m cognishift` module invocation.
+### Model Providers & Engine
+* **`src/cognishift/core/providers.py`:** Model provider abstract interface and factory.
+* **`src/cognishift/core/ollama_provider.py`:** Client for local Ollama service.
+* **`src/cognishift/core/simulated_provider.py`:** Mock provider for testing without local models.
+* **`src/cognishift/core/engine.py`:** Agent execution loop, tool detection, and approval pause state machine.
+* **`src/cognishift/core/tools.py`:** Registered tool definitions and execution functions.
 
-### G. Datasets & Test Scenarios
-12. **`data/refinery_topology_iso15926.json`:** P&ID equipment specifications and physical safety relief connections.
-13. **`data/telemetry_stream_tep.json`:** Dynamic time-series SCADA sensor stream with nominal baseline and overpressure surge fault injection.
-14. **`data/maintenance_orders_sap_pm.json`:** SAP S/4HANA PM maintenance orders with ISO 14224 FMEA damage coding.
-15. **`data/vision_test/`:** High-resolution test benchmark images of circular Bourdon pressure gauges and stamped metallic rating plates.
-
----
-
-## 4. Real-World Operational Scenarios
-
-### Scenario 1: Routine Sensor Telemetry Check
-* **Operator Query:** *"Check pressure on sensor PT-101."*
-* **Workflow:** Agent chooses tool `check_pressure(sensor_id="PT-101")` $\rightarrow$ System checks risk level (`read_only`) $\rightarrow$ Executes immediately $\rightarrow$ Reports nominal `105.5 PSI [GOOD]`.
-
-### Scenario 2: Emergency Overpressure Surge with Four-Eyes Authorization
-* **Alarm Trigger:** SCADA reports reactor pressure spiking to 495 PSI.
-* **Workflow:** Agent checks `MRPL_HAZOP_OISD_SOP.pdf` and determines pressure exceeds MAWP 450 PSI limit $\rightarrow$ Proposes `emergency_pressure_relief` $\rightarrow$ System detects `service_interrupting` risk $\rightarrow$ Engine enters `paused` state $\rightarrow$ Shift Superintendent EMP-8921 clicks [APPROVE] $\rightarrow$ Engine resumes, vents 35 PSI to flare header, and restores safe conditions.
-
-### Scenario 3: Multimodal Analog Gauge Inspection
-* **Field Action:** Operator takes photo of a field pressure dial (`gauge_pressure_critical_485psi.png`).
-* **Workflow:** Local Moondream VLM inspects image $\rightarrow$ Identifies dial `PT-101` pointing to 485 PSI in red warning zone $\rightarrow$ Engine matches against OISD-106 emergency manual $\rightarrow$ Alerts board operator and initiates safety venting protocol.
+### Terminal CLI
+* **`cli.py` & `src/cognishift/cli.py`:** Terminal interface built with Typer and Rich for managing workspaces, agents, knowledge, telemetry, runs, and approvals.
 
 ---
 
-## 5. Presentation Pitch & FAQ Cheat Sheet
+## 4. Simulated Operational Scenarios
 
-| Question / Topic | Hackathon Pitch Answer |
-|:---|:---|
-| **Why can't refineries use cloud AI?** | *"Refinery schematics and live sensor feeds are critical infrastructure secrets. CogniShift runs 100% on-premise on local GPUs with zero cloud egress."* |
-| **How does CogniShift prevent AI hallucinations?** | *"Every recommendation is grounded in verified engineering manuals with exact page citations (`[Manual.pdf | Page X]`), and cross-checked against the plant topology graph."* |
-| **Can the AI accidentally trip an emergency valve?** | *"No. Under our Four-Eyes Principle (OISD-STD-106 / IEC 62443), hazardous tools are physically intercepted by our state machine and require supervisor sign-off."* |
-| **How does it read analog dials?** | *"We run an offline multimodal Vision-Language Model (Moondream) on the local GPU that reads the needle position and gauge text directly from photos."* |
+### Scenario 1: Sensor Reading Check
+* **Operator Request:** *"Check the pressure on sensor PT-101."*
+* **Workflow:** Agent selects tool `check_pressure(sensor_id="PT-101")` $\rightarrow$ System checks risk level (`read_only`) $\rightarrow$ Executes immediately $\rightarrow$ Returns simulated reading (e.g., `105.5 PSI [NOMINAL]`).
+
+### Scenario 2: High-Pressure Condition with Supervisor Review
+* **Condition:** Simulated telemetry reports pressure exceeding threshold.
+* **Workflow:** Agent retrieves safety limits from operating manual $\rightarrow$ Recommends relief valve actuation $\rightarrow$ System identifies tool as `service_interrupting` $\rightarrow$ Run transitions to `paused` $\rightarrow$ Supervisor inspects request and clicks approve $\rightarrow$ Engine resumes and executes action.
+
+### Scenario 3: Analog Gauge Visual Inspection
+* **Operator Input:** Uploads a photo of an analog pressure gauge.
+* **Workflow:** Local Moondream vision model inspects the image $\rightarrow$ Estimates needle position and dial units $\rightarrow$ Reasoning model compares reading against manual limits.
+
+---
+
+## 5. Frequently Asked Questions
+
+**Why run models locally?**
+Refinery operating procedures, schematics, and sensor data are confidential. Running models on-premise ensures that data remains within the local network.
+
+**How are hallucinations reduced?**
+The system uses retrieval-augmented generation (RAG) to ground answers in indexed manuals with explicit page-number citations, and cross-checks equipment connections against the topology graph.
+
+**Can an agent actuate equipment on its own?**
+No. Tools are tagged with risk levels. Any action classified as sensitive or service-interrupting is intercepted by infrastructure code and held in a paused state until approved by a human supervisor.
+
+**What happens if a document contains conflicting instructions?**
+Retrieved text is presented with its source filename and page number, allowing operators to verify the authoritative manual. Extracted text is wrapped in untrusted data delimiters to reduce the risk of prompt injection.

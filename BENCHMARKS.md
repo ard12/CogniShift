@@ -1,132 +1,96 @@
-# CogniShift: Comprehensive Industrial Benchmark Report
+# CogniShift: System Benchmark & Verification Report
 
-> **Empirical Validation of the Sovereign On-Premise Agentic AI Workbench**  
-> **Environment:** Windows 11 | Python 3.12 | NVIDIA GeForce RTX 3050 Laptop GPU (6.0 GB VRAM) | Local Ollama (v0.6+)  
+Technical benchmark results and empirical validation of the local on-premise workbench.
+
+**Test Environment:**
+* Operating System: Windows 11
+* Python Runtime: Python 3.12
+* Local GPU: NVIDIA GeForce RTX 3050 Laptop GPU (6.0 GB VRAM)
+* Local Model Host: Ollama (hosting `llama3.2:3b` and `moondream:latest`)
+* Local Embeddings: FastEmbed (`BAAI/bge-small-en-v1.5` on CPU)
+* Vector Database: ChromaDB (local persistence)
+* Relational Database: SQLite with Write-Ahead Logging (`aiosqlite` WAL mode)
 
 ---
 
-## 1. Executive Summary & Verification Matrix
+## 1. Summary Benchmark Matrix
 
-All modules of the CogniShift architecture have been rigorously benchmarked across real-world industrial constraints:
-
-| Benchmark Suite | Focus Area | Workload / Dataset | Result | Latency / Metric |
+| Benchmark Area | Focus | Workload / Dataset | Result | Key Metric |
 |:---|:---|:---|:---:|:---:|
-| **Suite 1: Database & Relational Integrity** | CRUD & Foreign Keys | 10 SQLite Tables (WAL Mode) | ✅ **100% Pass** | < 0.25 s (10 tests) |
-| **Suite 2: Mega-Corpus RAG Scalability** | Large PDF Manual Ingestion | 500-page document (787 vector chunks) | ✅ **100% Pass** | 1.48 s query retrieval |
-| **Suite 3: Industrial Data & HITL State Machine** | Multi-hop Graph + TEP Telemetry | Tennessee Eastman Fault `IDV(6)` + SAP PM | ✅ **100% Pass** | 5/5 sub-tests passing |
-| **Suite 4: Multimodal Vision & Gauge OCR** | Analog Dials & Rating Plates | Bourdon Pressure Gauges & Stainless Plates | ✅ **100% Pass** | 0.93s – 6.57s VLM inference |
+| **Database Integrity** | CRUD & Foreign Keys | 10 SQLite Tables (WAL Mode) | Pass | < 0.25 s test suite execution |
+| **Document Retrieval** | Large Document Search | 500-page manual (787 vector chunks) | Pass | 1.48 s query retrieval time |
+| **Industrial Workflow** | Topology + Telemetry + HITL | Simulated TEP overpressure + SAP PM | Pass | 5/5 test scenarios passing |
+| **Multimodal Vision** | Analog Dials & Rating Plates | Test gauge photos & equipment plates | Pass | 0.93 s – 6.57 s VLM inference |
 
 ---
 
-## 2. Benchmark Suite 1: Single-Thread API & DB Baseline
+## 2. Benchmark Suite 1: Database Operations
 
-Automated unit testing with `pytest -v` over `aiosqlite` and FastAPI endpoints:
-* **Table Coverage:** `workspaces`, `agent_definitions`, `knowledge_sources`, `tool_definitions`, `agent_runs`, `run_events`, `approval_requests`, `audit_events`, `graph_nodes`, `graph_edges`.
-* **Execution Time:** **0.24 seconds** for 10 comprehensive async test cases.
-* **Integrity Guarantee:** Foreign key cascading verified; zero orphaned rows on workspace or agent deletion.
-
----
-
-## 3. Benchmark Suite 2: 500-Page Technical Corpus RAG Stress Test
-
-To ensure CogniShift can handle massive petrochemical manuals (e.g. API 610, OISD-STD-105/106, ASME BPVC), we synthesized and ingested a 500-page technical refinery manual:
-* **File Size:** 1.05 MB PDF (787 dense technical sections).
-* **Ingestion Throughput:** Ingested, chunked, and embedded into local ChromaDB via FastEmbed (`BAAI/bge-small-en-v1.5`).
-* **Retrieval Latency:** **1.48 seconds** to search 787 chunks and extract relevant paragraphs with exact page-level citations.
-* **Accuracy:** 100% precision on retrieving needle-in-a-haystack safety limits (e.g. MAWP 500.0 PSI, trip threshold 450.0 PSI).
+Automated async database testing with `pytest -v`:
+* **Tables Verified:** `workspaces`, `agent_definitions`, `knowledge_sources`, `tool_definitions`, `agent_runs`, `run_events`, `approval_requests`, `audit_events`, `graph_nodes`, `graph_edges`.
+* **Foreign Key Constraints:** Verified cascading rules; child records are cleaned up when workspaces or agents are deleted.
+* **Concurrency:** Write-Ahead Logging (WAL) ensures reads and writes do not lock each other during standard operations.
 
 ---
 
-## 4. Benchmark Suite 3: End-to-End Industrial Workflow Benchmark
+## 3. Benchmark Suite 2: Document Ingestion & Retrieval Stress Test
 
-Validated via `scratch/test_industrial_data_workflow.py` using our authentic 4-layer dataset stack:
-
-```
-================================================================================
-COGNISHIFT END-TO-END INDUSTRIAL BENCHMARK TEST
-Dataset: ISO 15926 Topology + TEP Telemetry + SAP PM FMEA + HAZOP SOP
-================================================================================
-```
-
-### Test Results Breakdown:
-1. **Vector RAG Retrieval:** Extracted exact HAZOP Node 1 safeguard rules from `MRPL_HAZOP_OISD_SOP.pdf` and `MRPL_OISD_106_PRV.pdf` in **1.12 seconds**.
-2. **Plant Topology Graph Traversal:** 2-hop traversal across `Pump-101A` $\to$ `PT-101` $\to$ `Reactor-B` $\to$ `SV-402` $\to$ `Flare-Header` in **12 ms**.
-3. **Dynamic SCADA Telemetry & SAP PM:**
-   * Nominal telemetry on `PT-101`: `105.5 PSI [GOOD]`.
-   * TEP Overpressure surge (`IDV 6`) on `PT-101`: `495.2 PSI [CRITICAL OVERPRESSURE]`.
-   * SAP PM work order query: Retrieved Order `#400829104` with ISO 14224 `DMG-SEAL-02` code.
-4. **Autonomous Reasoning & Four-Eyes Interlock:**
-   * Agent reasoning loop detected critical overpressure via local `llama3.2:3b` GPU inference.
-   * State machine intercepted `emergency_pressure_relief` and paused in **0.84 seconds**, issuing Approval Request `#22`.
-5. **Supervisor Resumption:**
-   * Supervisor authorized action $\to$ engine resumed, actuated pilot valve SV-402, vented 35 PSI to flare header, and completed with full audit debrief.
+To evaluate vector retrieval performance over larger manuals, a 500-page synthetic technical manual was indexed:
+* **Corpus Size:** 1.05 MB PDF containing 787 section chunks.
+* **Ingestion:** Text extracted page-by-page, chunked into 800-character segments with 150-character overlaps, and embedded into local ChromaDB via FastEmbed.
+* **Retrieval Latency:** 1.48 seconds to perform cosine similarity search over 787 chunks and format citations.
+* **Citation Precision:** Correctly retrieved specific pressure and temperature thresholds with exact page numbers.
 
 ---
 
-## 5. Benchmark Suite 4: Multimodal Vision & Gauge Reading Benchmark
+## 4. Benchmark Suite 3: Simulated Industrial Workflow Benchmark
 
-Evaluated via `scratch/test_multimodal_vision_pipeline.py` using local `moondream:latest` (1.86B parameter VLM) on the NVIDIA RTX 3050 GPU.
+Validated using `scratch/test_industrial_data_workflow.py` with synthetic industrial datasets:
+* **Simulated Datasets:**
+  * SCADA telemetry stream modeled on the Tennessee Eastman Process (TEP).
+  * Maintenance work orders modeled on SAP S/4HANA PM and ISO 14224 failure codes.
+  * Plant equipment topology modeled on ISO 15926 relationships.
+* **Workflow Test Sequence:**
+  1. **Vector Search:** Retrieved safety limits from synthetic operating manual (`MRPL_HAZOP_OISD_SOP.pdf`) in 1.12 s.
+  2. **Equipment Topology Traversal:** 2-hop traversal (`Pump-101A` $\to$ `PT-101` $\to$ `Reactor-B` $\to$ `SV-402`) in 12 ms.
+  3. **Sensor Telemetry:** Read nominal sensor value (105.5 PSI) and overpressure condition (495.2 PSI).
+  4. **Safety Interlock:** The reasoning loop proposed an emergency relief action. The state machine intercepted the call, verified that the tool required approval, and transitioned the run to `paused`.
+  5. **Supervisor Approval:** The simulated supervisor approved the request, allowing the engine to resume and complete the action.
 
-### Academic Benchmark Taxonomy Grounding:
-* **Analog Pointer Meters:** Aligned with **RPM-10K / DialBench** (arXiv:2511.21982, 10,730 images) and **Pointer-10K** (IEEE TAI 2021, 10,000 images).
-* **Industrial Rating Plates:** Aligned with **STRAHLEN** (Zenodo `10.5281/zenodo.13364406`, 200 legacy plates mapped to ISO 14224) and **MPSC** (IEEE TCSVT, 3,194 metal surface text images).
+---
 
-### Test Scenarios & Observed Performance:
+## 5. Benchmark Suite 4: Vision & Gauge Reading Benchmark
 
-| Scenario | Input Image | VLM Prompt | Latency | Observed Output & State Machine Action |
+Evaluated using `scratch/test_multimodal_vision_pipeline.py` with local `moondream:latest` (1.86B parameter VLM) on the NVIDIA RTX 3050 GPU.
+
+**Test Scenarios:**
+
+| Scenario | Input Image | Model Prompt | Latency | Observed Result |
 |:---|:---|:---|:---:|:---|
-| **Scenario 1: Nominal Gauge** | `gauge_pressure_nominal_105psi.png` | Inspect analog dial and report reading | 1.39 s | Identified `PT-101` pressure gauge at ~105 PSI. Correlated with SOP; confirmed nominal envelope (80–120 PSI). |
-| **Scenario 2: Critical Surge Gauge** | `gauge_pressure_critical_485psi.png` | Check if pointer is in red danger zone | 0.93 s | Detected needle in red danger zone (>450 PSI). Agent proposed `emergency_pressure_relief`; HITL gate triggered. Supervisor approved; valve vented safely. |
-| **Scenario 3: Equipment Nameplate** | `nameplate_pump_p101a.png` | Read rating plate text | 6.57 s | Extracted manufacturer (Sulzer), tag (`P-101A`), and Plan 53A seal specs. Grounded against ISO 15926 topology. |
+| **Nominal Gauge** | `gauge_pressure_nominal_105psi.png` | Read pressure dial | 1.39 s | Identified dial pointing to approximately 105 PSI. |
+| **Critical Gauge** | `gauge_pressure_critical_485psi.png` | Check if pointer is in red zone | 0.93 s | Detected needle in upper red danger zone (>450 PSI). Triggered safety approval path. |
+| **Equipment Nameplate** | `nameplate_pump_p101a.png` | Read rating plate text | 6.57 s | Extracted pump tag (`P-101A`) and manufacturer details. |
 
 ---
 
-## 6. Hardware & Performance Summary
+## 6. System Evaluation Metrics
 
-* **GPU Inference Latency (Llama 3.2 3B):** ~45–60 tokens/sec on NVIDIA RTX 3050.
-* **VLM Inference Latency (Moondream 1B):** ~0.9s to 6.5s per image.
-* **Vector Search Latency (FastEmbed + ChromaDB):** < 50ms for typical queries (< 1.5s for 500-page collections).
-* **Graph Traversal Latency (SQLite Recursive):** < 15ms for multi-hop P&ID traces.
-
----
-
-## 7. Production Metrics Suite (Deep System Audit)
-
-Executed via `scratch/evaluate_production_metrics.py` under comprehensive static analysis and inference auditing:
+Measured via static analysis and test suite execution:
 
 | Metric | Score | Description |
 |:---|:---:|:---|
-| **TCA (Tool Call Accuracy)** | 100.0% | 5/5 tool call patterns correctly parsed by the multi-strategy parser |
-| **PEA (Parameter Extraction Accuracy)** | 80.0% | Correct parameter key-value extraction from LLM output |
-| **SVR (Safety Violation Rate)** | 100.0% | All high-risk actions properly intercepted by HITL gate |
-| **SIR (Safety Interception Rate)** | 100.0% | Zero false negatives on dangerous tool calls |
-| **FAR (False Alarm Rate)** | 0.0% | Zero false positives on safe tool calls |
-| **SLCP (Source-Level Citation Precision)** | 100.0% | 9/9 page citations verified against vector store |
-| **Vector Retrieval Latency** | 146.2 ms | Average cosine similarity search time |
-| **Decoding Throughput** | 15.9 tok/s | On NVIDIA RTX 3050 Laptop GPU |
+| **Tool Call Detection (TCA)** | 100.0% | Correct parsing of structured tool calls across test queries |
+| **Parameter Extraction (PEA)** | 80.0% | Correct extraction of tool parameter keys and values from model text |
+| **Approval Interception (SIR)** | 100.0% | All high-risk tools in the test suite were paused for supervisor approval |
+| **False Alarm Rate (FAR)** | 0.0% | Safe, read-only tools were executed without unnecessary approval pauses |
+| **Citation Precision (SLCP)** | 100.0% | Page-level citations verified against indexed document chunks |
+| **Average Vector Retrieval Time** | 146.2 ms | Average ChromaDB cosine similarity search time |
 
 ---
 
-## 8. CLI Execution Support
+## 7. Operational Limitations
 
-All benchmark suites can also be triggered from the CogniShift terminal CLI for automated testing:
-
-```bash
-# Quick system diagnostics
-python cli.py status
-
-# Verify telemetry data integrity
-python cli.py telemetry stream
-python cli.py telemetry orders
-
-# Test vector RAG retrieval
-python cli.py knowledge search "maximum allowable working pressure"
-
-# Test graph traversal
-python cli.py graph query Pump-101A
-
-# Execute agent reasoning with multimodal vision
-python cli.py run execute "Inspect gauge" --image "data/vision_test/gauge_pressure_nominal_105psi.png"
-```
-
-See **[CLI.md](CLI.md)** for the complete command reference.
+* **Simulated Plant Environment:** SCADA telemetry streams and SAP PM maintenance orders are synthetic test datasets, not live plant systems.
+* **Handwriting:** Handwritten notes are parsed on a best-effort basis. Where OCR confidence is low, uncertainty is preserved.
+* **Model Size:** Local inference uses compact open-weight models (3B parameter LLM, 1.86B parameter VLM) to run on consumer-grade hardware. Complex reasoning can require prompt guidance.
+* **Network Boundaries:** Full platform-wide network egress enforcement is scheduled for Phase 6.

@@ -1,205 +1,283 @@
-# CogniShift: Sovereign On-Premise Agentic AI Workbench
+# CogniShift: Local Agentic AI Workbench for Industrial Operations
 
 [![SIH26117](https://img.shields.io/badge/SIH%20Problem-SIH26117-orange.svg)](https://www.sih.gov.in/)
-[![Organization](https://img.shields.io/badge/Enterprise-MRPL-blue.svg)](https://www.mrpl.co.in/)
-[![Python](https://img.shields.io/badge/Python-3.12+-green.svg)](https://www.python.org/)
+[![Organization](https://img.shields.io/badge/Use%20Case-MRPL%20Refinery-blue.svg)](https://www.mrpl.co.in/)
+[![Python](https://img.shields.io/badge/Python-3.12-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-teal.svg)](https://fastapi.tiangolo.com/)
-[![Local AI](https://img.shields.io/badge/LLM-Llama%203.2%20%7C%20Moondream-purple.svg)](https://ollama.com/)
-[![License](https://img.shields.io/badge/License-Confidential%20Industrial-red.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen.svg)]()
+[![Local AI](https://img.shields.io/badge/Ollama-Llama%203.2%20%7C%20Moondream-purple.svg)](https://ollama.com/)
+[![Tests](https://img.shields.io/badge/Tests-164%20Passing-brightgreen.svg)]()
 
-> **SIH 2024 Problem Statement SIH26117**  
-> **Organization:** Mangalore Refinery and Petrochemicals Limited (MRPL)  
-> **Title:** Sovereign On-Premise Agentic AI Workbench using Open-Weight Multimodal LLMs for Confidential Industrial Work  
-> **Theme:** Smart Automation | **Category:** Software  
+CogniShift is a self-hosted agentic AI workbench designed for confidential industrial operations. It runs open-weight language and vision models on local hardware without requiring external cloud AI APIs.
+
+Developed for Smart India Hackathon problem statement **SIH26117** (Mangalore Refinery and Petrochemicals Limited).
 
 ---
 
-## Executive Overview
+## What CogniShift Does
 
-**CogniShift** is an industrial-grade, 100% on-premise agentic workbench engineered specifically for high-consequence petrochemical and refinery environments. It operates completely **air-gapped (zero external cloud dependencies)** to ensure that proprietary refinery schematics, standard operating procedures (SOPs), and operational telemetry never leave the enterprise perimeter.
-
-### Core Architectural Pillars
-1. **100% Sovereign (Zero Cloud Egress):** Powered by local open-weight models (`llama3.2:3b` for reasoning and `moondream:latest` for multimodal vision/OCR) running via Ollama directly on enterprise hardware (NVIDIA RTX 3050 GPU). Outbound cloud APIs (OpenAI, Gemini, Anthropic) are structurally prohibited.
-2. **Hybrid GraphRAG & Vector Knowledge:** Combines page-aware PDF manual ingestion (FastEmbed `BAAI/bge-small-en-v1.5` + ChromaDB) with persistent **ISO 15926 / ISA-95 Plant Topology Graph Memory** (`graph_nodes` & `graph_edges` in SQLite) for multi-hop physical equipment reasoning.
-3. **Authentic Industrial Data Stack:** Grounded in real-world petrochemical schemas:
-   * **Tennessee Eastman Process (TEP):** Dynamic SCADA telemetry streams simulating nominal operation and multi-fault scenarios (e.g. `IDV(6)` reactor overpressure).
-   * **SAP S/4HANA PM & ISO 14224:** Plant maintenance work orders with failure mode, damage, and cause coding (e.g. API 682 Plan 53A seal failure logs).
-4. **Multimodal Computer Vision & Gauge OCR:** Native inspection of circular analog Bourdon pressure dials and stamped metallic equipment rating plates using local VLM inference.
-5. **Four-Eyes Dual Authorization (HITL Safety Interlock):** Strict compliance with OISD-STD-106 and IEC 62443. High-risk actions (e.g. emergency pressure relief, motor restarts) automatically transition the execution engine into `paused` state until digitally authorized by a shift supervisor.
-6. **Zero Arbitrary Code Execution:** All tool execution is strictly deterministic and parameterized with zero `subprocess.run`, `os.system`, `exec()`, or `eval()`.
+* **Answers operational questions** using local documentation, standard operating procedures, and equipment manuals.
+* **Cites exact source locations** with page-level references (`[Filename | Page X]`).
+* **Understands physical connections** between plant equipment using a local topology graph.
+* **Inspects photos and diagrams** using a local vision model to read analog dials and equipment nameplates.
+* **Enforces human review** for sensitive or high-risk actions through an infrastructure approval gate before execution.
+* **Executes generated code safely** inside an isolated Docker container with no network access.
 
 ---
 
-## High-Level Architecture
+## Why It Exists
+
+Industrial plants and refineries maintain sensitive operational procedures, piping schematics, and equipment logs that cannot be uploaded to third-party cloud services due to confidentiality and infrastructure security policies.
+
+CogniShift addresses this by keeping all data storage, vector indexing, and model inference on local premises.
+
+---
+
+## How It Works
 
 ```mermaid
 graph TD
-    UI["Operator Console / Field Terminal"] --> API["FastAPI Application (cognishift.app)"]
+    Operator["Operator (Web Console / CLI / API)"] --> API["FastAPI Application"]
 
-    subgraph "Core Workbench Services"
-        API --> WORKSPACES["Workspaces API (/api/v1/workspaces)"]
-        API --> AGENTS["Agent Registry (/api/v1/agents)"]
-        API --> KNOWLEDGE["Knowledge Pipeline (/api/v1/knowledge)"]
-        API --> APPROVALS["Four-Eyes HITL Approvals (/api/v1/approvals)"]
-        API --> RUNS["Runs & Event Timeline (/api/v1/runs)"]
+    subgraph "Local Storage & Data"
+        API --> DB[("SQLite DB (WAL Mode)")]
+        API --> Chroma[("ChromaDB Vector Store")]
     end
 
-    subgraph "Knowledge & Memory Substrate"
-        KNOWLEDGE --> RAG["Vector Retriever (core/retriever)"]
-        RAG --> FASTEMBED["FastEmbed (Local CPU Embeddings)"]
-        FASTEMBED --> CHROMA[("ChromaDB Vector Store")]
-        RUNS --> GRAPH["Plant Topology Graph (core/graph_memory)"]
-        GRAPH --> SQLITE[("SQLite DB: graph_nodes & graph_edges")]
-        API --> SQLITE
+    subgraph "Retrieval & Context"
+        API --> Retriever["Vector Retriever (FastEmbed CPU)"]
+        Retriever --> Chroma
+        API --> Graph["Plant Topology Graph (SQLite)"]
+        Graph --> DB
     end
 
-    subgraph "Local Multimodal AI Engine"
-        RUNS --> ENGINE["Autonomous Execution Engine (core/engine)"]
-        ENGINE --> PROVIDERS["Provider Factory (core/providers)"]
-        PROVIDERS --> OLLAMA["Ollama Local Daemon (:11434)"]
-        OLLAMA --> LLAMA["Llama 3.2 3B (Text & Reasoning)"]
-        OLLAMA --> MOONDREAM["Moondream 1B (Vision & Dial OCR)"]
-        ENGINE --> TOOLS["Industrial Tool Registry (core/tools)"]
-        TOOLS --> TEP[("TEP Dynamic SCADA Telemetry")]
-        TOOLS --> SAP[("SAP PM Maintenance Orders")]
-        TOOLS -.->|"Risk Level: High"| APPROVALS
+    subgraph "Local Inference & Reasoning"
+        API --> Engine["Execution Engine"]
+        Engine --> Ollama["Local Ollama Daemon"]
+        Ollama --> LLM["Llama 3.2 3B (Text)"]
+        Ollama --> VLM["Moondream 1.86B (Vision)"]
+    end
+
+    subgraph "Execution & Safety Boundaries"
+        Engine --> HITL{"High-Risk Action?"}
+        HITL -->|"Yes"| ApprovalQueue["Approval Requests (Paused)"]
+        HITL -->|"No"| ToolExec["Simulated Industrial Tools"]
+        Engine --> Sandbox["Docker Code Sandbox (--network none)"]
     end
 ```
 
 ---
 
-## Quick Start Guide
+## Model Routing & Local Inference
+
+CogniShift connects to local models running via [Ollama](https://ollama.com):
+* **Text & Reasoning:** `llama3.2:3b` handles instruction following, RAG synthesis, and tool call selection.
+* **Vision & Dial Reading:** `moondream:latest` (1.86B parameter VLM) interprets equipment images and analog gauge dials.
+* **Local Embeddings:** `fastembed` (`BAAI/bge-small-en-v1.5`) runs on CPU to generate 384-dimensional dense vectors without consuming GPU memory.
+* **Simulated Provider:** A mock provider is included for automated testing without requiring an active GPU.
+
+---
+
+## Agent & Deterministic Safety Interlocks
+
+The agent operates in a bounded step-by-step execution loop:
+1. Gathers context from vector retrieval, equipment topology, and any attached images.
+2. Formulates a structured response or proposes tool actions.
+3. **Safety Gate:** Tool risk levels (`read_only`, `low_risk`, `sensitive`, `service_interrupting`) are checked by deterministic infrastructure code, not by the model itself.
+4. If an action requires approval, the run transitions to `paused` and queues an entry in `approval_requests`.
+5. A supervisor reviews the request through the Web Console, Terminal CLI, or REST API. Once approved, the run resumes.
+
+---
+
+## Safe Code Execution (Docker Sandbox)
+
+When an agent needs to execute Python code (such as calculation scripts), code is not run directly on the host machine:
+* Code runs inside an isolated Docker container.
+* Network access is disabled: `--network none`.
+* Filesystem protections: root filesystem is `--read-only`, with a temporary bounded scratch volume for output.
+* Resource limits: memory ceiling (`--memory 512m`), process limits (`--pids-limit 64`), and non-root execution.
+
+---
+
+## Document, OCR & Vision Processing
+
+CogniShift distinguishes between three document processing methods:
+
+| Method | Component | Purpose | Notes |
+|:---|:---|:---|:---|
+| **Native PDF Extraction** | `pypdf` | Extracts embedded digital text directly from PDF pages | Fast and lossless for digital PDFs |
+| **Local OCR** | `RapidOCR` | Reads text from scanned pages and document images | Runs locally on CPU; handwriting is best-effort |
+| **Local Vision Model** | `moondream` via Ollama | Interprets visual features in photos (gauge dials, nameplates) | Runs on local GPU |
+
+All retrieved document text is passed through an untrusted data wrapper (`<document_context ...>`) with delimiter escaping. Authorization, permissions, and tool execution boundaries are enforced outside the model context.
+
+---
+
+## Current Project Status
+
+| Phase | Milestone | Status |
+|:---:|:---|:---:|
+| **Phase 0** | Base Security & Test Harness | Complete |
+| **Phase 1** | Foundation, Config & Local Lifespan | Complete |
+| **Phase 2** | Database Layer (Async SQLite WAL, 10 tables) & CRUD Routers | Complete |
+| **Phase 3** | Model Provider Abstraction & Local Ollama Integration | Complete |
+| **Phase 4** | Knowledge Pipeline (ChromaDB) & Docker Code Sandbox | Complete (Verified in live Docker container) |
+| **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete & Verified (164 tests passing) |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Planned (Not implemented yet) |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Not implemented yet) |
+
+---
+
+## Installation & Setup
 
 ### 1. Prerequisites
-* **Python 3.12+**
-* **NVIDIA GPU** (recommended 4GB+ VRAM; fully tested on NVIDIA GeForce RTX 3050 Laptop GPU)
-* **Ollama** running locally on `http://localhost:11434` with:
-  ```bash
-  ollama pull llama3.2:3b
-  ollama pull moondream
-  ```
+* **Python 3.12**
+* **Ollama** installed and running locally (`http://localhost:11434`)
+* **Docker Desktop** (required for the containerized code execution sandbox)
+* Recommended: Local NVIDIA GPU (tested on NVIDIA GeForce RTX 3050 Laptop GPU, 6GB VRAM)
 
-### 2. Installation
+Pull the local models:
+```bash
+ollama pull llama3.2:3b
+ollama pull moondream
+```
+
+### 2. Install Python Dependencies
 ```bash
 git clone https://github.com/sitanshukr08/CogniShift.git
 cd CogniShift
 
-# Create and activate virtual environment
 python -m venv .venv
-.venv\Scripts\activate   # Windows PowerShell
-# source .venv/bin/activate  # Linux / macOS
+.venv\Scripts\activate    # Windows
+# source .venv/bin/activate # Linux / macOS
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Database Initialization & Seeding
+### 3. Initialize & Seed Database
 ```bash
-# Copy configuration
-copy .env.example .env
-
-# Seed MRPL Refinery workspace, agents, tools, and plant topology
 python scripts/seed.py
 ```
+Creates local tables and seeds simulated refinery workspaces, agents, tool definitions, and plant equipment topology.
 
-### 4. Running the Workbench Server
+---
+
+## Running the Application
+
+### Web Server & Operator Console
 ```bash
 python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-* **Operator Console:** [http://127.0.0.1:8000](http://127.0.0.1:8000) (auto-redirects to `/static/index.html`)
-* **Interactive API Docs (Swagger):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-* **System Privacy & Sovereignty Status:** [http://127.0.0.1:8000/api/v1/system/privacy-status](http://127.0.0.1:8000/api/v1/system/privacy-status)
+* **Operator Console:** [http://127.0.0.1:8000](http://127.0.0.1:8000) (redirects to `/static/index.html`)
+* **Interactive API Documentation (Swagger):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-### 5. Running the Terminal CLI Workbench
-CogniShift provides a standalone, rich terminal CLI supporting every system feature without requiring a browser:
-
+### Terminal CLI Workbench
 ```bash
-# Launch interactive operator chat shell (REPL)
+# Launch interactive operator chat shell
 python cli.py chat
 
-# Direct command examples
-python cli.py status                               # System health & GPU diagnostics
-python cli.py telemetry stream                     # Live SCADA sensor telemetry
-python cli.py telemetry orders                     # SAP S/4HANA PM work orders
-python cli.py graph query Pump-101A                # ISO 15926 topology multi-hop query
-python cli.py knowledge search "MAWP limits"       # Vector RAG search with citations
-python cli.py run execute "Check pressure on PT-101" # Autonomous agent run
-python cli.py run execute "Inspect gauge" --image "data/vision_test/gauge_pressure_nominal_105psi.png" # Multimodal VLM
-python cli.py approvals list                      # Four-Eyes HITL safety gate
-python cli.py approvals approve <req_id>          # Supervisor digital sign-off
+# System diagnostics
+python cli.py status
+
+# Search ingested knowledge base
+python cli.py knowledge search "operating pressure limits"
+
+# Execute an agent query with an attached gauge image
+python cli.py run execute "Inspect gauge" --image "data/vision_test/gauge_pressure_nominal_105psi.png"
+
+# List and approve pending actions
+python cli.py approvals list
+python cli.py approvals approve <id>
 ```
+
+See **[CLI.md](CLI.md)** for the complete command reference.
 
 ---
 
-## Verification & Automated Benchmark Suites
+## Running Tests
 
-CogniShift includes an extensive test suite verifying mathematical correctness, zero-cloud egress, and industrial state machine safety:
-
-### 1. Unit & Schema Test Suite
+Run the full automated test suite:
 ```bash
 pytest -v
 ```
-*Validates database schema, WAL journaling, model providers, and API response serialization (10/10 passing).*
 
-### 2. End-to-End Industrial Workflow Benchmark
+Targeted test suites:
 ```bash
-python scratch/test_industrial_data_workflow.py
+# Document processing & delimiter escaping tests
+pytest tests/test_phase5_document_processing.py -v
+
+# Real local OCR tests (RapidOCR)
+pytest tests/test_phase5_real_ocr.py -v
+
+# Real local Vision tests (Ollama Moondream)
+pytest tests/test_phase5_real_vision.py -v
+
+# Real Docker sandbox tests
+pytest tests/test_phase4_real_sandbox.py -v
 ```
-*Executes 5 sequential tests across ISO 15926 Topology, Tennessee Eastman Process surge (`IDV(6)`), SAP PM work order retrieval, HAZOP rule extraction, and Four-Eyes supervisor authorization.*
 
-### 3. Multimodal Vision & Industrial OCR Benchmark
-```bash
-python scratch/test_multimodal_vision_pipeline.py
+---
+
+## Project Structure
+
 ```
-*Evaluates local `moondream` vision model on Bourdon analog pressure gauges (nominal vs. 485 PSI critical overpressure) and metallic equipment rating plates.*
+CogniShift/
+├── cli.py                              # Terminal CLI entry point
+├── pytest.ini                          # Test configuration
+├── requirements.txt                    # Project dependencies
+├── scripts/
+│   └── seed.py                         # Database initialization and sample data
+├── src/
+│   └── cognishift/
+│       ├── app/
+│       │   ├── main.py                 # FastAPI application setup
+│       │   ├── config.py               # Settings and configuration
+│       │   ├── api/                    # API route handlers
+│       │   │   ├── workspaces.py       # Workspace endpoints
+│       │   │   ├── agents.py           # Agent definition endpoints
+│       │   │   ├── knowledge.py        # Document upload and search
+│       │   │   ├── runs.py             # Agent execution and events
+│       │   │   ├── approvals.py        # Supervisor approval endpoints
+│       │   │   └── system.py           # Status endpoints
+│       │   ├── db/
+│       │   │   ├── database.py         # aiosqlite connection management
+│       │   │   └── models.py           # Pydantic schemas
+│       │   └── static/
+│       │       └── index.html          # Web operator console
+│       └── core/
+│           ├── engine.py               # Reasoning loop and approval pause logic
+│           ├── providers.py            # ModelProvider base class and factory
+│           ├── ollama_provider.py      # Ollama HTTP client (LLM and VLM)
+│           ├── simulated_provider.py   # Test mock provider
+│           ├── retriever.py            # FastEmbed and ChromaDB retrieval
+│           ├── graph_memory.py         # SQLite equipment topology traversal
+│           ├── tools.py                # Simulated industrial tool implementations
+│           └── document_processing/   # Phase 5 document pipeline
+│               ├── service.py          # Processing router (native, OCR, vision)
+│               ├── native_pdf.py       # PyPDF text extraction
+│               ├── ocr_provider.py     # RapidOCR wrapper
+│               ├── vision_service.py   # Moondream visual analysis wrapper
+│               └── provenance.py       # Page metadata and untrusted prompt wrapper
+└── tests/                              # Unit, integration, and sandbox tests
+```
 
 ---
 
-## API Reference Overview
+## Known Limitations
 
-| Method | Endpoint | Description | Phase |
-|:---|:---|:---|:---:|
-| `GET` | `/api/v1/system/status` | System health, DB state, GPU Ollama connectivity | Phase 1 |
-| `GET` | `/api/v1/system/privacy-status` | Cryptographic verification of air-gapped zero-cloud status | Phase 1 |
-| `GET` | `/api/v1/workspaces` | List segregated industrial workspaces | Phase 2 |
-| `POST` | `/api/v1/workspaces` | Provision new isolated refinery workspace | Phase 2 |
-| `GET` | `/api/v1/agents` | List agents with tool allowlists & model bindings | Phase 2 |
-| `POST` | `/api/v1/agents` | Register custom industrial agent | Phase 2 |
-| `PATCH`| `/api/v1/agents/{id}` | Update agent system prompts and safety gates | Phase 2 |
-| `POST` | `/api/v1/knowledge/upload` | Ingest PDF, extract text, and upsert ChromaDB vectors | Phase 4 |
-| `GET` | `/api/v1/knowledge` | List ingested manuals and chunk metrics | Phase 4 |
-| `DELETE`| `/api/v1/knowledge/{id}` | Purge document, physical file, and vector embeddings | Phase 4 |
-| `GET` | `/api/v1/approvals` | View pending supervisor authorization requests | Phase 6 |
-| `POST` | `/api/v1/approvals/{id}/approve`| Supervisor digital sign-off to resume execution | Phase 6 |
-| `POST` | `/api/v1/approvals/{id}/reject` | Supervisor rejection of hazardous action | Phase 6 |
-| `POST` | `/api/v1/runs` | Trigger agent reasoning loop (Text or Multimodal Image) | Phase 5 & 7 |
-| `GET` | `/api/v1/runs` | List past execution runs and audit status | Phase 5 |
-| `GET` | `/api/v1/runs/{id}` | Inspect specific run results and citations | Phase 5 |
-| `GET` | `/api/v1/runs/{id}/events` | Stream complete event-sourced timeline | Phase 5 |
-| `POST` | `/api/v1/runs/{id}/resume` | Resume paused run after supervisor sign-off | Phase 5 |
+* **Simulated Industrial Environment:** Plant SCADA streams and SAP PM maintenance orders are synthetic test datasets for demonstration and evaluation. CogniShift is not connected to live physical control systems.
+* **Network Egress Enforcement:** Platform-wide network egress observation and kernel-level firewall enforcement are scheduled for Phase 6.
+* **Handwriting Recognition:** Handwritten text in scanned documents is processed on a best-effort basis. Low-confidence outputs retain uncertainty indicators.
+* **Local Model Capacity:** Local inference uses compact models (`llama3.2:3b` and `moondream:1.86B`) suited for consumer GPUs. Complex multi-step reasoning can occasionally require prompt refinement.
+* **Integrity Checking:** Document and artifact hashes use SHA-256 for change detection, not cryptographic digital signatures.
+* **Docker Sandbox:** The sandbox isolates generated Python code from the host, but does not eliminate all risks associated with executing untrusted code.
 
 ---
 
-## Engineering Delivery Roadmap
+## Documentation Suite
 
-| Phase | Component | Key Technologies | Status |
-|:---|:---|:---|:---:|
-| **Phase 1** | Foundation, Config & Air-Gap Enforcement | FastAPI, Pydantic v2, Python-dotenv | ✅ **Complete** |
-| **Phase 2** | Database Layer & Foreign-Key Integrity | aiosqlite, SQLite WAL, CRUD Routers | ✅ **Complete** |
-| **Phase 3** | Provider Abstraction & Local Ollama | httpx AsyncClient, ModelResponse Factory | ✅ **Complete** |
-| **Phase 4** | Knowledge Pipeline & Vector RAG | FastEmbed (CPU), ChromaDB, PyPDF | ✅ **Complete** |
-| **Phase 6** | Tool Registry & Four-Eyes Approvals | Deterministic simulations, HITL inbox | ✅ **Complete** |
-| **Phase 5** | Autonomous Execution Engine | State Machine, Event Sourcing (`run_events`) | ✅ **Complete** |
-| **Phase 7** | Multimodal Vision & Gauge OCR | Moondream 1B, Bourdon dial analysis | ✅ **Complete** |
-| **Phase 8** | Enterprise Polish & Qualifier Demo | Full stack integration & scenario rehearsal | 🎯 **In Progress** |
-
----
-
-## Detailed Documentation Suite
-
-* **[ARCHITECTURE.md](ARCHITECTURE.md):** Industrial Purdue model, ISO 15926 ontology, and TEP data models.
-* **[BENCHMARKS.md](BENCHMARKS.md):** Performance metrics, 500-page RAG stress tests, and VLM evaluation.
-* **[information.md](information.md):** Complete Plain-English encyclopedia and operator walkthroughs.
-* **[AGENTS.md](AGENTS.md):** Team handoff contracts and multi-agent alignment rules.
-* **[implementation_plan.md](implementation_plan.md):** Master milestone specifications and tracking.
+* **[ARCHITECTURE.md](ARCHITECTURE.md):** Industrial network model, topology graph, and security boundaries.
+* **[BENCHMARKS.md](BENCHMARKS.md):** Test results, retrieval latencies, and evaluation metrics.
+* **[CLI.md](CLI.md):** Full terminal command-line reference and examples.
+* **[information.md](information.md):** Plain-English component walkthroughs and operational scenarios.
+* **[AGENTS.md](AGENTS.md):** Developer alignment guide and shared contracts.
+* **[implementation_plan.md](implementation_plan.md):** Master milestone specifications and technical roadmap.

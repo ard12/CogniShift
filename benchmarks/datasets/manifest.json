@@ -1,0 +1,57 @@
+{
+  "manifest_version": "1.0",
+  "generated_at_utc": "2026-09-04T07:50:00Z",
+  "provenance_policy": "Strict Real-Data Separation (No synthetic data labeled as real)",
+  "datasets": {
+    "real_industrial_ocr": {
+      "status": "PROVISIONING_REQUIRED",
+      "target_task": "Real Document OCR Benchmark (CER/WER evaluation)",
+      "recommended_source": "MVTec Industrial Text / Scanned Public Technical Reports (e.g. NASA NTRS technical reports or OSHA incident reports)",
+      "license": "Public / Permissive Academic",
+      "local_path": null,
+      "requires_download": true,
+      "ground_truth_format": "Box/Text UTF-8 JSON or TXT"
+    },
+    "real_engineering_pdf": {
+      "status": "PROVISIONING_REQUIRED",
+      "target_task": "Native PDF Extraction vs OCR Routing Accuracy",
+      "recommended_source": "Public OSHA / Chemical Safety Board (CSB) Investigation Reports (clean native digital PDFs with known text layers)",
+      "license": "Public Domain (US Government)",
+      "local_path": null,
+      "requires_download": true,
+      "ground_truth_format": "Page-aligned ground truth text"
+    },
+    "real_rag_qa_benchmark": {
+      "status": "PROVISIONING_REQUIRED",
+      "target_task": "Technical Knowledge Retrieval & Grounded QA (Recall@k, MRR, Citation Completeness)",
+      "recommended_source": "Public CSB Investigation Reports with curated Q&A pairs and ground-truth page citations",
+      "license": "Public Domain",
+      "local_path": null,
+      "requires_download": true,
+      "ground_truth_format": "Query-Document-Page relevance mapping (JSON)"
+    },
+    "real_industrial_vision": {
+      "status": "PROVISIONING_REQUIRED",
+      "target_task": "Gauge Reading & Nameplate Identification Benchmark",
+      "recommended_source": "OpenGauge Dataset / Roboflow Industrial Pointer Meter Dataset (real photographic captures under varied lighting and angles)",
+      "license": "CC BY 4.0 / Open Access",
+      "local_path": null,
+      "requires_download": true,
+      "ground_truth_format": "Bounding box + ground-truth numerical reading / text"
+    },
+    "local_synthetic_fixtures": {
+      "status": "SYNTHETIC_FIXTURE_ONLY",
+      "target_task": "Regression & Security Gate Unit Testing (NOT valid for real-data benchmark metrics)",
+      "source": "Programmatic generation (PIL, FPDF, ReportLab) in CogniShift repo",
+      "license": "Proprietary / Internal",
+      "local_paths": [
+        "data/manuals/MRPL_HAZOP_OISD_SOP.pdf",
+        "data/manuals/MRPL_MEGA_CORPUS_500P.pdf",
+        "data/vision_test/gauge_pressure_critical_485psi.png",
+        "data/vision_test/nameplate_pump_p101a.png"
+      ],
+      "requires_download": false,
+      "ground_truth_format": "Test assertion constants"
+    }
+  }
+}

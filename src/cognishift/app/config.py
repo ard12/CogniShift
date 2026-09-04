@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 class Settings(BaseSettings):
     """Configuration settings for CogniShift."""
     operating_mode: str = "local"
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str = "http://127.0.0.1:11434"
     text_model: str = "llama3.2:3b"
     vision_model: str = "moondream"
     data_dir: Path = PROJECT_ROOT / "data"

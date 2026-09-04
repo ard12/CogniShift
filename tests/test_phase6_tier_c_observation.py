@@ -17,7 +17,8 @@ from cognishift.core.retriever import embedding_model
 def test_observer_negative_control():
     """Negative Control: Proves the observer detects socket events when they occur."""
     result = run_negative_control()
-    assert result is True, "Negative control failed: Observer did not detect active socket!"
+    is_detected = result if isinstance(result, bool) else result.get("detected", False)
+    assert is_detected is True, "Negative control failed: Observer did not detect active socket!"
 
 
 @pytest.mark.asyncio

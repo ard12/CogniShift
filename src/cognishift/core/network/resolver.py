@@ -113,8 +113,8 @@ def classify_destination(host: str, port: int) -> Tuple[DestinationClass, List[s
         overall = DestinationClass.PRIVATE
     elif all(c == DestinationClass.LOOPBACK for c in classes):
         overall = DestinationClass.LOOPBACK
+    if overall == DestinationClass.LOOPBACK and "127.0.0.1" in resolved_ips:
+        primary_ip = "127.0.0.1"
     else:
-        overall = DestinationClass.UNKNOWN
-
-    primary_ip = resolved_ips[0]
+        primary_ip = resolved_ips[0]
     return overall, resolved_ips, primary_ip

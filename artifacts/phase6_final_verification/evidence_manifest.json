@@ -1,0 +1,48 @@
+{
+  "manifest_version": "1.0",
+  "description": "Machine-readable evidence manifest for CogniShift Phase 6 Final Sovereignty Verification",
+  "generated_at_utc": "2026-09-04T07:48:30Z",
+  "file_count": 10,
+  "files": {
+    "application_network_events.json": {
+      "size_bytes": 18429,
+      "sha256": "f337929a152c6e0d435008b2b24ef6553a63bb176f3b1116d4c55394cf6dfb02"
+    },
+    "browser_network_report.json": {
+      "size_bytes": 1252,
+      "sha256": "becc4063a2edf5d0ec2cfcde84126148dbc963d91b7bd1d3eea0d38e72d04835"
+    },
+    "dns_binding_test.json": {
+      "size_bytes": 1977,
+      "sha256": "b01e63aaee8f386d46ecbc5374c1027c1f7d72c7a1384352936c088969b62cef"
+    },
+    "environment.txt": {
+      "size_bytes": 1490,
+      "sha256": "fab0cc148094f30f6b345ed4867cd89571b07ac337518920db23c2a29bba751a"
+    },
+    "git_state.txt": {
+      "size_bytes": 228,
+      "sha256": "246e8ddefab5f292e35109ee836d6d40b579435b82dc71017ba4044209d3429f"
+    },
+    "observer_negative_control.json": {
+      "size_bytes": 4701,
+      "sha256": "b20b6a2cd3918181729a46acd768718f98472c31282a32302b8277c8eceefeb0"
+    },
+    "observer_strict_workflow.json": {
+      "size_bytes": 2386,
+      "sha256": "12c8c9d0499f738e0e5396034769f8ff6554722a5051f982fd42ba8a7f86ce39"
+    },
+    "pytest_full.txt": {
+      "size_bytes": 44382,
+      "sha256": "e027ccdacaffc2aad943ccf13c2dcc9ff90d3108f5205f1bea71827564cba419"
+    },
+    "pytest_phase6.txt": {
+      "size_bytes": 7504,
+      "sha256": "b865d085e341f618b6f83b14bdc006e7fec58dc7f4c424d59454d0925a4ee949"
+    },
+    "secrets_audit.json": {
+      "size_bytes": 242,
+      "sha256": "76eb6a809cc3379bf34e30c4e6e0fa6c4dce7f5c2242e53fb973e6a6cbdb58e7"
+    }
+  }
+}

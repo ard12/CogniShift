@@ -1,0 +1,146 @@
+{
+  "status": "PASSED",
+  "target_port": 19876,
+  "detected": true,
+  "total_connections_recorded": 4,
+  "captured_records": [
+    {
+      "timestamp": "2026-09-04T07:39:45.181657+00:00",
+      "pid": 6984,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 0,
+      "remote_address": "127.0.0.1",
+      "remote_port": 19876,
+      "status": "EVENT_socket.connect",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Authorized loopback socket event socket.connect to 127.0.0.1:19876",
+      "source_mechanism": "python_runtime_audit_hook"
+    },
+    {
+      "timestamp": "2026-09-04T07:39:45.192832+00:00",
+      "pid": 6984,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50065,
+      "remote_address": "127.0.0.1",
+      "remote_port": 19876,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:19876",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T07:39:45.192832+00:00",
+      "pid": 6984,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 19876,
+      "remote_address": "127.0.0.1",
+      "remote_port": 50065,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:50065",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T07:39:45.192832+00:00",
+      "pid": 6984,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 19876,
+      "remote_address": "",
+      "remote_port": 0,
+      "status": "LISTEN",
+      "classification": "unspecified",
+      "is_authorized": true,
+      "details": "Local bind/listen on 127.0.0.1:19876",
+      "source_mechanism": "os_socket_table"
+    }
+  ],
+  "summary": {
+    "observer_mechanisms": [
+      "python_runtime_audit_hook (sys.addaudithook: synchronous event capture)",
+      "os_socket_table (psutil / Windows GetExtendedTcpTable)"
+    ],
+    "total_observed": 4,
+    "loopback_count": 3,
+    "unauthorized_count": 0,
+    "public_count": 0,
+    "private_count": 0,
+    "link_local_count": 0,
+    "target_pids": [
+      6984
+    ],
+    "connections": [
+      {
+        "timestamp": "2026-09-04T07:39:45.181657+00:00",
+        "pid": 6984,
+        "process_name": "python.exe",
+        "protocol": "TCP",
+        "local_address": "127.0.0.1",
+        "local_port": 0,
+        "remote_address": "127.0.0.1",
+        "remote_port": 19876,
+        "status": "EVENT_socket.connect",
+        "classification": "loopback",
+        "is_authorized": true,
+        "details": "Authorized loopback socket event socket.connect to 127.0.0.1:19876",
+        "source_mechanism": "python_runtime_audit_hook"
+      },
+      {
+        "timestamp": "2026-09-04T07:39:45.192832+00:00",
+        "pid": 6984,
+        "process_name": "python.exe",
+        "protocol": "TCP",
+        "local_address": "127.0.0.1",
+        "local_port": 50065,
+        "remote_address": "127.0.0.1",
+        "remote_port": 19876,
+        "status": "ESTABLISHED",
+        "classification": "loopback",
+        "is_authorized": true,
+        "details": "Loopback connection to 127.0.0.1:19876",
+        "source_mechanism": "os_socket_table"
+      },
+      {
+        "timestamp": "2026-09-04T07:39:45.192832+00:00",
+        "pid": 6984,
+        "process_name": "python.exe",
+        "protocol": "TCP",
+        "local_address": "127.0.0.1",
+        "local_port": 19876,
+        "remote_address": "127.0.0.1",
+        "remote_port": 50065,
+        "status": "ESTABLISHED",
+        "classification": "loopback",
+        "is_authorized": true,
+        "details": "Loopback connection to 127.0.0.1:50065",
+        "source_mechanism": "os_socket_table"
+      },
+      {
+        "timestamp": "2026-09-04T07:39:45.192832+00:00",
+        "pid": 6984,
+        "process_name": "python.exe",
+        "protocol": "TCP",
+        "local_address": "127.0.0.1",
+        "local_port": 19876,
+        "remote_address": "",
+        "remote_port": 0,
+        "status": "LISTEN",
+        "classification": "unspecified",
+        "is_authorized": true,
+        "details": "Local bind/listen on 127.0.0.1:19876",
+        "source_mechanism": "os_socket_table"
+      }
+    ],
+    "unauthorized_violations": []
+  }
+}

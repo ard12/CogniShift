@@ -1,0 +1,47 @@
+{
+  "browser": "Microsoft Edge (Chromium, channel='msedge')",
+  "test_url": "http://127.0.0.1:8000/static/index.html",
+  "requests_captured": [
+    {
+      "url": "http://127.0.0.1:8000/static/index.html",
+      "method": "GET",
+      "resource_type": "document"
+    },
+    {
+      "url": "http://127.0.0.1:8000/static/app.css",
+      "method": "GET",
+      "resource_type": "stylesheet"
+    }
+  ],
+  "negative_control": {
+    "status": "PASSED",
+    "detected_external_requests": [
+      {
+        "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
+        "method": "GET",
+        "resource_type": "stylesheet"
+      },
+      {
+        "url": "https://cdn.tailwindcss.com/",
+        "method": "GET",
+        "resource_type": "script"
+      },
+      {
+        "url": "https://cdn.tailwindcss.com/3.4.17",
+        "method": "GET",
+        "resource_type": "script"
+      }
+    ],
+    "detected_count": 3
+  },
+  "summary": {
+    "total_captured": 2,
+    "local_requests_count": 2,
+    "public_cdn_requests": 0,
+    "external_font_requests": 0,
+    "analytics_requests": 0,
+    "external_js_css_requests": 0,
+    "total_unauthorized_external": 0,
+    "status": "PASSED"
+  }
+}

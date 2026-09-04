@@ -1,0 +1,5 @@
+HEAD: 0057463a570a8f752bbbd52a6330d03eafb9dd17
+Parent: a2dcf066752bfd7cde77d97c8e00469da367edb8
+Branch: main
+Status: CLEAN
+Last Commit: 0057463 feat(phase6): implement network sovereignty enforcement and egress observation

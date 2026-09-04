@@ -1,0 +1,68 @@
+{
+  "dns_binding": {
+    "configured_host": "localhost",
+    "policy_resolved_ip": "127.0.0.1",
+    "actual_socket_destination": "127.0.0.1",
+    "match": true,
+    "server_response": "DNS_BINDING_OK",
+    "status": "PASSED"
+  },
+  "multi_address_safety": {
+    "ipv4_rebind": {
+      "decision": "BLOCKED",
+      "destination_class": "public",
+      "blocked": true,
+      "highest_risk_wins": true
+    },
+    "ipv6_rebind": {
+      "decision": "BLOCKED",
+      "destination_class": "public",
+      "blocked": true,
+      "highest_risk_wins": true
+    }
+  },
+  "redirect_enforcement": {
+    "redirect_blocked": true,
+    "caught_error": "[NETWORK POLICY VIOLATION] HTTP redirect from 127.0.0.1:19879 to 93.184.216.34:80 (public) blocked by policy: Public internet egress to 93.184.216.34:80 (93.184.216.34) is strictly forbidden in sovereign mode.",
+    "public_connections": 0,
+    "status": "PASSED"
+  },
+  "ipv6_reality": {
+    "loopback_allowed": {
+      "host": "::1",
+      "port": 11434,
+      "expected_decision": "ALLOWED",
+      "actual_decision": "ALLOWED",
+      "expected_class": "loopback",
+      "actual_class": "loopback",
+      "passed": true
+    },
+    "public_blocked": {
+      "host": "2606:4700:4700::1111",
+      "port": 443,
+      "expected_decision": "BLOCKED",
+      "actual_decision": "BLOCKED",
+      "expected_class": "public",
+      "actual_class": "public",
+      "passed": true
+    },
+    "link_local_blocked": {
+      "host": "fe80::1",
+      "port": 80,
+      "expected_decision": "BLOCKED",
+      "actual_decision": "BLOCKED",
+      "expected_class": "link_local",
+      "actual_class": "link_local",
+      "passed": true
+    },
+    "private_ula_blocked": {
+      "host": "fc00::1",
+      "port": 80,
+      "expected_decision": "BLOCKED",
+      "actual_decision": "BLOCKED",
+      "expected_class": "private",
+      "actual_class": "private",
+      "passed": true
+    }
+  }
+}

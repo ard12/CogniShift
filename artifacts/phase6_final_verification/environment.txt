@@ -1,0 +1,31 @@
+================================================================================
+CogniShift Phase 6 Final Sovereignty Verification: Environment Reality Check
+Generated: 2026-09-04T13:06:35Z
+================================================================================
+Operating System: Windows-11-10.0.26200-SP0 (Windows 11 10.0.26200)
+Architecture: AMD64
+Processor: Intel64 Family 6 Model 183 Stepping 1, GenuineIntel
+
+Python Runtime:
+sys.version: 3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]
+sys.executable: C:\Users\sitan\AppData\Local\Programs\Python\Python312\python.exe
+sys.prefix: C:\Users\sitan\AppData\Local\Programs\Python\Python312
+In Virtualenv: False
+
+Container Environment:
+Docker Version: Docker version 29.7.2, build a7dcaa6
+Docker OSType: linux
+Docker Context: desktop-linux
+
+Local Inference Environment:
+Ollama Version: ollama version is 0.33.3
+Ollama API Endpoint: http://localhost:11434
+Ollama Models & Digests:
+  - moondream:latest: digest=55fc3abd386771e5b5d1bbcc732f3c3f4df6e9f9f08f1131f9cc27ba2d1eec5b size=1738451197 modified_at=2026-09-03T14:20:53.551635+05:30
+  - llama3.2:3b: digest=a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72 size=2019393189 modified_at=2026-09-03T14:18:29.2213779+05:30
+
+Local ML Libraries:
+FastEmbed Version: 0.8.0
+RapidOCR Version: 1.4.4
+ONNX Runtime Version: 1.26.0
+================================================================================

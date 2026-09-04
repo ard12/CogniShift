@@ -1,0 +1,78 @@
+{
+  "observer_mechanisms": [
+    "python_runtime_audit_hook (sys.addaudithook: synchronous event capture)",
+    "os_socket_table (psutil / Windows GetExtendedTcpTable)"
+  ],
+  "total_observed": 4,
+  "loopback_count": 4,
+  "unauthorized_count": 0,
+  "public_count": 0,
+  "private_count": 0,
+  "link_local_count": 0,
+  "target_pids": [
+    23076
+  ],
+  "connections": [
+    {
+      "timestamp": "2026-09-04T07:42:38.313984+00:00",
+      "pid": 23076,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 64605,
+      "remote_address": "127.0.0.1",
+      "remote_port": 64604,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:64604",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T07:42:38.313984+00:00",
+      "pid": 23076,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 64604,
+      "remote_address": "127.0.0.1",
+      "remote_port": 64605,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:64605",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T07:42:39.391832+00:00",
+      "pid": 23076,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 64606,
+      "remote_address": "127.0.0.1",
+      "remote_port": 11434,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:11434",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T07:43:14.483644+00:00",
+      "pid": 23076,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 59336,
+      "remote_address": "127.0.0.1",
+      "remote_port": 11434,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:11434",
+      "source_mechanism": "os_socket_table"
+    }
+  ],
+  "unauthorized_violations": []
+}

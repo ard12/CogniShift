@@ -96,7 +96,14 @@ class SovereignAsyncTransport(httpx.AsyncBaseTransport):
                 f"blocked by policy: {reason}"
             )
 
-        # 4. Forward allowed request to underlying transport
+        # 4. Strict IP Pinning & DNS TOCTOU Protection:
+        # Re-target request directly to the validated resolved IP address so the
+        # underlying transport connects exclusively to the IP that passed policy evaluation.
+        if resolved_ip and host != resolved_ip:
+            original_host_header = request.headers.get("host") or (f"{host}:{port}" if port not in (80, 443) else host)
+            request.url = request.url.copy_with(host=resolved_ip)
+            request.headers["host"] = original_host_header
+
         response = await self._underlying.handle_async_request(request)
 
         # 5. Redirect validation: if server returns 3xx, intercept and validate redirect location
@@ -179,6 +186,12 @@ class SovereignTransport(httpx.BaseTransport):
                 f"[NETWORK POLICY VIOLATION] Outbound {method} request to {host}:{port} ({dest_class.value}) "
                 f"blocked by policy: {reason}"
             )
+
+        # Strict IP Pinning & DNS TOCTOU Protection:
+        if resolved_ip and host != resolved_ip:
+            original_host_header = request.headers.get("host") or (f"{host}:{port}" if port not in (80, 443) else host)
+            request.url = request.url.copy_with(host=resolved_ip)
+            request.headers["host"] = original_host_header
 
         response = self._underlying.handle_request(request)
 

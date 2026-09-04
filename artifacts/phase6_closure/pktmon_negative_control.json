@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "loopback_detected": true,
+  "public_detected": true,
+  "loopback_target": "127.0.0.1:11434",
+  "public_target": "1.1.1.1:80",
+  "captured_loopback_count": 1,
+  "captured_public_count": 36,
+  "sample_loopback_event": {
+    "raw_line": "Drop: ip: 127.0.0.1.64941 > 127.0.0.1.11434: Flags [.], ack 2764868206, win 255, length 0",
+    "src_ip": "127.0.0.1",
+    "src_port": 64941,
+    "dst_ip": "127.0.0.1",
+    "dst_port": 11434
+  },
+  "sample_public_event": {
+    "raw_line": "4C-49-6C-39-52-B5 > CC-2D-E0-CA-35-20, ethertype IPv4 (0x0800), length 66: 152.20.19.134.64942 > 1.1.1.1.80: Flags [S], seq 3360729324, win 65535, options [mss 1460,nop,wscale 8,nop,nop,sackOK], length 0",
+    "src_ip": "152.20.19.134",
+    "src_port": 64942,
+    "dst_ip": "1.1.1.1",
+    "dst_port": 80
+  },
+  "etl_sha256": "172733b26230c6f0d16c0a9ef435d801bdccbb2846a65dd5b62da3b8a636a890",
+  "txt_sha256": "d0bb6f732291a89a379597a56785d9e629ffe94dd612b519037a85e891a6bb8e"
+}

@@ -1,0 +1,86 @@
+{
+  "report": "CogniShift PktMon Strict Workflow Report",
+  "workflow_start": "2026-09-04T08:39:05.071085+00:00",
+  "workflow_results": {
+    "llm": {
+      "model": "llama3.2:3b",
+      "response": "CLOSURE PIPELINE VERIFIED",
+      "status": "SUCCESS"
+    },
+    "embedding": {
+      "model": "BAAI/bge-small-en-v1.5",
+      "dimensions": 384,
+      "status": "SUCCESS"
+    },
+    "ocr": {
+      "extracted_text": "",
+      "status": "SUCCESS"
+    },
+    "vision": {
+      "model": "moondream",
+      "observation": "\nThe image features a gray and white striped background with the text \"Safety Interlock Shutdown S. ",
+      "status": "SUCCESS"
+    },
+    "artifact": {
+      "path": "C:\\Users\\sitan\\OneDrive\\Desktop\\CogniShift\\artifacts\\phase6_closure\\workflow_artifact.txt",
+      "sha256": "f1ab87b3b2335dd84de12f9315dd15b3a69c88d39294413365bb20d2e4848817",
+      "status": "SUCCESS"
+    },
+    "sandbox": {
+      "execution_id": "closure_sbx_01",
+      "status": "SandboxStatus.SUCCESS",
+      "stdout": "SANDBOX_NETWORK_NONE_VERIFIED",
+      "network_none_enforced": true
+    },
+    "guard_interception": {
+      "target": "8.8.8.8:80",
+      "decision": "BLOCKED",
+      "exception": "NetworkPolicyViolation"
+    }
+  },
+  "application_ledger_events": [
+    {
+      "timestamp": "2026-09-04T08:39:05.441962+00:00",
+      "component": "llm_inference",
+      "requested_host": "localhost",
+      "resolved_ip": "127.0.0.1",
+      "port": 11434,
+      "destination_class": "loopback",
+      "policy_decision": "ALLOWED",
+      "reason": "Explicitly permitted local service at localhost:11434."
+    },
+    {
+      "timestamp": "2026-09-04T08:39:19.325028+00:00",
+      "component": "ollama_provider",
+      "requested_host": "localhost",
+      "resolved_ip": "127.0.0.1",
+      "port": 11434,
+      "destination_class": "loopback",
+      "policy_decision": "ALLOWED",
+      "reason": "Explicitly permitted local service at localhost:11434."
+    },
+    {
+      "timestamp": "2026-09-04T08:39:21.069367+00:00",
+      "component": "closure_egress_probe",
+      "requested_host": "8.8.8.8",
+      "resolved_ip": "8.8.8.8",
+      "port": 80,
+      "destination_class": "public",
+      "policy_decision": "BLOCKED",
+      "reason": "Public internet egress to 8.8.8.8:80 (8.8.8.8) is strictly forbidden in sovereign mode."
+    }
+  ],
+  "capture_filter": "Broad capture (all TCP/UDP egress ports including 80, 443, 11434, 19878, 53)",
+  "etl_sha256": "32c9a2edcb7413937b20cbb2dca13c0121301122fa5ada73300ab0d3f7e17e03",
+  "txt_sha256": "c9dc23e5a692a94e354a668507b77875c39f55e8be61d379fcea3163217cae78",
+  "observed_loopback_count": 2,
+  "observed_private_count": 0,
+  "observed_link_local_count": 0,
+  "observed_public_count": 0,
+  "unauthorized_public_count": 0,
+  "unauthorized_private_count": 0,
+  "unauthorized_link_local_count": 0,
+  "authorized_local_activity_detected": true,
+  "attribution_methodology": "Broad PktMon captures all host network packets. Attribution to CogniShift was evaluated by matching known local ports (11434, 8000), target IP destinations (8.8.8.8 probe), and cross-referencing the application-level network_events audit ledger within the exact execution window.",
+  "sovereignty_verdict": "PASS"
+}

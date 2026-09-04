@@ -1,0 +1,43 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\sitan\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\sitan\OneDrive\Desktop\CogniShift
+configfile: pytest.ini
+plugins: anyio-4.13.0, Faker-40.36.0, langsmith-0.8.5, locust-2.44.0, asyncio-1.3.0, cov-7.1.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 32 items
+
+tests/test_phase6_tier_a_policy.py::test_classify_ip_ipv4_loopback PASSED [  3%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_ipv6_loopback PASSED [  6%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_private_rfc1918 PASSED [  9%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_private_ipv6_ula PASSED [ 12%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_link_local PASSED   [ 15%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_public PASSED       [ 18%]
+tests/test_phase6_tier_a_policy.py::test_network_destination_valid PASSED [ 21%]
+tests/test_phase6_tier_a_policy.py::test_network_destination_rejects_wildcards PASSED [ 25%]
+tests/test_phase6_tier_a_policy.py::test_network_destination_rejects_invalid_ports PASSED [ 28%]
+tests/test_phase6_tier_a_policy.py::test_policy_allows_default_loopback_ollama PASSED [ 31%]
+tests/test_phase6_tier_a_policy.py::test_policy_allows_default_loopback_fastapi PASSED [ 34%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_unauthorized_loopback_port_in_strict PASSED [ 37%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_unauthorized_private_lan PASSED [ 40%]
+tests/test_phase6_tier_a_policy.py::test_policy_allows_explicitly_allowlisted_private_destination PASSED [ 43%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_link_local_metadata_unconditionally PASSED [ 46%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_public_destinations PASSED [ 50%]
+tests/test_phase6_tier_a_policy.py::test_dns_rebinding_fail_closed_if_one_ip_is_public PASSED [ 53%]
+tests/test_phase6_tier_a_policy.py::test_dns_unresolvable_fails_closed PASSED [ 56%]
+tests/test_phase6_tier_a_policy.py::test_development_mode_allows_with_warning PASSED [ 59%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_ollama_loopback_allowed PASSED [ 62%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_public_request_blocked_before_socket_connect PASSED [ 65%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_unauthorized_lan_request_blocked PASSED [ 68%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_fastembed_offline_fails_closed_when_cache_missing PASSED [ 71%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_missing_ollama_model_fails_closed_without_pull PASSED [ 75%]
+tests/test_phase6_tier_b_real_enforcement.py::test_approval_does_not_override_network_policy PASSED [ 78%]
+tests/test_phase6_tier_b_real_enforcement.py::test_sensitive_data_not_leaked_in_network_audit PASSED [ 81%]
+tests/test_phase6_tier_c_observation.py::test_observer_negative_control PASSED [ 84%]
+tests/test_phase6_tier_c_observation.py::test_strict_workflow_records_zero_unauthorized_egress PASSED [ 87%]
+tests/test_phase6_browser_egress.py::test_index_html_contains_zero_external_links PASSED [ 90%]
+tests/test_phase6_browser_egress.py::test_local_static_assets_exist PASSED [ 93%]
+tests/test_phase6_browser_egress.py::test_browser_scanner_negative_control PASSED [ 96%]
+tests/test_phase6_browser_egress.py::test_content_security_policy_header_enforced PASSED [100%]
+
+============================= 32 passed in 8.59s ==============================

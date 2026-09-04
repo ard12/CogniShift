@@ -1,0 +1,45 @@
+{
+  "report": "Cross-Correlation: Independent PktMon Observer vs Application Audit Ledger",
+  "timestamp": "2026-09-04T08:39:21.107843+00:00",
+  "workflow_start": "2026-09-04T08:39:05.071085+00:00",
+  "application_ledger_total_events": 3,
+  "application_ledger_allowed_loopback": 2,
+  "application_ledger_blocked_public": 1,
+  "application_ledger_events": [
+    {
+      "timestamp": "2026-09-04T08:39:05.441962+00:00",
+      "component": "llm_inference",
+      "requested_host": "localhost",
+      "resolved_ip": "127.0.0.1",
+      "port": 11434,
+      "destination_class": "loopback",
+      "policy_decision": "ALLOWED",
+      "reason": "Explicitly permitted local service at localhost:11434."
+    },
+    {
+      "timestamp": "2026-09-04T08:39:19.325028+00:00",
+      "component": "ollama_provider",
+      "requested_host": "localhost",
+      "resolved_ip": "127.0.0.1",
+      "port": 11434,
+      "destination_class": "loopback",
+      "policy_decision": "ALLOWED",
+      "reason": "Explicitly permitted local service at localhost:11434."
+    },
+    {
+      "timestamp": "2026-09-04T08:39:21.069367+00:00",
+      "component": "closure_egress_probe",
+      "requested_host": "8.8.8.8",
+      "resolved_ip": "8.8.8.8",
+      "port": 80,
+      "destination_class": "public",
+      "policy_decision": "BLOCKED",
+      "reason": "Public internet egress to 8.8.8.8:80 (8.8.8.8) is strictly forbidden in sovereign mode."
+    }
+  ],
+  "pktmon_observed_total_events": 1588,
+  "pktmon_observed_loopback_count": 2,
+  "pktmon_observed_unauthorized_public": 0,
+  "pktmon_observed_unauthorized_private": 0,
+  "correlation_analysis": "1. Loopback Correlation: Both the SQLite application audit ledger and the broad PktMon kernel packet capture confirmed active authorized local communication exclusively with the local Ollama daemon (127.0.0.1:11434). 2. Blocked Egress Distinction: When public outbound traffic was attempted (http://8.8.8.8:80), the application ledger recorded 'policy_decision: BLOCKED' via SovereignAsyncTransport BEFORE socket creation. Consequently, the broad OS PktMon kernel capture recorded 0 outbound packets to 8.8.8.8 from CogniShift, confirming complete pre-transport containment."
+}

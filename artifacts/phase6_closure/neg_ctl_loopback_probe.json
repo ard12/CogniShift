@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-09-04T08:38:18.021228+00:00",
+  "executable": "C:\\Users\\sitan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "target_host": "127.0.0.1",
+  "target_port": 11434,
+  "timeout_seconds": 2.0,
+  "connected": true,
+  "blocked_by_os": false,
+  "error_type": null,
+  "error_message": null,
+  "error_code": null,
+  "elapsed_ms": 2.26
+}

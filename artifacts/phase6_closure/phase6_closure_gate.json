@@ -1,0 +1,19 @@
+{
+  "runtime_match": true,
+  "public_firewall_aba": "PASS",
+  "private_firewall_aba": "PASS",
+  "broad_observer_loopback_negative_control": true,
+  "broad_observer_public_negative_control": true,
+  "strict_workflow_completed": true,
+  "strict_workflow_local_activity_detected": true,
+  "strict_workflow_unauthorized_public_count": 0,
+  "strict_workflow_unauthorized_private_count": 0,
+  "strict_workflow_unauthorized_link_local_count": 0,
+  "unrelated_firewall_removed": 0,
+  "unrelated_firewall_modified": 0,
+  "firewall_cleanup_clean": true,
+  "phase6_tests_failed": 0,
+  "full_tests_failed": 0,
+  "mandatory_skips": 0,
+  "final_gate": "PASS"
+}

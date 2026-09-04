@@ -1,0 +1,109 @@
+{
+  "manifest_version": "1.0",
+  "description": "CogniShift Phase 6 Final Closure Evidence Manifest",
+  "statement": "SHA-256 proves integrity after generation, not truthfulness at generation time.",
+  "generated_at_utc": "2026-09-04T08:45:02.144169+00:00",
+  "total_files": 20,
+  "files": {
+    "firewall_non_cognishift_after.json": {
+      "size_bytes": 183436,
+      "sha256": "b38fc51cf9cc3837b2eea8218e8cc69d22ba854814c8e075792e44ee0418140f",
+      "modified_utc": "2026-09-04T08:39:28.639933+00:00"
+    },
+    "firewall_non_cognishift_before.json": {
+      "size_bytes": 183436,
+      "sha256": "b38fc51cf9cc3837b2eea8218e8cc69d22ba854814c8e075792e44ee0418140f",
+      "modified_utc": "2026-09-04T08:38:17.741943+00:00"
+    },
+    "firewall_non_cognishift_diff.json": {
+      "size_bytes": 410,
+      "sha256": "b9d2e1b4b4d7a785f7ea9daac698607671e9b379cf166039fe003e4c81a5dde5",
+      "modified_utc": "2026-09-04T08:39:28.805990+00:00"
+    },
+    "firewall_private_aba.json": {
+      "size_bytes": 2690,
+      "sha256": "593221daf280e291cd1ac90868fe47b4b95d439455a41a14d6ce207de8e00ed7",
+      "modified_utc": "2026-09-04T08:38:59.679034+00:00"
+    },
+    "firewall_public_aba.json": {
+      "size_bytes": 2515,
+      "sha256": "e189b06dcc325a7bcfbf02bff2311e081d05ba038233cb90cde36d7447f8e94c",
+      "modified_utc": "2026-09-04T08:38:26.195015+00:00"
+    },
+    "git_state.txt": {
+      "size_bytes": 306,
+      "sha256": "384b85fda26bb466a09a9b5d4e53d20560632a59ad36c06a814aac340854538d",
+      "modified_utc": "2026-09-04T08:14:11.860953+00:00"
+    },
+    "neg_ctl_loopback_probe.json": {
+      "size_bytes": 376,
+      "sha256": "1c880d8a73339468c0e1aea65a154ef4ecfc91d41f4b466ae3971fd34bd82194",
+      "modified_utc": "2026-09-04T08:38:18.022731+00:00"
+    },
+    "neg_ctl_public_probe.json": {
+      "size_bytes": 372,
+      "sha256": "fac76421038091fa6cdc00f269d50fe82cd8651f7b7da858fa045588db00746a",
+      "modified_utc": "2026-09-04T08:38:18.175840+00:00"
+    },
+    "observer_vs_application_ledger.json": {
+      "size_bytes": 2243,
+      "sha256": "9a6b4ab9159a5118748cd35cef453645c4ade32994bff6ed893f9f1dba4a11ca",
+      "modified_utc": "2026-09-04T08:39:23.109094+00:00"
+    },
+    "phase6_closure_gate.json": {
+      "size_bytes": 664,
+      "sha256": "e705834ac6cba32fbee88d89a5b5fb7452590403c6689ff4d4a4e2e2c2a41a78",
+      "modified_utc": "2026-09-04T08:45:01.994381+00:00"
+    },
+    "pktmon_negative_control.etl": {
+      "size_bytes": 47151,
+      "sha256": "172733b26230c6f0d16c0a9ef435d801bdccbb2846a65dd5b62da3b8a636a890",
+      "modified_utc": "2026-09-04T08:38:18.602975+00:00"
+    },
+    "pktmon_negative_control.json": {
+      "size_bytes": 1001,
+      "sha256": "7924f0c622cd22e2cc8d70d860c82746840b9e912e104068e2102acaad12b0b8",
+      "modified_utc": "2026-09-04T08:38:19.480177+00:00"
+    },
+    "pktmon_negative_control.txt": {
+      "size_bytes": 344662,
+      "sha256": "d0bb6f732291a89a379597a56785d9e629ffe94dd612b519037a85e891a6bb8e",
+      "modified_utc": "2026-09-04T08:38:19.332270+00:00"
+    },
+    "pktmon_strict_workflow.etl": {
+      "size_bytes": 89786,
+      "sha256": "32c9a2edcb7413937b20cbb2dca13c0121301122fa5ada73300ab0d3f7e17e03",
+      "modified_utc": "2026-09-04T08:39:22.193072+00:00"
+    },
+    "pktmon_strict_workflow.json": {
+      "size_bytes": 3319,
+      "sha256": "dac3a823e7a06e3caf551c92196638a88dd51eb032c70b10536bbf982d6c2d3a",
+      "modified_utc": "2026-09-04T08:39:23.102583+00:00"
+    },
+    "pktmon_strict_workflow.txt": {
+      "size_bytes": 1841540,
+      "sha256": "c9dc23e5a692a94e354a668507b77875c39f55e8be61d379fcea3163217cae78",
+      "modified_utc": "2026-09-04T08:39:22.865153+00:00"
+    },
+    "pytest_full.txt": {
+      "size_bytes": 23212,
+      "sha256": "61debb34d08a4e55585b4fb7c60640ef39a0ce247bce1769ef30ee2ebac67d27",
+      "modified_utc": "2026-09-04T08:43:51.334483+00:00"
+    },
+    "pytest_phase6.txt": {
+      "size_bytes": 3754,
+      "sha256": "03eba4ed4534585ccdf4d545f482b950498e3e57665acd58bb793f1a7ca2e6f1",
+      "modified_utc": "2026-09-04T08:39:39.801304+00:00"
+    },
+    "runtime_identity.json": {
+      "size_bytes": 471,
+      "sha256": "4e5dbedd6008d36b5d7d7d656d162059530b826c03a0ce096a0afac6dec0fd77",
+      "modified_utc": "2026-09-04T08:14:16.626023+00:00"
+    },
+    "workflow_artifact.txt": {
+      "size_bytes": 30,
+      "sha256": "f1ab87b3b2335dd84de12f9315dd15b3a69c88d39294413365bb20d2e4848817",
+      "modified_utc": "2026-09-04T08:39:20.152296+00:00"
+    }
+  }
+}

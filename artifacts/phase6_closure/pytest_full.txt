@@ -1,0 +1,261 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\sitan\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\sitan\OneDrive\Desktop\CogniShift
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.13.0, Faker-40.36.0, langsmith-0.8.5, locust-2.44.0, asyncio-1.3.0, cov-7.1.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 196 items
+
+tests/test_audit_adversarial.py::test_adversarial_prompt_keyword_cannot_trigger_tool_execution PASSED [  0%]
+tests/test_audit_adversarial.py::test_adversarial_model_refusal_prevents_tool_and_approval PASSED [  1%]
+tests/test_audit_adversarial.py::test_known_source_credential_strings_cannot_authenticate PASSED [  1%]
+tests/test_audit_adversarial.py::test_invalid_api_key_rejected_with_401 PASSED [  2%]
+tests/test_audit_adversarial.py::test_disabled_or_revoked_credential_rejected PASSED [  2%]
+tests/test_audit_adversarial.py::test_client_controlled_role_header_ignored PASSED [  3%]
+tests/test_audit_adversarial.py::test_workspace_idor_cross_tenant_access_blocked PASSED [  3%]
+tests/test_audit_adversarial.py::test_self_approval_denied_by_four_eyes PASSED [  4%]
+tests/test_audit_adversarial.py::test_concurrent_resume_executes_tool_exactly_once PASSED [  4%]
+tests/test_audit_adversarial.py::test_adversarial_tool_schema_empty_sensor_id_produces_zero_execution PASSED [  5%]
+tests/test_audit_adversarial.py::test_adversarial_tool_schema_oversized_sensor_id_produces_zero_execution PASSED [  5%]
+tests/test_audit_adversarial.py::test_adversarial_tool_schema_illegal_characters_produces_zero_execution PASSED [  6%]
+tests/test_audit_adversarial.py::test_adversarial_tool_schema_empty_high_risk_reason_produces_zero_execution PASSED [  6%]
+tests/test_audit_adversarial.py::test_parse_tool_call_validation_failure_returns_false_contract PASSED [  7%]
+tests/test_audit_adversarial.py::test_adversarial_provider_protocol_empty_response_fails PASSED [  7%]
+tests/test_audit_adversarial.py::test_adversarial_provider_protocol_whitespace_only_fails PASSED [  8%]
+tests/test_audit_adversarial.py::test_adversarial_provider_protocol_garbage_response_fails PASSED [  8%]
+tests/test_audit_adversarial.py::test_adversarial_provider_protocol_malformed_json_fails PASSED [  9%]
+tests/test_audit_adversarial.py::test_adversarial_provider_protocol_timeout_fails PASSED [  9%]
+tests/test_audit_adversarial.py::test_approval_crash_recovery_resumption_succeeds PASSED [ 10%]
+tests/test_audit_phase4_gate.py::test_remediation_generic_file_write_subsystem_directories_strictly_denied PASSED [ 10%]
+tests/test_audit_phase4_gate.py::test_remediation_generic_directory_create_subsystem_directories_strictly_denied PASSED [ 11%]
+tests/test_audit_phase4_gate.py::test_remediation_generic_file_read_and_list_internal_subsystems_denied PASSED [ 11%]
+tests/test_audit_phase4_gate.py::test_remediation_canonical_immutability_denies_all_path_variants PASSED [ 12%]
+tests/test_audit_phase4_gate.py::test_remediation_empty_allowed_tools_strictly_denies_every_tool PASSED [ 12%]
+tests/test_audit_phase4_gate.py::test_remediation_specific_allowed_tools_enforcement PASSED [ 13%]
+tests/test_audit_phase4_gate.py::test_remediation_file_read_max_bytes_defense_in_depth PASSED [ 13%]
+tests/test_audit_phase4_gate.py::test_remediation_end_to_end_knowledge_boundary_confidentiality PASSED [ 14%]
+tests/test_database.py::test_init_db PASSED                              [ 14%]
+tests/test_database.py::test_create_workspace PASSED                     [ 15%]
+tests/test_database.py::test_create_agent PASSED                         [ 15%]
+tests/test_database.py::test_seed_data PASSED                            [ 16%]
+tests/test_engine.py::test_parse_tool_call PASSED                        [ 16%]
+tests/test_engine.py::test_direct_answer_run PASSED                      [ 17%]
+tests/test_engine.py::test_safe_tool_execution PASSED                    [ 17%]
+tests/test_engine.py::test_high_risk_tool_pauses_for_approval PASSED     [ 18%]
+tests/test_engine.py::test_resume_after_approval PASSED                  [ 18%]
+tests/test_engine.py::test_resume_after_rejection PASSED                 [ 19%]
+tests/test_engine.py::test_runs_api_endpoints PASSED                     [ 19%]
+tests/test_knowledge_boundary.py::test_agent_allowed_source_filtering PASSED [ 20%]
+tests/test_knowledge_boundary.py::test_agent_empty_sources_fails_closed PASSED [ 20%]
+tests/test_knowledge_boundary.py::test_agent_execution_enforces_knowledge_boundary PASSED [ 21%]
+tests/test_knowledge_boundary.py::test_cross_workspace_source_filtered_out PASSED [ 21%]
+tests/test_knowledge_boundary.py::test_purge_knowledge_source_removes_chunks_from_chroma PASSED [ 22%]
+tests/test_knowledge_boundary.py::test_chroma_purge_failure_prevents_false_success PASSED [ 22%]
+tests/test_phase0_security.py::test_path_traversal_rejected PASSED       [ 23%]
+tests/test_phase0_security.py::test_valid_workspace_path_resolution PASSED [ 23%]
+tests/test_phase0_security.py::test_four_eyes_identity_enforced PASSED   [ 24%]
+tests/test_phase0_security.py::test_workspace_access_control PASSED      [ 25%]
+tests/test_phase0_security.py::test_cors_origins_restricted PASSED       [ 25%]
+tests/test_phase1_router.py::test_task_classification PASSED             [ 26%]
+tests/test_phase1_router.py::test_model_routing_coding PASSED            [ 26%]
+tests/test_phase1_router.py::test_model_routing_vram_constraint PASSED   [ 27%]
+tests/test_phase1_router.py::test_model_routing_vision PASSED            [ 27%]
+tests/test_phase1_router.py::test_model_registry_extensibility PASSED    [ 28%]
+tests/test_phase2a_tool_calling.py::test_parse_tool_call_proposal PASSED [ 28%]
+tests/test_phase2a_tool_calling.py::test_parse_final_answer PASSED       [ 29%]
+tests/test_phase2a_tool_calling.py::test_parse_plain_text_fallback PASSED [ 29%]
+tests/test_phase2a_tool_calling.py::test_validate_tool_call_valid PASSED [ 30%]
+tests/test_phase2a_tool_calling.py::test_validate_tool_call_missing_parameters PASSED [ 30%]
+tests/test_phase2a_tool_calling.py::test_validate_tool_call_permission_denied PASSED [ 31%]
+tests/test_phase2a_tool_calling.py::test_central_risk_policy_forces_hitl PASSED [ 31%]
+tests/test_phase2b_agent_loop.py::test_plan_creation_bounded_to_max_steps PASSED [ 32%]
+tests/test_phase2b_agent_loop.py::test_plan_serialization_roundtrip PASSED [ 32%]
+tests/test_phase2b_agent_loop.py::test_plan_preservation_across_hitl_pause_and_resumption PASSED [ 33%]
+tests/test_phase3_artifacts.py::test_standardized_workspace_layout_creation PASSED [ 33%]
+tests/test_phase3_artifacts.py::test_safe_file_write_and_read PASSED     [ 34%]
+tests/test_phase3_artifacts.py::test_file_tools_path_traversal_strictly_rejected PASSED [ 34%]
+tests/test_phase3_artifacts.py::test_generic_file_write_cannot_overwrite_registered_artifact PASSED [ 35%]
+tests/test_phase3_artifacts.py::test_generate_and_validate_docx PASSED   [ 35%]
+tests/test_phase3_artifacts.py::test_generate_and_validate_xlsx_with_formula_sanitization PASSED [ 36%]
+tests/test_phase3_artifacts.py::test_generate_and_validate_pptx PASSED   [ 36%]
+tests/test_phase3_artifacts.py::test_structural_validation_failure_leaves_no_orphan_or_db PASSED [ 37%]
+tests/test_phase3_artifacts.py::test_two_runs_same_filename_produce_independent_artifacts PASSED [ 37%]
+tests/test_phase3_artifacts.py::test_register_artifact_with_cross_workspace_run_id_rejected PASSED [ 38%]
+tests/test_phase3_artifacts.py::test_tamper_detection_refuses_modified_download PASSED [ 38%]
+tests/test_phase3_artifacts.py::test_cross_tenant_idor_blocked_on_artifacts PASSED [ 39%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_basic_execution PASSED [ 39%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_non_root_execution PASSED [ 40%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_network_isolation PASSED [ 40%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_read_only_root_filesystem PASSED [ 41%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_read_only_source_mount PASSED [ 41%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_read_only_input_mount PASSED [ 42%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_writable_output_mount PASSED [ 42%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_host_secret_isolation PASSED [ 43%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_environment_isolation PASSED [ 43%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_timeout_and_removal PASSED [ 44%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_memory_limit PASSED [ 44%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_pid_limit PASSED    [ 45%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_output_symlink_rejection PASSED [ 45%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_output_extension_policy PASSED [ 46%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_artifact_promotion PASSED [ 46%]
+tests/test_phase4_real_sandbox.py::test_real_sandbox_missing_runtime_fails_closed PASSED [ 47%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_empty_code PASSED [ 47%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_oversized_code PASSED [ 48%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[../evil.py] PASSED [ 48%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[../../main.py] PASSED [ 49%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[sub/main.py] PASSED [ 50%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[main.sh] PASSED [ 50%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[script.exe] PASSED [ 51%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[main.py\x00] PASSED [ 51%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_invalid_entrypoint[main] PASSED [ 52%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_out_of_bounds_timeout[0] PASSED [ 52%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_out_of_bounds_timeout[4] PASSED [ 53%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_out_of_bounds_timeout[121] PASSED [ 53%]
+tests/test_phase4_sandbox.py::test_sandbox_schema_rejects_out_of_bounds_timeout[-10] PASSED [ 54%]
+tests/test_phase4_sandbox.py::test_staging_valid_inputs PASSED           [ 54%]
+tests/test_phase4_sandbox.py::test_staging_strictly_rejects_knowledge_subsystem PASSED [ 55%]
+tests/test_phase4_sandbox.py::test_staging_strictly_rejects_path_traversal PASSED [ 55%]
+tests/test_phase4_sandbox.py::test_simulated_backend_executes_zero_code PASSED [ 56%]
+tests/test_phase4_sandbox.py::test_simulated_backend_trigger_runtime_error PASSED [ 56%]
+tests/test_phase4_sandbox.py::test_output_validation_rejects_executable_scripts PASSED [ 57%]
+tests/test_phase4_sandbox.py::test_docker_backend_fails_closed_when_unavailable PASSED [ 57%]
+tests/test_phase4_sandbox.py::test_execute_code_denied_with_empty_allowlist PASSED [ 58%]
+tests/test_phase4_sandbox.py::test_execute_code_denied_when_not_in_allowlist PASSED [ 58%]
+tests/test_phase4_sandbox.py::test_execute_code_classified_as_sensitive PASSED [ 59%]
+tests/test_phase4_sandbox.py::test_execute_code_pauses_when_agent_requires_approval PASSED [ 59%]
+tests/test_phase4_sandbox.py::test_coding_agent_retry_loop_bounded PASSED [ 60%]
+tests/test_phase5_document_processing.py::test_file_type_detection PASSED [ 60%]
+tests/test_phase5_document_processing.py::test_inspect_document_rejects_unsupported_file PASSED [ 61%]
+tests/test_phase5_document_processing.py::test_inspect_document_rejects_oversized_file PASSED [ 61%]
+tests/test_phase5_document_processing.py::test_inspect_document_rejects_excessive_pdf_pages PASSED [ 62%]
+tests/test_phase5_document_processing.py::test_inspect_document_rejects_oversized_image_dimensions PASSED [ 62%]
+tests/test_phase5_document_processing.py::test_assess_native_page_quality_good_text PASSED [ 63%]
+tests/test_phase5_document_processing.py::test_assess_native_page_quality_too_short PASSED [ 63%]
+tests/test_phase5_document_processing.py::test_assess_native_page_quality_garbage_replacement_chars PASSED [ 64%]
+tests/test_phase5_document_processing.py::test_assess_native_page_quality_scanned_image_page_with_stray_chars PASSED [ 64%]
+tests/test_phase5_document_processing.py::test_native_pdf_extraction_1_based_page_contract PASSED [ 65%]
+tests/test_phase5_document_processing.py::test_render_page_to_png_bounded_dpi PASSED [ 65%]
+tests/test_phase5_document_processing.py::test_mixed_pdf_page_scoped_triage PASSED [ 66%]
+tests/test_phase5_document_processing.py::test_versioned_reprocessing_failure_preserves_old_generation PASSED [ 66%]
+tests/test_phase5_document_processing.py::test_ocr_unavailable_fails_closed PASSED [ 67%]
+tests/test_phase5_document_processing.py::test_low_ocr_confidence_marks_uncertain PASSED [ 67%]
+tests/test_phase5_document_processing.py::test_vision_optional_when_unavailable_continues PASSED [ 68%]
+tests/test_phase5_document_processing.py::test_vision_required_when_unavailable_raises PASSED [ 68%]
+tests/test_phase5_document_processing.py::test_source_isolation_through_retriever PASSED [ 69%]
+tests/test_phase5_document_processing.py::test_temporary_processing_directory_purged PASSED [ 69%]
+tests/test_phase5_document_processing.py::test_prompt_injection_quarantine_in_document PASSED [ 70%]
+tests/test_phase5_document_processing.py::test_versioned_reprocessing_success_retires_old_chunks PASSED [ 70%]
+tests/test_phase5_document_processing.py::test_reconciliation_cleans_orphaned_directories_and_stuck_jobs PASSED [ 71%]
+tests/test_phase5_document_processing.py::test_cross_workspace_processing_prevented_before_side_effects PASSED [ 71%]
+tests/test_phase5_document_processing.py::test_wrap_document_data_escapes_hostile_delimiters PASSED [ 72%]
+tests/test_phase5_document_processing.py::test_stale_generation_excluded_by_active_version_filter PASSED [ 72%]
+tests/test_phase5_document_processing.py::test_multi_source_paired_active_version_filter PASSED [ 73%]
+tests/test_phase5_document_processing.py::test_wrap_document_data_escapes_body_delimiter_breakout PASSED [ 73%]
+tests/test_phase5_real_ocr.py::test_real_rapidocr_extracts_known_scanned_fixture PASSED [ 74%]
+tests/test_phase5_real_ocr.py::test_real_rapidocr_full_service_pipeline PASSED [ 75%]
+tests/test_phase5_real_ocr.py::test_real_ocr_missing_assets_fails_closed PASSED [ 75%]
+tests/test_phase5_real_vision.py::test_real_vision_model_availability PASSED [ 76%]
+tests/test_phase5_real_vision.py::test_real_vision_router_selected_identity PASSED [ 76%]
+tests/test_phase5_real_vision.py::test_real_vision_inference_with_local_ollama PASSED [ 77%]
+tests/test_phase5_real_vision.py::test_real_vision_missing_model_fails_closed PASSED [ 77%]
+tests/test_phase5_real_vision.py::test_real_vision_inference_error_distinguished_from_unavailable PASSED [ 78%]
+tests/test_phase6_browser_egress.py::test_index_html_contains_zero_external_links PASSED [ 78%]
+tests/test_phase6_browser_egress.py::test_local_static_assets_exist PASSED [ 79%]
+tests/test_phase6_browser_egress.py::test_browser_scanner_negative_control PASSED [ 79%]
+tests/test_phase6_browser_egress.py::test_content_security_policy_header_enforced PASSED [ 80%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_ipv4_loopback PASSED [ 80%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_ipv6_loopback PASSED [ 81%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_private_rfc1918 PASSED [ 81%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_private_ipv6_ula PASSED [ 82%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_link_local PASSED   [ 82%]
+tests/test_phase6_tier_a_policy.py::test_classify_ip_public PASSED       [ 83%]
+tests/test_phase6_tier_a_policy.py::test_network_destination_valid PASSED [ 83%]
+tests/test_phase6_tier_a_policy.py::test_network_destination_rejects_wildcards PASSED [ 84%]
+tests/test_phase6_tier_a_policy.py::test_network_destination_rejects_invalid_ports PASSED [ 84%]
+tests/test_phase6_tier_a_policy.py::test_policy_allows_default_loopback_ollama PASSED [ 85%]
+tests/test_phase6_tier_a_policy.py::test_policy_allows_default_loopback_fastapi PASSED [ 85%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_unauthorized_loopback_port_in_strict PASSED [ 86%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_unauthorized_private_lan PASSED [ 86%]
+tests/test_phase6_tier_a_policy.py::test_policy_allows_explicitly_allowlisted_private_destination PASSED [ 87%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_link_local_metadata_unconditionally PASSED [ 87%]
+tests/test_phase6_tier_a_policy.py::test_policy_blocks_public_destinations PASSED [ 88%]
+tests/test_phase6_tier_a_policy.py::test_dns_rebinding_fail_closed_if_one_ip_is_public PASSED [ 88%]
+tests/test_phase6_tier_a_policy.py::test_dns_unresolvable_fails_closed PASSED [ 89%]
+tests/test_phase6_tier_a_policy.py::test_development_mode_allows_with_warning PASSED [ 89%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_ollama_loopback_allowed PASSED [ 90%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_public_request_blocked_before_socket_connect PASSED [ 90%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_unauthorized_lan_request_blocked PASSED [ 91%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_fastembed_offline_fails_closed_when_cache_missing PASSED [ 91%]
+tests/test_phase6_tier_b_real_enforcement.py::test_real_missing_ollama_model_fails_closed_without_pull PASSED [ 92%]
+tests/test_phase6_tier_b_real_enforcement.py::test_approval_does_not_override_network_policy PASSED [ 92%]
+tests/test_phase6_tier_b_real_enforcement.py::test_sensitive_data_not_leaked_in_network_audit PASSED [ 93%]
+tests/test_phase6_tier_c_observation.py::test_observer_negative_control PASSED [ 93%]
+tests/test_phase6_tier_c_observation.py::test_strict_workflow_records_zero_unauthorized_egress PASSED [ 94%]
+tests/test_providers.py::test_simulated_provider_generate PASSED         [ 94%]
+tests/test_providers.py::test_simulated_provider_health PASSED           [ 95%]
+tests/test_providers.py::test_simulated_provider_image PASSED            [ 95%]
+tests/test_providers.py::test_factory_simulated_mode PASSED              [ 96%]
+tests/test_providers.py::test_factory_rejects_external PASSED            [ 96%]
+tests/test_providers.py::test_model_response_dataclass PASSED            [ 97%]
+tests/test_security_regression.py::test_regression_path_traversal_impossible PASSED [ 97%]
+tests/test_security_regression.py::test_regression_same_person_approval_denied PASSED [ 98%]
+tests/test_security_regression.py::test_regression_unauthorized_workspace_denied PASSED [ 98%]
+tests/test_security_regression.py::test_regression_no_wildcard_cors PASSED [ 99%]
+tests/test_security_regression.py::test_regression_zero_external_cloud_endpoints PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_phase4_real_sandbox.py::test_real_sandbox_artifact_promotion
+  C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\unraisableexception.py:67: PytestUnraisableExceptionWarning: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x0000021D02AC80E0>
+  
+  Traceback (most recent call last):
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\proactor_events.py", line 116, in __del__
+      _warn(f"unclosed transport {self!r}", ResourceWarning, source=self)
+                                 ^^^^^^^^
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\proactor_events.py", line 80, in __repr__
+      info.append(f'fd={self._sock.fileno()}')
+                        ^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\windows_utils.py", line 102, in fileno
+      raise ValueError("I/O operation on closed pipe")
+  ValueError: I/O operation on closed pipe
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+tests/test_phase4_real_sandbox.py::test_real_sandbox_artifact_promotion
+  C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\unraisableexception.py:67: PytestUnraisableExceptionWarning: Exception ignored in: <function BaseSubprocessTransport.__del__ at 0x0000021D0285E840>
+  
+  Traceback (most recent call last):
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_subprocess.py", line 126, in __del__
+      self.close()
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_subprocess.py", line 104, in close
+      proto.pipe.close()
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\proactor_events.py", line 109, in close
+      self._loop.call_soon(self._call_connection_lost, None)
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 799, in call_soon
+      self._check_closed()
+    File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 545, in _check_closed
+      raise RuntimeError('Event loop is closed')
+  RuntimeError: Event loop is closed
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 196 passed, 2 warnings in 61.33s (0:01:01) ==================
+Exception ignored in atexit callback: <function cleanup_numbered_dir at 0x0000021D02127880>
+Traceback (most recent call last):
+  File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py", line 374, in cleanup_numbered_dir
+    cleanup_dead_symlinks(root)
+  File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py", line 359, in cleanup_dead_symlinks
+    if not left_dir.resolve().exists():
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 860, in exists
+    self.stat(follow_symlinks=follow_symlinks)
+  File "C:\Users\sitan\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 840, in stat
+    return os.stat(self, follow_symlinks=follow_symlinks)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [WinError 5] Access is denied: 'C:\\Users\\sitan\\AppData\\Local\\Temp\\pytest-of-sitan\\pytest-current'

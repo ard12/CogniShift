@@ -1,0 +1,8 @@
+﻿Repository State
+Timestamp: 2026-09-04T13:44:11.8552539+05:30
+HEAD: fb5ac840660d9ae3ce0027eda1133506820b22c1
+Parent: 75e63685b050129ad425a46ef021eddb9025bd41
+Branch: main
+Clean: True
+Log: fb5ac84 fix(phase6): empirical windows firewall enforcement, pktmon os observation, and evidence manifest
+

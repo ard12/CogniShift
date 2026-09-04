@@ -1,0 +1,5420 @@
+﻿[
+    {
+        "Name":  "{004F4118-9A35-4562-A05B-E4FFE50C6A51}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{07D78C47-E6EB-4BC6-B2EE-6DEA761E29AA}",
+        "DisplayName":  "@{MicrosoftWindows.Client.CBS_1000.22677.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.CBS/resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.Client.CBS_1000.22677.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.CBS/resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "{0C51BA80-C1FC-4606-BC5F-59CC05FD9EC8}",
+        "DisplayName":  "Steam",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "{105E62A8-B4EB-4193-ACF7-48B2BD6C578B}",
+        "DisplayName":  "@{Microsoft.AAD.BrokerPlugin_1000.19580.1000.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.AAD.BrokerPlugin/resources/PackageDisplayName}",
+        "DisplayGroup":  "@{Microsoft.AAD.BrokerPlugin_1000.19580.1000.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.AAD.BrokerPlugin/resources/PackageDisplayName}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "{10E44432-9615-4023-99BB-4E1D75F286AA}",
+        "DisplayName":  "Free Download Manager",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{12BDA4F4-3B37-4C7E-8F09-E41B5BCA057C}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{130C63CE-392F-429C-AA29-A529CCAF8120}",
+        "DisplayName":  "BlueStacksWeb",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{13A91A6B-C4A9-4A43-8DB2-ACE4468CFF6C}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{13E64504-F0D1-4B40-8E8F-24F4B2B3EDDC}",
+        "DisplayName":  "NcsiUwpApp",
+        "DisplayGroup":  "NcsiUwpApp",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{1511AE0F-4F1E-4C90-83F7-1B46CBCD2C03}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{19CDA331-1665-4B71-ACAE-A2A185F357EA}",
+        "DisplayName":  "Microsoft 365 Copilot",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{1C803277-C5C1-4A82-A0C8-EF42CC5ACDCD}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{1F5F78BE-3EA8-4E2C-9613-A4F578A6CFB9}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{1F813897-F51F-4A7A-B8F7-00884E376784}",
+        "DisplayName":  "Microsoft 365 Copilot",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{1FB46449-A833-4906-B525-6EF46D66A243}",
+        "DisplayName":  "Free Download Manager",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "{22B6B495-C466-412F-B6F2-099821A9928C}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{22FEB085-FCB0-4FE0-A5FA-6A42AF5C84A7}",
+        "DisplayName":  "@{Microsoft.Windows.CloudExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.CloudExperienceHost/resources/appDescription}",
+        "DisplayGroup":  "@{Microsoft.Windows.CloudExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.CloudExperienceHost/resources/appDescription}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "{233FFF8E-721F-4124-AAC2-DAF7DC2A7E22}",
+        "DisplayName":  "@{Microsoft.Windows.ParentalControls_1000.22621.1.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.ParentalControls/resources/DisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.ParentalControls_1000.22621.1.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.ParentalControls/resources/DisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{23D6B15B-3DAF-49EE-B115-07BF000B8897}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{246B2F3C-2C8F-4E88-B36D-75BDBEBF65D1}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{282ABAEE-356D-4D60-B81F-32E0CAB2F2ED}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{2934E155-F2E5-4626-9178-A132EB82B37E}",
+        "DisplayName":  "Steam Web Helper",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "{30836523-39D5-4C64-87B7-435637D26E5C}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{31851371-97CA-46C2-94AF-C1E23F3DA38E}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{322F54F9-E47C-45D1-A171-3B2B3C87814B}",
+        "DisplayName":  "ChatGPT",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{3292620C-A94C-4E1C-90AB-E162D73BBA3B}",
+        "DisplayName":  "Microsoft Teams (personal)",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{3ACCDA5D-5F79-47EA-8EFB-28665ABAEB6F}",
+        "DisplayName":  "Microsoft Teams",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{3E848DD0-3ED2-4191-8A2D-1A8F6B646CA7}",
+        "DisplayName":  "codex_sandbox_offline_block_outbound",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  4,
+        "Profile":  0
+    },
+    {
+        "Name":  "{4208CBD7-65A7-477F-8A55-42CDC72992A0}",
+        "DisplayName":  "qBittorrent",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{438CC8B9-EC50-4211-BEA9-ADD31DC5B773}",
+        "DisplayName":  "BlueStacksAppplayerWeb",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{43CA4465-7BC5-44A0-BAFB-BA99F9BEF24A}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{49557856-A4A7-4732-BC20-B3DCFE3C393C}",
+        "DisplayName":  "@{MicrosoftWindows.Client.CBS_1000.22677.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.CBS/resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.Client.CBS_1000.22677.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.CBS/resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{49BDC6B8-E7E0-4E4C-B3E1-27629432FF7A}",
+        "DisplayName":  "@{Microsoft.Windows.OOBENetworkCaptivePortal_10.0.21302.1000_neutral__cw5n1h2txyewy?ms-resource://Microsoft.Windows.OOBENetworkCaptivePortal/Resources/AppDisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.OOBENetworkCaptivePortal_10.0.21302.1000_neutral__cw5n1h2txyewy?ms-resource://Microsoft.Windows.OOBENetworkCaptivePortal/Resources/AppDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{4B0F2227-A887-4BC4-AD4E-03B81CAB252C}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{4DC92BA8-35D4-44BD-9032-B6F879494892}",
+        "DisplayName":  "Steam",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "{4F0F22C1-6532-45EE-A275-768F90A37CE5}",
+        "DisplayName":  "Resident Evil 4",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "{501E43B1-7C9C-4C30-B71A-33B037B6659D}",
+        "DisplayName":  "@{Microsoft.Windows.StartMenuExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.StartMenuExperienceHost/StartMenuExperienceHost/PkgDisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.StartMenuExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.StartMenuExperienceHost/StartMenuExperienceHost/PkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "{52AB739A-2625-4C13-967B-E9133C94AA8F}",
+        "DisplayName":  "Cloud Game",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{533BF29C-139B-476A-8B98-0012E71C5526}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{5421B2F9-C4D7-4649-A7B5-5843618E66BE}",
+        "DisplayName":  "Free Download Manager",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "{55589589-F3B1-4AB8-B643-1AC9278C6728}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{55A2EC1A-4EEF-40A3-9E30-A6B59E9CA665}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{58B4E8BF-64E2-46A6-9F5E-1B95B92690E8}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{58B987B5-7E46-4817-9CF3-2D5E5AF67520}",
+        "DisplayName":  "@{Microsoft.LockApp_10.0.22621.1_neutral__cw5n1h2txyewy?ms-resource://Microsoft.LockApp/resources/AppDisplayName}",
+        "DisplayGroup":  "@{Microsoft.LockApp_10.0.22621.1_neutral__cw5n1h2txyewy?ms-resource://Microsoft.LockApp/resources/AppDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{58C31EB8-15C9-4F4C-8EC8-944C79FDE95E}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{593E6E0B-816C-43C6-908B-DEF6C66761C6}",
+        "DisplayName":  "Microsoft Teams",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{5A324425-6865-4DD5-A6F2-EF911F22EE73}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{5A788E75-36BA-468F-A34F-6DCD3C90A177}",
+        "DisplayName":  "Free Download Manager",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{5BB50FC6-5044-40D6-B7AA-FE905CA849D0}",
+        "DisplayName":  "Microsoft Teams (personal)",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{5DE675C9-F7DF-41E5-835B-B98FFCA8BFD9}",
+        "DisplayName":  "@{Microsoft.AAD.BrokerPlugin_1000.19580.1000.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.AAD.BrokerPlugin/resources/PackageDisplayName}",
+        "DisplayGroup":  "@{Microsoft.AAD.BrokerPlugin_1000.19580.1000.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.AAD.BrokerPlugin/resources/PackageDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{5F0A404F-AE41-4F42-BFD8-BAFB609B9037}",
+        "DisplayName":  "@{Microsoft.Win32WebViewHost_10.0.22621.1_neutral_neutral_cw5n1h2txyewy?ms-resource://Windows.Win32WebViewHost/resources/DisplayName}",
+        "DisplayGroup":  "@{Microsoft.Win32WebViewHost_10.0.22621.1_neutral_neutral_cw5n1h2txyewy?ms-resource://Windows.Win32WebViewHost/resources/DisplayName}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{5F5B336F-96FA-4424-8CBC-E8A571254CE2}",
+        "DisplayName":  "Steam Web Helper",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "{61D1264B-0445-455B-86EB-0B5C320835B9}",
+        "DisplayName":  "ChatGPT",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{61D50545-1C23-4DE0-BAC0-90B9BC6B5207}",
+        "DisplayName":  "@{Microsoft.Windows.PeopleExperienceHost_10.0.22621.1_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.PeopleExperienceHost/resources/PkgDisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.PeopleExperienceHost_10.0.22621.1_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.PeopleExperienceHost/resources/PkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{62B73CFC-D7E5-433A-A9B3-9CE11C4BA77E}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{68B60D79-4984-464B-8428-09241377E721}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{6A29752B-4C52-41D2-820B-5E87B793B5E1}",
+        "DisplayName":  "codex_sandbox_offline_block_loopback_udp",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  4,
+        "Profile":  0
+    },
+    {
+        "Name":  "{6BBD6051-65FB-427B-9AE6-0F1ED1710EFB}",
+        "DisplayName":  "Dell SupportAssist for Home PCs",
+        "DisplayGroup":  "Dell SupportAssist for Home PCs",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{6D67FB3D-4F9C-467D-A8DF-3F1509DD73DE}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{6E0A67D8-16EB-4A88-8CC1-A562170ADDB6}",
+        "DisplayName":  "@{Microsoft.AccountsControl_10.0.22621.1_neutral__cw5n1h2txyewy?ms-resource://Microsoft.AccountsControl/Resources/DisplayName}",
+        "DisplayGroup":  "@{Microsoft.AccountsControl_10.0.22621.1_neutral__cw5n1h2txyewy?ms-resource://Microsoft.AccountsControl/Resources/DisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{760592C2-171E-4B1B-8080-48470418E6AB}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{765385E9-9BB1-447F-AD2D-60BD2911E5D6}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{79209B0E-997D-487C-924D-E1CE88C03F3F}",
+        "DisplayName":  "Microsoft 365 Copilot",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{7D1D6911-A1E9-4B23-85A9-8AB5B4E4EEB1}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{81EB17BD-AA00-4AD8-B874-D8DD6E0984F6}",
+        "DisplayName":  "Free Download Manager",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{84EA5F3E-6DDF-4DEE-9B3E-5390CD01D198}",
+        "DisplayName":  "@{Microsoft.Windows.Apprep.ChxApp_1000.22621.1.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.Apprep.ChxApp/resources/DisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.Apprep.ChxApp_1000.22621.1.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.Apprep.ChxApp/resources/DisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{851E8AFB-32CE-4E5F-B160-6A6F34DA3B34}",
+        "DisplayName":  "@{MicrosoftWindows.Client.Core_1000.22643.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.Core/resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.Client.Core_1000.22643.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.Core/resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "{8B161552-6D84-4437-AC03-D5E2FA99AF3A}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{91DDC201-DE67-4CBE-A346-92C52C27B557}",
+        "DisplayName":  "@{MicrosoftWindows.Client.FileExp_1000.22651.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.FileExp/resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.Client.FileExp_1000.22651.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.FileExp/resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{94EC43B6-55F8-41AD-A056-60423BA8FDCE}",
+        "DisplayName":  "ChatGPT",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{A1571AF2-060D-4A6A-B973-A17FD60AB195}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{A1616B44-EDE4-4B14-882E-D65EE69757B3}",
+        "DisplayName":  "McAfee® Security",
+        "DisplayGroup":  "McAfee® Security",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{A6716C29-425B-44EC-B568-E36B1FB115D9}",
+        "DisplayName":  "@{Microsoft.Win32WebViewHost_10.0.22621.1_neutral_neutral_cw5n1h2txyewy?ms-resource://Windows.Win32WebViewHost/resources/DisplayName}",
+        "DisplayGroup":  "@{Microsoft.Win32WebViewHost_10.0.22621.1_neutral_neutral_cw5n1h2txyewy?ms-resource://Windows.Win32WebViewHost/resources/DisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{A9D79064-088A-4FEC-9AFB-F94BC8E9287D}",
+        "DisplayName":  "@{Microsoft.Windows.CloudExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.CloudExperienceHost/resources/appDescription}",
+        "DisplayGroup":  "@{Microsoft.Windows.CloudExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.CloudExperienceHost/resources/appDescription}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{AEB856DB-3CAB-4A03-B414-13B007CBD50D}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{AFC6FDAF-6A49-4FE1-9E9F-FD797BEF7050}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{B0BD18E1-BCF1-496B-BD13-F8F4FC957E72}",
+        "DisplayName":  "@{Microsoft.XboxGameCallableUI_1000.22621.1.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.XboxGameCallableUI/resources/PkgDisplayName}",
+        "DisplayGroup":  "@{Microsoft.XboxGameCallableUI_1000.22621.1.0_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.XboxGameCallableUI/resources/PkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{B58C63AD-F8FE-4B58-B9ED-84C7E7F0208F}",
+        "DisplayName":  "BlueStacksAIRun",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{BD84B1CE-100C-41C6-977E-D1751CD565AF}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{BE3B6A7E-A689-449F-8A07-71E447129C64}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{BE86D110-8780-4BE5-9070-998532FF8EF8}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{BFF55D01-2AB6-49B8-BCA1-4E8B6EBAABA7}",
+        "DisplayName":  "ChatGPT",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{C6BAD746-323D-45F0-AD29-C82BB760C18C}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{C7B5C201-78E3-4EC7-8F80-7553D64894A0}",
+        "DisplayName":  "BlueStacks Service",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{C9832234-87C8-45EC-8777-51FBFB0C9BF2}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{CC31611E-5715-4462-8E0F-EC383D2AB03A}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{CDBB7D3C-5634-4FFE-9296-FA0FD7D270C0}",
+        "DisplayName":  "@{Microsoft.Windows.StartMenuExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.StartMenuExperienceHost/StartMenuExperienceHost/PkgDisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.StartMenuExperienceHost_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.StartMenuExperienceHost/StartMenuExperienceHost/PkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{D01B9832-CF99-4A66-A3B3-704DFCB96606}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{D2D9120F-AA17-471C-98B5-7DB7E9465B10}",
+        "DisplayName":  "ChatGPT",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{D6745908-33F7-450A-8F2B-A77900B1AAEA}",
+        "DisplayName":  "Free Download Manager",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{D8FEE22A-4AB6-4D44-B61D-5F472D139D71}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{D9D80EB6-2AE6-4B3C-BEE4-5F5B41247BFB}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{DFE628DB-E7FB-4176-8E85-2256A613DBD5}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{E43C5D21-C057-49E4-943C-7AB64058F7D2}",
+        "DisplayName":  "Resident Evil 4",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "{E660DB14-178F-44BF-B11F-D587D42811BC}",
+        "DisplayName":  "ms-resource:AppTitle",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{E6B49BE2-1C37-468E-A916-1D114E7BC7A0}",
+        "DisplayName":  "Microsoft 365 Copilot",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{E77FAFBC-6210-4086-A2E4-2515D8337C7C}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{E7C18FB8-4467-4F6D-9F9A-DF56F84BB6E7}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{EC0E9B8C-DA16-45A5-AEA9-D34A2C8BB1AF}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{EC10074D-452D-43F2-991A-A94DB3FB8D3A}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{EE1CD4FE-C409-4455-B868-3EADBE9CD493}",
+        "DisplayName":  "ChatGPT",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{EED02326-8156-4C3A-8B1F-EE468773CAA9}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{F0658B14-47C8-4874-9D21-129A60D6EA57}",
+        "DisplayName":  "ms-resource:ProductPkgDisplayName",
+        "DisplayGroup":  "{78E1CD88-49E3-476E-B926-580E596AD309}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "{F4E718FE-C9BE-4BD7-9200-8AC58621A6DD}",
+        "DisplayName":  "qBittorrent",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "{F597AABA-9C0F-4847-9AE4-D0CE9F23885A}",
+        "DisplayName":  "@{MicrosoftWindows.Client.Core_1000.22643.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.Core/resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.Client.Core_1000.22643.1000.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.Client.Core/resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{F8184853-E610-47A0-BBF3-4B965A4200E7}",
+        "DisplayName":  "@{Microsoft.Windows.ContentDeliveryManager_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.ContentDeliveryManager/resources/AppDisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.ContentDeliveryManager_10.0.22621.2506_neutral_neutral_cw5n1h2txyewy?ms-resource://Microsoft.Windows.ContentDeliveryManager/resources/AppDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{F838F3AC-1362-45E5-B866-E5B36D43036D}",
+        "DisplayName":  "@{Microsoft.Windows.NarratorQuickStart_10.0.22621.1_neutral_neutral_8wekyb3d8bbwe?ms-resource://Microsoft.Windows.NarratorQuickStart/Resources/AppDisplayName}",
+        "DisplayGroup":  "@{Microsoft.Windows.NarratorQuickStart_10.0.22621.1_neutral_neutral_8wekyb3d8bbwe?ms-resource://Microsoft.Windows.NarratorQuickStart/Resources/AppDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "{F884549E-E2DB-4799-873B-BBD31514EAAD}",
+        "DisplayName":  "Dell SupportAssist for Home PCs",
+        "DisplayGroup":  "Dell SupportAssist for Home PCs",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "{FAC8866B-D325-457A-9CD1-D7BF9A2EA51A}",
+        "DisplayName":  "codex_sandbox_offline_block_loopback_tcp",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  4,
+        "Profile":  0
+    },
+    {
+        "Name":  "{FB448E53-E17D-4330-89ED-DD212E0C4FDB}",
+        "DisplayName":  "Microsoft Edge (mDNS-In)",
+        "DisplayGroup":  "Microsoft Edge WebView2 Runtime",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "5319275A.WhatsAppDesktop_cv1g1gvanyjgmS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "WhatsApp",
+        "DisplayGroup":  "WhatsApp",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "AllJoyn-Router-In-TCP",
+        "DisplayName":  "AllJoyn Router (TCP-In)",
+        "DisplayGroup":  "AllJoyn Router",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "AllJoyn-Router-In-UDP",
+        "DisplayName":  "AllJoyn Router (UDP-In)",
+        "DisplayGroup":  "AllJoyn Router",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "AllJoyn-Router-Out-TCP",
+        "DisplayName":  "AllJoyn Router (TCP-Out)",
+        "DisplayGroup":  "AllJoyn Router",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "AllJoyn-Router-Out-UDP",
+        "DisplayName":  "AllJoyn Router (UDP-Out)",
+        "DisplayGroup":  "AllJoyn Router",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "AppUp.IntelGraphicsExperience_8j3eq9eme6ctt-Out-Allow-AllCapabilities",
+        "DisplayName":  "Intel® Graphics Command Center",
+        "DisplayGroup":  "Intel® Graphics Command Center",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "AppUp.IntelGraphicsExperience_8j3eq9eme6cttS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Intel® Graphics Command Center",
+        "DisplayGroup":  "Intel® Graphics Command Center",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "AppUp.IntelOptaneMemoryandStorageManagement_8j3eq9eme6cttS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Intel® Rapid Storage Technology Application",
+        "DisplayGroup":  "Intel® Rapid Storage Technology Application",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "CDPSvc-In-TCP",
+        "DisplayName":  "Connected Devices Platform (TCP-In)",
+        "DisplayGroup":  "Connected Devices Platform",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "CDPSvc-In-UDP",
+        "DisplayName":  "Connected Devices Platform (UDP-In)",
+        "DisplayGroup":  "Connected Devices Platform",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "CDPSvc-Out-TCP",
+        "DisplayName":  "Connected Devices Platform (TCP-Out)",
+        "DisplayGroup":  "Connected Devices Platform",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "CDPSvc-Out-UDP",
+        "DisplayName":  "Connected Devices Platform (UDP-Out)",
+        "DisplayGroup":  "Connected Devices Platform",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "CDPSvc-WFD-In-TCP",
+        "DisplayName":  "Connected Devices Platform - Wi-Fi Direct Transport (TCP-In)",
+        "DisplayGroup":  "Connected Devices Platform",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "CDPSvc-WFD-Out-TCP",
+        "DisplayName":  "Connected Devices Platform - Wi-Fi Direct Transport (TCP-Out)",
+        "DisplayGroup":  "Connected Devices Platform",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "Clipchamp.Clipchamp_yxz26nhyzhsrtS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Clipchamp",
+        "DisplayGroup":  "Microsoft Clipchamp",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Collab-PNRP-In-UDP",
+        "DisplayName":  "Windows Peer to Peer Collaboration Foundation (PNRP-In)",
+        "DisplayGroup":  "Windows Peer to Peer Collaboration Foundation",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Collab-PNRP-Out-UDP",
+        "DisplayName":  "Windows Peer to Peer Collaboration Foundation (PNRP-Out)",
+        "DisplayGroup":  "Windows Peer to Peer Collaboration Foundation",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Collab-PNRP-SSDPSrv-In-UDP",
+        "DisplayName":  "Windows Peer to Peer Collaboration Foundation (SSDP-In)",
+        "DisplayGroup":  "Windows Peer to Peer Collaboration Foundation",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Collab-PNRP-SSDPSrv-Out-UDP",
+        "DisplayName":  "Windows Peer to Peer Collaboration Foundation (SSDP-Out)",
+        "DisplayGroup":  "Windows Peer to Peer Collaboration Foundation",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-DHCP-In",
+        "DisplayName":  "Core Networking - Dynamic Host Configuration Protocol (DHCP-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-DHCP-Out",
+        "DisplayName":  "Core Networking - Dynamic Host Configuration Protocol (DHCP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-DHCPV6-In",
+        "DisplayName":  "Core Networking - Dynamic Host Configuration Protocol for IPv6(DHCPV6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-DHCPV6-Out",
+        "DisplayName":  "Core Networking - Dynamic Host Configuration Protocol for IPv6(DHCPV6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP4-EchoRequest-In",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv4-In)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP4-EchoRequest-In-NoScope",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv4-In)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP4-EchoRequest-Out",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv4-Out)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP4-EchoRequest-Out-NoScope",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv4-Out)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP6-EchoRequest-In",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP6-EchoRequest-In-NoScope",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP6-EchoRequest-Out",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "CoreNet-Diag-ICMP6-EchoRequest-Out-NoScope",
+        "DisplayName":  "Core Networking Diagnostics - ICMP Echo Request (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking Diagnostics",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-DNS-Out-UDP",
+        "DisplayName":  "Core Networking - DNS (UDP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-GP-LSASS-Out-TCP",
+        "DisplayName":  "Core Networking - Group Policy (LSASS-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-GP-NP-Out-TCP",
+        "DisplayName":  "Core Networking - Group Policy (NP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-GP-Out-TCP",
+        "DisplayName":  "Core Networking - Group Policy (TCP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "CoreNet-ICMP4-DUFRAG-In",
+        "DisplayName":  "Core Networking - Destination Unreachable Fragmentation Needed (ICMPv4-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-DU-In",
+        "DisplayName":  "Core Networking - Destination Unreachable (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LD-In",
+        "DisplayName":  "Core Networking - Multicast Listener Done (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LD-Out",
+        "DisplayName":  "Core Networking - Multicast Listener Done (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LQ-In",
+        "DisplayName":  "Core Networking - Multicast Listener Query (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LQ-Out",
+        "DisplayName":  "Core Networking - Multicast Listener Query (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LR2-In",
+        "DisplayName":  "Core Networking - Multicast Listener Report v2 (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LR2-Out",
+        "DisplayName":  "Core Networking - Multicast Listener Report v2 (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LR-In",
+        "DisplayName":  "Core Networking - Multicast Listener Report (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-LR-Out",
+        "DisplayName":  "Core Networking - Multicast Listener Report (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-NDA-In",
+        "DisplayName":  "Core Networking - Neighbor Discovery Advertisement (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-NDA-Out",
+        "DisplayName":  "Core Networking - Neighbor Discovery Advertisement (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-NDS-In",
+        "DisplayName":  "Core Networking - Neighbor Discovery Solicitation (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-NDS-Out",
+        "DisplayName":  "Core Networking - Neighbor Discovery Solicitation (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-PP-In",
+        "DisplayName":  "Core Networking - Parameter Problem (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-PP-Out",
+        "DisplayName":  "Core Networking - Parameter Problem (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-PTB-In",
+        "DisplayName":  "Core Networking - Packet Too Big (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-PTB-Out",
+        "DisplayName":  "Core Networking - Packet Too Big (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-RA-In",
+        "DisplayName":  "Core Networking - Router Advertisement (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-RA-Out",
+        "DisplayName":  "Core Networking - Router Advertisement (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-RS-In",
+        "DisplayName":  "Core Networking - Router Solicitation (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-RS-Out",
+        "DisplayName":  "Core Networking - Router Solicitation (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-TE-In",
+        "DisplayName":  "Core Networking - Time Exceeded (ICMPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-ICMP6-TE-Out",
+        "DisplayName":  "Core Networking - Time Exceeded (ICMPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-IGMP-In",
+        "DisplayName":  "Core Networking - Internet Group Management Protocol (IGMP-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-IGMP-Out",
+        "DisplayName":  "Core Networking - Internet Group Management Protocol (IGMP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-IPHTTPS-In",
+        "DisplayName":  "Core Networking - IPHTTPS (TCP-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-IPHTTPS-Out",
+        "DisplayName":  "Core Networking - IPHTTPS (TCP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-IPv6-In",
+        "DisplayName":  "Core Networking - IPv6 (IPv6-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-IPv6-Out",
+        "DisplayName":  "Core Networking - IPv6 (IPv6-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-Teredo-In",
+        "DisplayName":  "Core Networking - Teredo (UDP-In)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "CoreNet-Teredo-Out",
+        "DisplayName":  "Core Networking - Teredo (UDP-Out)",
+        "DisplayGroup":  "Core Networking",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "DeliveryOptimization-TCP-In",
+        "DisplayName":  "Delivery Optimization (TCP-In)",
+        "DisplayGroup":  "Delivery Optimization",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "DeliveryOptimization-UDP-In",
+        "DisplayName":  "Delivery Optimization (UDP-In)",
+        "DisplayGroup":  "Delivery Optimization",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "DellInc.DellCustomerConnect_htrsf667h5kn2S-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Dell Customer Connect",
+        "DisplayGroup":  "Dell Customer Connect",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "DellInc.DellSupportAssistforPCs_htrsf667h5kn2-In-Allow-ServerCapability",
+        "DisplayName":  "Dell SupportAssist for Home PCs",
+        "DisplayGroup":  "Dell SupportAssist for Home PCs",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "DellInc.DellSupportAssistforPCs_htrsf667h5kn2-Out-Allow-AllCapabilities",
+        "DisplayName":  "Dell SupportAssist for Home PCs",
+        "DisplayGroup":  "Dell SupportAssist for Home PCs",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "DellInc.MyDell_htrsf667h5kn2S-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "My Dell",
+        "DisplayGroup":  "My Dell",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "DellInc.MyDell_htrsf667h5kn2S-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "My Dell",
+        "DisplayGroup":  "My Dell",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "DIAL-Protocol-Server-HTTPSTR-In-TCP-LocalSubnetScope",
+        "DisplayName":  "DIAL protocol server (HTTP-In)",
+        "DisplayGroup":  "DIAL protocol server",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "DIAL-Protocol-Server-In-TCP-NoScope",
+        "DisplayName":  "DIAL protocol server (HTTP-In)",
+        "DisplayGroup":  "DIAL protocol server",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "DolbyLaboratories.DolbyAccess_rz1tebttyb220S-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Dolby Access",
+        "DisplayGroup":  "Dolby Access",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "DolbyLaboratories.DolbyAccess_rz1tebttyb220S-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Dolby Access",
+        "DisplayGroup":  "Dolby Access",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "EdgeWebView2-MDNS-In-UDP",
+        "DisplayName":  "Microsoft Edge WebView2 mDNS [UDP]",
+        "DisplayGroup":  "Microsoft Edge WebView2",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "EventForwarder-In-TCP",
+        "DisplayName":  "Remote Event Monitor (RPC)",
+        "DisplayGroup":  "Remote Event Monitor",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "EventForwarder-RPCSS-In-TCP",
+        "DisplayName":  "Remote Event Monitor (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Event Monitor",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-ICMP4-ERQ-In",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv4-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-ICMP4-ERQ-In-NoScope",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv4-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-ICMP4-ERQ-In-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Echo Request - ICMPv4-In)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-ICMP4-ERQ-Out",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv4-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-ICMP4-ERQ-Out-NoScope",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv4-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-ICMP4-ERQ-Out-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Echo Request - ICMPv4-Out)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-ICMP6-ERQ-In",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv6-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-ICMP6-ERQ-In-NoScope",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv6-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-ICMP6-ERQ-In-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Echo Request - ICMPv6-In)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-ICMP6-ERQ-Out",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv6-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-ICMP6-ERQ-Out-NoScope",
+        "DisplayName":  "File and Printer Sharing (Echo Request - ICMPv6-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-ICMP6-ERQ-Out-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Echo Request - ICMPv6-Out)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-LLMNR-In-UDP",
+        "DisplayName":  "File and Printer Sharing (LLMNR-UDP-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-LLMNR-In-UDP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (LLMNR-UDP-In)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-LLMNR-Out-UDP",
+        "DisplayName":  "File and Printer Sharing (LLMNR-UDP-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-LLMNR-Out-UDP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (LLMNR-UDP-Out)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-NB_Datagram-In-UDP",
+        "DisplayName":  "File and Printer Sharing (NB-Datagram-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-NB_Datagram-In-UDP-NoScope",
+        "DisplayName":  "File and Printer Sharing (NB-Datagram-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-NB_Datagram-Out-UDP",
+        "DisplayName":  "File and Printer Sharing (NB-Datagram-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-NB_Datagram-Out-UDP-NoScope",
+        "DisplayName":  "File and Printer Sharing (NB-Datagram-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-NB_Name-In-UDP",
+        "DisplayName":  "File and Printer Sharing (NB-Name-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-NB_Name-In-UDP-NoScope",
+        "DisplayName":  "File and Printer Sharing (NB-Name-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-NB_Name-Out-UDP",
+        "DisplayName":  "File and Printer Sharing (NB-Name-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-NB_Name-Out-UDP-NoScope",
+        "DisplayName":  "File and Printer Sharing (NB-Name-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-NB_Session-In-TCP",
+        "DisplayName":  "File and Printer Sharing (NB-Session-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-NB_Session-In-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (NB-Session-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-NB_Session-Out-TCP",
+        "DisplayName":  "File and Printer Sharing (NB-Session-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-NB_Session-Out-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (NB-Session-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-RPCSS-In-TCP",
+        "DisplayName":  "File and Printer Sharing (Spooler Service - RPC-EPMAP)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (Spooler Service - RPC-EPMAP)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-RPCSS-In-TCP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Spooler Service - RPC-EPMAP)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-SMB-In-TCP",
+        "DisplayName":  "File and Printer Sharing (SMB-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-SMB-In-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (SMB-In)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-SMB-In-TCP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (SMB-In)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-SMB-Out-TCP",
+        "DisplayName":  "File and Printer Sharing (SMB-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-SMB-Out-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (SMB-Out)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-SMB-Out-TCP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (SMB-Out)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-SpoolSvc-In-TCP",
+        "DisplayName":  "File and Printer Sharing (Spooler Service - RPC)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-SpoolSvc-In-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (Spooler Service - RPC)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-SpoolSvc-In-TCP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Spooler Service - RPC)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "FPS-SpoolWorker-In-TCP",
+        "DisplayName":  "File and Printer Sharing (Spooler Service Worker - RPC)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "FPS-SpoolWorker-In-TCP-NoScope",
+        "DisplayName":  "File and Printer Sharing (Spooler Service Worker - RPC)",
+        "DisplayGroup":  "File and Printer Sharing",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "FPS-SpoolWorker-In-TCP-V2",
+        "DisplayName":  "File and Printer Sharing (Restrictive) (Spooler Service Worker - RPC)",
+        "DisplayGroup":  "File and Printer Sharing (Restrictive)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "HNS Container Networking - DNS (UDP-In) - 790E58B4-7939-4434-9358-89AE7DDBE87F - 0",
+        "DisplayName":  "HNS Container Networking - DNS (UDP-In) - 790E58B4-7939-4434-9358-89AE7DDBE87F - 0",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "HNS Container Networking - ICS DNS (TCP-In) - 790E58B4-7939-4434-9358-89AE7DDBE87F - 0",
+        "DisplayName":  "HNS Container Networking - ICS DNS (TCP-In) - 790E58B4-7939-4434-9358-89AE7DDBE87F - 0",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-FDPHost-Out-TCP",
+        "DisplayName":  "Media Center Extenders - UPnP (TCP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-HTTPSTR-In-TCP",
+        "DisplayName":  "Media Center Extenders - HTTP Streaming (TCP-In)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-MCX2SVC-Out-TCP",
+        "DisplayName":  "Media Center Extenders - Service (TCP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-PlayTo-In-TCP",
+        "DisplayName":  "Media Center Extenders - Media Streaming (TCP-In)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-PlayTo-Out-TCP",
+        "DisplayName":  "Media Center Extenders - Media Streaming (TCP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-PlayTo-Out-UDP",
+        "DisplayName":  "Media Center Extenders - Media Streaming (UDP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-QWave-In-TCP",
+        "DisplayName":  "Media Center Extenders - qWave (TCP-In)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-QWave-In-UDP",
+        "DisplayName":  "Media Center Extenders - qWave (UDP-In)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-QWave-Out-TCP",
+        "DisplayName":  "Media Center Extenders - qWave (TCP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-QWave-Out-UDP",
+        "DisplayName":  "Media Center Extenders - qWave (UDP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-SSDPSrv-In-UDP",
+        "DisplayName":  "Media Center Extenders - SSDP (UDP-In)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-SSDPSrv-Out-UDP",
+        "DisplayName":  "Media Center Extenders - SSDP (UDP-Out)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MCX-TERMSRV-In-TCP",
+        "DisplayName":  "Media Center Extenders - XSP (TCP-In)",
+        "DisplayGroup":  "Media Center Extenders",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MDNS-In-UDP-Domain-Active",
+        "DisplayName":  "mDNS (UDP-In)",
+        "DisplayGroup":  "mDNS",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MDNS-In-UDP-Private-Active",
+        "DisplayName":  "mDNS (UDP-In)",
+        "DisplayGroup":  "mDNS",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "MDNS-In-UDP-Public-Active",
+        "DisplayName":  "mDNS (UDP-In)",
+        "DisplayGroup":  "mDNS",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "MDNS-Out-UDP-Domain-Active",
+        "DisplayName":  "mDNS (UDP-Out)",
+        "DisplayGroup":  "mDNS",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MDNS-Out-UDP-Private-Active",
+        "DisplayName":  "mDNS (UDP-Out)",
+        "DisplayGroup":  "mDNS",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "MDNS-Out-UDP-Public-Active",
+        "DisplayName":  "mDNS (UDP-Out)",
+        "DisplayGroup":  "mDNS",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "Microsoft.6365217CE6EB4_8wekyb3d8bbwe-In-Allow-ServerCapability",
+        "DisplayName":  "Microsoft Defender",
+        "DisplayGroup":  "Microsoft Defender",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.6365217CE6EB4_8wekyb3d8bbwe-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Defender",
+        "DisplayGroup":  "Microsoft Defender",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.AAD.BrokerPlugin_cw5n1h2txyewy-In-Allow-ServerCapability",
+        "DisplayName":  "Work or school account",
+        "DisplayGroup":  "Work or school account",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.AAD.BrokerPlugin_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Work or school account",
+        "DisplayGroup":  "Work or school account",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.AccountsControl_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Email and accounts",
+        "DisplayGroup":  "Email and accounts",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.DesktopAppInstaller_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "App Installer",
+        "DisplayGroup":  "App Installer",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.DesktopAppInstaller_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "App Installer",
+        "DisplayGroup":  "App Installer",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Edge.GameAssist_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Edge For Game Bar",
+        "DisplayGroup":  "Microsoft Edge For Game Bar",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.GamingApp_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Xbox",
+        "DisplayGroup":  "Xbox",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.GamingApp_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Xbox",
+        "DisplayGroup":  "Xbox",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.GamingServices_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Gaming Services",
+        "DisplayGroup":  "Gaming Services",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.GetHelp_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Get Help",
+        "DisplayGroup":  "Get Help",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.LockApp_cw5n1h2txyewyS-1-5-18-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Default Lock Screen",
+        "DisplayGroup":  "Windows Default Lock Screen",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.LockApp_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Default Lock Screen",
+        "DisplayGroup":  "Windows Default Lock Screen",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Microsoft 365 Copilot",
+        "DisplayGroup":  "Microsoft 365 Copilot",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft 365 Copilot",
+        "DisplayGroup":  "Microsoft 365 Copilot",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Office.ActionsServer_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft.Office.ActionsServer",
+        "DisplayGroup":  "Microsoft.Office.ActionsServer",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.OfficePushNotificationUtility_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "OfficePushNotificationsUtility",
+        "DisplayGroup":  "OfficePushNotificationsUtility",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.PPIProjection_cw5n1h2txyewy-In-Allow-ServerCapability",
+        "DisplayName":  "Wireless Display",
+        "DisplayGroup":  "Wireless Display",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.PPIProjection_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Wireless Display",
+        "DisplayGroup":  "Wireless Display",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.SecHealthUI_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Security",
+        "DisplayGroup":  "Windows Security",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.SecHealthUI_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Security",
+        "DisplayGroup":  "Windows Security",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.StartExperiencesApp_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Start Experiences App",
+        "DisplayGroup":  "Start Experiences App",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Todos_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Microsoft To Do",
+        "DisplayGroup":  "Microsoft To Do",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.Todos_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft To Do",
+        "DisplayGroup":  "Microsoft To Do",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.WidgetsPlatformRuntime_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Widgets Platform Runtime",
+        "DisplayGroup":  "Widgets Platform Runtime",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Win32WebViewHost_cw5n1h2txyewy-In-Allow-ServerCapability",
+        "DisplayName":  "Desktop App Web Viewer",
+        "DisplayGroup":  "Desktop App Web Viewer",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Win32WebViewHost_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Desktop App Web Viewer",
+        "DisplayGroup":  "Desktop App Web Viewer",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.Apprep.ChxApp_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Defender SmartScreen",
+        "DisplayGroup":  "Windows Defender SmartScreen",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.CloudExperienceHost_cw5n1h2txyewy-In-Allow-ServerCapability",
+        "DisplayName":  "Your account",
+        "DisplayGroup":  "Your account",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.Windows.CloudExperienceHost_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Your account",
+        "DisplayGroup":  "Your account",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.ContentDeliveryManager_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Content",
+        "DisplayGroup":  "Microsoft Content",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.NarratorQuickStart_8wekyb3d8bbwe-Out-Allow-AllCapabilities",
+        "DisplayName":  "Narrator",
+        "DisplayGroup":  "Narrator",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.OOBENetworkCaptivePortal_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Captive Portal Flow",
+        "DisplayGroup":  "Captive Portal Flow",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.ParentalControls_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Family Safety",
+        "DisplayGroup":  "Microsoft Family Safety",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.PeopleExperienceHost_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Shell Experience",
+        "DisplayGroup":  "Windows Shell Experience",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.PrintQueueActionCenter_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Print Queue",
+        "DisplayGroup":  "Print Queue",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewyS-1-5-18-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Shell Experience",
+        "DisplayGroup":  "Windows Shell Experience",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.Windows.ShellExperienceHost_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Shell Experience",
+        "DisplayGroup":  "Windows Shell Experience",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy-In-Allow-ServerCapability",
+        "DisplayName":  "Start",
+        "DisplayGroup":  "Start",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Start",
+        "DisplayGroup":  "Start",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.WindowsAlarms_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Clock",
+        "DisplayGroup":  "Windows Clock",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.WindowsAlarms_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Clock",
+        "DisplayGroup":  "Windows Clock",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.WindowsCalculator_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Calculator",
+        "DisplayGroup":  "Windows Calculator",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.WindowsCamera_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Camera",
+        "DisplayGroup":  "Windows Camera",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "Microsoft.WindowsCamera_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Camera",
+        "DisplayGroup":  "Windows Camera",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "microsoft.windowscommunicationsapps_8wekyb3d8bbwe-In-Allow-ServerCapability",
+        "DisplayName":  "Mail and Calendar",
+        "DisplayGroup":  "Mail and Calendar",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "microsoft.windowscommunicationsapps_8wekyb3d8bbwe-Out-Allow-AllCapabilities",
+        "DisplayName":  "Mail and Calendar",
+        "DisplayGroup":  "Mail and Calendar",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.WindowsStore_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Microsoft Store",
+        "DisplayGroup":  "Microsoft Store",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.WindowsStore_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Store",
+        "DisplayGroup":  "Microsoft Store",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.XboxGameCallableUI_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Xbox Game UI",
+        "DisplayGroup":  "Xbox Game UI",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.XboxGamingOverlay_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-In-Allow-ServerCapability",
+        "DisplayName":  "Game Bar",
+        "DisplayGroup":  "Game Bar",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft.XboxGamingOverlay_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Game Bar",
+        "DisplayGroup":  "Game Bar",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftCorporationII.MicrosoftFamily_8wekyb3d8bbwe-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Family",
+        "DisplayGroup":  "Microsoft Family",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftCorporationII.WindowsSubsystemForLinux_8wekyb3d8bbweS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Subsystem for Linux",
+        "DisplayGroup":  "Windows Subsystem for Linux",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.57242383.Tasbar_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.57242383.Tasbar_1000.26100.8737.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.57242383.Tasbar/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.57242383.Tasbar_1000.26100.8737.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.57242383.Tasbar/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.59336768.Speion_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.59336768.Speion_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59336768.Speion/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.59336768.Speion_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59336768.Speion/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.59337133.Voiess_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.59337133.Voiess_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59337133.Voiess/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.59337133.Voiess_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59337133.Voiess/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.59337145.Livtop_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.59337145.Livtop_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59337145.Livtop/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.59337145.Livtop_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59337145.Livtop/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.59379618.InpApp_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.59379618.InpApp_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59379618.InpApp/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.59379618.InpApp_1000.26100.7824.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.59379618.InpApp/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.60719890.Voiess_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.60719890.Voiess_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719890.Voiess/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.60719890.Voiess_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719890.Voiess/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.60719895.Livtop_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.60719895.Livtop_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719895.Livtop/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.60719895.Livtop_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719895.Livtop/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.60719896.Speion_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.60719896.Speion_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719896.Speion/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.60719896.Speion_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719896.Speion/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.60719898.InpApp_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "@{MicrosoftWindows.60719898.InpApp_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719898.InpApp/Resources/ProductPkgDisplayName}",
+        "DisplayGroup":  "@{MicrosoftWindows.60719898.InpApp_1000.26100.8328.0_x64__cw5n1h2txyewy?ms-resource://MicrosoftWindows.60719898.InpApp/Resources/ProductPkgDisplayName}",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.61869720.Voiess_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.61869721.Livtop_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.61869722.Speion_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.61869836.InpApp_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.CBS_cw5n1h2txyewyS-1-5-18-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.CBS_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.Core_cw5n1h2txyewyS-1-5-18-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.Core_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.CoreAI_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Click to Do",
+        "DisplayGroup":  "Click to Do",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.FileExp_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.OOBE_cw5n1h2txyewyS-1-5-18-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.OOBE_cw5n1h2txyewyS-1-5-18-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.Photon_cw5n1h2txyewy-In-Allow-ServerCapability",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.Photon_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Feature Experience Pack",
+        "DisplayGroup":  "Windows Feature Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MicrosoftWindows.Client.WebExperience_cw5n1h2txyewyS-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Web Experience Pack",
+        "DisplayGroup":  "Windows Web Experience Pack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Microsoft-Windows-DeviceManagement-CertificateInstall-TCP-Out",
+        "DisplayName":  "Windows Device Management Certificate Installer (TCP out)",
+        "DisplayGroup":  "Windows Device Management",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-DeviceManagement-deviceenroller-TCP-Out",
+        "DisplayName":  "Windows Device Management Device Enroller (TCP out)",
+        "DisplayGroup":  "Windows Device Management",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-DeviceManagement-OmaDmClient-TCP-Out",
+        "DisplayName":  "Windows Device Management Sync Client (TCP out)",
+        "DisplayGroup":  "Windows Device Management",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-Enrollment-WinRT-TCP-Out",
+        "DisplayName":  "Windows Device Management Enrollment Service (TCP out)",
+        "DisplayGroup":  "Windows Device Management",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-Troubleshooting-HTTP-HTTPS-Out",
+        "DisplayName":  "Recommended Troubleshooting Client (HTTP/HTTPS Out)",
+        "DisplayGroup":  "Recommended Troubleshooting",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-Unified-Telemetry-Client",
+        "DisplayName":  "Connected User Experiences and Telemetry",
+        "DisplayGroup":  "DiagTrack",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-WLANSvc-ASP-CP-In",
+        "DisplayName":  "WFD ASP Coordination Protocol (UDP-In)",
+        "DisplayGroup":  "WLAN Service - WFD Application Services Platform Coordination Protocol (Uses UDP)",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Microsoft-Windows-WLANSvc-ASP-CP-Out",
+        "DisplayName":  "WFD ASP Coordination Protocol (UDP-Out)",
+        "DisplayGroup":  "WLAN Service - WFD Application Services Platform Coordination Protocol (Uses UDP)",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "MSDTC-In-TCP",
+        "DisplayName":  "Distributed Transaction Coordinator (TCP-In)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "MSDTC-In-TCP-NoScope",
+        "DisplayName":  "Distributed Transaction Coordinator (TCP-In)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MSDTC-KTMRM-In-TCP",
+        "DisplayName":  "Distributed Transaction Coordinator (RPC)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "MSDTC-KTMRM-In-TCP-NoScope",
+        "DisplayName":  "Distributed Transaction Coordinator (RPC)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MSDTC-Out-TCP",
+        "DisplayName":  "Distributed Transaction Coordinator (TCP-Out)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "MSDTC-Out-TCP-NoScope",
+        "DisplayName":  "Distributed Transaction Coordinator (TCP-Out)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MSDTC-RPCSS-In-TCP",
+        "DisplayName":  "Distributed Transaction Coordinator (RPC-EPMAP)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "MSDTC-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Distributed Transaction Coordinator (RPC-EPMAP)",
+        "DisplayGroup":  "Distributed Transaction Coordinator",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MsiScsi-In-TCP",
+        "DisplayName":  "iSCSI Service (TCP-In)",
+        "DisplayGroup":  "iSCSI Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "MsiScsi-In-TCP-NoScope",
+        "DisplayName":  "iSCSI Service (TCP-In)",
+        "DisplayGroup":  "iSCSI Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MsiScsi-Out-TCP",
+        "DisplayName":  "iSCSI Service (TCP-Out)",
+        "DisplayGroup":  "iSCSI Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "MsiScsi-Out-TCP-NoScope",
+        "DisplayName":  "iSCSI Service (TCP-Out)",
+        "DisplayGroup":  "iSCSI Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "MSTeams_8wekyb3d8bbwe-In-Allow-ServerCapability",
+        "DisplayName":  "Microsoft Teams",
+        "DisplayGroup":  "Microsoft Teams",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "MSTeams_8wekyb3d8bbwe-Out-Allow-AllCapabilities",
+        "DisplayName":  "Microsoft Teams",
+        "DisplayGroup":  "Microsoft Teams",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "NETDIS-DAS-In-UDP",
+        "DisplayName":  "Network Discovery (WSD-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-DAS-In-UDP-Active",
+        "DisplayName":  "Network Discovery (WSD-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-FDPHOST-In-UDP",
+        "DisplayName":  "Network Discovery (WSD-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-FDPHOST-In-UDP-Active",
+        "DisplayName":  "Network Discovery (WSD-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-FDPHOST-Out-UDP",
+        "DisplayName":  "Network Discovery (WSD-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-FDPHOST-Out-UDP-Active",
+        "DisplayName":  "Network Discovery (WSD-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-FDRESPUB-WSD-In-UDP",
+        "DisplayName":  "Network Discovery (Pub-WSD-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-FDRESPUB-WSD-In-UDP-Active",
+        "DisplayName":  "Network Discovery (Pub-WSD-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-FDRESPUB-WSD-Out-UDP",
+        "DisplayName":  "Network Discovery (Pub WSD-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-FDRESPUB-WSD-Out-UDP-Active",
+        "DisplayName":  "Network Discovery (Pub WSD-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-LLMNR-In-UDP",
+        "DisplayName":  "Network Discovery (LLMNR-UDP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-LLMNR-In-UDP-Active",
+        "DisplayName":  "Network Discovery (LLMNR-UDP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-LLMNR-Out-UDP",
+        "DisplayName":  "Network Discovery (LLMNR-UDP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-LLMNR-Out-UDP-Active",
+        "DisplayName":  "Network Discovery (LLMNR-UDP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-NB_Datagram-In-UDP",
+        "DisplayName":  "Network Discovery (NB-Datagram-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-NB_Datagram-In-UDP-Active",
+        "DisplayName":  "Network Discovery (NB-Datagram-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-NB_Datagram-In-UDP-NoScope",
+        "DisplayName":  "Network Discovery (NB-Datagram-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-NB_Datagram-Out-UDP",
+        "DisplayName":  "Network Discovery (NB-Datagram-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-NB_Datagram-Out-UDP-Active",
+        "DisplayName":  "Network Discovery (NB-Datagram-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-NB_Datagram-Out-UDP-NoScope",
+        "DisplayName":  "Network Discovery (NB-Datagram-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-NB_Name-In-UDP",
+        "DisplayName":  "Network Discovery (NB-Name-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-NB_Name-In-UDP-Active",
+        "DisplayName":  "Network Discovery (NB-Name-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-NB_Name-In-UDP-NoScope",
+        "DisplayName":  "Network Discovery (NB-Name-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-NB_Name-Out-UDP",
+        "DisplayName":  "Network Discovery (NB-Name-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-NB_Name-Out-UDP-Active",
+        "DisplayName":  "Network Discovery (NB-Name-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-NB_Name-Out-UDP-NoScope",
+        "DisplayName":  "Network Discovery (NB-Name-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-SSDPSrv-In-UDP",
+        "DisplayName":  "Network Discovery (SSDP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-SSDPSrv-In-UDP-Active",
+        "DisplayName":  "Network Discovery (SSDP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-SSDPSrv-In-UDP-Teredo",
+        "DisplayName":  "Network Discovery for Teredo (SSDP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-SSDPSrv-Out-UDP",
+        "DisplayName":  "Network Discovery (SSDP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-SSDPSrv-Out-UDP-Active",
+        "DisplayName":  "Network Discovery (SSDP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-In-TCP",
+        "DisplayName":  "Network Discovery (UPnP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-In-TCP-Active",
+        "DisplayName":  "Network Discovery (UPnP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-In-TCP-NoScope",
+        "DisplayName":  "Network Discovery (UPnP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-In-TCP-Teredo",
+        "DisplayName":  "Network Discovery for Teredo (UPnP-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-Out-TCP",
+        "DisplayName":  "Network Discovery (UPnP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-Out-TCP-Active",
+        "DisplayName":  "Network Discovery (UPnP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-UPnPHost-Out-TCP-NoScope",
+        "DisplayName":  "Network Discovery (UPnP-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-UPnP-Out-TCP",
+        "DisplayName":  "Network Discovery (UPnPHost-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  5
+    },
+    {
+        "Name":  "NETDIS-UPnP-Out-TCP-Active",
+        "DisplayName":  "Network Discovery (UPnPHost-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-WSDEVNT-In-TCP",
+        "DisplayName":  "Network Discovery (WSD Events-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-WSDEVNT-In-TCP-Active",
+        "DisplayName":  "Network Discovery (WSD Events-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-WSDEVNT-In-TCP-NoScope",
+        "DisplayName":  "Network Discovery (WSD Events-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-WSDEVNT-Out-TCP",
+        "DisplayName":  "Network Discovery (WSD Events-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-WSDEVNT-Out-TCP-Active",
+        "DisplayName":  "Network Discovery (WSD Events-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-WSDEVNT-Out-TCP-NoScope",
+        "DisplayName":  "Network Discovery (WSD Events-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-WSDEVNTS-In-TCP",
+        "DisplayName":  "Network Discovery (WSD EventsSecure-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-WSDEVNTS-In-TCP-Active",
+        "DisplayName":  "Network Discovery (WSD EventsSecure-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-WSDEVNTS-In-TCP-NoScope",
+        "DisplayName":  "Network Discovery (WSD EventsSecure-In)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "NETDIS-WSDEVNTS-Out-TCP",
+        "DisplayName":  "Network Discovery (WSD EventsSecure-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "NETDIS-WSDEVNTS-Out-TCP-Active",
+        "DisplayName":  "Network Discovery (WSD EventsSecure-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "NETDIS-WSDEVNTS-Out-TCP-NoScope",
+        "DisplayName":  "Network Discovery (WSD EventsSecure-Out)",
+        "DisplayGroup":  "Network Discovery",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "Netlogon-NamedPipe-In",
+        "DisplayName":  "Netlogon Service (NP-In)",
+        "DisplayGroup":  "Netlogon Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Netlogon-TCP-RPC-In",
+        "DisplayName":  "Netlogon Service Authz (RPC)",
+        "DisplayGroup":  "Netlogon Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "NVS-FrameServer-In-TCP-NoScope",
+        "DisplayName":  "Microsoft Media Foundation Network Source IN [TCP 554]",
+        "DisplayGroup":  "Microsoft Media Foundation Network Source",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "NVS-FrameServer-In-UDP-NoScope",
+        "DisplayName":  "Microsoft Media Foundation Network Source IN [UDP 5004-5009]",
+        "DisplayGroup":  "Microsoft Media Foundation Network Source",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "NVS-FrameServer-Out-TCP-NoScope",
+        "DisplayName":  "Microsoft Media Foundation Network Source OUT [TCP ALL]",
+        "DisplayGroup":  "Microsoft Media Foundation Network Source",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "OpenAI.Codex_2p2nqsd0c76g0S-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  "Codex",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "PerfLogsAlerts-DCOM-In-TCP",
+        "DisplayName":  "Performance Logs and Alerts (DCOM-In)",
+        "DisplayGroup":  "Performance Logs and Alerts",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "PerfLogsAlerts-DCOM-In-TCP-NoScope",
+        "DisplayName":  "Performance Logs and Alerts (DCOM-In)",
+        "DisplayGroup":  "Performance Logs and Alerts",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "PerfLogsAlerts-PLASrv-In-TCP",
+        "DisplayName":  "Performance Logs and Alerts (TCP-In)",
+        "DisplayGroup":  "Performance Logs and Alerts",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "PerfLogsAlerts-PLASrv-In-TCP-NoScope",
+        "DisplayName":  "Performance Logs and Alerts (TCP-In)",
+        "DisplayGroup":  "Performance Logs and Alerts",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "PlayTo-HTTPSTR-In-TCP-LocalSubnetScope",
+        "DisplayName":  "Cast to Device streaming server (HTTP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "PlayTo-HTTPSTR-In-TCP-NoScope",
+        "DisplayName":  "Cast to Device streaming server (HTTP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "PlayTo-HTTPSTR-In-TCP-PlayToScope",
+        "DisplayName":  "Cast to Device streaming server (HTTP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "PlayTo-In-RTSP-LocalSubnetScope",
+        "DisplayName":  "Cast to Device streaming server (RTSP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "PlayTo-In-RTSP-NoScope",
+        "DisplayName":  "Cast to Device streaming server (RTSP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "PlayTo-In-RTSP-PlayToScope",
+        "DisplayName":  "Cast to Device streaming server (RTSP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "PlayTo-In-UDP-LocalSubnetScope",
+        "DisplayName":  "Cast to Device streaming server (RTCP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "PlayTo-In-UDP-NoScope",
+        "DisplayName":  "Cast to Device streaming server (RTCP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "PlayTo-In-UDP-PlayToScope",
+        "DisplayName":  "Cast to Device streaming server (RTCP-Streaming-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "PlayTo-Out-UDP-LocalSubnetScope",
+        "DisplayName":  "Cast to Device streaming server (RTP-Streaming-Out)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  2
+    },
+    {
+        "Name":  "PlayTo-Out-UDP-NoScope",
+        "DisplayName":  "Cast to Device streaming server (RTP-Streaming-Out)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "PlayTo-Out-UDP-PlayToScope",
+        "DisplayName":  "Cast to Device streaming server (RTP-Streaming-Out)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "PlayTo-QWave-In-TCP-PlayToScope",
+        "DisplayName":  "Cast to Device functionality (qWave-TCP-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "PlayTo-QWave-In-UDP-PlayToScope",
+        "DisplayName":  "Cast to Device functionality (qWave-UDP-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "PlayTo-QWave-Out-TCP-PlayToScope",
+        "DisplayName":  "Cast to Device functionality (qWave-TCP-Out)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "PlayTo-QWave-Out-UDP-PlayToScope",
+        "DisplayName":  "Cast to Device functionality (qWave-UDP-Out)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "PlayTo-SSDP-Discovery-PlayToScope",
+        "DisplayName":  "Cast to Device SSDP Discovery (UDP-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "PlayTo-UPnP-Events-PlayToScope",
+        "DisplayName":  "Cast to Device UPnP Events (TCP-In)",
+        "DisplayGroup":  "Cast to Device functionality",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "PNRPMNRS-PNRP-In-UDP",
+        "DisplayName":  "Windows Collaboration Computer Name Registration Service (PNRP-In)",
+        "DisplayGroup":  "Windows Collaboration Computer Name Registration Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "PNRPMNRS-PNRP-Out-UDP",
+        "DisplayName":  "Windows Collaboration Computer Name Registration Service (PNRP-Out)",
+        "DisplayGroup":  "Windows Collaboration Computer Name Registration Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "PNRPMNRS-SSDPSrv-In-UDP",
+        "DisplayName":  "Windows Collaboration Computer Name Registration Service (SSDP-In)",
+        "DisplayGroup":  "Windows Collaboration Computer Name Registration Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "PNRPMNRS-SSDPSrv-Out-UDP",
+        "DisplayName":  "Windows Collaboration Computer Name Registration Service (SSDP-Out)",
+        "DisplayGroup":  "Windows Collaboration Computer Name Registration Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "ProximityUxHost-Sharing-In-TCP-NoScope",
+        "DisplayName":  "Proximity sharing over TCP (TCP sharing-In)",
+        "DisplayGroup":  "Proximity Sharing",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "ProximityUxHost-Sharing-Out-TCP-NoScope",
+        "DisplayName":  "Proximity sharing over TCP (TCP sharing-Out)",
+        "DisplayGroup":  "Proximity Sharing",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RemoteAssistance-DCOM-In-TCP-NoScope-Active",
+        "DisplayName":  "Remote Assistance (DCOM-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteAssistance-In-TCP-EdgeScope",
+        "DisplayName":  "Remote Assistance (TCP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "RemoteAssistance-In-TCP-EdgeScope-Active",
+        "DisplayName":  "Remote Assistance (TCP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-Out-TCP",
+        "DisplayName":  "Remote Assistance (TCP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "RemoteAssistance-Out-TCP-Active",
+        "DisplayName":  "Remote Assistance (TCP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-PnrpSvc-UDP-In-EdgeScope",
+        "DisplayName":  "Remote Assistance (PNRP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "RemoteAssistance-PnrpSvc-UDP-In-EdgeScope-Active",
+        "DisplayName":  "Remote Assistance (PNRP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-PnrpSvc-UDP-OUT",
+        "DisplayName":  "Remote Assistance (PNRP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "RemoteAssistance-PnrpSvc-UDP-OUT-Active",
+        "DisplayName":  "Remote Assistance (PNRP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-RAServer-In-TCP-NoScope-Active",
+        "DisplayName":  "Remote Assistance (RA Server TCP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteAssistance-RAServer-Out-TCP-NoScope-Active",
+        "DisplayName":  "Remote Assistance (RA Server TCP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteAssistance-SSDPSrv-In-TCP-Active",
+        "DisplayName":  "Remote Assistance (SSDP TCP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-SSDPSrv-In-UDP-Active",
+        "DisplayName":  "Remote Assistance (SSDP UDP-In)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-SSDPSrv-Out-TCP-Active",
+        "DisplayName":  "Remote Assistance (SSDP TCP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteAssistance-SSDPSrv-Out-UDP-Active",
+        "DisplayName":  "Remote Assistance (SSDP UDP-Out)",
+        "DisplayGroup":  "Remote Assistance",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "RemoteEventLogSvc-In-TCP",
+        "DisplayName":  "Remote Event Log Management (RPC)",
+        "DisplayGroup":  "Remote Event Log Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteEventLogSvc-In-TCP-NoScope",
+        "DisplayName":  "Remote Event Log Management (RPC)",
+        "DisplayGroup":  "Remote Event Log Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteEventLogSvc-NP-In-TCP",
+        "DisplayName":  "Remote Event Log Management (NP-In)",
+        "DisplayGroup":  "Remote Event Log Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteEventLogSvc-NP-In-TCP-NoScope",
+        "DisplayName":  "Remote Event Log Management (NP-In)",
+        "DisplayGroup":  "Remote Event Log Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteEventLogSvc-RPCSS-In-TCP",
+        "DisplayName":  "Remote Event Log Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Event Log Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteEventLogSvc-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Remote Event Log Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Event Log Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteFwAdmin-In-TCP",
+        "DisplayName":  "Windows Defender Firewall Remote Management (RPC)",
+        "DisplayGroup":  "Windows Defender Firewall Remote Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteFwAdmin-In-TCP-NoScope",
+        "DisplayName":  "Windows Defender Firewall Remote Management (RPC)",
+        "DisplayGroup":  "Windows Defender Firewall Remote Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteFwAdmin-RPCSS-In-TCP",
+        "DisplayName":  "Windows Defender Firewall Remote Management (RPC-EPMAP)",
+        "DisplayGroup":  "Windows Defender Firewall Remote Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteFwAdmin-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Windows Defender Firewall Remote Management (RPC-EPMAP)",
+        "DisplayGroup":  "Windows Defender Firewall Remote Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteSvcAdmin-In-TCP",
+        "DisplayName":  "Remote Service Management (RPC)",
+        "DisplayGroup":  "Remote Service Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteSvcAdmin-In-TCP-NoScope",
+        "DisplayName":  "Remote Service Management (RPC)",
+        "DisplayGroup":  "Remote Service Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteSvcAdmin-NP-In-TCP",
+        "DisplayName":  "Remote Service Management (NP-In)",
+        "DisplayGroup":  "Remote Service Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteSvcAdmin-NP-In-TCP-NoScope",
+        "DisplayName":  "Remote Service Management (NP-In)",
+        "DisplayGroup":  "Remote Service Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteSvcAdmin-RPCSS-In-TCP",
+        "DisplayName":  "Remote Service Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Service Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteSvcAdmin-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Remote Service Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Service Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteTask-In-TCP",
+        "DisplayName":  "Remote Scheduled Tasks Management (RPC)",
+        "DisplayGroup":  "Remote Scheduled Tasks Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteTask-In-TCP-NoScope",
+        "DisplayName":  "Remote Scheduled Tasks Management (RPC)",
+        "DisplayGroup":  "Remote Scheduled Tasks Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RemoteTask-RPCSS-In-TCP",
+        "DisplayName":  "Remote Scheduled Tasks Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Scheduled Tasks Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RemoteTask-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Remote Scheduled Tasks Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Scheduled Tasks Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RRAS-GRE-In",
+        "DisplayName":  "Routing and Remote Access (GRE-In)",
+        "DisplayGroup":  "Routing and Remote Access",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RRAS-GRE-Out",
+        "DisplayName":  "Routing and Remote Access (GRE-Out)",
+        "DisplayGroup":  "Routing and Remote Access",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RRAS-L2TP-In-UDP",
+        "DisplayName":  "Routing and Remote Access (L2TP-In)",
+        "DisplayGroup":  "Routing and Remote Access",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RRAS-L2TP-Out-UDP",
+        "DisplayName":  "Routing and Remote Access (L2TP-Out)",
+        "DisplayGroup":  "Routing and Remote Access",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RRAS-PPTP-In-TCP",
+        "DisplayName":  "Routing and Remote Access (PPTP-In)",
+        "DisplayGroup":  "Routing and Remote Access",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RRAS-PPTP-Out-TCP",
+        "DisplayName":  "Routing and Remote Access (PPTP-Out)",
+        "DisplayGroup":  "Routing and Remote Access",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "RVM-RPCSS-In-TCP",
+        "DisplayName":  "Remote Volume Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Volume Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RVM-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Remote Volume Management (RPC-EPMAP)",
+        "DisplayGroup":  "Remote Volume Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RVM-VDS-In-TCP",
+        "DisplayName":  "Remote Volume Management - Virtual Disk Service (RPC)",
+        "DisplayGroup":  "Remote Volume Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RVM-VDS-In-TCP-NoScope",
+        "DisplayName":  "Remote Volume Management - Virtual Disk Service (RPC)",
+        "DisplayGroup":  "Remote Volume Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "RVM-VDSLDR-In-TCP",
+        "DisplayName":  "Remote Volume Management - Virtual Disk Service Loader (RPC)",
+        "DisplayGroup":  "Remote Volume Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "RVM-VDSLDR-In-TCP-NoScope",
+        "DisplayName":  "Remote Volume Management - Virtual Disk Service Loader (RPC)",
+        "DisplayGroup":  "Remote Volume Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "SNMPTRAP-In-UDP",
+        "DisplayName":  "SNMP Trap Service (UDP In)",
+        "DisplayGroup":  "SNMP Trap",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "SNMPTRAP-In-UDP-NoScope",
+        "DisplayName":  "SNMP Trap Service (UDP In)",
+        "DisplayGroup":  "SNMP Trap",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "SpotifyAB.SpotifyMusic_zpdnekdrzrea0S-1-5-21-2797052581-3053368880-2343031033-1001-Out-Allow-AllCapabilities",
+        "DisplayName":  "Spotify - Music and Podcasts",
+        "DisplayGroup":  "Spotify - Music and Podcasts",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "SSTP-IN-TCP",
+        "DisplayName":  "Secure Socket Tunneling Protocol (SSTP-In)",
+        "DisplayGroup":  "Secure Socket Tunneling Protocol",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "TCP Query User{07DB98ED-F508-4CCD-8063-9810AF58BC52}C:\\program files\\windowsapps\\openai.codex_26.810.4967.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{27E3EACF-73FD-44FC-8D74-70802E2668F2}C:\\program files\\windowsapps\\openai.codex_26.803.10989.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{2C45DB27-081B-4526-BA56-9AAD206A76E5}C:\\program files\\windowsapps\\openai.codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{3306D9F6-B977-4F07-8B6E-4A90090573D2}C:\\program files\\windowsapps\\openai.codex_26.810.7004.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{489A17D8-5BC0-423B-A0CF-A44236B31A83}C:\\users\\sitan\\appdata\\local\\bravesoftware\\brave-browser\\application\\brave.exe",
+        "DisplayName":  "brave.exe",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{67845F90-36A0-4D7A-979D-8310D84A22A2}C:\\program files\\windowsapps\\openai.codex_26.727.4816.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{74D07EF6-4913-4156-B45D-802E66027EEA}C:\\program files\\windowsapps\\openai.codex_26.727.6591.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{85D086AB-B1DC-4AB5-8E7F-BECFC329BF7D}C:\\users\\sitan\\appdata\\local\\programs\\python\\python312\\python.exe",
+        "DisplayName":  "python.exe",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{9EEB506F-33CB-47DA-B2EB-3BF5B4AF6AE6}C:\\program files\\nodejs\\node.exe",
+        "DisplayName":  "Node.js JavaScript Runtime",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{BC4D6DD8-8F70-4032-85AA-B378EA3C39F0}C:\\users\\sitan\\appdata\\roaming\\zoom\\bin\\zoom.exe",
+        "DisplayName":  "zoom.exe",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{F305836C-72F4-4DC0-9E44-1E2E87704FE1}C:\\program files\\java\\jdk-21.0.10\\bin\\java.exe",
+        "DisplayName":  "Java(TM) Platform SE binary",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TCP Query User{FF893B31-51FA-431D-B50B-4457C3AD1DA7}C:\\program files\\windowsapps\\openai.codex_26.730.8199.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "TPMVSCMGR-RPCSS-In-TCP",
+        "DisplayName":  "TPM Virtual Smart Card Management (DCOM-In)",
+        "DisplayGroup":  "TPM Virtual Smart Card Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "TPMVSCMGR-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "TPM Virtual Smart Card Management (DCOM-In)",
+        "DisplayGroup":  "TPM Virtual Smart Card Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "TPMVSCMGR-Server-In-TCP",
+        "DisplayName":  "TPM Virtual Smart Card Management (TCP-In)",
+        "DisplayGroup":  "TPM Virtual Smart Card Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "TPMVSCMGR-Server-In-TCP-NoScope",
+        "DisplayName":  "TPM Virtual Smart Card Management (TCP-In)",
+        "DisplayGroup":  "TPM Virtual Smart Card Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "TPMVSCMGR-Server-Out-TCP",
+        "DisplayName":  "TPM Virtual Smart Card Management (TCP-Out)",
+        "DisplayGroup":  "TPM Virtual Smart Card Management",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "TPMVSCMGR-Server-Out-TCP-NoScope",
+        "DisplayName":  "TPM Virtual Smart Card Management (TCP-Out)",
+        "DisplayGroup":  "TPM Virtual Smart Card Management",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "UDP Query User{04D9CF49-916B-40F0-B930-B9F2446D03A2}C:\\users\\sitan\\appdata\\local\\programs\\python\\python312\\python.exe",
+        "DisplayName":  "python.exe",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{34E56966-BCF7-4B8A-820C-0E8CF8083C61}C:\\program files\\windowsapps\\openai.codex_26.727.6591.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{35875603-B99D-4BB9-A6A7-573B22C15E99}C:\\program files\\windowsapps\\openai.codex_26.803.5235.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{3CE105ED-0E30-4FA8-AF50-62183EA81B19}C:\\program files\\java\\jdk-21.0.10\\bin\\java.exe",
+        "DisplayName":  "Java(TM) Platform SE binary",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{4AF22058-C385-4E5D-B68A-6377EA369430}C:\\users\\sitan\\appdata\\roaming\\zoom\\bin\\zoom.exe",
+        "DisplayName":  "zoom.exe",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{56EFB100-BCAE-4E6C-8B48-2DAB47A0D585}C:\\program files\\nodejs\\node.exe",
+        "DisplayName":  "Node.js JavaScript Runtime",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{60397F82-ADA5-4749-AAE3-83C1F7E47AEC}C:\\program files\\windowsapps\\openai.codex_26.803.10989.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{6EA74DDD-F793-417C-B0BB-9F9F78B12211}C:\\program files\\windowsapps\\openai.codex_26.730.8199.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{91CD09C1-D1F4-412D-9CC6-5924CC403F9E}C:\\program files\\windowsapps\\openai.codex_26.727.4816.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{9C6D1AF3-6886-462D-89E4-804179EDCD0D}C:\\program files\\windowsapps\\openai.codex_26.810.7004.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{B6B61E9D-8A56-43E3-8FA3-E6E9FA396945}C:\\users\\sitan\\appdata\\local\\bravesoftware\\brave-browser\\application\\brave.exe",
+        "DisplayName":  "brave.exe",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "UDP Query User{C390E80E-0DF4-4E7D-819F-55BE076CF43B}C:\\program files\\windowsapps\\openai.codex_26.810.4967.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe",
+        "DisplayName":  "Codex",
+        "DisplayGroup":  null,
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "vm-monitoring-dcom",
+        "DisplayName":  "Virtual Machine Monitoring (DCOM-In)",
+        "DisplayGroup":  "Virtual Machine Monitoring",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "vm-monitoring-icmpv4",
+        "DisplayName":  "Virtual Machine Monitoring (Echo Request - ICMPv4-In)",
+        "DisplayGroup":  "Virtual Machine Monitoring",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "vm-monitoring-icmpv6",
+        "DisplayName":  "Virtual Machine Monitoring (Echo Request - ICMPv6-In)",
+        "DisplayGroup":  "Virtual Machine Monitoring",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "vm-monitoring-nb-session",
+        "DisplayName":  "Virtual Machine Monitoring (NB-Session-In)",
+        "DisplayGroup":  "Virtual Machine Monitoring",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "vm-monitoring-rpc",
+        "DisplayName":  "Virtual Machine Monitoring (RPC)",
+        "DisplayGroup":  "Virtual Machine Monitoring",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WFDPRINT-DAFWSD-In-Active",
+        "DisplayName":  "Wi-Fi Direct Network Discovery (In)",
+        "DisplayGroup":  "Wi-Fi Direct Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WFDPRINT-DAFWSD-Out-Active",
+        "DisplayName":  "Wi-Fi Direct Network Discovery (Out)",
+        "DisplayGroup":  "Wi-Fi Direct Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WFDPRINT-SCAN-In-Active",
+        "DisplayName":  "Wi-Fi Direct Scan Service Use (In)",
+        "DisplayGroup":  "Wi-Fi Direct Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WFDPRINT-SCAN-Out-Active",
+        "DisplayName":  "Wi-Fi Direct Scan Service Use (Out)",
+        "DisplayGroup":  "Wi-Fi Direct Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WFDPRINT-SPOOL-In-Active",
+        "DisplayName":  "Wi-Fi Direct Spooler Use (In)",
+        "DisplayGroup":  "Wi-Fi Direct Network Discovery",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WFDPRINT-SPOOL-Out-Active",
+        "DisplayName":  "Wi-Fi Direct Spooler Use (Out)",
+        "DisplayGroup":  "Wi-Fi Direct Network Discovery",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WiFiDirect-KM-Driver-In-TCP",
+        "DisplayName":  "WFD Driver-only (TCP-In)",
+        "DisplayGroup":  "WLAN Service - WFD Services Kernel Mode Driver Rules",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WiFiDirect-KM-Driver-In-UDP",
+        "DisplayName":  "WFD Driver-only (UDP-In)",
+        "DisplayGroup":  "WLAN Service - WFD Services Kernel Mode Driver Rules",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WiFiDirect-KM-Driver-Out-TCP",
+        "DisplayName":  "WFD Driver-only (TCP-Out)",
+        "DisplayGroup":  "WLAN Service - WFD Services Kernel Mode Driver Rules",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WiFiDirect-KM-Driver-Out-UDP",
+        "DisplayName":  "WFD Driver-only (UDP-Out)",
+        "DisplayGroup":  "WLAN Service - WFD Services Kernel Mode Driver Rules",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Windows.PrintDialog_cw5n1h2txyewy-Out-Allow-AllCapabilities",
+        "DisplayName":  "Windows Print",
+        "DisplayGroup":  "Windows Print",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "windows_ie_ac_001-Out-Allow-AllCapabilities",
+        "DisplayName":  "windows_ie_ac_001",
+        "DisplayGroup":  "windows_ie_ac_001",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  7
+    },
+    {
+        "Name":  "Wininit-Shutdown-In-Rule-TCP-RPC",
+        "DisplayName":  "Inbound Rule for Remote Shutdown (TCP-In)",
+        "DisplayGroup":  "Remote Shutdown",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "Wininit-Shutdown-In-Rule-TCP-RPC-EPMapper",
+        "DisplayName":  "Inbound Rule for Remote Shutdown (RPC-EP-In)",
+        "DisplayGroup":  "Remote Shutdown",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WINRM-HTTP-Compat-In-TCP",
+        "DisplayName":  "Windows Remote Management - Compatibility Mode (HTTP-In)",
+        "DisplayGroup":  "Windows Remote Management (Compatibility)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WINRM-HTTP-Compat-In-TCP-NoScope",
+        "DisplayName":  "Windows Remote Management - Compatibility Mode (HTTP-In)",
+        "DisplayGroup":  "Windows Remote Management (Compatibility)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WINRM-HTTP-In-TCP",
+        "DisplayName":  "Windows Remote Management (HTTP-In)",
+        "DisplayGroup":  "Windows Remote Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  4
+    },
+    {
+        "Name":  "WINRM-HTTP-In-TCP-NoScope",
+        "DisplayName":  "Windows Remote Management (HTTP-In)",
+        "DisplayGroup":  "Windows Remote Management",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  3
+    },
+    {
+        "Name":  "WirelessDisplay-Infra-In-TCP",
+        "DisplayName":  "Wireless Display Infrastructure Back Channel (TCP-In)",
+        "DisplayGroup":  "Wireless Display",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WirelessDisplay-In-TCP",
+        "DisplayName":  "Wireless Display (TCP-In)",
+        "DisplayGroup":  "Wireless Display",
+        "Enabled":  1,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WirelessDisplay-Out-TCP",
+        "DisplayName":  "Wireless Display (TCP-Out)",
+        "DisplayGroup":  "Wireless Display",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WirelessDisplay-Out-UDP",
+        "DisplayName":  "Wireless Display (UDP-Out)",
+        "DisplayGroup":  "Wireless Display",
+        "Enabled":  1,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMI-ASYNC-In-TCP",
+        "DisplayName":  "Windows Management Instrumentation (ASync-In)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMI-ASYNC-In-TCP-NoScope",
+        "DisplayName":  "Windows Management Instrumentation (ASync-In)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMI-RPCSS-In-TCP",
+        "DisplayName":  "Windows Management Instrumentation (DCOM-In)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMI-RPCSS-In-TCP-NoScope",
+        "DisplayName":  "Windows Management Instrumentation (DCOM-In)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMI-WINMGMT-In-TCP",
+        "DisplayName":  "Windows Management Instrumentation (WMI-In)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMI-WINMGMT-In-TCP-NoScope",
+        "DisplayName":  "Windows Management Instrumentation (WMI-In)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMI-WINMGMT-Out-TCP",
+        "DisplayName":  "Windows Management Instrumentation (WMI-Out)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMI-WINMGMT-Out-TCP-NoScope",
+        "DisplayName":  "Windows Management Instrumentation (WMI-Out)",
+        "DisplayGroup":  "Windows Management Instrumentation (WMI)",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMP-In-UDP",
+        "DisplayName":  "Windows Media Player (UDP-In)",
+        "DisplayGroup":  "Windows Media Player",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMP-In-UDP-x86",
+        "DisplayName":  "Windows Media Player x86 (UDP-In)",
+        "DisplayGroup":  "Windows Media Player",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMPNSS-HTTPSTR-In-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (HTTP-Streaming-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-HTTPSTR-In-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (HTTP-Streaming-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-HTTPSTR-Out-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (HTTP-Streaming-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-HTTPSTR-Out-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (HTTP-Streaming-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-In-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (TCP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-In-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (TCP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-In-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-In-UDP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-Out-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (TCP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-Out-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (TCP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-Out-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-Out-UDP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-QWave-In-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-TCP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-QWave-In-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-TCP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-QWave-In-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-UDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-QWave-In-UDP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-UDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-QWave-Out-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-TCP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-QWave-Out-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-TCP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-QWave-Out-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-UDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-QWave-Out-UDP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (qWave-UDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-SSDPSrv-In-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (SSDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMPNSS-SSDPSrv-Out-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (SSDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMPNSS-UPnPHost-In-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UPnP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMPNSS-UPnPHost-Out-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UPnP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMPNSS-UPnP-Out-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (UPnPHost-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMPNSS-WMP-In-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (Streaming-UDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-WMP-In-UDP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (Streaming-UDP-In)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-WMP-Out-TCP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (Streaming-TCP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-WMP-Out-TCP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (Streaming-TCP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMPNSS-WMP-Out-UDP",
+        "DisplayName":  "Windows Media Player Network Sharing Service (Streaming-UDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WMPNSS-WMP-Out-UDP-NoScope",
+        "DisplayName":  "Windows Media Player Network Sharing Service (Streaming-UDP-Out)",
+        "DisplayGroup":  "Windows Media Player Network Sharing Service",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WMP-Out-TCP",
+        "DisplayName":  "Windows Media Player (TCP-Out)",
+        "DisplayGroup":  "Windows Media Player",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMP-Out-TCP-x86",
+        "DisplayName":  "Windows Media Player x86 (TCP-Out)",
+        "DisplayGroup":  "Windows Media Player",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMP-Out-UDP",
+        "DisplayName":  "Windows Media Player (UDP-Out)",
+        "DisplayGroup":  "Windows Media Player",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WMP-Out-UDP-x86",
+        "DisplayName":  "Windows Media Player x86 (UDP-Out)",
+        "DisplayGroup":  "Windows Media Player",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WPDMTP-Out-TCP",
+        "DisplayName":  "Wireless Portable Devices (TCP-Out)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  6
+    },
+    {
+        "Name":  "WPDMTP-Out-TCP-NoScope",
+        "DisplayName":  "Wireless Portable Devices (TCP-Out)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  1
+    },
+    {
+        "Name":  "WPDMTP-SSDPSrv-In-UDP",
+        "DisplayName":  "Wireless Portable Devices (SSDP-In)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WPDMTP-SSDPSrv-Out-UDP",
+        "DisplayName":  "Wireless Portable Devices (SSDP-Out)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WPDMTP-UPnPHost-In-TCP",
+        "DisplayName":  "Wireless Portable Devices (UPnP-In)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  1,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WPDMTP-UPnPHost-Out-TCP",
+        "DisplayName":  "Wireless Portable Devices (UPnP-Out)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    },
+    {
+        "Name":  "WPDMTP-UPnP-Out-TCP",
+        "DisplayName":  "Wireless Portable Devices (UPnPHost-Out)",
+        "DisplayGroup":  "Wireless Portable Devices",
+        "Enabled":  2,
+        "Direction":  2,
+        "Action":  2,
+        "Profile":  0
+    }
+]

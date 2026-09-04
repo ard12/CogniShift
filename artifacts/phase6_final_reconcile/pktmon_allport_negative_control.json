@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "pktmon_command": "pktmon start --capture --pkt-size 128 -f pktmon_allport_negative_control.etl",
+  "port_filter_present": false,
+  "port_filter_value": null,
+  "loopback_detected": true,
+  "public_80_detected": true,
+  "public_other_port_detected": true,
+  "captured_loopback_count": 2,
+  "captured_public_80_count": 2,
+  "captured_public_443_count": 2,
+  "raw_etl_sha256": null,
+  "decoded_trace_sha256": null
+}

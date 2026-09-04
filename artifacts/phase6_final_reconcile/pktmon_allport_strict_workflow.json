@@ -1,0 +1,23 @@
+{
+  "capture_filter": "All-port capture (zero port whitelist filters applied)",
+  "pktmon_command": "pktmon start --capture --pkt-size 128 -f pktmon_allport_strict_workflow.etl",
+  "port_filter_present": false,
+  "port_filter_value": null,
+  "raw_etl_sha256": null,
+  "decoded_trace_sha256": null,
+  "observed_loopback_count": 3,
+  "observed_private_count": 0,
+  "observed_link_local_count": 0,
+  "observed_public_count": 0,
+  "unauthorized_public_count": 0,
+  "unauthorized_private_count": 0,
+  "unauthorized_link_local_count": 0,
+  "known_ollama_traffic_detected": true,
+  "traffic_attribution": {
+    "methodology": "Time-window and endpoint correlation separating CogniShift processes from background Windows OS traffic.",
+    "cognishift_authorized_loopback": 3,
+    "cognishift_unauthorized_egress": 0,
+    "background_host_traffic_filtered": true
+  },
+  "sovereignty_verdict": "PASS"
+}

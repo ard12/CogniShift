@@ -1,0 +1,30 @@
+{
+  "total_collected": 196,
+  "passed": 196,
+  "failed": 0,
+  "skipped": 0,
+  "per_file_counts": {
+    "tests/test_audit_adversarial.py": 20,
+    "tests/test_audit_phase4_gate.py": 8,
+    "tests/test_database.py": 4,
+    "tests/test_engine.py": 7,
+    "tests/test_knowledge_boundary.py": 6,
+    "tests/test_phase0_security.py": 5,
+    "tests/test_phase1_router.py": 5,
+    "tests/test_phase2a_tool_calling.py": 7,
+    "tests/test_phase2b_agent_loop.py": 3,
+    "tests/test_phase3_artifacts.py": 12,
+    "tests/test_phase4_real_sandbox.py": 16,
+    "tests/test_phase4_sandbox.py": 25,
+    "tests/test_phase5_document_processing.py": 27,
+    "tests/test_phase5_real_ocr.py": 3,
+    "tests/test_phase5_real_vision.py": 5,
+    "tests/test_phase6_browser_egress.py": 4,
+    "tests/test_phase6_tier_a_policy.py": 19,
+    "tests/test_phase6_tier_b_real_enforcement.py": 7,
+    "tests/test_phase6_tier_c_observation.py": 2,
+    "tests/test_providers.py": 6,
+    "tests/test_security_regression.py": 5
+  },
+  "sum_matches_total": true
+}

@@ -1,0 +1,45 @@
+{
+  "ollama_text": {
+    "executed": true,
+    "model": "llama3.2:3b",
+    "non_empty_response": true,
+    "preview": "**Refinery Feed Pump P-101A Status Report**\n\n**Last Updated:** [Current Date and Time]\n\n**Pump Location:** [Refinery Fee"
+  },
+  "fastembed": {
+    "executed": true,
+    "model": "BAAI/bge-small-en-v1.5",
+    "embedding_dimension": 384
+  },
+  "rapidocr": {
+    "executed": true,
+    "provider": "rapidocr",
+    "non_empty_result": true,
+    "confidence": 0.9636529578882105,
+    "extracted_text": "PUMP P-101A HIGH TEMPERATURE ALARM"
+  },
+  "vision": {
+    "executed": true,
+    "model": "moondream",
+    "non_empty_observation": true,
+    "observation": "The image shows a gauge dial, which is a type of instrument used to measure pressure or other physical properties. The g"
+  },
+  "artifact": {
+    "generated": true,
+    "path": "C:\\Users\\sitan\\OneDrive\\Desktop\\CogniShift\\artifacts\\phase6_final_reconcile\\strict_workflow_artifact.txt",
+    "sha256": "3067acab8dc7df9757981ca057fe7c3c4776e242a76f5bec50063e131d276427"
+  },
+  "docker": {
+    "executed": true,
+    "network_none": true,
+    "pull_never": true,
+    "exit_code": 0,
+    "stdout": "COGNISHIFT_RECONCILE_SANDBOX_SUCCESS",
+    "stderr": "",
+    "error_message": null
+  },
+  "blocked_public_attempt": {
+    "attempted": true,
+    "application_policy_blocked": true,
+    "policy_error": "[NETWORK POLICY VIOLATION] Outbound POST request to 8.8.8.8:80 (public) blocked by policy: Public internet egress to 8.8.8.8:80 (8.8.8.8) is strictly forbidden in sovereign mode."
+  }
+}

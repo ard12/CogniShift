@@ -1,0 +1,86 @@
+{
+  "manifest_version": "1.0",
+  "description": "CogniShift Phase 6 Final Reconciliation Evidence Manifest",
+  "statement": "SHA-256 proves integrity after generation, not truthfulness at generation time.",
+  "generated_at_utc": "2026-09-04T10:34:36.486916+00:00",
+  "total_files": 13,
+  "files": {
+    "firewall_non_cognishift_after.json": {
+      "size_bytes": 183436,
+      "sha256": "b38fc51cf9cc3837b2eea8218e8cc69d22ba854814c8e075792e44ee0418140f",
+      "modified_utc": "2026-09-04T08:39:28.639933+00:00"
+    },
+    "firewall_non_cognishift_before.json": {
+      "size_bytes": 183436,
+      "sha256": "b38fc51cf9cc3837b2eea8218e8cc69d22ba854814c8e075792e44ee0418140f",
+      "modified_utc": "2026-09-04T08:38:17.741943+00:00"
+    },
+    "firewall_non_cognishift_diff.json": {
+      "size_bytes": 410,
+      "sha256": "b9d2e1b4b4d7a785f7ea9daac698607671e9b379cf166039fe003e4c81a5dde5",
+      "modified_utc": "2026-09-04T08:39:28.805990+00:00"
+    },
+    "neg_ctl_probes.json": {
+      "size_bytes": 460,
+      "sha256": "93438af2dd43deb161350e81a1dad38a1536cf9bdf102593ddee736bc9d23930",
+      "modified_utc": "2026-09-04T10:32:18.930515+00:00"
+    },
+    "observer_vs_application_ledger_final.json": {
+      "size_bytes": 1817,
+      "sha256": "4cca532b52115ceb8af4aa6586477460a456f715fcc71ad76551bf8e47539a5c",
+      "modified_utc": "2026-09-04T10:31:44.623821+00:00"
+    },
+    "phase6_final_reconcile_gate.json": {
+      "size_bytes": 944,
+      "sha256": "d0ec653251271479d7c9552478b0aab04bb97b63e3e3710e5a357438ee69bdde",
+      "modified_utc": "2026-09-04T10:34:36.200887+00:00"
+    },
+    "pktmon_allport_negative_control.json": {
+      "size_bytes": 450,
+      "sha256": "bb41e70f7555b195451deb870251953a9d66602cc8679e01720532473b6b25b4",
+      "modified_utc": "2026-09-04T10:34:31.273297+00:00"
+    },
+    "pktmon_allport_strict_workflow.json": {
+      "size_bytes": 914,
+      "sha256": "0c8af5b835d0d8a6291f50d32881768c74c1315997b395af32dcffbd6c4df6d2",
+      "modified_utc": "2026-09-04T10:34:31.273297+00:00"
+    },
+    "pytest_collection.txt": {
+      "size_bytes": 15602,
+      "sha256": "6a1b48fba6bccf8b00c083d3dc346289eff50af5af9dce8cb08f5f668b474084",
+      "modified_utc": "2026-09-04T08:52:53.049242+00:00"
+    },
+    "pytest_full.txt": {
+      "size_bytes": 22205,
+      "sha256": "374e99e942f575bddbff32f4cf7d1b039737d624cbc3688a5ff07827030b14fd",
+      "modified_utc": "2026-09-04T08:54:42.699230+00:00"
+    },
+    "pytest_inventory.json": {
+      "size_bytes": 1056,
+      "sha256": "67cd26ae40b080c68f8887ebedfa299557a5a98e3834687918bee34254df0423",
+      "modified_utc": "2026-09-04T08:54:55.653330+00:00"
+    },
+    "strict_workflow_artifact.txt": {
+      "size_bytes": 165,
+      "sha256": "3067acab8dc7df9757981ca057fe7c3c4776e242a76f5bec50063e131d276427",
+      "modified_utc": "2026-09-04T10:31:43.594860+00:00"
+    },
+    "strict_workflow_components.json": {
+      "size_bytes": 1611,
+      "sha256": "af67aabbc112af87d6ea7899d42013faecd04c5b94d6f56f36a9357ae0a8e17d",
+      "modified_utc": "2026-09-04T10:31:44.577084+00:00"
+    }
+  },
+  "preserved_closure_artifacts": {
+    "firewall_public_aba.json": {
+      "source": "artifacts/phase6_closure/firewall_public_aba.json",
+      "size_bytes": 2515,
+      "sha256": "e189b06dcc325a7bcfbf02bff2311e081d05ba038233cb90cde36d7447f8e94c"
+    },
+    "firewall_private_aba.json": {
+      "source": "artifacts/phase6_closure/firewall_private_aba.json",
+      "size_bytes": 2690,
+      "sha256": "593221daf280e291cd1ac90868fe47b4b95d439455a41a14d6ce207de8e00ed7"
+    }
+  }
+}

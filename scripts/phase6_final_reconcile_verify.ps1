@@ -62,25 +62,31 @@ $rulesBeforeJson | Out-File -FilePath $beforePath -Encoding utf8
 Write-Host "Exported $($rulesBefore.Count) non-CogniShift rules to $beforePath" -ForegroundColor Gray
 
 # -----------------------------------------------------------------------------
+function Safe-Pktmon {
+    param([string]$Arguments)
+    cmd.exe /c "pktmon $Arguments >nul 2>&1"
+}
+
+# -----------------------------------------------------------------------------
 # STEP 2: All-Port PktMon Negative Control (Zero Port Whitelist)
 # -----------------------------------------------------------------------------
 Write-Host "`n[STEP 2] Running All-Port PktMon Negative Control (No Port Filters)..." -ForegroundColor Cyan
 $negEtl = Join-Path $ReconcileDir "pktmon_allport_negative_control.etl"
 $negTxt = Join-Path $ReconcileDir "pktmon_allport_negative_control.txt"
 
-pktmon stop 2>$null | Out-Null
-pktmon filter remove 2>$null | Out-Null
+Safe-Pktmon "stop"
+Safe-Pktmon "filter remove"
 Write-Host "  Starting all-port unfiltered PktMon capture..." -ForegroundColor Gray
-pktmon start --capture --pkt-size 128 -f $negEtl 2>$null | Out-Null
+Safe-Pktmon "start --capture --pkt-size 128 -f `"$negEtl`""
 
 Write-Host "  Generating negative control probes (loopback 11434, public 80, public 443)..." -ForegroundColor Gray
 & $PythonExe (Join-Path $PSScriptRoot "run_final_reconciliation.py") --run-negative-control-probes
 
 Write-Host "  Stopping all-port PktMon capture..." -ForegroundColor Gray
-pktmon stop 2>$null | Out-Null
+Safe-Pktmon "stop"
 
 Write-Host "  Decoding negative control trace..." -ForegroundColor Gray
-pktmon etl2txt $negEtl -o $negTxt 2>$null | Out-Null
+Safe-Pktmon "etl2txt `"$negEtl`" -o `"$negTxt`""
 
 Write-Host "  Parsing negative control trace..." -ForegroundColor Gray
 & $PythonExe (Join-Path $PSScriptRoot "run_final_reconciliation.py") --parse-pktmon-allport-neg
@@ -95,19 +101,19 @@ Write-Host "  Enabling CogniShift strict firewall..." -ForegroundColor Gray
 $wfEtl = Join-Path $ReconcileDir "pktmon_allport_strict_workflow.etl"
 $wfTxt = Join-Path $ReconcileDir "pktmon_allport_strict_workflow.txt"
 
-pktmon stop 2>$null | Out-Null
-pktmon filter remove 2>$null | Out-Null
+Safe-Pktmon "stop"
+Safe-Pktmon "filter remove"
 Write-Host "  Starting all-port unfiltered PktMon capture..." -ForegroundColor Gray
-pktmon start --capture --pkt-size 128 -f $wfEtl 2>$null | Out-Null
+Safe-Pktmon "start --capture --pkt-size 128 -f `"$wfEtl`""
 
 Write-Host "  Executing 7 strict workflow components (Ollama, FastEmbed, RapidOCR, Moondream, Artifact, Docker, Forbidden Public Probe)..." -ForegroundColor Gray
 & $PythonExe (Join-Path $PSScriptRoot "run_final_reconciliation.py") --run-strict-workflow-components
 
 Write-Host "  Stopping all-port PktMon capture..." -ForegroundColor Gray
-pktmon stop 2>$null | Out-Null
+Safe-Pktmon "stop"
 
 Write-Host "  Decoding strict workflow trace..." -ForegroundColor Gray
-pktmon etl2txt $wfEtl -o $wfTxt 2>$null | Out-Null
+Safe-Pktmon "etl2txt `"$wfEtl`" -o `"$wfTxt`""
 
 Write-Host "  Parsing strict workflow trace & attributing traffic..." -ForegroundColor Gray
 & $PythonExe (Join-Path $PSScriptRoot "run_final_reconciliation.py") --parse-pktmon-allport-strict

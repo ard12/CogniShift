@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-09-04T07:58:56.269659+00:00",
+  "executable": "C:\\Users\\sitan\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "target_host": "1.1.1.1",
+  "target_port": 80,
+  "timeout_seconds": 2.0,
+  "connected": false,
+  "blocked_by_os": true,
+  "error_type": "PermissionError",
+  "error_message": "[WinError 10013] An attempt was made to access a socket in a way forbidden by its access permissions",
+  "error_code": 10013,
+  "elapsed_ms": 0.72
+}

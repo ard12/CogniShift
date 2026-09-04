@@ -1,0 +1,105 @@
+{
+  "report": "Cross-Correlation: Independent Observer vs Application Audit Ledger",
+  "timestamp": "2026-09-04T08:04:29.118332+00:00",
+  "application_ledger_total_events": 3,
+  "application_ledger_allowed_loopback": 0,
+  "application_ledger_blocked_public": 0,
+  "os_observer_total_events": 4,
+  "os_observer_loopback_connections": 4,
+  "os_observer_public_connections": 0,
+  "correlation_analysis": "1. Loopback Correlation: Both the application ledger and the independent OS observer recorded active authorized communication exclusively with the local Ollama daemon (127.0.0.1:11434). 2. Blocked Egress Distinction: When public outbound traffic was attempted (8.8.8.8), the application ledger recorded 'decision: blocked' via SovereignAsyncTransport BEFORE socket creation. Consequently, the independent OS observer observed 0 public outbound packets/connections, confirming complete pre-transport containment.",
+  "application_ledger_events": [
+    {
+      "timestamp": "2026-09-04T08:04:11.621913+00:00",
+      "component": "llm_inference",
+      "requested_host": "localhost",
+      "resolved_ip": "127.0.0.1",
+      "port": 11434,
+      "destination_class": "loopback",
+      "policy_decision": "ALLOWED",
+      "reason": "Explicitly permitted local service at localhost:11434."
+    },
+    {
+      "timestamp": "2026-09-04T08:04:22.151587+00:00",
+      "component": "ollama_provider",
+      "requested_host": "localhost",
+      "resolved_ip": "127.0.0.1",
+      "port": 11434,
+      "destination_class": "loopback",
+      "policy_decision": "ALLOWED",
+      "reason": "Explicitly permitted local service at localhost:11434."
+    },
+    {
+      "timestamp": "2026-09-04T08:04:28.980647+00:00",
+      "component": "egress_probe",
+      "requested_host": "8.8.8.8",
+      "resolved_ip": "8.8.8.8",
+      "port": 80,
+      "destination_class": "public",
+      "policy_decision": "BLOCKED",
+      "reason": "Public internet egress to 8.8.8.8:80 (8.8.8.8) is strictly forbidden in sovereign mode."
+    }
+  ],
+  "os_observer_connections": [
+    {
+      "timestamp": "2026-09-04T08:04:11.238926+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50707,
+      "remote_address": "127.0.0.1",
+      "remote_port": 50706,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:50706",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T08:04:11.238926+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50706,
+      "remote_address": "127.0.0.1",
+      "remote_port": 50707,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:50707",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T08:04:11.644562+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50708,
+      "remote_address": "127.0.0.1",
+      "remote_port": 11434,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:11434",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T08:04:22.184623+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50713,
+      "remote_address": "127.0.0.1",
+      "remote_port": 11434,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:11434",
+      "source_mechanism": "os_socket_table"
+    }
+  ]
+}

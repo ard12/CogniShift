@@ -1,0 +1,86 @@
+﻿Firewall State Enabled
+Timestamp: 2026-09-04T13:28:51.3550631+05:30
+Total NetFirewallRule Count: 603
+CogniShift Rule Count: 
+
+Rules Detail:
+
+
+DisplayName : CogniShift-Phase6-Block-Outbound-WAN
+Enabled     : True
+Direction   : Outbound
+Action      : Block
+Profile     : Any
+
+
+
+
+
+Address Filters:
+
+
+LocalAddress            : Any
+LocalIP                 : Any
+RemoteAddress           : {0.0.0.0-126.255.255.255, 128.0.0.0-255.255.255.255, ::, 
+                          ::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff}
+RemoteIP                : {0.0.0.0-126.255.255.255, 128.0.0.0-255.255.255.255, ::, 
+                          ::2-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff}
+Caption                 : 
+Description             : 
+ElementName             : 
+InstanceID              : {f8dbc475-9750-41df-a857-a0952cec70ac}
+CommunicationStatus     : 
+DetailedStatus          : 
+HealthState             : 
+InstallDate             : 
+Name                    : 
+OperatingStatus         : 
+OperationalStatus       : 
+PrimaryStatus           : 
+Status                  : 
+StatusDescriptions      : 
+CreationClassName       : MSFT|FW|FirewallRule|{f8dbc475-9750-41df-a857-a0952cec70ac}
+IsNegated               : 
+SystemCreationClassName : 
+SystemName              : 
+PSComputerName          : 
+CimClass                : root/standardcimv2:MSFT_NetAddressFilter
+CimInstanceProperties   : {Caption, Description, ElementName, InstanceID...}
+CimSystemProperties     : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+
+
+
+Application Filters:
+
+
+Program                 : C:\Users\sitan\AppData\Local\Programs\Python\Python312\python.exe
+Caption                 : 
+Description             : 
+ElementName             : 
+InstanceID              : {f8dbc475-9750-41df-a857-a0952cec70ac}
+CommunicationStatus     : 
+DetailedStatus          : 
+HealthState             : 
+InstallDate             : 
+Name                    : 
+OperatingStatus         : 
+OperationalStatus       : 
+PrimaryStatus           : 
+Status                  : 
+StatusDescriptions      : 
+CreationClassName       : MSFT|FW|FirewallRule|{f8dbc475-9750-41df-a857-a0952cec70ac}
+IsNegated               : 
+SystemCreationClassName : 
+SystemName              : 
+AppPath                 : C:\Users\sitan\AppData\Local\Programs\Python\Python312\python.exe
+Package                 : 
+PSComputerName          : 
+CimClass                : root/standardcimv2:MSFT_NetApplicationFilter
+CimInstanceProperties   : {Caption, Description, ElementName, InstanceID...}
+CimSystemProperties     : Microsoft.Management.Infrastructure.CimSystemProperties
+
+
+
+

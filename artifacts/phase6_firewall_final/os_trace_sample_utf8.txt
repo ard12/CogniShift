@@ -1,0 +1,30 @@
+﻿[00]199C.7644::2026-09-04 13:29:00.769441300 [MSNT_SystemTrace] Event: Header, BufferSize: 16777216, Version: 131082, ProviderVersion: 26200, NumberOfProcessors: 16, EndTime: 134329823409093837, TimerResolution: 156250, MaxFileSize: 512, LogFileMode: 0x4010001, BuffersWritten: 4, StartBuffers: 1, PointerSize: 8, EventsLost: 0, CPUSpeed: 2611, LoggerName: 0x0, LogFileName: 0x0, TimeZoneInformation: 0, BootTime: 134329699665000000, PerfFreq: 10000000, StartTime: 134329823407694413, ReservedFlags: 0x1, BuffersLost: 0, SessionNameString: Relogger, LogFileNameString: C:\Users\sitan\OneDrive\Desktop\CogniShift\artifacts\phase6_firewall_final\os_trace.etl
+[00]199C.7644::2026-09-04 13:29:00.769441300 [MSNT_SystemTrace] Event: PartitionInfoExtensionV2, EventVersion: 0, Reserved: 0, PartitionType: 0, QpcOffsetFromRoot: 0, PartitionId: , ParentId: 
+[00]199C.7644::2026-09-04 13:29:00.769441300 [MSNT_SystemTrace] Event: PartitionInfoExtensionV2, EventVersion: 0, Reserved: 0, PartitionType: 0, QpcOffsetFromRoot: 0, PartitionId: , ParentId: 
+[14]6108.2C6C::2026-09-04 13:29:00.873576000 [Microsoft-Windows-PktMon] Drop: PktGroupId 3940649673949185, PktNumber 1, Appearance 0, Direction Rx , Type IP , Component 107, Filter 1, DropReason INET: FIN-WAIT2 , DropLocation 0xE000451E, OriginalSize 40, LoggedSize 40 
+	Drop: ip: 127.0.0.1.60115 > 127.0.0.1.11434: Flags [.], ack 3799955204, win 255, length 0
+[02]3438.36F8::2026-09-04 13:29:00.891987900 [Microsoft-Windows-PktMon] Packet Filter 1, Name , MAC-1 0x000000000000, MAC-2 0x000000000000, EtherType 0, VlanId 0, IP-1 0.0.0.0, IP-2 0.0.0.0, Protocol 0, Port-1 11434, Port-2 0, TCPFlags 0 
+[02]3438.36F8::2026-09-04 13:29:00.891989800 [Microsoft-Windows-PktMon] Component 139, Type HTTP Message , Name HTTP.SYS, HTTP Message 
+[02]3438.36F8::2026-09-04 13:29:00.891990700 [Microsoft-Windows-PktMon] Drop Counters: Component 139, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891991600 [Microsoft-Windows-PktMon] Flow Counters: Component 139, Edge Ssl, Edge Id 3, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891992600 [Microsoft-Windows-PktMon] Flow Counters: Component 139, Edge HttpLow, Edge Id 2, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891993200 [Microsoft-Windows-PktMon] Flow Counters: Component 139, Edge HttpUp, Edge Id 1, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891993500 [Microsoft-Windows-PktMon] Component 138, Type HTTP Protocol , Name http.sys, HTTP 
+[02]3438.36F8::2026-09-04 13:29:00.891993800 [Microsoft-Windows-PktMon] Property: Component 138, IP Address  = fe80::5f7e:4e47:35c9:f146 
+[02]3438.36F8::2026-09-04 13:29:00.891994200 [Microsoft-Windows-PktMon] Property: Component 138, MiniportIfIndex  = 39 
+[02]3438.36F8::2026-09-04 13:29:00.891994900 [Microsoft-Windows-PktMon] Drop Counters: Component 138, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891995600 [Microsoft-Windows-PktMon] Flow Counters: Component 138, Edge Upper, Edge Id 2, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891996500 [Microsoft-Windows-PktMon] Flow Counters: Component 138, Edge Lower, Edge Id 1, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891996800 [Microsoft-Windows-PktMon] Component 137, Type HTTP Protocol , Name http.sys, HTTP 
+[02]3438.36F8::2026-09-04 13:29:00.891997000 [Microsoft-Windows-PktMon] Property: Component 137, IP Address  = fe80::ccd0:494d:eafa:b51b 
+[02]3438.36F8::2026-09-04 13:29:00.891997200 [Microsoft-Windows-PktMon] Property: Component 137, MiniportIfIndex  = 10 
+[02]3438.36F8::2026-09-04 13:29:00.891997800 [Microsoft-Windows-PktMon] Drop Counters: Component 137, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891998400 [Microsoft-Windows-PktMon] Flow Counters: Component 137, Edge Upper, Edge Id 2, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891999000 [Microsoft-Windows-PktMon] Flow Counters: Component 137, Edge Lower, Edge Id 1, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.891999300 [Microsoft-Windows-PktMon] Component 136, Type HTTP Protocol , Name http.sys, HTTP 
+[02]3438.36F8::2026-09-04 13:29:00.891999400 [Microsoft-Windows-PktMon] Property: Component 136, IP Address  = fe80::183a:441d:e413:d9e 
+[02]3438.36F8::2026-09-04 13:29:00.891999600 [Microsoft-Windows-PktMon] Property: Component 136, MiniportIfIndex  = 17 
+[02]3438.36F8::2026-09-04 13:29:00.892000200 [Microsoft-Windows-PktMon] Drop Counters: Component 136, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.892000700 [Microsoft-Windows-PktMon] Flow Counters: Component 136, Edge Upper, Edge Id 2, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.892001300 [Microsoft-Windows-PktMon] Flow Counters: Component 136, Edge Lower, Edge Id 1, Direction In = Rx , Packets In 0, Bytes In 0, Direction Out = Tx , Packets Out 0, Bytes Out 0 
+[02]3438.36F8::2026-09-04 13:29:00.892001400 [Microsoft-Windows-PktMon] Component 135, Type HTTP Protocol , Name http.sys, HTTP 

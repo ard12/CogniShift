@@ -1,0 +1,4 @@
+﻿Firewall State Before Enable
+Timestamp: 2026-09-04T13:28:48.7548446+05:30
+Total NetFirewallRule Count: 602
+CogniShift-Phase6 Rules: NONE (0 rules found)

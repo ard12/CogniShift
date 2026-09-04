@@ -1,0 +1,102 @@
+{
+  "report": "CogniShift OS Independent Observer Strict Workflow Report",
+  "timestamp": "2026-09-04T08:04:29.117266+00:00",
+  "workflow_results": {
+    "llm": {
+      "status": "SUCCESS",
+      "response": "PIPELINE OPERATIONAL"
+    },
+    "embedding": {
+      "status": "SUCCESS",
+      "dimensions": 384
+    },
+    "ocr": {
+      "status": "SUCCESS",
+      "extracted_text": "VESSEL V-102 RELIEF SETTING 150 PSI"
+    },
+    "vision": {
+      "status": "SUCCESS",
+      "text": ""
+    },
+    "sandbox": {
+      "status": "SandboxStatus.TIMEOUT",
+      "stdout": "",
+      "network_none_enforced": true
+    },
+    "guard_interception": {
+      "status": "BLOCKED_AS_EXPECTED",
+      "exception": "NetworkPolicyViolation"
+    }
+  },
+  "observer_summary": {
+    "total_observed": 4,
+    "loopback_count": 4,
+    "public_count": 0,
+    "private_count": 0,
+    "link_local_count": 0,
+    "unauthorized_count": 0
+  },
+  "connections": [
+    {
+      "timestamp": "2026-09-04T08:04:11.238926+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50707,
+      "remote_address": "127.0.0.1",
+      "remote_port": 50706,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:50706",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T08:04:11.238926+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50706,
+      "remote_address": "127.0.0.1",
+      "remote_port": 50707,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:50707",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T08:04:11.644562+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50708,
+      "remote_address": "127.0.0.1",
+      "remote_port": 11434,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:11434",
+      "source_mechanism": "os_socket_table"
+    },
+    {
+      "timestamp": "2026-09-04T08:04:22.184623+00:00",
+      "pid": 2456,
+      "process_name": "python.exe",
+      "protocol": "TCP",
+      "local_address": "127.0.0.1",
+      "local_port": 50713,
+      "remote_address": "127.0.0.1",
+      "remote_port": 11434,
+      "status": "ESTABLISHED",
+      "classification": "loopback",
+      "is_authorized": true,
+      "details": "Loopback connection to 127.0.0.1:11434",
+      "source_mechanism": "os_socket_table"
+    }
+  ],
+  "sovereignty_verdict": "PASS"
+}

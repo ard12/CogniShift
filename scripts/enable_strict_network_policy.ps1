@@ -48,14 +48,14 @@ Write-Host ""
 Write-Host "Cleaning up existing CogniShift-Phase6 rules..." -ForegroundColor Gray
 Remove-NetFirewallRule -Group "CogniShift-Phase6" -ErrorAction SilentlyContinue
 
-# 4. Create Rule: Allow Outbound Loopback (IPv4 & IPv6)
+# 4. Create Rule: Allow Outbound Loopback
 Write-Host "Creating Rule: Allow Outbound Loopback..." -ForegroundColor Green
 New-NetFirewallRule -DisplayName "CogniShift-Phase6-Allow-Loopback-Out" `
     -Group "CogniShift-Phase6" `
     -Description "Allow CogniShift Python process outbound loopback communication" `
     -Direction Outbound `
     -Program $PythonPath `
-    -RemoteAddress @("127.0.0.1", "::1") `
+    -RemoteAddress "127.0.0.1" `
     -Action Allow `
     -Profile Any `
     -Enabled True | Out-Null
@@ -69,7 +69,7 @@ New-NetFirewallRule -DisplayName "CogniShift-Phase6-Allow-Loopback-In" `
     -Program $PythonPath `
     -LocalPort 8000 `
     -Protocol TCP `
-    -RemoteAddress @("127.0.0.1", "::1") `
+    -RemoteAddress "127.0.0.1" `
     -Action Allow `
     -Profile Any `
     -Enabled True | Out-Null

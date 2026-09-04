@@ -15,3 +15,9 @@ data/private/
 *.auth.json
 auth_store.json
 .env.local
+
+# Benchmarks Raw Data and Runtime Outputs (Preserve structure via .gitkeep)
+benchmarks/datasets/**/raw/*
+!benchmarks/datasets/**/raw/.gitkeep
+benchmarks/results/*
+!benchmarks/results/.gitkeep

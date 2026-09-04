@@ -1,49 +1,91 @@
 {
-  "manifest_version": "1.0",
-  "generated_at_utc": "2026-09-04T07:50:00Z",
-  "provenance_policy": "Strict Real-Data Separation (No synthetic data labeled as real)",
+  "manifest_version": "2.0",
+  "generated_at_utc": "2026-09-04T11:00:00Z",
+  "provenance_policy": "Strict Real-Data Separation (No synthetic data labeled as real benchmark data)",
+  "benchmark_v1_status": "PROVISIONING_REQUIRED (AWAITING_HUMAN_APPROVAL)",
+  "acquisition_plan_reference": "benchmarks/datasets/acquisition_plan.json",
   "datasets": {
-    "real_industrial_ocr": {
-      "status": "PROVISIONING_REQUIRED",
-      "target_task": "Real Document OCR Benchmark (CER/WER evaluation)",
-      "recommended_source": "MVTec Industrial Text / Scanned Public Technical Reports (e.g. NASA NTRS technical reports or OSHA incident reports)",
-      "license": "Public / Permissive Academic",
-      "local_path": null,
-      "requires_download": true,
-      "ground_truth_format": "Box/Text UTF-8 JSON or TXT"
+    "funsd": {
+      "name": "FUNSD (Form Understanding in Noisy Scanned Documents)",
+      "status": "AWAITING_HUMAN_APPROVAL",
+      "target_task": "Real Scanned Document OCR (CER, WER, Failure Rate, Latency)",
+      "dataset_type": "REAL_WITH_GROUND_TRUTH",
+      "official_source": "https://guillaumejaume.github.io/FUNSD/",
+      "license": "Custom Non-Commercial Research & Educational Terms (EPFL-LTS5)",
+      "evaluation_split": "testing_data (50 pages)",
+      "ground_truth_format": "JSON with word-level bounding boxes and transcriptions",
+      "local_path": "benchmarks/datasets/funsd/raw/",
+      "requires_download": true
     },
-    "real_engineering_pdf": {
-      "status": "PROVISIONING_REQUIRED",
-      "target_task": "Native PDF Extraction vs OCR Routing Accuracy",
-      "recommended_source": "Public OSHA / Chemical Safety Board (CSB) Investigation Reports (clean native digital PDFs with known text layers)",
-      "license": "Public Domain (US Government)",
-      "local_path": null,
-      "requires_download": true,
-      "ground_truth_format": "Page-aligned ground truth text"
+    "cord_v2": {
+      "name": "CORD v2 (Consolidated Receipt Dataset for Post-OCR Parsing)",
+      "status": "AWAITING_HUMAN_APPROVAL",
+      "target_task": "Receipt OCR & Post-OCR Structured Extraction",
+      "dataset_type": "REAL_WITH_GROUND_TRUTH",
+      "official_source": "https://github.com/clovaai/cord",
+      "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+      "evaluation_split": "test split (100 receipts)",
+      "ground_truth_format": "Parquet / JSON line hierarchy with bounding boxes and field tags",
+      "local_path": "benchmarks/datasets/cord/raw/",
+      "requires_download": true
     },
-    "real_rag_qa_benchmark": {
-      "status": "PROVISIONING_REQUIRED",
-      "target_task": "Technical Knowledge Retrieval & Grounded QA (Recall@k, MRR, Citation Completeness)",
-      "recommended_source": "Public CSB Investigation Reports with curated Q&A pairs and ground-truth page citations",
-      "license": "Public Domain",
-      "local_path": null,
-      "requires_download": true,
-      "ground_truth_format": "Query-Document-Page relevance mapping (JSON)"
+    "nasa_ntrs": {
+      "name": "NASA Technical Reports Server (NTRS) Engineering Corpus",
+      "status": "AWAITING_HUMAN_APPROVAL",
+      "target_task": "Technical PDF Ingestion, Native Extraction vs OCR Routing, RAG Retrieval & QA",
+      "dataset_type": "REAL_REQUIRES_HUMAN_GROUND_TRUTH",
+      "official_source": "https://ntrs.nasa.gov/",
+      "candidate_manifest": "benchmarks/datasets/nasa_ntrs/candidate_reports.json",
+      "license": "Public Domain / Public Use Permitted (US Government Work)",
+      "evaluation_split": "12 technical reports (~888 pages)",
+      "ground_truth_format": "benchmarks/schemas/qa_gold.schema.json (Human-verified Q&A pairs)",
+      "local_path": "benchmarks/datasets/nasa_ntrs/raw/",
+      "requires_download": true
     },
-    "real_industrial_vision": {
-      "status": "PROVISIONING_REQUIRED",
-      "target_task": "Gauge Reading & Nameplate Identification Benchmark",
-      "recommended_source": "OpenGauge Dataset / Roboflow Industrial Pointer Meter Dataset (real photographic captures under varied lighting and angles)",
-      "license": "CC BY 4.0 / Open Access",
-      "local_path": null,
-      "requires_download": true,
-      "ground_truth_format": "Bounding box + ground-truth numerical reading / text"
+    "csb_reports": {
+      "name": "U.S. Chemical Safety Board (CSB) Investigation Reports",
+      "status": "AWAITING_HUMAN_APPROVAL",
+      "target_task": "Industrial Chemical & Petroleum Process RAG Retrieval, Citation Verification, Grounded QA",
+      "dataset_type": "REAL_REQUIRES_HUMAN_GROUND_TRUTH",
+      "official_source": "https://www.csb.gov/",
+      "candidate_manifest": "benchmarks/datasets/csb/candidate_reports.json",
+      "license": "Public Domain (17 U.S.C. 105 - US Government Work)",
+      "evaluation_split": "10 completed investigation reports (~1,090 pages)",
+      "ground_truth_format": "benchmarks/schemas/qa_gold.schema.json (Human-verified Q&A pairs)",
+      "local_path": "benchmarks/datasets/csb/raw/",
+      "requires_download": true
+    },
+    "pointer_meter": {
+      "name": "Pointer Meter Reader Benchmark Dataset",
+      "status": "AWAITING_HUMAN_APPROVAL",
+      "target_task": "Analog Dial Gauge & Meter Detection, Reading Estimation (MAE)",
+      "dataset_type": "REAL_WITH_GROUND_TRUTH",
+      "official_source": "https://github.com/b10011/pointer-meter-reader",
+      "license": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)",
+      "evaluation_split": "50-100 real photographed meter images",
+      "ground_truth_format": "YAML templates + values.json with calibrated scale endpoints and readings",
+      "local_path": "benchmarks/datasets/pointer_meter/raw/",
+      "requires_download": true
+    },
+    "docvqa": {
+      "name": "DocVQA (Document Visual Question Answering)",
+      "status": "DEFERRED",
+      "target_task": "Visual Question Answering on Document Images (Benchmark v2)",
+      "dataset_type": "REAL_WITH_GROUND_TRUTH",
+      "official_source": "https://www.docvqa.org/",
+      "license": "Custom Academic Competition Terms",
+      "evaluation_split": "DEFERRED",
+      "ground_truth_format": "JSON Q&A with bounding boxes",
+      "local_path": "benchmarks/datasets/docvqa/raw/",
+      "requires_download": false
     },
     "local_synthetic_fixtures": {
+      "name": "Local Synthetic Development Fixtures",
       "status": "SYNTHETIC_FIXTURE_ONLY",
-      "target_task": "Regression & Security Gate Unit Testing (NOT valid for real-data benchmark metrics)",
-      "source": "Programmatic generation (PIL, FPDF, ReportLab) in CogniShift repo",
-      "license": "Proprietary / Internal",
+      "target_task": "Unit, Integration & Security Gate Testing ONLY (Strictly prohibited for real-data benchmark metrics)",
+      "dataset_type": "SYNTHETIC",
+      "source": "Programmatic generation (PIL, FPDF, ReportLab) in repository",
+      "license": "Internal Project Fixtures",
       "local_paths": [
         "data/manuals/MRPL_HAZOP_OISD_SOP.pdf",
         "data/manuals/MRPL_MEGA_CORPUS_500P.pdf",
@@ -51,7 +93,7 @@
         "data/vision_test/nameplate_pump_p101a.png"
       ],
       "requires_download": false,
-      "ground_truth_format": "Test assertion constants"
+      "ground_truth_format": "Hardcoded test assertion constants"
     }
   }
 }

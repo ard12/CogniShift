@@ -29,7 +29,8 @@ from cognishift.core.tool_schemas import (
     parse_agent_action,
     validate_proposed_tool_call,
     ToolCallProposal,
-    FinalAnswer
+    FinalAnswer,
+    TOOL_SCHEMAS
 )
 from cognishift.core.planner import (
     create_initial_plan,
@@ -96,6 +97,26 @@ def parse_tool_call(
     return False, None, {}, ""
 
 
+def is_capability_or_conversational_query(prompt: str) -> bool:
+    """Check if query is asking about agent capabilities or general identity rather than plant telemetry/SOPs."""
+    p = (prompt or "").lower().strip()
+    capability_patterns = [
+        r"can you (?:run|execute|write|do|help)\b",
+        r"\b(?:what|which) (?:tools|capabilities|actions|functions)\b",
+        r"\bwhat are your (?:capabilities|tools|functions|features|instructions|skills)\b",
+        r"\bwhat can you (?:do|run|execute)\b",
+        r"\b(?:who|what) are you\b",
+        r"\btell me about yourself\b",
+        r"\bhow can you help\b",
+        r"\bhow do you work\b",
+        r"^(?:hi|hello|hey|greetings|help)\b"
+    ]
+    for pattern in capability_patterns:
+        if re.search(pattern, p):
+            return True
+    return False
+
+
 def build_system_prompt(
     base_instructions: str,
     available_tools: List[Dict[str, Any]],
@@ -106,8 +127,11 @@ def build_system_prompt(
         base_instructions or "You are an industrial operations assistant for Mangalore Refinery and Petrochemicals Limited (MRPL).",
         "\n--- INDUSTRIAL SAFETY & OPERATIONAL GUIDELINES ---",
         "1. Prioritize plant safety, personnel protection, and OISD standards.",
-        "2. When citing facts from the provided manuals, reference the manual name and page number.",
-        "3. If a tool is required to inspect telemetry or perform an action, output a JSON tool call.",
+        "2. Answer the user's specific question directly, truthfully, and conversationally.",
+        "3. When citing facts from the provided manuals, reference the manual name and page number.",
+        "4. If no relevant manuals are provided or the retrieved context does not contain information about the requested document or equipment, state clearly that the document/manual is not indexed in the knowledge base. Do NOT fabricate equipment trip readings, SOP details, or alarm states unless they are present in the query or retrieved context.",
+        "5. If the user asks about your capabilities or what tools you can run, accurately explain the tools available in your profile.",
+        "6. If a tool is required to inspect telemetry or perform an action, output a JSON tool call.",
     ]
     
     if available_tools:
@@ -115,10 +139,20 @@ def build_system_prompt(
         for t in available_tools:
             risk = t.get("risk_level", "read_only")
             req_app = "YES (Requires Supervisor Approval)" if t.get("requires_approval") else "NO (Safe to auto-run)"
+            schema_repr = t.get("input_schema")
+            if not schema_repr or schema_repr in ("{}", ""):
+                model_cls = TOOL_SCHEMAS.get(t["name"])
+                if model_cls:
+                    schema_repr = json.dumps({
+                        k: v.get("description", v.get("type", "string"))
+                        for k, v in model_cls.model_json_schema().get("properties", {}).items()
+                    })
+                else:
+                    schema_repr = "{}"
             prompt_parts.append(
                 f"- Tool: `{t['name']}` | Risk: {risk} | Human Approval: {req_app}\n"
                 f"  Description: {t.get('description', '')}\n"
-                f"  Input Schema: {t.get('input_schema', '{}')}"
+                f"  Input Schema: {schema_repr}"
             )
         prompt_parts.append(
             "\nTo call a tool, reply ONLY with a JSON object:\n"
@@ -277,19 +311,59 @@ async def execute_agent_run(
                 rows = await c_sources.fetchall()
                 allowed_source_ids = [r["id"] for r in rows]
 
-            await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids}) and plant topology graph...")
-            retrieval_query = f"{input_text} {vision_analysis}".strip() if vision_analysis else input_text
-            
-            # Fail-closed: If agent has no authorized workspace sources, do NOT retrieve unrestricted
-            context_str = ""
-            if allowed_source_ids:
-                context_str = await retrieve_context(
-                    workspace_id=workspace_id,
-                    query=retrieval_query,
-                    top_k=3,
-                    allowed_source_ids=allowed_source_ids
+            # 5. Domain-Specific RAG Retrieval & Graph Memory
+            is_capability_query = is_capability_or_conversational_query(input_text)
+            if is_capability_query and not vision_analysis:
+                context_str = ""
+                graph_context = ""
+                sources_used = "None (Conversational/Capability Query)"
+                await log_event(
+                    db,
+                    run_id,
+                    "retrieval_bypassed",
+                    "Capability/conversational query detected: bypassing document retrieval.",
+                    {"query": input_text}
                 )
-            graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
+            else:
+                await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids}) and plant topology graph...")
+                retrieval_query = f"{input_text} {vision_analysis}".strip() if vision_analysis else input_text
+                
+                # Fail-closed: If agent has no authorized workspace sources, do NOT retrieve unrestricted
+                context_str = ""
+                if allowed_source_ids:
+                    context_str = await retrieve_context(
+                        workspace_id=workspace_id,
+                        query=retrieval_query,
+                        top_k=3,
+                        allowed_source_ids=allowed_source_ids
+                    )
+                graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
+
+                # Extract citations if present
+                citations = []
+                if context_str:
+                    citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", context_str)))
+                    sources_used = ", ".join(citations) if citations else "Local Knowledge Base"
+                else:
+                    sources_used = "None (No matching manual found)"
+
+                if graph_context:
+                    sources_used += " + Plant Topology Graph"
+                if vision_analysis:
+                    sources_used += " + Local VLM Inspection"
+
+                await log_event(
+                    db,
+                    run_id,
+                    "retrieval_completed",
+                    f"Retrieved context ({len(citations)} manual citations, graph topology: {'yes' if graph_context else 'none'}, visual input: {'yes' if vision_analysis else 'none'})",
+                    {
+                        "citations": citations,
+                        "has_graph": bool(graph_context),
+                        "has_vision": bool(vision_analysis),
+                        "manual_preview": context_str[:200] if context_str else ""
+                    }
+                )
 
             combined_context_parts = []
             if vision_analysis:
@@ -305,31 +379,24 @@ async def execute_agent_run(
 
             combined_context = "\n\n".join(combined_context_parts)
 
-            # Extract citations if present
-            citations = []
-            if context_str:
-                citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", context_str)))
-                sources_used = ", ".join(citations) if citations else "Local Knowledge Base"
-            else:
-                sources_used = "None (No matching manual found)"
-
-            if graph_context:
-                sources_used += " + Plant Topology Graph"
-            if vision_analysis:
-                sources_used += " + Local VLM Inspection"
-
-            await log_event(
-                db,
-                run_id,
-                "retrieval_completed",
-                f"Retrieved context ({len(citations)} manual citations, graph topology: {'yes' if graph_context else 'none'}, visual input: {'yes' if vision_analysis else 'none'})",
-                {
-                    "citations": citations,
-                    "has_graph": bool(graph_context),
-                    "has_vision": bool(vision_analysis),
-                    "manual_preview": context_str[:200] if context_str else ""
-                }
-            )
+            # Fetch recent completed conversation turns for context continuity
+            history = []
+            try:
+                hist_cursor = await db.execute(
+                    """SELECT input_text, result_text FROM agent_runs
+                       WHERE workspace_id = ? AND agent_id = ? AND id < ? AND status = 'completed' AND result_text IS NOT NULL
+                       ORDER BY id DESC LIMIT 3""",
+                    (workspace_id, agent_id, run_id)
+                )
+                recent_runs = await hist_cursor.fetchall()
+                for r in reversed(recent_runs):
+                    u_text = r["input_text"]
+                    a_text = r["result_text"]
+                    if u_text and a_text:
+                        history.append({"role": "user", "content": u_text})
+                        history.append({"role": "assistant", "content": a_text})
+            except Exception as e:
+                logger.warning(f"Failed to fetch conversation history: {e}")
 
             # 5. Model Inference Call
             # 5. Bounded Iterative Plan Execution Loop (P0-3)
@@ -373,7 +440,8 @@ async def execute_agent_run(
                         prompt=step_prompt,
                         system_prompt=system_prompt,
                         context=combined_context,
-                        model_name=selected_model_id
+                        model_name=selected_model_id,
+                        history=history if history else None
                     )
                 except Exception as e:
                     err_msg = f"Model provider failure ({selected_model_id}) on step #{current_step.id}: {str(e)}"

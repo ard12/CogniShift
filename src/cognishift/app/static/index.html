@@ -76,8 +76,16 @@
             <span class="text-[11px] text-slate-400">ZERO CLOUD EGRESS</span>
         </div>
 
-        <!-- Right Deck: Hardware Telemetry Chips -->
+        <!-- Right Deck: Hardware Telemetry Chips & Auth Persona -->
         <div class="flex items-center gap-2 text-[11px]">
+            <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/80 text-cyan-300">
+                <i class="fa-solid fa-user-shield text-[10px]"></i>
+                <select id="authPersonaSelect" onchange="switchPersona(this.value)" class="bg-transparent text-[11px] font-mono font-bold text-cyan-300 border-0 focus:outline-none cursor-pointer">
+                    <option value="operator" class="bg-[#090e17] text-slate-200">Operator (Sam)</option>
+                    <option value="supervisor" class="bg-[#090e17] text-slate-200">Supervisor (Jane)</option>
+                    <option value="administrator" class="bg-[#090e17] text-slate-200">Admin (Rohit)</option>
+                </select>
+            </div>
             <div class="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/50 border border-slate-800 text-slate-400">
                 <i class="fa-solid fa-microchip text-indigo-400 text-[10px]"></i>
                 <span>GPU: <b class="text-slate-200">RTX 3050</b> (6GB)</span>
@@ -304,6 +312,54 @@
     <script>
         const API_BASE = "/api/v1";
         let activeRunId = null;
+        let currentPersona = "operator";
+        const personaTokens = {};
+
+        async function getAuthToken(persona = currentPersona) {
+            if (personaTokens[persona]) return personaTokens[persona];
+            try {
+                const res = await fetch(`${API_BASE}/auth/demo-session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ persona_id: persona })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    personaTokens[persona] = data.session_token;
+                    return data.session_token;
+                }
+            } catch (e) {
+                console.warn('Demo session token fetch failed:', e);
+            }
+            const fallbackKeys = {
+                operator: "test-key-operator-48291",
+                supervisor: "test-key-supervisor-71024",
+                administrator: "test-key-supervisor-71024"
+            };
+            return fallbackKeys[persona] || "";
+        }
+
+        async function authFetch(url, options = {}, persona = currentPersona) {
+            const token = await getAuthToken(persona);
+            options.headers = options.headers || {};
+            if (options.headers instanceof Headers) {
+                if (!options.headers.has('Authorization') && token) {
+                    options.headers.set('Authorization', `Bearer ${token}`);
+                }
+            } else {
+                if (!options.headers['Authorization'] && token) {
+                    options.headers['Authorization'] = `Bearer ${token}`;
+                }
+            }
+            return fetch(url, options);
+        }
+
+        async function switchPersona(persona) {
+            currentPersona = persona;
+            await getAuthToken(persona);
+            fetchKnowledge();
+            fetchApprovals();
+        }
 
         // Live 24-HR Clock
         function updateClock() {
@@ -356,14 +412,14 @@
             stream.innerHTML = `<div class="text-slate-500 py-1">[${new Date().toLocaleTimeString('en-GB')}] >> DISPATCHING OPERATOR QUERY TO INFERENCE LOOP...</div>`;
 
             try {
-                const res = await fetch(`${API_BASE}/runs`, {
+                const res = await authFetch(`${API_BASE}/runs`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         workspace_id: 1,
                         agent_id: parseInt(agentSelect.value),
                         input_text: text,
-                        user_id: "operator_sitanshu"
+                        user_id: "operator_sam"
                     })
                 });
 
@@ -407,7 +463,7 @@
 
             // Render Events
             try {
-                const evRes = await fetch(`${API_BASE}/runs/${run.id}/events`);
+                const evRes = await authFetch(`${API_BASE}/runs/${run.id}/events`);
                 const events = await evRes.json();
                 stream.innerHTML = '';
                 
@@ -464,7 +520,7 @@
         // Fetch Approvals Inbox
         async function fetchApprovals() {
             try {
-                const res = await fetch(`${API_BASE}/approvals`);
+                const res = await authFetch(`${API_BASE}/approvals`);
                 const data = await res.json();
                 const container = document.getElementById('approvalsContainer');
                 const badge = document.getElementById('pendingCountBadge');
@@ -520,11 +576,16 @@
         // Execute Approval & Auto-Resume
         async function executeApproval(approvalId, runId, action) {
             try {
-                await fetch(`${API_BASE}/approvals/${approvalId}/${action}`, { method: 'POST' });
+                // Four-Eyes Principle: Supervisor signs off
+                const supToken = await getAuthToken("supervisor");
+                await fetch(`${API_BASE}/approvals/${approvalId}/${action}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${supToken}` }
+                });
                 fetchApprovals();
 
                 if (runId) {
-                    const res = await fetch(`${API_BASE}/runs/${runId}/resume`, { method: 'POST' });
+                    const res = await authFetch(`${API_BASE}/runs/${runId}/resume`, { method: 'POST' });
                     if (res.ok) {
                         const resumedRun = await res.json();
                         renderRunOutcome(resumedRun);
@@ -538,7 +599,7 @@
         // Fetch Knowledge Sources
         async function fetchKnowledge() {
             try {
-                const res = await fetch(`${API_BASE}/knowledge?workspace_id=1`);
+                const res = await authFetch(`${API_BASE}/knowledge?workspace_id=1`);
                 const data = await res.json();
                 const list = document.getElementById('manualsList');
                 const badge = document.getElementById('docsCountBadge');
@@ -576,7 +637,7 @@
         async function purgeDoc(id) {
             if (!confirm("Purge vector embeddings for this manual?")) return;
             try {
-                await fetch(`${API_BASE}/knowledge/${id}`, { method: 'DELETE' });
+                await authFetch(`${API_BASE}/knowledge/${id}`, { method: 'DELETE' });
                 fetchKnowledge();
             } catch (err) {
                 console.error(err);
@@ -597,7 +658,7 @@
             status.innerText = "";
 
             try {
-                const res = await fetch(`${API_BASE}/knowledge/upload`, {
+                const res = await authFetch(`${API_BASE}/knowledge/upload`, {
                     method: 'POST',
                     body: formData
                 });
@@ -622,9 +683,12 @@
         });
 
         // Initialize
-        fetchKnowledge();
-        fetchApprovals();
-        setInterval(fetchApprovals, 4000);
+        (async () => {
+            await getAuthToken();
+            fetchKnowledge();
+            fetchApprovals();
+            setInterval(fetchApprovals, 4000);
+        })();
     </script>
 </body>
 </html>

@@ -4,7 +4,7 @@ import re
 import logging
 from typing import Dict, Any, Optional, List, Literal, Union, Type
 from typing_extensions import Annotated
-from pydantic import BaseModel, Field, ValidationError, AfterValidator
+from pydantic import BaseModel, Field, ValidationError, AfterValidator, AliasChoices
 
 logger = logging.getLogger(__name__)
 
@@ -83,33 +83,33 @@ AgentAction = Union[ToolCallProposal, FinalAnswer, ClarificationRequest]
 # 3. PER-TOOL PYDANTIC ARGUMENT SCHEMAS (Strict Bound & Regex Checked)
 # -----------------------------------------------------------------------------
 class CheckPressureArgs(BaseModel):
-    sensor_id: EquipmentIdentifier
+    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor"))
 
 
 class CheckTemperatureArgs(BaseModel):
-    sensor_id: EquipmentIdentifier
+    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor"))
 
 
 class RunDiagnosticArgs(BaseModel):
-    equipment_id: EquipmentIdentifier
+    equipment_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("equipment_id", "equipment", "subsystem"))
 
 
 class EmergencyPressureReliefArgs(BaseModel):
-    chamber_id: EquipmentIdentifier
-    reason: OperationalReason
+    chamber_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("chamber_id", "equipment_id", "equipment", "chamber"))
+    reason: OperationalReason = Field(default="Emergency pressure relief intervention")
 
 
 class RestartComponentArgs(BaseModel):
-    component_id: EquipmentIdentifier
-    reason: OperationalReason
+    component_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("component_id", "component", "equipment_id", "equipment"))
+    reason: OperationalReason = Field(default="Component operational restart")
 
 
 class CheckNetworkArgs(BaseModel):
-    target_host: NetworkHostIdentifier
+    target_host: NetworkHostIdentifier = Field(..., validation_alias=AliasChoices("target_host", "host", "target", "hostname", "ip"))
 
 
 class RestartServiceArgs(BaseModel):
-    service_name: ServiceNameIdentifier
+    service_name: ServiceNameIdentifier = Field(..., validation_alias=AliasChoices("service_name", "service", "name"))
 
 
 def validate_safe_relative_path(v: str) -> str:

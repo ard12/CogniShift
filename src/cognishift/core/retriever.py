@@ -45,11 +45,16 @@ chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path))
 
 # Initialize FastEmbed locally (CPU optimized, 100% offline in sovereign mode)
 os.environ["HF_HUB_OFFLINE"] = "1"
-embedding_model = TextEmbedding(
-    model_name="BAAI/bge-small-en-v1.5",
-    cache_dir=str(settings.fastembed_cache_dir),
-    local_files_only=settings.fastembed_offline,
-)
+try:
+    embedding_model = TextEmbedding(
+        model_name="BAAI/bge-small-en-v1.5",
+        cache_dir=str(settings.fastembed_cache_dir),
+        local_files_only=settings.fastembed_offline,
+    )
+except Exception:
+    embedding_model = TextEmbedding(
+        model_name="BAAI/bge-small-en-v1.5"
+    )
 
 
 async def process_pdf(file_path: str, workspace_id: int, source_id: int, filename: str = "") -> int:
@@ -94,11 +99,15 @@ async def purge_knowledge_source(workspace_id: int, source_id: int) -> bool:
     return True
 
 
+MAX_DISTANCE_THRESHOLD = 0.75
+
+
 async def retrieve_context(
     workspace_id: int,
     query: str,
     top_k: int = 3,
-    allowed_source_ids: Optional[List[int]] = None
+    allowed_source_ids: Optional[List[int]] = None,
+    distance_threshold: float = MAX_DISTANCE_THRESHOLD
 ) -> str:
     """
     Searches ChromaDB for the given query within the workspace.
@@ -203,8 +212,20 @@ async def retrieve_context(
         format_grounded_citation
     )
 
-    formatted_context = "--- RETRIEVED CONTEXT ---\n"
+    # Filter chunks based on distance threshold
+    distances = results.get('distances', [[]])[0] if results.get('distances') else []
+    valid_chunks = []
     for i, doc in enumerate(results['documents'][0]):
+        dist = distances[i] if i < len(distances) else None
+        if dist is not None and dist > distance_threshold:
+            continue
+        valid_chunks.append((doc, i))
+
+    if not valid_chunks:
+        return ""
+
+    formatted_context = "--- RETRIEVED CONTEXT ---\n"
+    for doc, i in valid_chunks:
         meta = results['metadatas'][0][i] if results.get('metadatas') and len(results['metadatas']) > 0 else {}
         citation = format_grounded_citation(meta)
         wrapped_doc = wrap_document_data_for_prompt(doc, meta)

@@ -9,7 +9,14 @@ from fastapi.testclient import TestClient
 from cognishift.app.main import app
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db, init_db
-from cognishift.core.engine import execute_agent_run, resume_agent_run, parse_tool_call
+from cognishift.core.engine import (
+    execute_agent_run,
+    resume_agent_run,
+    parse_tool_call,
+    is_capability_or_conversational_query,
+)
+from cognishift.core.retriever import retrieve_context, MAX_DISTANCE_THRESHOLD
+from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture(autouse=True)
@@ -216,7 +223,16 @@ async def test_resume_after_rejection():
 
 def test_runs_api_endpoints():
     """Test full HTTP REST endpoints for Runs API."""
-    from tests.conftest import TEST_OPERATOR_TOKEN
+    try:
+        from tests.conftest import TEST_OPERATOR_TOKEN
+    except ImportError:
+        import importlib.util
+        from pathlib import Path
+        conftest_path = Path(__file__).parent / "conftest.py"
+        spec = importlib.util.spec_from_file_location("local_conftest", conftest_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        TEST_OPERATOR_TOKEN = getattr(mod, "TEST_OPERATOR_TOKEN", "mock_token")
     client = TestClient(app)
 
     auth_headers = {"Authorization": f"Bearer {TEST_OPERATOR_TOKEN}"}
@@ -255,3 +271,102 @@ def test_runs_api_endpoints():
     events = events_res.json()
     assert len(events) >= 2
     assert events[0]["event_type"] == "run_started"
+
+
+def test_is_capability_or_conversational_query():
+    """Verify regex patterns for capability and conversational queries."""
+    # True positives (should bypass domain RAG)
+    assert is_capability_or_conversational_query("can you run a python script?") is True
+    assert is_capability_or_conversational_query("what tools do you have?") is True
+    assert is_capability_or_conversational_query("hello there") is True
+    assert is_capability_or_conversational_query("who are you?") is True
+    assert is_capability_or_conversational_query("what are your capabilities?") is True
+    assert is_capability_or_conversational_query("can you write code") is True
+
+    # True negatives (domain queries that require RAG)
+    assert is_capability_or_conversational_query("What are the basic guidelines for refinery pump maintenance?") is False
+    assert is_capability_or_conversational_query("Check vibration on pump P-101") is False
+    assert is_capability_or_conversational_query("SOP for pump 610 startup sequence") is False
+
+
+@pytest.mark.asyncio
+async def test_capability_query_bypasses_retrieval():
+    """Verify that capability queries bypass retrieval and record retrieval_bypassed event."""
+    run_res = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="can you run a python script?",
+        user_id="test_operator"
+    )
+    assert run_res.status == "completed"
+    assert run_res.sources_used == "None (Conversational/Capability Query)"
+
+    async with get_db() as db:
+        cursor = await db.execute("SELECT event_type FROM run_events WHERE run_id = ?", (run_res.id,))
+        events = [e["event_type"] for e in await cursor.fetchall()]
+        assert "retrieval_bypassed" in events
+        assert "retrieval_started" not in events
+
+
+@pytest.mark.asyncio
+async def test_retriever_distance_threshold():
+    """Verify that retriever suppresses chunks with embedding distance above threshold."""
+    assert MAX_DISTANCE_THRESHOLD == 0.75
+    mock_collection = MagicMock()
+    mock_collection.count.return_value = 1
+
+    # Case 1: Distance above 0.75 -> filtered out to empty string
+    mock_collection.query.return_value = {
+        "documents": [["Irrelevant SOP procedure chunk"]],
+        "metadatas": [[{"filename": "manual.pdf", "page": 1, "source_id": 1}]],
+        "distances": [[0.95]]
+    }
+    with patch("cognishift.core.retriever.chroma_client.get_collection", return_value=mock_collection), \
+         patch("cognishift.core.retriever.embedding_model.embed", return_value=[MagicMock(tolist=lambda: [0.1] * 384)]):
+        result = await retrieve_context(workspace_id=1, query="can you run python?")
+        assert result == ""
+
+    # Case 2: Distance within 0.75 -> included
+    mock_collection.query.return_value = {
+        "documents": [["Relevant SOP procedure chunk"]],
+        "metadatas": [[{"filename": "pump_manual.pdf", "page": 4, "source_id": 1}]],
+        "distances": [[0.35]]
+    }
+    with patch("cognishift.core.retriever.chroma_client.get_collection", return_value=mock_collection), \
+         patch("cognishift.core.retriever.embedding_model.embed", return_value=[MagicMock(tolist=lambda: [0.1] * 384)]):
+        result = await retrieve_context(workspace_id=1, query="pump SOP")
+        assert "Relevant SOP procedure chunk" in result
+
+
+@pytest.mark.asyncio
+async def test_multi_turn_history_forwarded():
+    """Verify that previous completed run turns are loaded into history for subsequent runs."""
+    # First turn
+    run1 = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="Hello, my name is Operator Alex",
+        user_id="test_operator"
+    )
+    assert run1.status == "completed"
+
+    captured_history = []
+    from cognishift.core.simulated_provider import SimulatedProvider
+    original_generate = SimulatedProvider.generate_text
+
+    async def spy_generate_text(self, prompt, system_prompt="", context="", model_name=None, history=None):
+        nonlocal captured_history
+        captured_history = history
+        return await original_generate(self, prompt, system_prompt, context, model_name, history)
+
+    with patch.object(SimulatedProvider, "generate_text", spy_generate_text):
+        run2 = await execute_agent_run(
+            workspace_id=1,
+            agent_id=1,
+            input_text="What did I just tell you my name was?",
+            user_id="test_operator"
+        )
+        assert run2.status == "completed"
+        assert captured_history is not None
+        assert len(captured_history) >= 2
+        assert any("Operator Alex" in h["content"] for h in captured_history)

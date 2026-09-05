@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Dict
 
 class ProviderError(Exception):
     """Base exception for model provider errors."""
@@ -34,9 +34,10 @@ class ModelProvider(ABC):
         prompt: str,
         system_prompt: str = "",
         context: str = "",
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> ModelResponse:
-        """Generate text from a prompt with optional system instructions and context."""
+        """Generate text from a prompt with optional system instructions, context, and multi-turn history."""
         ...
     
     @abstractmethod

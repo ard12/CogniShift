@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 from cognishift.core.providers import ModelProvider, ModelResponse
 
 class SimulatedProvider(ModelProvider):
@@ -9,7 +9,8 @@ class SimulatedProvider(ModelProvider):
         prompt: str,
         system_prompt: str = "",
         context: str = "",
-        model_name: str = None
+        model_name: str = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> ModelResponse:
         """Return a simulated text response adhering to the structured AgentAction protocol."""
         chosen_model = model_name or "simulated-text"

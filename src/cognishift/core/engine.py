@@ -29,7 +29,8 @@ from cognishift.core.tool_schemas import (
     parse_agent_action,
     validate_proposed_tool_call,
     ToolCallProposal,
-    FinalAnswer
+    FinalAnswer,
+    TOOL_SCHEMAS
 )
 from cognishift.core.planner import (
     create_initial_plan,
@@ -138,10 +139,20 @@ def build_system_prompt(
         for t in available_tools:
             risk = t.get("risk_level", "read_only")
             req_app = "YES (Requires Supervisor Approval)" if t.get("requires_approval") else "NO (Safe to auto-run)"
+            schema_repr = t.get("input_schema")
+            if not schema_repr or schema_repr in ("{}", ""):
+                model_cls = TOOL_SCHEMAS.get(t["name"])
+                if model_cls:
+                    schema_repr = json.dumps({
+                        k: v.get("description", v.get("type", "string"))
+                        for k, v in model_cls.model_json_schema().get("properties", {}).items()
+                    })
+                else:
+                    schema_repr = "{}"
             prompt_parts.append(
                 f"- Tool: `{t['name']}` | Risk: {risk} | Human Approval: {req_app}\n"
                 f"  Description: {t.get('description', '')}\n"
-                f"  Input Schema: {t.get('input_schema', '{}')}"
+                f"  Input Schema: {schema_repr}"
             )
         prompt_parts.append(
             "\nTo call a tool, reply ONLY with a JSON object:\n"

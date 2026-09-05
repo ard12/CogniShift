@@ -115,3 +115,26 @@ def test_central_risk_policy_forces_hitl():
     assert restart_res.valid is True
     assert restart_res.requires_approval is True
     assert restart_res.risk_level == "sensitive"
+
+
+def test_validate_tool_call_aliases():
+    """Verify that AliasChoices allow small SLMs to pass equipment_id or sensor interchangeably."""
+    # check_pressure with 'sensor' instead of 'sensor_id'
+    res1 = validate_proposed_tool_call(
+        tool_name="check_pressure",
+        raw_parameters={"sensor": "PT-101"},
+        allowed_tools=["check_pressure"]
+    )
+    assert res1.valid is True
+    assert res1.validated_parameters == {"sensor_id": "PT-101"}
+
+    # emergency_pressure_relief with 'equipment_id' instead of 'chamber_id'
+    res2 = validate_proposed_tool_call(
+        tool_name="emergency_pressure_relief",
+        raw_parameters={"equipment_id": "Reactor-B"},
+        allowed_tools=["emergency_pressure_relief"]
+    )
+    assert res2.valid is True
+    assert res2.validated_parameters["chamber_id"] == "Reactor-B"
+    assert "Emergency pressure relief" in res2.validated_parameters["reason"]
+

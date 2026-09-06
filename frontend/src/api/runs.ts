@@ -1,61 +1,56 @@
-import { apiFetch, apiUpload } from "./clients";
-import type { NewRunPayload, Run, RunEvent } from "@/types";
+import { apiFetch } from "./clients";
+import type { Run, RunCreateRequest, RunEvent } from "@/types";
 
-// Adjust these paths if your backend's actual routes differ.
+// NOTE: the backend (src/cognishift/app/api/runs.py) exposes exactly:
+//   POST   /api/v1/runs
+//   GET    /api/v1/runs
+//   GET    /api/v1/runs/{run_id}
+//   GET    /api/v1/runs/{run_id}/events
+//   POST   /api/v1/runs/{run_id}/resume
+// There is no cancel endpoint — do not add one here.
 const PATHS = {
-  list: "/api/runs",
-  detail: (id: string) => `/api/runs/${id}`,
-  events: (id: string) => `/api/runs/${id}/events`,
-  cancel: (id: string) => `/api/runs/${id}/cancel`,
+  list: "/api/v1/runs",
+  detail: (id: number) => `/api/v1/runs/${id}`,
+  events: (id: number) => `/api/v1/runs/${id}/events`,
+  resume: (id: number) => `/api/v1/runs/${id}/resume`,
 };
 
 export const runsApi = {
-  list: (signal?: AbortSignal) =>
-    apiFetch<Run[]>(PATHS.list, { signal }),
+  list: (
+    filters: { workspaceId?: number; agentId?: number } = {},
+    signal?: AbortSignal
+  ) =>
+    apiFetch<Run[]>(PATHS.list, {
+      query: { workspace_id: filters.workspaceId, agent_id: filters.agentId },
+      signal,
+    }),
 
-  get: (id: string, signal?: AbortSignal) =>
-    apiFetch<Run>(PATHS.detail(id), { signal }),
+  get: (id: number, signal?: AbortSignal) => apiFetch<Run>(PATHS.detail(id), { signal }),
 
-  events: (id: string, signal?: AbortSignal) =>
+  events: (id: number, signal?: AbortSignal) =>
     apiFetch<RunEvent[]>(PATHS.events(id), { signal }),
 
   /**
-   * Starts a new agent run.
-   * Uses multipart/form-data when an image is attached.
-   * Otherwise sends normal JSON.
+   * Dispatches a new agent run. This call blocks until the backend engine
+   * reaches a terminal or paused state (runs execute synchronously) —
+   * there is no separate "queued" state to poll for.
    */
-  create: (
-    payload: NewRunPayload,
-    signal?: AbortSignal
-  ): Promise<Run> => {
-    if (payload.image) {
-      const formData = new FormData();
-
-      formData.append("workspace_id", payload.workspace_id);
-      formData.append("agent_id", payload.agent_id);
-      formData.append("query", payload.query);
-      formData.append("image", payload.image);
-
-      return apiUpload<Run>(
-        PATHS.list,
-        formData,
-        { signal }
-      );
-    }
-
-    return apiFetch<Run>(PATHS.list, {
+  create: (payload: RunCreateRequest, signal?: AbortSignal): Promise<Run> =>
+    apiFetch<Run>(PATHS.list, {
       method: "POST",
       body: {
         workspace_id: payload.workspace_id,
         agent_id: payload.agent_id,
-        query: payload.query,
+        input_text: payload.input_text,
+        input_type: payload.input_image_path ? "multimodal" : payload.input_type ?? "text",
+        input_image_path: payload.input_image_path ?? null,
       },
       signal,
-    });
-  },
+    }),
 
-  cancel: (id: string) =>
-    apiFetch<Run>(PATHS.cancel(id), {
+  /** Requires 'supervisor' or 'administrator' role — backend enforces this. */
+  resume: (id: number) =>
+    apiFetch<Run>(PATHS.resume(id), {
       method: "POST",
     }),
 };

@@ -1,35 +1,32 @@
 import { apiFetch } from "./clients";
 import type { Approval } from "@/types";
 
-// Adjust these paths if your backend's actual routes differ.
-//
-// IMPORTANT: this module only calls the backend's existing approval
-// endpoints. All approval/rejection validation and security logic lives in
-// the backend. This frontend only displays the request and forwards
-// the operator's decision.
+// NOTE: the backend (src/cognishift/app/api/approvals.py) has no approval
+// detail endpoint and no generic list-all — only the pending queue. Approving
+// or rejecting a request also triggers the engine to resume the associated
+// run server-side, so the frontend does not need to call runs.resume itself
+// afterward.
 const PATHS = {
-  list: "/api/approvals",
-  detail: (id: string) => `/api/approvals/${id}`,
-  approve: (id: string) => `/api/approvals/${id}/approve`,
-  reject: (id: string) => `/api/approvals/${id}/reject`,
+  listPending: "/api/v1/approvals",
+  approve: (id: number) => `/api/v1/approvals/${id}/approve`,
+  reject: (id: number) => `/api/v1/approvals/${id}/reject`,
 };
 
 export const approvalsApi = {
-  list: (signal?: AbortSignal) =>
-    apiFetch<Approval[]>(PATHS.list, { signal }),
+  listPending: (signal?: AbortSignal) => apiFetch<Approval[]>(PATHS.listPending, { signal }),
 
-  get: (id: string, signal?: AbortSignal) =>
-    apiFetch<Approval>(PATHS.detail(id), { signal }),
-
-  approve: (id: string, note?: string) =>
+  /**
+   * Enforces the Four-Eyes policy server-side: the approver must be a
+   * 'supervisor' or 'administrator', and cannot be the run's original
+   * requester. Surfacing the resulting 403 honestly is the frontend's job.
+   */
+  approve: (id: number) =>
     apiFetch<Approval>(PATHS.approve(id), {
       method: "POST",
-      body: note ? { note } : undefined,
     }),
 
-  reject: (id: string, note?: string) =>
+  reject: (id: number) =>
     apiFetch<Approval>(PATHS.reject(id), {
       method: "POST",
-      body: note ? { note } : undefined,
     }),
 };

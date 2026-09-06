@@ -1,6 +1,4 @@
-import type { ApprovalStatus, DocumentStatus, RunStatus, ServiceState } from "@/types";
-
-export function formatRelativeTime(iso?: string): string {
+export function formatRelativeTime(iso?: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -29,7 +27,7 @@ export function formatRelativeTime(iso?: string): string {
   return "just now";
 }
 
-export function formatDateTime(iso?: string): string {
+export function formatDateTime(iso?: string | null): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
@@ -41,7 +39,7 @@ export function formatDateTime(iso?: string): string {
   });
 }
 
-export function formatBytes(bytes?: number): string {
+export function formatBytes(bytes?: number | null): string {
   if (bytes === undefined || bytes === null) return "—";
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB", "TB"];
@@ -54,47 +52,95 @@ export function formatBytes(bytes?: number): string {
   return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-const RUN_STATUS_LABELS: Record<RunStatus, string> = {
-  queued: "Queued",
-  running: "Running",
-  waiting_for_approval: "Needs approval",
-  completed: "Completed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-};
+export type Tone = "neutral" | "info" | "success" | "warning" | "danger";
 
-export function runStatusLabel(status: RunStatus): string {
-  return RUN_STATUS_LABELS[status] ?? status;
+/** Run statuses are free-text on the backend; these are the ones the engine emits. */
+export function runStatusTone(status: string): Tone {
+  switch (status) {
+    case "completed":
+      return "success";
+    case "paused":
+      return "warning";
+    case "failed":
+      return "danger";
+    case "running":
+    case "resuming":
+      return "info";
+    default:
+      return "neutral";
+  }
 }
 
-const DOCUMENT_STATUS_LABELS: Record<DocumentStatus, string> = {
-  queued: "Queued",
-  processing: "Processing",
-  ready: "Ready",
-  failed: "Failed",
-};
-
-export function documentStatusLabel(status: DocumentStatus): string {
-  return DOCUMENT_STATUS_LABELS[status] ?? status;
+export function runStatusLabel(status: string): string {
+  switch (status) {
+    case "paused":
+      return "Awaiting approval";
+    case "resuming":
+      return "Resuming";
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1);
+  }
 }
 
-const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
-  pending: "Pending",
-  approved: "Approved",
-  rejected: "Rejected",
-};
-
-export function approvalStatusLabel(status: ApprovalStatus): string {
-  return APPROVAL_STATUS_LABELS[status] ?? status;
+export function approvalStatusTone(status: string): Tone {
+  switch (status) {
+    case "approved":
+      return "success";
+    case "rejected":
+      return "danger";
+    case "pending":
+      return "warning";
+    default:
+      return "neutral";
+  }
 }
 
-const SERVICE_STATE_LABELS: Record<ServiceState, string> = {
-  online: "Online",
-  degraded: "Degraded",
-  offline: "Offline",
-  unknown: "Unknown",
-};
+export function processingStatusTone(status: string): Tone {
+  switch (status) {
+    case "completed":
+    case "ready":
+      return "success";
+    case "processing":
+    case "pending":
+      return "info";
+    case "deleting":
+      return "warning";
+    case "failed":
+    case "deletion_failed":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}
 
-export function serviceStateLabel(state: ServiceState): string {
-  return SERVICE_STATE_LABELS[state] ?? state;
+export function riskLevelTone(riskLevel?: string | null): Tone {
+  switch (riskLevel) {
+    case "read_only":
+    case "low_risk":
+      return "success";
+    case "sensitive":
+      return "warning";
+    case "service_interrupting":
+      return "danger";
+    default:
+      return "neutral";
+  }
+}
+
+export function titleCase(value: string): string {
+  return value
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+/** Safely pretty-prints a JSON string the backend stores as free text (parameters, structured_data, metadata). */
+export function prettyJson(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }

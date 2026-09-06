@@ -1,20 +1,31 @@
 /**
  * Central API client.
  *
- * Every request the frontend makes goes through `apiFetch` below, so there
- * is exactly one place that knows how to reach the backend, attach headers,
- * and turn a non-2xx response into a typed error. Feature modules in this
- * `api/` folder (workspaces.ts, runs.ts, ...) should never call `fetch`
- * directly — they call `apiFetch`/`apiUpload` and stay focused on paths and
- * types.
+ * Every request the frontend makes goes through `apiFetch`/`apiUpload` below,
+ * so there is exactly one place that knows how to reach the backend, attach
+ * auth headers, and turn a non-2xx response into a typed error. Feature
+ * modules in this `api/` folder (workspaces.ts, runs.ts, ...) should never
+ * call `fetch` directly.
+ *
+ * Authentication:
+ * - The backend (`cognishift.app.core.auth.get_current_user`) requires a
+ *   bearer token or `X-API-Key` header on every route. There is no
+ *   username/password login endpoint; operators are issued a token out of
+ *   band (see `scripts/bootstrap_demo_auth.py`) and paste it into the app.
+ * - The token is normally read from local storage via `getStoredToken()`.
+ *   `AuthContext.signIn` passes a token explicitly (via `options.token`)
+ *   so it can verify a credential before it has been persisted.
  *
  * Base URL:
  * - In production, the frontend is built and copied into the FastAPI
  *   static directory, so relative paths ("/api/...") already resolve to
  *   the right place — BASE_URL is left empty.
- * - In development, set VITE_API_BASE_URL if your backend isn't at the
- *   default proxied address (see vite.config.ts).
+ * - In development, set VITE_API_BASE_URL if your backend isn't reachable
+ *   at the same origin (e.g. `http://127.0.0.1:8000` while Vite serves the
+ *   frontend from a different port).
  */
+
+import { getStoredToken } from "../lib/token-storage";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -67,6 +78,8 @@ export interface RequestOptions {
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
   signal?: AbortSignal;
+  /** Explicit token override — used only during sign-in verification. */
+  token?: string;
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
@@ -83,13 +96,21 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
   return BASE_URL ? url.toString() : url.pathname + url.search;
 }
 
+function authHeader(token?: string): Record<string, string> {
+  const effective = token ?? getStoredToken();
+  return effective ? { Authorization: `Bearer ${effective}` } : {};
+}
+
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, query, signal } = options;
+  const { method = "GET", body, query, signal, token } = options;
 
   const res = await fetch(buildUrl(path, query), {
     method,
     signal,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...authHeader(token),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
@@ -100,13 +121,14 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 export async function apiUpload<T>(
   path: string,
   formData: FormData,
-  options: { method?: "POST" | "PUT"; signal?: AbortSignal } = {}
+  options: { method?: "POST" | "PUT"; signal?: AbortSignal; token?: string } = {}
 ): Promise<T> {
   const res = await fetch(buildUrl(path), {
     method: options.method ?? "POST",
     body: formData,
     signal: options.signal,
     // No Content-Type header — the browser sets the multipart boundary.
+    headers: authHeader(options.token),
   });
 
   return handleResponse<T>(res);

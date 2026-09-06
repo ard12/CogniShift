@@ -1,49 +1,40 @@
 import { apiFetch, apiUpload } from "./clients";
-import type { KnowledgeDocument, SearchResult } from "@/types";
+import type { DocumentProcessingJob, KnowledgeSource } from "@/types";
 
-// Adjust these paths if your backend's actual routes differ.
+// NOTE: the backend (src/cognishift/app/api/knowledge.py) does not expose a
+// standalone knowledge-search endpoint. Retrieval happens internally during
+// agent runs (see src/cognishift/core/retriever.py). Do not add a `search`
+// method here — there is nothing to call.
 const PATHS = {
-  list: "/api/knowledge",
-  upload: "/api/knowledge/upload",
-  search: "/api/knowledge/search",
-  delete: (id: string) => `/api/knowledge/${id}`,
+  list: "/api/v1/knowledge",
+  upload: "/api/v1/knowledge/upload",
+  detail: (id: number) => `/api/v1/knowledge/${id}`,
+  jobs: (id: number) => `/api/v1/knowledge/${id}/jobs`,
 };
 
 export const knowledgeApi = {
-  list: (workspaceId?: string, signal?: AbortSignal) =>
-    apiFetch<KnowledgeDocument[]>(PATHS.list, {
+  list: (workspaceId: number, signal?: AbortSignal) =>
+    apiFetch<KnowledgeSource[]>(PATHS.list, {
       query: { workspace_id: workspaceId },
       signal,
     }),
 
-  upload: (file: File, workspaceId: string, signal?: AbortSignal) => {
+  get: (id: number, signal?: AbortSignal) => apiFetch<KnowledgeSource>(PATHS.detail(id), { signal }),
+
+  /** Only .pdf, .png, .jpg/.jpeg are accepted by the backend. */
+  upload: (file: File, workspaceId: number, signal?: AbortSignal) => {
     const formData = new FormData();
-
+    formData.append("workspace_id", String(workspaceId));
     formData.append("file", file);
-    formData.append("workspace_id", workspaceId);
 
-    return apiUpload<KnowledgeDocument>(
-      PATHS.upload,
-      formData,
-      { signal }
-    );
+    return apiUpload<KnowledgeSource>(PATHS.upload, formData, { signal });
   },
 
-  search: (
-    query: string,
-    workspaceId?: string,
-    signal?: AbortSignal
-  ) =>
-    apiFetch<SearchResult[]>(PATHS.search, {
-      query: {
-        q: query,
-        workspace_id: workspaceId,
-      },
-      signal,
-    }),
-
-  remove: (id: string) =>
-    apiFetch<void>(PATHS.delete(id), {
+  remove: (id: number) =>
+    apiFetch<{ status: string; source_id: number; message: string }>(PATHS.detail(id), {
       method: "DELETE",
     }),
+
+  jobs: (id: number, signal?: AbortSignal) =>
+    apiFetch<DocumentProcessingJob[]>(PATHS.jobs(id), { signal }),
 };

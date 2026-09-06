@@ -1,22 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #7c3aed;
-  --color-brand-strong: #6d28d9;
+  /* CogniShift industrial palette — dark, technical, restrained. Cyan is
+     the operational accent (matches the existing static console at
+     src/cognishift/app/static/), amber/emerald/rose carry status meaning. */
+  --color-brand: #06b6d4;
+  --color-brand-strong: #0891b2;
 
-  --color-surface-0: #09090b;
-  --color-surface-1: #0f0f12;
-  --color-surface-2: #18181b;
-  --color-surface-3: #27272a;
+  --color-surface-0: #05070a;
+  --color-surface-1: #0a0d12;
+  --color-surface-2: #0e131a;
+  --color-surface-3: #171d27;
 
-  --color-surface-border: #3f3f46;
-  --color-surface-border-strong: #52525b;
+  --color-surface-border: #232b38;
+  --color-surface-border-strong: #384355;
 
-  --color-ink-1: #f4f4f5;
-  --color-ink-2: #a1a1aa;
-  --color-ink-3: #71717a;
+  --color-ink-1: #e6ebf1;
+  --color-ink-2: #8b98ab;
+  --color-ink-3: #5b6678;
 
-  --color-status-error: #ef4444;
+  --color-status-info: #22d3ee;
+  --color-status-success: #34d399;
+  --color-status-warning: #fbbf24;
+  --color-status-error: #f87171;
+  --color-status-knowledge: #818cf8;
+
+  --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 @layer base {
@@ -51,6 +60,36 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-surface-1);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-border);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-surface-border-strong);
+  }
+}
+
+@keyframes beacon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
   }
 }
 
@@ -174,5 +213,21 @@
     line-height: 1rem;
     font-weight: 500;
     color: var(--color-ink-2);
+  }
+
+  .beacon-active {
+    animation: beacon-pulse 2.5s ease-in-out infinite;
+  }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.25rem;
+    background-color: var(--color-surface-3);
+    border: 1px solid var(--color-surface-border);
+    color: var(--color-ink-2);
+    font-size: 0.6875rem;
+    padding: 0.0625rem 0.375rem;
+    font-family: var(--font-mono);
   }
 }

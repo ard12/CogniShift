@@ -23,6 +23,17 @@ from cognishift.core.sandbox.schemas import (
 logger = logging.getLogger(__name__)
 
 
+async def read_bounded(stream, limit):
+    """Drain the pipe without retaining attacker-controlled unbounded output."""
+    retained = bytearray()
+    truncated = False
+    while chunk := await stream.read(8192):
+        remaining = max(0, limit - len(retained))
+        retained.extend(chunk[:remaining])
+        truncated = truncated or len(chunk) > remaining
+    return bytes(retained), truncated
+
+
 class SandboxBackend(ABC):
     """Abstract interface for sandbox execution backends."""
 
@@ -59,11 +70,16 @@ class DockerPodmanBackend(SandboxBackend):
             return False
         try:
             proc = await asyncio.create_subprocess_exec(
-                self.runtime_bin, "--version",
+                self.runtime_bin, "info",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            await proc.communicate()
+            try:
+                await asyncio.wait_for(proc.communicate(), timeout=5)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                return False
             return proc.returncode == 0
         except Exception:
             return False
@@ -116,16 +132,19 @@ class DockerPodmanBackend(SandboxBackend):
                 stderr=asyncio.subprocess.PIPE
             )
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    proc.communicate(),
+                captured = await asyncio.wait_for(
+                    asyncio.gather(
+                        read_bounded(proc.stdout, settings.sandbox_stdout_limit),
+                        read_bounded(proc.stderr, settings.sandbox_stderr_limit),
+                        proc.wait(),
+                    ),
                     timeout=request.timeout_seconds
                 )
+                (stdout_bytes, stdout_truncated), (stderr_bytes, stderr_truncated), _ = captured
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 exit_code = proc.returncode or 0
 
                 # Truncate output streams to server limits
-                stdout_truncated = len(stdout_bytes) > settings.sandbox_stdout_limit
-                stderr_truncated = len(stderr_bytes) > settings.sandbox_stderr_limit
 
                 stdout_clean = stdout_bytes[:settings.sandbox_stdout_limit].decode("utf-8", errors="replace")
                 stderr_clean = stderr_bytes[:settings.sandbox_stderr_limit].decode("utf-8", errors="replace")
@@ -166,10 +185,20 @@ class DockerPodmanBackend(SandboxBackend):
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 # Explicitly kill and purge container
                 try:
-                    await asyncio.create_subprocess_exec(self.runtime_bin, "kill", container_name)
-                    await asyncio.create_subprocess_exec(self.runtime_bin, "rm", "-f", container_name)
+                    cleanup = await asyncio.create_subprocess_exec(
+                        self.runtime_bin, "rm", "-f", container_name,
+                        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+                    )
+                    try:
+                        await asyncio.wait_for(cleanup.wait(), timeout=10)
+                    except asyncio.TimeoutError:
+                        cleanup.kill()
+                        await cleanup.wait()
                 except Exception as k_err:
                     logger.warning(f"Error killing timed-out container {container_name}: {k_err}")
+                if proc.returncode is None:
+                    proc.kill()
+                await proc.communicate()
 
                 return CodeExecutionResult(
                     execution_id=request.execution_id,

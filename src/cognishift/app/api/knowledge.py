@@ -1,5 +1,4 @@
 import os
-import shutil
 import hashlib
 import uuid
 from pathlib import Path
@@ -9,7 +8,7 @@ from typing import List, Optional
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import KnowledgeSourceResponse, DocumentProcessingJobResponse, DocumentPageResponse
 from cognishift.app.config import settings
-from cognishift.core.retriever import process_pdf, chroma_client, purge_knowledge_source
+from cognishift.core.retriever import purge_knowledge_source
 from cognishift.core.security import resolve_workspace_path
 from cognishift.app.core.auth import get_current_user, verify_workspace_access, User
 from fastapi import Depends

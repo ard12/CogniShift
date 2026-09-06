@@ -9,6 +9,7 @@ from typing import Optional, List
 import logging
 
 from cognishift.app.config import settings
+from cognishift.core.document_processing.layout import format_ocr_blocks
 from cognishift.core.document_processing.schemas import (
     OCRResult,
     OCRTextBlock,
@@ -71,7 +72,8 @@ class RapidOCREngine(OCRProvider):
         if not raw_results:
             return OCRResult(
                 text="",
-                confidence=1.0,
+                confidence=0.0,
+                layout_warnings=["No readable text detected; inspect the original page."],
                 blocks=[],
                 engine="rapidocr"
             )
@@ -97,10 +99,14 @@ class RapidOCREngine(OCRProvider):
                 conf_scores.append(score)
 
         avg_conf = sum(conf_scores) / max(len(conf_scores), 1)
-        full_text = "\n".join(text_lines)
+        full_text, blocks, layout_warnings = format_ocr_blocks(
+            blocks, settings.ocr_normal_confidence_threshold
+        )
 
         return OCRResult(
             text=full_text,
+            raw_text="\n".join(text_lines),
+            layout_warnings=layout_warnings,
             confidence=avg_conf,
             blocks=blocks,
             engine="rapidocr"

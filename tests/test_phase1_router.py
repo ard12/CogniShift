@@ -39,6 +39,12 @@ def test_task_classification():
     assert c4.task_type == "general_reasoning"
     assert "reasoning" in c4.required_capabilities
 
+    # 5. Data artifact inquiry task (must NOT trigger coding)
+    c5 = classify_task("can you tell me about processed_equipment_readings.csv")
+    assert c5.task_type == "document_analysis"
+    assert "document_analysis" in c5.required_capabilities
+    assert not c5.requires_vision
+
 
 def test_model_routing_coding():
     """Verify that coding task routes to coding specialist within VRAM budget."""
@@ -61,8 +67,8 @@ def test_model_routing_vram_constraint():
     assert deepseek_eval.vram_feasible is False
     assert deepseek_eval.eligible is False
     assert "Infeasible" in deepseek_eval.rationale
-    # Should select feasible model (llama3.2:3b)
-    assert decision.selected_model == "llama3.2:3b"
+    # Should select feasible model (qwen2.5:7b or llama3.2:3b)
+    assert decision.selected_model in ["qwen2.5:7b", "llama3.2:3b"]
 
 
 def test_model_routing_vision():

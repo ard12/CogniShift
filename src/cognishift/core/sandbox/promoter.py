@@ -73,7 +73,11 @@ async def validate_and_promote_outputs(
             if item.is_symlink() or not item.is_file():
                 logger.warning(f"Rejecting non-regular/symlinked output file: {item.name}")
                 continue
-            file_size = item.stat().st_size
+            st = item.stat()
+            if getattr(st, "st_nlink", 1) > 1:
+                logger.warning(f"Rejecting hardlinked output file: {item.name}")
+                continue
+            file_size = st.st_size
         except OSError as e:
             logger.warning(f"Rejecting inaccessible/symlinked output item {item.name}: {e}")
             continue
@@ -81,6 +85,12 @@ async def validate_and_promote_outputs(
         if file_size > settings.sandbox_max_output_file_bytes:
             logger.warning(
                 f"Rejecting oversized output file {item.name}: {file_size} bytes exceeds limit of {settings.sandbox_max_output_file_bytes}."
+            )
+            continue
+
+        if total_bytes + file_size > settings.sandbox_max_output_aggregate_bytes:
+            logger.warning(
+                f"Rejecting output file {item.name}: aggregate size would exceed {settings.sandbox_max_output_aggregate_bytes} bytes."
             )
             continue
 

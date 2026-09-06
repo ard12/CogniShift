@@ -50,8 +50,17 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.95
         )
 
+    # Detect conversational or informational inquiries about artifacts, data, or files
+    is_inquiry = any(p in text for p in [
+        "tell me about", "what is", "explain", "describe", "what's in", 
+        "summary of", "can you check", "analyze the file", "summarize",
+        "how does", "what does", "overview", "details of"
+    ])
+
     # 2. Autonomous Coding & Debugging Tasks
-    if any(w in text for w in ["python", "script", "program", "code", "csv", "dataframe", "debug", "compile", "execute"]):
+    # Active coding requests involve writing, modifying, debugging, or compiling code/scripts
+    coding_triggers = ["python", "script", "program", "code", "dataframe", "debug", "compile", "execute"]
+    if not is_inquiry and any(w in text for w in coding_triggers):
         return TaskClassification(
             task_type="coding",
             required_capabilities=["coding", "structured_data"],
@@ -59,8 +68,12 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.92
         )
 
-    # 3. Document Analysis & Technical Manual Interpretation
-    if any(w in text for w in ["sop", "manual", "inspection report", "oisd", "standard", "procedure", "guideline"]):
+    # 3. Document Analysis & Technical Manual / Artifact Interpretation
+    if any(w in text for w in [
+        "sop", "manual", "inspection report", "oisd", "standard", "procedure", 
+        "guideline", ".csv", ".pdf", ".txt", ".json", ".yaml", ".log", "report", 
+        "document", "artifact", "file", "readings", "csv"
+    ]):
         return TaskClassification(
             task_type="document_analysis",
             required_capabilities=["document_analysis", "reasoning"],

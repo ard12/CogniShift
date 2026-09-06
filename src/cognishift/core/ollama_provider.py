@@ -1,6 +1,6 @@
 import base64
 import httpx
-from typing import Optional
+from typing import Optional, List, Dict
 from cognishift.app.config import settings
 from cognishift.core.network.client import get_sovereign_async_client
 from cognishift.core.network.schemas import NetworkPolicyViolation
@@ -25,13 +25,19 @@ class OllamaProvider(ModelProvider):
         prompt: str,
         system_prompt: str = "",
         context: str = "",
-        model_name: Optional[str] = None
+        model_name: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> ModelResponse:
-        """Generate text from a prompt using the specified or default local Ollama model."""
+        """Generate text from a prompt using the specified or default local Ollama model with optional multi-turn history."""
         target_model = model_name or self.text_model
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
+
+        if history:
+            for turn in history:
+                if isinstance(turn, dict) and "role" in turn and "content" in turn:
+                    messages.append({"role": turn["role"], "content": turn["content"]})
         
         user_content = prompt
         if context:

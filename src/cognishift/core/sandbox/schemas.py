@@ -29,10 +29,17 @@ class SandboxInputFile(BaseModel):
     source_path: str = Field(..., description="Workspace-relative path to source file (e.g. 'documents/data.csv')")
     dest_name: str = Field(..., pattern=r"^[A-Za-z0-9_.-]+$", description="Destination filename inside /workspace/input")
 
+    @field_validator("dest_name")
+    @classmethod
+    def reject_directory_names(cls, value):
+        if value in {".", ".."}:
+            raise ValueError("Input destination must be a filename")
+        return value
+
 
 class CodeExecutionRequest(BaseModel):
     """Fully validated execution payload prepared for sandbox runner."""
-    execution_id: str
+    execution_id: str = Field(pattern=r"^[A-Za-z0-9_-]{0,100}$")
     workspace_id: int
     run_id: int
     code: str = Field(..., min_length=1, max_length=100000)

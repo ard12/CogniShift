@@ -3,13 +3,34 @@ from httpx import AsyncClient, ASGITransport
 from cognishift.app.main import app
 from cognishift.app.core.auth import register_local_credential, User
 
+from cognishift.app.db.database import init_db, get_db
+
 TEST_OP_TOKEN = "test-token-operator-front-integration"
 TEST_SUP_TOKEN = "test-token-supervisor-front-integration"
 TEST_ADM_TOKEN = "test-token-admin-front-integration"
 
 
 @pytest.fixture(autouse=True)
-def setup_credentials():
+async def setup_test_environment():
+    await init_db()
+    async with get_db() as db:
+        await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Refinery-1', 'MRPL')")
+        await db.execute("""
+            INSERT OR REPLACE INTO tool_definitions
+            (id, name, description, risk_level, requires_approval, implementation_key)
+            VALUES (5, 'restart_component', 'Restart Component', 'sensitive', 1, 'restart_component')
+        """)
+        await db.execute("""
+            INSERT OR REPLACE INTO agent_runs
+            (id, workspace_id, agent_id, status, user_id)
+            VALUES (1, 1, 1, 'paused', 'op_tester')
+        """)
+        await db.execute("""
+            INSERT OR REPLACE INTO approval_requests
+            (id, run_id, tool_id, status, request_reason, parameters, risk_level, required_approvals)
+            VALUES (1, 1, 5, 'pending', 'Safety interlock test', '{}', 'sensitive', 2)
+        """)
+        await db.commit()
     register_local_credential(TEST_OP_TOKEN, User(user_id="op_tester", role="operator", allowed_workspace_ids=[1]))
     register_local_credential(TEST_SUP_TOKEN, User(user_id="sup_tester", role="supervisor", allowed_workspace_ids=[1]))
     register_local_credential(TEST_ADM_TOKEN, User(user_id="adm_tester", role="administrator", allowed_workspace_ids=[1, 2, 3]))

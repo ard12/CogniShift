@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from cognishift.app.db.database import get_db
+from cognishift.app.config import settings
 from cognishift.core.sandbox.schemas import (
     CodeExecutionRequest,
     CodeExecutionResult,
@@ -40,7 +41,15 @@ async def execute_sandbox_code(
     5. Guaranteed ephemeral cleanup in finally: block.
     """
     staging_dir: Optional[Path] = None
+    if not settings.sandbox_enabled:
+        raise SandboxUnavailableError("Sandbox execution is disabled by server policy.")
     execution_id = request.execution_id or str(uuid.uuid4())
+    request = request.model_copy(update={
+        "execution_id": execution_id, "workspace_id": workspace_id, "run_id": run_id,
+        "timeout_seconds": min(request.timeout_seconds, settings.sandbox_max_timeout),
+        "cpu_count": min(request.cpu_count, settings.sandbox_cpu_limit),
+        "memory_mb": min(request.memory_mb, settings.sandbox_memory_mb),
+    })
 
     async def log_event(event_type: str, message: str, structured_data: Dict[str, Any]):
         try:

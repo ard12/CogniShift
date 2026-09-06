@@ -244,6 +244,29 @@ async def test_output_validation_rejects_executable_scripts(tmp_path):
     assert len(promoted_ids) == 1
 
 
+@pytest.mark.asyncio
+async def test_output_validation_enforces_aggregate_cap(tmp_path, monkeypatch):
+    from cognishift.app.config import settings
+    out_dir = tmp_path / "output"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(settings, "sandbox_max_output_aggregate_bytes", 100)
+
+    (out_dir / "file1.txt").write_text("A" * 60, encoding="utf-8")
+    (out_dir / "file2.txt").write_text("B" * 60, encoding="utf-8")
+
+    promoted_names, promoted_ids = await validate_and_promote_outputs(
+        workspace_id=1,
+        run_id=10,
+        execution_id="sbx_agg_cap",
+        output_dir=out_dir
+    )
+
+    assert len(promoted_names) == 1
+    assert len(promoted_ids) == 1
+    assert ("file1.txt" in promoted_names) ^ ("file2.txt" in promoted_names)
+
+
 # -----------------------------------------------------------------------------
 # 5. FAIL-CLOSED WHEN CONTAINER RUNTIME IS UNAVAILABLE
 # -----------------------------------------------------------------------------

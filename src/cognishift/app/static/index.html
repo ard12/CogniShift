@@ -3,628 +3,1021 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>COGNISHIFT // SOVEREIGN INDUSTRIAL WORKBENCH</title>
-    <!-- Tailwind CSS -->
-    
-    <!-- Google Fonts: Inter & JetBrains Mono -->
-    
-    
-    
-    <!-- FontAwesome Pro Icons -->
-    <link rel="stylesheet" href="/static/app.css">
-    
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #070a0f;
-            color: #cbd5e1;
-        }
-        .font-mono {
-            font-family: 'JetBrains Mono', monospace;
-        }
-        /* Custom hairline scrollbar */
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0b111a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #1e293b;
-            border-radius: 2px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #334155;
-        }
-        /* Subtle pulse animation for status beacon */
-        @keyframes pulse-beacon {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(0.9); }
-        }
-        .beacon-active {
-            animation: pulse-beacon 2.5s infinite ease-in-out;
-        }
-    </style>
+    <title>COGNISHIFT // SECURE INDUSTRIAL OPERATIONS CONSOLE</title>
+    <link rel="stylesheet" href="/static/app.css?v=20260905_v5">
+    <script src="/static/app.js?v=20260905_v5" defer></script>
 </head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500/20 selection:text-cyan-300">
+<body class="bg-base text-secondary min-h-screen flex flex-col font-sans select-none antialiased">
 
     <!-- ========================================================================= -->
-    <!-- WAYBAR PERSISTENT STATUS BAR (Arch / Hyprland Inspired)                   -->
+    <!-- 1. TOP PERSISTENT GLOBAL SECURITY HEADER                                   -->
     <!-- ========================================================================= -->
-    <header class="h-10 bg-[#090e17] border-b border-slate-800/80 px-4 flex items-center justify-between text-xs font-mono select-none tracking-tight">
-        
-        <!-- Left Deck: Identity & Workspace Scope -->
+    <header class="relative z-50 h-10 bg-surface border-b border-subtle px-4 flex items-center justify-between text-xs font-mono select-none">
+
+        <!-- Left: Brand & Scope -->
         <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2 text-cyan-400 font-bold">
+            <div class="flex items-center gap-2 text-green font-bold cursor-pointer" data-nav="dashboard">
                 <span class="text-sm">⬡</span>
-                <span class="tracking-widest text-slate-100 font-semibold">COGNISHIFT</span>
-                <span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700/60 font-medium">SIH26117</span>
+                <span class="text-white font-extrabold tracking-wider">COGNISHIFT</span>
             </div>
-            <span class="text-slate-700">/</span>
-            <div class="flex items-center gap-1.5 text-slate-400">
-                <span class="text-[10px] text-slate-500 uppercase">WS:</span>
-                <span class="text-slate-200 font-medium bg-slate-800/40 px-2 py-0.5 rounded border border-slate-800">MRPL-REFINERY-UNIT-01</span>
+            <span class="text-dark">/</span>
+            <div class="flex items-center gap-1 text-muted text-[11px]">
+                <span id="headerWorkspaceTitle" class="text-slate-300 font-medium">MRPL Operations Workspace</span>
             </div>
         </div>
 
-        <!-- Center Deck: Sovereignty & Air-Gap Integrity -->
-        <div class="hidden md:flex items-center gap-2 bg-[#0c1422] px-3 py-1 rounded-full border border-slate-800/90">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 beacon-active"></span>
-            <span class="text-[11px] text-emerald-400/90 font-medium uppercase tracking-wider">AIRGAP ISOLATED</span>
-            <span class="text-slate-600">•</span>
-            <span class="text-[11px] text-slate-400">ZERO CLOUD EGRESS</span>
+        <!-- Center: Security & Sovereignty Badges -->
+        <div class="hidden md:flex items-center gap-2">
+            <span class="pill-strict" title="Enforcing Strict Local Isolation">
+                <span class="w-1.5 h-1.5 rounded-full bg-green beacon-active"></span>
+                STRICT MODE
+            </span>
+            <span class="pill-local" title="Zero Cloud LLMs — Local-First Inference">
+                LOCAL ONLY
+            </span>
+            <span class="pill-egress-blocked" title="Windows Firewall & Host Kernel Outbound Egress Blocked">
+                PUBLIC EGRESS BLOCKED
+            </span>
+            <span id="headerNetworkBadge" class="pill-simulation" title="Real Physical Network Adapter State">
+                EXTERNAL NETWORK: CHECKING...
+            </span>
+            <span class="pill-simulation" title="Synthetic Industrial Evaluation Environment">
+                SIMULATION
+            </span>
         </div>
 
-        <!-- Right Deck: Hardware Telemetry Chips -->
-        <div class="flex items-center gap-2 text-[11px]">
-            <div class="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/50 border border-slate-800 text-slate-400">
-                <i class="fa-solid fa-microchip text-indigo-400 text-[10px]"></i>
-                <span>GPU: <b class="text-slate-200">RTX 3050</b> (6GB)</span>
+        <!-- Right: Local Timestamp & User Session Manager -->
+        <div class="flex items-center gap-4 text-xs font-mono">
+            <div class="hidden lg:flex items-center gap-2 text-[11px] text-muted border-r border-subtle pr-4">
+                <span class="w-1.5 h-1.5 rounded-full bg-green beacon-active"></span>
+                <span id="liveTimestamp" class="text-slate-200">2026-09-04 17:15:00 IST</span>
+                <span class="text-[9px] text-dark uppercase font-semibold">SYSTEM TIME (LOCAL)</span>
             </div>
-            <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/50 border border-slate-800 text-slate-400">
-                <i class="fa-solid fa-brain text-cyan-400 text-[10px]"></i>
-                <span id="topModelChip">LLAMA-3.2:3B</span>
-            </div>
-            <div class="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/50 border border-slate-800 text-slate-400">
-                <i class="fa-solid fa-database text-amber-400 text-[10px]"></i>
-                <span id="topVectorsChip">891 VEC</span>
-            </div>
-            <div class="text-slate-400 pl-2 border-l border-slate-800" id="liveClock">
-                12:00:00
+
+            <!-- Role / User Switcher (Click to toggle Operator / Supervisor / Admin) -->
+            <div class="relative">
+                <button id="userMenuBtn" data-action="toggle-user-menu" class="flex items-center gap-2 bg-card hover:bg-card-hover px-2.5 py-1 rounded border border-subtle hover:border-accent transition cursor-pointer">
+                    <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                    <div class="flex flex-col text-left">
+                        <span id="activeUserName" class="text-white text-[11px] font-bold leading-tight">admin</span>
+                        <span id="activeUserRole" class="text-green text-[9px] font-semibold leading-tight">ROLE: ADMIN</span>
+                    </div>
+                    <svg class="w-2.5 h-2.5 text-muted ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+
+                <!-- Dropdown -->
+                <div id="userDropdown" class="hidden absolute right-0 mt-1 w-64 bg-surface border border-medium rounded shadow-2xl p-2 z-[100] text-xs font-mono">
+                    <div class="text-[10px] text-muted uppercase tracking-wider px-2 py-1 border-b border-subtle mb-1">
+                        Sovereign Session
+                    </div>
+                    <div class="px-2 py-1.5 space-y-1">
+                        <div class="text-[11px] text-slate-300">Identity: <b id="dropdownUserId" class="text-white">Active Session</b></div>
+                        <div class="text-[10px] text-muted">Scope: Local Loopback Only</div>
+                    </div>
+                    <div class="pt-2 border-t border-subtle space-y-1">
+                        <div class="text-[10px] text-muted uppercase tracking-wider px-2 py-0.5">Quick Switch Persona</div>
+                        <button data-action="demo-persona" data-persona="operator" class="w-full text-left px-2 py-1 rounded hover:bg-card text-slate-200 font-semibold transition cursor-pointer flex items-center justify-between">
+                            <span>Sam (Field Operator)</span>
+                            <span class="text-[9px] text-muted">OPERATOR</span>
+                        </button>
+                        <button data-action="demo-persona" data-persona="supervisor" class="w-full text-left px-2 py-1 rounded hover:bg-card text-amber font-semibold transition cursor-pointer flex items-center justify-between">
+                            <span>Jane (Plant Supervisor)</span>
+                            <span class="text-[9px] text-amber">SUPERVISOR</span>
+                        </button>
+                        <button data-action="demo-persona" data-persona="administrator" class="w-full text-left px-2 py-1 rounded hover:bg-card text-green font-semibold transition cursor-pointer flex items-center justify-between">
+                            <span>Rohit (System Authorizer)</span>
+                            <span class="text-[9px] text-green">ADMIN</span>
+                        </button>
+                        <button id="switchIdentityBtn" data-action="open-auth" class="w-full text-left px-2 py-1.5 rounded hover:bg-card text-cyan font-semibold transition cursor-pointer flex items-center justify-between">
+                            <span>⇄ Switch Identity Modal</span>
+                            <span class="text-[10px] text-muted">Demo</span>
+                        </button>
+                        <button data-action="open-auth" class="w-full text-left px-2 py-1.5 rounded hover:bg-card text-green font-semibold transition cursor-pointer flex items-center justify-between">
+                            <span>🔑 Manual Authentication</span>
+                            <span class="text-[10px] text-muted">Bearer</span>
+                        </button>
+                        <button data-action="logout" class="w-full text-left px-2 py-1.5 rounded hover:bg-card text-red font-semibold transition cursor-pointer flex items-center justify-between">
+                            <span>⏏ Terminate Session</span>
+                            <span class="text-[10px] text-muted">Purge</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
 
     <!-- ========================================================================= -->
-    <!-- MAIN TILING INTERFACE GRID                                                -->
+    <!-- 2. MAIN APPLICATION WORKSPACE                                              -->
     <!-- ========================================================================= -->
-    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1720px] mx-auto w-full">
+    <div class="flex-1 flex overflow-hidden">
 
         <!-- ===================================================================== -->
-        <!-- LEFT COLUMN: OPERATOR COMMAND DECK & TERMINAL STREAM (7 COLS)         -->
+        <!-- LEFT NAVIGATION SIDEBAR                                               -->
         <!-- ===================================================================== -->
-        <section class="lg:col-span-7 flex flex-col gap-4">
-            
-            <!-- Command Input Pane -->
-            <div class="bg-[#0b1018] rounded-lg border border-slate-800/80 shadow-2xl overflow-hidden flex flex-col">
-                <!-- Pane Header -->
-                <div class="h-9 bg-[#090d14] border-b border-slate-800/80 px-4 flex items-center justify-between text-xs font-mono">
-                    <div class="flex items-center gap-2 text-slate-300">
-                        <i class="fa-solid fa-terminal text-cyan-400 text-[11px]"></i>
-                        <span class="font-semibold uppercase tracking-wider text-slate-200">Operator Command Deck</span>
+        <aside class="w-60 bg-surface border-r border-subtle flex flex-col justify-between p-3 select-none flex-shrink-0 z-20">
+            <div class="space-y-1">
+                <!-- Nav Items -->
+                <button data-nav="dashboard" id="nav-dashboard" class="nav-btn active">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Dashboard</div>
+                        <div class="text-[10px] text-muted leading-tight">Overview & Status</div>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-slate-500 text-[11px]">AGENT:</span>
-                        <select id="agentSelect" class="bg-[#0e1624] text-slate-200 border border-slate-800 rounded px-2 py-0.5 text-xs font-mono focus:border-cyan-500 focus:outline-none">
-                            <option value="1">Maintenance Assistant (Industrial SOPs & Telemetry)</option>
-                            <option value="2">IT Helpdesk Agent (SCADA & Network)</option>
-                        </select>
+                </button>
+
+                <button data-nav="workspaces" id="nav-workspaces" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Workspaces</div>
+                        <div class="text-[10px] text-muted leading-tight">Isolated Environments</div>
                     </div>
-                </div>
+                </button>
 
-                <!-- Linux Shell Aliases (Quick Scenarios) -->
-                <div class="px-4 py-2 bg-[#090e16] border-b border-slate-800/60 flex flex-wrap items-center gap-2 text-[11px] font-mono">
-                    <span class="text-slate-500"><i class="fa-solid fa-bolt text-amber-400/80 mr-1"></i>quick:</span>
-                    <button onclick="setScenario(1)" class="px-2 py-0.5 rounded bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition">
-                        $ check-pt101-telemetry
-                    </button>
-                    <button onclick="setScenario(2)" class="px-2 py-0.5 rounded bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-900/60 transition">
-                        $ trip-495psi-emergency
-                    </button>
-                    <button onclick="setScenario(3)" class="px-2 py-0.5 rounded bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-700/60 transition">
-                        $ verify-tt204-temp
-                    </button>
-                </div>
-
-                <!-- Shell Input Buffer -->
-                <div class="p-4 bg-[#080c13] flex flex-col gap-3">
-                    <div class="flex items-start gap-2.5">
-                        <span class="text-cyan-400 font-mono text-sm select-none pt-2.5 font-bold">operator@mrpl:~$</span>
-                        <textarea id="promptInput" rows="3" class="flex-1 bg-[#0b111a] text-slate-100 placeholder-slate-600 border border-slate-800 rounded-md p-2.5 text-sm font-mono focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none resize-none transition" placeholder="Enter operational command, telemetry query, or safety intervention..."></textarea>
+                <button data-nav="documents" id="nav-documents" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Documents</div>
+                        <div class="text-[10px] text-muted leading-tight">Local Document Store</div>
                     </div>
+                </button>
 
-                    <div class="flex items-center justify-between pt-1">
-                        <div class="flex items-center gap-3 text-xs text-slate-500 font-mono">
-                            <span><kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-400 border border-slate-700">Ctrl</kbd> + <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-400 border border-slate-700">Enter</kbd> to execute</span>
-                            <span id="runStateIndicator" class="text-slate-400 font-medium">● READY</span>
+                <button data-nav="agents" id="nav-agents" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Agents</div>
+                        <div class="text-[10px] text-muted leading-tight">AI & Tool Orchestrators</div>
+                    </div>
+                </button>
+
+                <button data-nav="approvals" id="nav-approvals" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    <div class="flex-1 flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-bold leading-tight">Approvals</div>
+                            <div class="text-[10px] text-muted leading-tight">Human-in-the-Loop</div>
                         </div>
-                        <button id="dispatchBtn" onclick="dispatchRun()" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-mono font-bold px-4 py-1.5 rounded text-xs shadow transition flex items-center gap-2">
-                            <i class="fa-solid fa-play text-[10px]"></i> EXECUTE
+                        <span id="navApprovalsBadge" class="text-[9px] font-mono bg-card text-muted border border-subtle px-1.5 py-0.2 rounded font-bold">0</span>
+                    </div>
+                </button>
+
+                <button data-nav="artifacts" id="nav-artifacts" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                    <div class="flex-1 flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-bold leading-tight">Artifacts</div>
+                            <div class="text-[10px] text-muted leading-tight">Generated Outputs</div>
+                        </div>
+                        <span id="navArtifactsBadge" class="text-[9px] font-mono bg-card text-muted border border-subtle px-1.5 py-0.2 rounded">0</span>
+                    </div>
+                </button>
+
+                <button data-nav="audit" id="nav-audit" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Audit</div>
+                        <div class="text-[10px] text-muted leading-tight">Logs & Traceability</div>
+                    </div>
+                </button>
+
+                <button data-nav="sandbox" id="nav-sandbox" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Sandbox</div>
+                        <div class="text-[10px] text-muted leading-tight">Safe Experimentation</div>
+                    </div>
+                </button>
+
+                <button data-nav="sovereignty" id="nav-sovereignty" class="nav-btn">
+                    <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold leading-tight">Sovereignty</div>
+                        <div class="text-[10px] text-muted leading-tight">Data & Network Control</div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Bottom: Environment Box -->
+            <div class="space-y-3 pt-4 border-t border-subtle">
+                <div class="bg-card p-2.5 rounded border border-subtle font-mono text-[11px] space-y-1.5">
+                    <div class="text-[10px] text-green font-bold uppercase tracking-wider mb-2">
+                        ENVIRONMENT
+                    </div>
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-muted">Plant tools</span>
+                        <span class="text-amber font-semibold bg-amber-tint px-1 rounded">SIMULATION</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-muted">Data Residency</span>
+                        <span class="text-green font-semibold">LOCAL ONLY</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-muted">External Egress</span>
+                        <span class="text-red font-semibold bg-red-tint px-1 rounded">BLOCKED</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-muted">Network Zone</span>
+                        <span class="text-green font-semibold">ISOLATED</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-muted">Workspace</span>
+                        <span class="text-slate-300 font-semibold truncate max-w-[90px]">MRPL_OPS_WS</span>
+                    </div>
+                </div>
+
+                <div class="text-[9px] text-dark font-mono px-1">
+                    COGNISHIFT v1.2.0 | LOCAL-FIRST AI WORKBENCH
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===================================================================== -->
+        <!-- MAIN VIEW CONTAINER                                                   -->
+        <!-- ===================================================================== -->
+        <main class="flex-1 flex flex-col overflow-y-auto bg-base p-3.5 gap-3.5 max-w-[1800px] mx-auto w-full">
+
+            <!-- ================================================================= -->
+            <!-- VIEW: DASHBOARD (MAIN DEMO SCREEN - EXACT MOCKUP RECONSTRUCTION)   -->
+            <!-- ================================================================= -->
+            <div id="view-dashboard" class="flex-1 grid grid-cols-12 gap-3.5">
+
+                <!-- Center Area: 9 Columns -->
+                <div class="col-span-9 flex flex-col gap-3.5">
+
+                    <!-- 1. ACTIVE WORKFLOW STEPPER CARD -->
+                    <div class="bg-card rounded-lg border border-subtle p-3 flex flex-col gap-3">
+                        <div class="flex items-center justify-between border-b border-subtle pb-2">
+                            <div class="flex items-center gap-2.5 font-mono">
+                                <span id="workflowStatusBadge" class="bg-surface text-muted border border-subtle px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">
+                                    STANDBY
+                                </span>
+                                <span id="workflowTitle" class="text-slate-300 font-medium text-xs">Awaiting Operational Command</span>
+                                <span id="workflowIdPill" class="text-[10px] text-muted border border-subtle bg-surface px-1.5 py-0.2 rounded">IDLE</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs font-mono">
+                                <span id="workflowStartTime" class="text-[11px] text-muted">Status: <b class="text-green">READY</b></span>
+                                <button data-nav="audit" class="text-[11px] text-green hover:underline flex items-center gap-1 cursor-pointer">
+                                    View Details ↗
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 8-Stage Pipeline Stepper -->
+                        <div id="workflowStepperContainer" class="grid grid-cols-8 gap-1.5 items-center font-mono text-[10px] select-none py-1">
+
+                            <!-- Step 1: UPLOAD -->
+                            <div id="step-1" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                    <span>1 UPLOAD</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 2: OCR -->
+                            <div id="step-2" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+                                    <span>2 OCR</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 3: VISION -->
+                            <div id="step-3" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                    <span>3 VISION</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 4: RETRIEVE -->
+                            <div id="step-4" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                                    <span>4 RETRIEVE</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 5: REASON -->
+                            <div id="step-5" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                                    <span>5 REASON</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 6: APPROVAL -->
+                            <div id="step-6" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                                    <span>6 APPROVAL</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 7: ACTION -->
+                            <div id="step-7" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    <span>7 ACTION</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                            <!-- Step 8: ARTIFACT -->
+                            <div id="step-8" class="step-card step-pending">
+                                <div class="flex items-center gap-1 text-slate-400 font-semibold mb-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                    <span>8 ARTIFACT</span>
+                                </div>
+                                <div class="text-[9px] text-dark">Pending</div>
+                            </div>
+
+                        </div>
+
+                        <!-- Progress Bar Line -->
+                        <div class="flex items-center justify-between text-[11px] font-mono text-muted pt-1">
+                            <span id="stepProgressText"><b class="text-muted">0 / 8</b> steps completed</span>
+                            <div class="flex-1 mx-4 bg-surface h-1.5 rounded-full overflow-hidden border border-subtle">
+                                <div id="stepProgressBar" class="bg-green h-full rounded-full transition" style="width: 0%;"></div>
+                            </div>
+                            <span id="stepEstimateText" class="flex items-center gap-1">
+                                <svg class="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                System Ready
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 2. ACTIVITY CONSOLE CARD -->
+                    <div class="bg-card rounded-lg border border-subtle flex flex-col overflow-hidden shadow-2xl flex-1 min-h-[360px]">
+                        <!-- Console Header -->
+                        <div class="h-9 bg-surface border-b border-subtle px-3.5 flex items-center justify-between text-xs font-mono select-none">
+                            <div class="flex items-center gap-2">
+                                <span class="text-green font-bold text-xs uppercase tracking-wider">ACTIVITY CONSOLE</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span id="consoleLiveBadge" class="bg-green-tint text-green px-2 py-0.5 rounded text-[10px] font-bold border border-green flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-green beacon-active"></span>
+                                    Live
+                                </span>
+                                <button data-action="console-pause" id="consolePauseBtn" class="text-muted hover:text-white bg-surface hover:bg-card px-2 py-0.5 rounded border border-subtle text-[11px] transition cursor-pointer">
+                                    ⏸ Pause
+                                </button>
+                                <button data-action="console-clear" class="text-muted hover:text-white bg-surface hover:bg-card px-2 py-0.5 rounded border border-subtle text-[11px] transition cursor-pointer">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Console Log Stream -->
+                        <div id="consoleStream" class="flex-1 p-3.5 font-mono text-xs space-y-1.5 overflow-y-auto bg-terminal text-secondary">
+                            <!-- Stream populated dynamically -->
+                            <div class="flex items-start gap-2 py-0.2">
+                                <span class="text-dark select-none">--:--:--</span>
+                                <span class="console-tag tag-system">[SYSTEM]</span>
+                                <span class="text-slate-300">CogniShift Sovereign Operations Console initialized.</span>
+                            </div>
+                            <div class="flex items-start gap-2 py-0.2">
+                                <span class="text-dark select-none">--:--:--</span>
+                                <span class="console-tag tag-network">[SECURITY]</span>
+                                <span class="text-green font-semibold">Strict local runtime active. Public cloud egress blocked.</span>
+                            </div>
+                            <div class="flex items-start gap-2 py-0.2">
+                                <span class="text-dark select-none">--:--:--</span>
+                                <span class="console-tag tag-policy">[READY]</span>
+                                <span class="text-slate-300">System standing by. Type an operational command below (e.g. 'analyze p101a', 'check pt101').</span>
+                            </div>
+                        </div>
+
+                        <!-- Console Command Input Bar -->
+                        <div class="bg-surface border-t border-subtle p-2.5 flex items-center gap-2">
+                            <span class="text-green font-mono font-bold text-sm blink-cursor select-none pl-1">▌</span>
+                            <input type="text" id="consoleCmdInput" class="flex-1 bg-terminal text-slate-100 placeholder-slate-600 text-xs font-mono px-3 py-1.5 rounded border border-subtle focus:border-green focus:outline-none transition" placeholder="Type a command (e.g., analyze p101a, check pt101, trip emergency, show policy, help)..." >
+                            <button data-action="console-submit" class="bg-card hover:bg-card-hover text-green border border-subtle hover:border-green px-3 py-1.5 rounded text-xs font-mono font-bold transition flex items-center gap-1 cursor-pointer">
+                                <span>&gt;</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. ARTIFACT VAULT TABLE -->
+                    <div class="bg-card rounded-lg border border-subtle p-3.5 flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between border-b border-subtle pb-2">
+                            <div class="flex items-center gap-2 font-mono">
+                                <span class="text-white font-bold text-xs uppercase tracking-wider">ARTIFACT VAULT</span>
+                                <span id="artifactCountPill" class="w-4 h-4 rounded-full bg-surface text-muted border border-subtle text-[10px] font-bold flex items-center justify-center">
+                                    0
+                                </span>
+                            </div>
+                            <button data-nav="artifacts" class="text-xs font-mono text-muted hover:text-green flex items-center gap-1 cursor-pointer">
+                                View All Artifacts &gt;
+                            </button>
+                        </div>
+
+                        <!-- Artifacts Table -->
+                        <div class="overflow-x-auto">
+                            <table class="table-custom font-mono">
+                                <thead>
+                                    <tr>
+                                        <th>NAME</th>
+                                        <th>TYPE</th>
+                                        <th>WORKSPACE</th>
+                                        <th>SHA-256 (INTEGRITY)</th>
+                                        <th>CREATED</th>
+                                        <th>STATUS</th>
+                                        <th class="text-right">ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="artifactTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted italic py-4">No verified artifacts generated yet. Run an analysis workflow to produce output deliverables.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Area: 3 Columns -->
+                <div class="col-span-3 flex flex-col gap-3.5">
+
+                    <!-- 1. SECURITY / SOVEREIGNTY STATUS CARD -->
+                    <div class="bg-card rounded-lg border border-subtle p-3.5 flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between border-b border-subtle pb-2">
+                            <div class="flex items-center gap-2 font-mono">
+                                <svg class="w-4 h-4 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                                <span class="text-white font-bold text-xs uppercase tracking-wider">SECURITY / SOVEREIGNTY</span>
+                            </div>
+                            <button data-action="refresh-sovereignty" class="text-muted hover:text-green cursor-pointer" title="Refresh Telemetry">↻</button>
+                        </div>
+
+                        <div class="space-y-2 text-xs font-mono">
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-muted">⚙</span> LLM (Local)
+                                </span>
+                                <span class="text-green font-bold text-[11px]">OPERATIONAL ●</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-muted">🔍</span> OCR (Local)
+                                </span>
+                                <span class="text-green font-bold text-[11px]">OPERATIONAL ●</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-muted">👁</span> Vision (Local)
+                                </span>
+                                <span class="text-green font-bold text-[11px]">OPERATIONAL ●</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-muted">📦</span> Docker Network
+                                </span>
+                                <span class="text-amber font-bold text-[11px] flex items-center gap-1">
+                                    NONE 🔒
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-muted">🌐</span> Public Egress
+                                </span>
+                                <span class="text-red font-bold text-[11px] flex items-center gap-1">
+                                    BLOCKED 🔒
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-slate-300 flex items-center gap-1.5">
+                                    <span class="text-muted">⚠</span> Unauthorized Outbound
+                                </span>
+                                <span id="unauthCountBadge" class="text-green font-bold text-[11px]">0</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-2 pt-2 border-t border-subtle text-[10px] text-green font-mono leading-tight">
+                            All processing confined to this environment.
+                        </div>
+                    </div>
+
+                    <!-- 2. EVIDENCE / PROVENANCE CARD -->
+                    <div class="bg-card rounded-lg border border-subtle p-3.5 flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between border-b border-subtle pb-2">
+                            <div class="flex items-center gap-2 font-mono">
+                                <svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                <span class="text-white font-bold text-xs uppercase tracking-wider">EVIDENCE / PROVENANCE</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5 text-xs font-mono">
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-muted">Source Document</span>
+                                <span id="provDoc" class="text-slate-400 italic font-normal">None (Standby)</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-muted">Page Number</span>
+                                <span id="provPage" class="text-slate-400">—</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-muted">Selected Model</span>
+                                <span id="provModel" class="text-cyan font-semibold">qwen2.5:7b / moondream</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-muted">Execution Location</span>
+                                <span class="text-green font-semibold">LOCAL</span>
+                            </div>
+                            <div class="flex justify-between items-center py-0.5">
+                                <span class="text-muted">Tool / Engine</span>
+                                <span id="provEngine" class="text-slate-300 font-medium">PyMuPDF / ChromaDB</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-1 pt-2 border-t border-subtle flex justify-end">
+                            <button data-action="open-provenance" class="text-xs font-mono text-green hover:underline cursor-pointer flex items-center gap-1">
+                                View Full Provenance &gt;
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 3. APPROVAL CONSOLE (FOUR-EYES HITL) -->
+                    <div id="approvalConsoleCard" class="bg-card rounded-lg border border-subtle p-3.5 flex flex-col gap-2.5">
+                        <div class="flex items-center justify-between border-b border-subtle pb-2">
+                            <div class="flex items-center gap-2 font-mono">
+                                <svg class="w-4 h-4 text-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <span class="text-white font-bold text-xs uppercase tracking-wider">APPROVAL CONSOLE</span>
+                            </div>
+                            <span id="apprRiskBadge" class="bg-surface text-muted border border-subtle px-2 py-0.5 rounded text-[9px] font-bold uppercase">
+                                NOMINAL
+                            </span>
+                        </div>
+
+                        <div class="space-y-1.5 text-xs font-mono">
+                            <div>
+                                <span class="text-[10px] text-muted uppercase">REQUESTED ACTION</span>
+                                <div id="apprAction" class="text-slate-400 italic">None</div>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-muted uppercase">TARGET</span>
+                                <div id="apprTarget" class="text-slate-400 italic">No interlock pending</div>
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-muted uppercase">JUSTIFICATION</span>
+                                <div id="apprJustification" class="text-slate-400 text-[11px] leading-relaxed">
+                                    All safety boundaries nominal. Zero high-risk interlocks pending.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2-Step Approval Progress Visualizer -->
+                        <div class="pt-2 border-t border-subtle">
+                            <div class="text-[10px] text-muted font-mono uppercase mb-1.5">
+                                APPROVAL PROGRESS (2-STEP)
+                            </div>
+                            <div class="flex items-center justify-between text-xs font-mono">
+                                <div class="flex items-center gap-1.5">
+                                    <span id="approver1Dot" class="w-4 h-4 rounded-full bg-surface border border-subtle text-muted font-bold text-[10px] flex items-center justify-center">1</span>
+                                    <div>
+                                        <div class="text-[10px] text-slate-200 font-bold">Reviewer</div>
+                                        <div id="approver1Status" class="text-[9px] text-muted font-semibold">NOMINAL</div>
+                                    </div>
+                                </div>
+
+                                <span class="text-dark font-mono text-sm">➔</span>
+
+                                <div class="flex items-center gap-1.5">
+                                    <span id="approver2Dot" class="w-4 h-4 rounded-full bg-surface border border-subtle text-muted font-bold text-[10px] flex items-center justify-center">2</span>
+                                    <div>
+                                        <div class="text-[10px] text-slate-200 font-bold">Authorizer</div>
+                                        <div id="approver2Status" class="text-[9px] text-muted font-semibold">NOMINAL</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Button -->
+                        <div class="pt-2">
+                            <button id="apprReviewBtn" data-action="review-approval" class="w-full bg-card text-muted border border-subtle font-mono font-bold py-2 rounded text-xs transition cursor-not-allowed opacity-50 flex items-center justify-center gap-2">
+                                <span>No Pending Interlocks</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: WORKSPACES                                                  -->
+            <!-- ================================================================= -->
+            <div id="view-workspaces" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Isolated Workspaces</h2>
+                        <p class="text-xs text-muted">Partitioned operational environments with independent security scopes.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4" id="workspacesGrid">
+                    <!-- Cards populated dynamically -->
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: DOCUMENTS (KNOWLEDGE STORE)                                 -->
+            <!-- ================================================================= -->
+            <div id="view-documents" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Local Document Store & Processing Pipeline</h2>
+                        <p class="text-xs text-muted">Ingest native and scanned industrial manuals. RapidOCR and FastEmbed execute strictly on CPU/GPU locally.</p>
+                    </div>
+                </div>
+
+                <!-- Upload Dropzone -->
+                <div class="bg-card p-4 rounded-lg border border-dashed border-medium flex flex-col items-center justify-center gap-3 text-center">
+                    <svg class="w-8 h-8 text-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <div>
+                        <div class="text-xs font-bold text-slate-200">Upload PDF Manual, Scanned Inspection Sheet, or Field Gauge Image</div>
+                        <div class="text-[10px] text-muted">Accepts .pdf, .png, .jpg — Processed with PyMuPDF, RapidOCR & Moondream Vision</div>
+                    </div>
+                    <form id="docsUploadForm" class="flex items-center gap-3">
+                        <input type="file" id="docsFileInput" accept=".pdf,.png,.jpg,.jpeg" class="text-xs text-muted file:bg-surface file:border file:border-subtle file:text-green file:px-3 file:py-1 file:rounded file:cursor-pointer">
+                        <button type="submit" id="docsUploadBtn" class="bg-green hover:bg-emerald-400 text-surface font-bold px-4 py-1.5 rounded text-xs transition cursor-pointer">
+                            INGEST LOCALLY
+                        </button>
+                    </form>
+                    <div id="docsUploadStatus" class="text-[10px]"></div>
+                </div>
+
+                <!-- Document List -->
+                <div class="bg-card rounded-lg border border-subtle overflow-hidden">
+                    <table class="table-custom">
+                        <thead>
+                            <tr>
+                                <th>DOCUMENT NAME</th>
+                                <th>TYPE</th>
+                                <th>INDEXED CHUNKS</th>
+                                <th>OCR ENGINE</th>
+                                <th>INDEX STATUS</th>
+                                <th class="text-right">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documentsTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: AGENTS                                                      -->
+            <!-- ================================================================= -->
+            <div id="view-agents" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">AI & Tool Orchestrators</h2>
+                        <p class="text-xs text-muted">Specialized agents configured with distinct system prompts and permitted industrial tools.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4" id="agentsGrid">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: APPROVALS (DEDICATED HITL CENTER)                           -->
+            <!-- ================================================================= -->
+            <div id="view-approvals" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Human-in-the-Loop Safety Authorization Center</h2>
+                        <p class="text-xs text-muted">Review, verify, and authorize service-interrupting or high-risk industrial interlocks.</p>
+                    </div>
+                </div>
+                <div class="space-y-3" id="approvalsListContainer">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: ARTIFACTS                                                   -->
+            <!-- ================================================================= -->
+            <div id="view-artifacts" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Generated Artifact Vault & Deliverables</h2>
+                        <p class="text-xs text-muted">Cryptographically verified output files generated by autonomous agent workflows.</p>
+                    </div>
+                </div>
+                <div class="bg-card rounded-lg border border-subtle overflow-hidden">
+                    <table class="table-custom">
+                        <thead>
+                            <tr>
+                                <th>FILE NAME</th>
+                                <th>FORMAT</th>
+                                <th>FILE SIZE</th>
+                                <th>SHA-256 CHECKSUM</th>
+                                <th>TIMESTAMP</th>
+                                <th>INTEGRITY</th>
+                                <th class="text-right">DOWNLOAD</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fullArtifactsTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: AUDIT                                                       -->
+            <!-- ================================================================= -->
+            <div id="view-audit" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Audit Logs & Execution Traceability</h2>
+                        <p class="text-xs text-muted">Immutable ledger of operator commands, reasoning events, safety interventions, and firewall blocks.</p>
+                    </div>
+                </div>
+                <div class="bg-card rounded-lg border border-subtle overflow-hidden">
+                    <table class="table-custom text-[11px]">
+                        <thead>
+                            <tr>
+                                <th>TIMESTAMP</th>
+                                <th>ACTOR</th>
+                                <th>SCOPE</th>
+                                <th>ACTION / EVENT</th>
+                                <th>RESOURCE & DETAILS</th>
+                                <th>RESULT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ================================================================= -->
+            <!-- VIEW: SANDBOX                                                     -->
+            <!-- ================================================================= -->
+            <div id="view-sandbox" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Safe Docker Sandbox Experimentation</h2>
+                        <p class="text-xs text-muted">Ephemeral container runtime isolated with --network=none, read-only rootfs, and strict cgroups.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-12 gap-4">
+                    <div class="col-span-6 bg-card p-4 rounded-lg border border-subtle space-y-3">
+                        <div class="text-xs font-bold text-white uppercase tracking-wider">Execute Python Script in Sandbox</div>
+                        <textarea id="sandboxCodeInput" rows="10" class="w-full bg-terminal p-3 rounded text-xs font-mono text-green border border-subtle focus:outline-none resize-none" placeholder="# Enter Python code to execute safely inside Docker container...
+import pandas as pd
+import numpy as np
+print('Scanning telemetry for 3-sigma anomalies...')
+"></textarea>
+                        <button data-action="run-sandbox" class="bg-cyan-tint text-cyan border border-cyan hover:bg-cyan hover:text-surface font-bold px-4 py-1.5 rounded text-xs transition cursor-pointer">
+                            EXECUTE IN ISOLATED CONTAINER
                         </button>
                     </div>
-                </div>
-            </div>
-
-            <!-- Terminal Stepper & Execution Timeline -->
-            <div id="terminalPane" class="bg-[#0b1018] rounded-lg border border-slate-800/80 shadow-2xl flex-1 flex flex-col overflow-hidden">
-                <!-- Terminal Header -->
-                <div class="h-9 bg-[#090d14] border-b border-slate-800/80 px-4 flex items-center justify-between text-xs font-mono">
-                    <div class="flex items-center gap-2">
-                        <div class="flex gap-1.5">
-                            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
-                            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
-                            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+                    <div class="col-span-6 bg-card p-4 rounded-lg border border-subtle flex flex-col justify-between">
+                        <div>
+                            <div class="text-xs font-bold text-white uppercase tracking-wider mb-2">Container Console Output</div>
+                            <pre id="sandboxConsoleOutput" class="bg-terminal p-3 rounded text-xs font-mono text-slate-300 min-h-[220px] overflow-y-auto">
+Container Engine: Docker 27.x (WSL2 Engine)
+Flags: --network=none --read-only --memory=512m --cpus=1.0
+Container Status: STANDBY
+                            </pre>
                         </div>
-                        <span class="text-slate-400 text-[11px] ml-2 font-semibold tracking-wider uppercase">Event Sourcing Execution Stream</span>
-                    </div>
-                    <span id="runBadge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                        IDLE
-                    </span>
-                </div>
-
-                <!-- Event Stream Body -->
-                <div id="eventStream" class="p-4 font-mono text-xs space-y-1.5 max-h-[360px] overflow-y-auto bg-[#070b10]">
-                    <div class="text-slate-600 italic">// System standing by. Dispatch a query to observe sovereign reasoning trace...</div>
-                </div>
-
-                <!-- Ingested Sources Citation Banner -->
-                <div id="sourcesCitationBox" class="border-t border-slate-800/80 px-4 py-2 bg-[#090e16] text-xs font-mono hidden">
-                    <span class="text-slate-400 font-semibold"><i class="fa-solid fa-book text-indigo-400 mr-1.5"></i>VERIFIED KNOWLEDGE CITATIONS:</span>
-                    <p id="sourcesListText" class="text-cyan-300/80 text-[11px] mt-0.5 truncate"></p>
-                </div>
-
-                <!-- Synthesized Operational Report -->
-                <div id="reportBox" class="border-t border-slate-800/80 p-4 bg-[#0a0f18] space-y-2 hidden">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-mono uppercase font-bold text-slate-200 tracking-wider flex items-center gap-1.5">
-                            <i class="fa-solid fa-file-shield text-emerald-400"></i> Operational Synthesis Report
-                        </span>
-                        <span class="text-[10px] font-mono text-slate-500">GENERATED LOCALLY (LLAMA-3.2:3B)</span>
-                    </div>
-                    <div id="reportContent" class="text-sm font-sans text-slate-300 leading-relaxed whitespace-pre-wrap bg-[#070a0f] p-3 rounded border border-slate-800/60">
-                        <!-- Synthesized text -->
                     </div>
                 </div>
             </div>
 
-        </section>
-
-        <!-- ===================================================================== -->
-        <!-- RIGHT COLUMN: PLANT TOPOLOGY & SAFETY GATING DECK (5 COLS)            -->
-        <!-- ===================================================================== -->
-        <section class="lg:col-span-5 flex flex-col gap-4">
-            
-            <!-- Plant Topology Graph Navigator (SQLite Graph Memory) -->
-            <div class="bg-[#0b1018] rounded-lg border border-slate-800/80 shadow-2xl p-4 flex flex-col gap-3">
-                <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-diagram-project text-cyan-400 text-xs"></i>
-                        <h2 class="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Plant Topology Graph Memory</h2>
+            <!-- ================================================================= -->
+            <!-- VIEW: SOVEREIGNTY                                                 -->
+            <!-- ================================================================= -->
+            <div id="view-sovereignty" class="hidden flex-1 space-y-4 font-mono">
+                <div class="flex items-center justify-between border-b border-subtle pb-3">
+                    <div>
+                        <h2 class="text-white font-bold text-base">Network Sovereignty & Outbound Egress Audit</h2>
+                        <p class="text-xs text-muted">Proving 100% offline isolation, zero cloud calls, and kernel-level network enforcement.</p>
                     </div>
-                    <span class="text-[10px] font-mono bg-cyan-950/60 text-cyan-400 px-2 py-0.5 rounded border border-cyan-800/60">SQLite Substrate</span>
                 </div>
-
-                <p class="text-xs text-slate-400 leading-relaxed font-sans">
-                    Physical P&ID interconnects, calibrated safe operating envelopes, and emergency relief paths for Unit 01.
-                </p>
-
-                <!-- Interactive Topology Cards Grid -->
-                <div class="space-y-2 font-mono text-xs pt-1">
-                    <!-- Pump Node -->
-                    <div class="p-2.5 bg-[#080d15] rounded border border-slate-800 hover:border-cyan-500/50 transition">
-                        <div class="flex justify-between items-center text-slate-200 font-semibold mb-1">
-                            <span class="flex items-center gap-1.5 text-blue-400">
-                                <i class="fa-solid fa-gears text-[11px]"></i> PUMP-101A (API 610)
-                            </span>
-                            <span class="text-[10px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-900">NOMINAL</span>
-                        </div>
-                        <p class="text-[11px] text-slate-400">HAS_SENSOR: PT-101 (80-120 PSI) • TT-204 (60-80°C)</p>
-                        <p class="text-[11px] text-slate-500 mt-0.5">FEEDS_INTO ➔ Catalytic Hydrotreater Reactor-B</p>
-                    </div>
-
-                    <!-- Reactor Node -->
-                    <div class="p-2.5 bg-[#080d15] rounded border border-slate-800 hover:border-amber-500/50 transition">
-                        <div class="flex justify-between items-center text-slate-200 font-semibold mb-1">
-                            <span class="flex items-center gap-1.5 text-amber-400">
-                                <i class="fa-solid fa-atom text-[11px]"></i> REACTOR-B (CHAMBER)
-                            </span>
-                            <span class="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">MAWP: 500 PSI</span>
-                        </div>
-                        <p class="text-[11px] text-slate-400">PROTECTED_BY ➔ Pilot Safety Valve SV-402 (Set: 450 PSI)</p>
-                        <p class="text-[11px] text-slate-500 mt-0.5">DISCHARGES_TO ➔ High-Pressure Acid Gas Flare Header</p>
+                <div class="grid grid-cols-3 gap-4" id="sovereigntyCardsGrid">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="bg-card p-4 rounded-lg border border-subtle space-y-2">
+                    <div class="text-xs font-bold text-white uppercase tracking-wider">Network Policy Decision Ledger</div>
+                    <div id="blockedNetworkLedger" class="font-mono text-xs text-slate-300 space-y-1 bg-terminal p-3 rounded max-h-[200px] overflow-y-auto">
+                        <!-- Populated dynamically -->
                     </div>
                 </div>
             </div>
 
-            <!-- Human-in-the-Loop Safety Authorization Drawer (Phase 6) -->
-            <div id="approvalsDeck" class="bg-[#0b1018] rounded-lg border border-slate-800/80 shadow-2xl p-4 flex flex-col gap-3 transition">
-                <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-user-shield text-amber-400 text-xs"></i>
-                        <h2 class="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Shift Supervisor Authorization</h2>
-                    </div>
-                    <span id="pendingCountBadge" class="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">0 PENDING</span>
+        </main>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 3. PERSISTENT CONFIDENTIALITY BOUNDARY FOOTER                              -->
+    <!-- ========================================================================= -->
+    <footer class="h-8 bg-surface border-t border-subtle px-4 flex items-center justify-between text-[10px] font-mono text-muted select-none z-30">
+        <div class="flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-green"></span>
+            <span class="text-slate-300 font-semibold">COGNISHIFT SECURE LOCAL BOUNDARY</span>
+            <span class="text-dark">|</span>
+            <span class="text-green font-semibold">PUBLIC CLOUD EGRESS BLOCKED</span>
+            <span class="text-dark">|</span>
+            <span>SANDBOX NETWORK: <b class="text-amber">NONE</b></span>
+        </div>
+        <div class="flex items-center gap-3">
+            <span>DATA RESIDENCY: <b class="text-green">LOCAL ONLY</b></span>
+            <span class="text-dark">|</span>
+            <span>ENCRYPTION: NOT VERIFIED | LOCAL HTTP CONNECTION</span>
+        </div>
+    </footer>
+
+    <!-- ========================================================================= -->
+    <!-- 4. MODALS: APPROVAL REVIEW, ARTIFACT PREVIEW, PROVENANCE                  -->
+    <!-- ========================================================================= -->
+
+    <!-- Modal: Authentication & Local Demo Identity -->
+    <div id="authModal" class="hidden modal-backdrop">
+        <div class="modal-window auth-console font-mono">
+            <header class="auth-header">
+                <div class="auth-brand"><span>⬡</span> COGNISHIFT // SOVEREIGN ACCESS</div>
+                <span id="demoModeBadge" class="hidden auth-mode-badge">DEMO MODE</span>
+            </header>
+
+            <div class="auth-body">
+                <div>
+                    <div class="auth-kicker">LOCAL AUTHENTICATION REQUIRED</div>
+                    <p class="auth-copy">Session credentials remain on this workstation and are removed when the session ends.</p>
                 </div>
 
-                <div id="approvalsContainer" class="space-y-3 font-mono text-xs min-h-[90px] flex items-center justify-center">
-                    <p class="text-slate-600 text-center text-xs italic font-mono py-6">
-                        <i class="fa-solid fa-lock text-slate-700 block text-lg mb-1"></i>
-                        ALL SAFETY INTERLOCKS NOMINAL<br>
-                        <span class="text-[10px] text-slate-700">ZERO HIGH-RISK INTERVENTIONS GATED</span>
+                <section id="demoPersonaSection" class="hidden space-y-2">
+                    <div class="auth-section-label">LOCAL DEMO IDENTITIES</div>
+                    <button type="button" data-action="demo-persona" data-persona="operator" class="persona-card">
+                        <span><strong>SAM</strong><small>Field Operator</small></span><b>OPERATOR</b>
+                    </button>
+                    <button type="button" data-action="demo-persona" data-persona="supervisor" class="persona-card">
+                        <span><strong>JANE</strong><small>Plant Supervisor</small></span><b>SUPERVISOR</b>
+                    </button>
+                    <button type="button" data-action="demo-persona" data-persona="administrator" class="persona-card">
+                        <span><strong>ROHIT</strong><small>System Authorizer</small></span><b>ADMINISTRATOR</b>
+                    </button>
+                </section>
+
+                <details id="manualAuthDetails" class="manual-auth">
+                    <summary>&gt; Advanced / Manual Bearer Authentication</summary>
+                    <form id="authModalForm" class="manual-auth-form">
+                        <label class="auth-section-label" for="authModalTokenInput">TOKEN / API KEY</label>
+                        <div class="token-input-wrapper">
+                            <input type="password" id="authModalTokenInput" autocomplete="off" spellcheck="false"
+                                placeholder="Paste sovereign token here..." class="token-input-field" required />
+                            <div class="token-input-actions">
+                                <button type="button" id="toggleTokenVisibilityBtn" data-action="toggle-token-visibility" class="token-btn-action" title="Reveal token value">SHOW</button>
+                                <button type="button" id="pasteTokenBtn" data-action="paste-token" class="token-btn-action" title="Paste token from clipboard">PASTE</button>
+                            </div>
+                        </div>
+                        <div id="tokenCharCount" class="token-count">0 characters detected</div>
+                        <button type="submit" id="authModalSubmitBtn" class="auth-submit">
+                            <span id="authSubmitSpinner" class="hidden w-3 h-3 border-2 border-green border-t-transparent rounded-full animate-spin"></span>
+                            <span id="authSubmitBtnText">AUTHENTICATE LOCAL SESSION</span>
+                        </button>
+                    </form>
+                </details>
+
+                <div id="authModalError" class="hidden auth-error"></div>
+                <div id="authModalStatus" class="auth-status">[AUTH] <span>Awaiting local identity</span></div>
+            </div>
+
+            <footer class="auth-boundary">SECURITY BOUNDARY: LOCAL SESSION ONLY</footer>
+        </div>
+    </div>
+
+    <!-- Modal: Review & Authorize Request (Four-Eyes HITL) -->
+    <div id="approvalModal" class="hidden modal-backdrop">
+        <div class="modal-window p-5 space-y-4 font-mono">
+            <div class="flex justify-between items-center border-b border-subtle pb-3">
+                <div class="flex items-center gap-2">
+                    <span id="modalInterlockBadge" class="bg-red-tint text-red border border-red px-2 py-0.5 rounded text-[10px] font-bold">FOUR-EYES INTERLOCK</span>
+                    <span class="text-white font-bold text-sm">Review Operational Action</span>
+                </div>
+                <button data-action="close-approval-modal" class="text-muted hover:text-white cursor-pointer font-bold">✕</button>
+            </div>
+
+            <div class="space-y-2.5 text-xs">
+                <div class="bg-card p-3 rounded border border-subtle space-y-1.5">
+                    <div class="text-[10px] text-muted uppercase">Equipment Under Control</div>
+                    <div id="modalEquipment" class="text-white font-bold">P-101A (API 610 Heavy Duty Centrifugal Pump)</div>
+                    <div class="text-[11px] text-slate-300">Action: <b id="modalAction" class="text-amber">restart_component</b></div>
+                </div>
+
+                <div class="bg-card p-3 rounded border border-subtle space-y-1">
+                    <div class="text-[10px] text-muted uppercase">SOP Guidance & Telemetry Justification</div>
+                    <p id="modalJustification" class="text-slate-300 text-[11px] leading-relaxed">
+                        Fluctuating vibration (7.8 mm/s RMS) and bearing metal temperature exceeding 92°C trigger mandatory thermal stabilization check under MRPL SOP 610. Supervisor sign-off required prior to motor breaker re-engagement.
                     </p>
                 </div>
-            </div>
 
-            <!-- Knowledge Vault & Ingestion Panel (Phase 4) -->
-            <div class="bg-[#0b1018] rounded-lg border border-slate-800/80 shadow-2xl p-4 flex flex-col gap-3 flex-1">
-                <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-box-archive text-indigo-400 text-xs"></i>
-                        <h2 class="font-mono text-xs font-bold uppercase tracking-wider text-slate-200">Sovereign Knowledge Vault</h2>
+                <div class="bg-card p-3 rounded border border-subtle text-[11px] space-y-1">
+                    <div class="text-[10px] text-muted uppercase">Approver Identity & Authorization Scope</div>
+                    <div class="flex justify-between">
+                        <span class="text-muted">Active Signer:</span>
+                        <span id="modalSignerName" class="text-green font-bold">Supervisor Jane (supervisor)</span>
                     </div>
-                    <span id="docsCountBadge" class="text-[10px] font-mono bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">3 MANUALS</span>
-                </div>
-
-                <!-- Minimalist Upload Dropzone -->
-                <form id="uploadForm" class="space-y-2">
-                    <input type="hidden" name="workspace_id" value="1">
-                    <div class="border border-dashed border-slate-800 rounded p-2.5 bg-[#080d14] flex items-center justify-between hover:border-indigo-500/50 transition">
-                        <input type="file" name="file" accept=".pdf" class="text-[11px] text-slate-400 font-mono file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-mono file:bg-indigo-950 file:text-indigo-300 hover:file:bg-indigo-900">
-                        <button type="submit" id="uploadBtn" class="bg-indigo-600 hover:bg-indigo-500 text-slate-100 font-mono text-[11px] font-semibold px-2.5 py-1 rounded transition">
-                            INGEST
-                        </button>
+                    <div class="flex justify-between">
+                        <span class="text-muted">Four-Eyes Status:</span>
+                        <span id="modalFourEyesStatus" class="text-amber font-semibold">Stage 1 Review Required</span>
                     </div>
-                    <p id="uploadStatus" class="text-[10px] font-mono text-center"></p>
-                </form>
-
-                <!-- Active Ingested Documents List -->
-                <div class="space-y-1.5 font-mono text-[11px] overflow-y-auto max-h-[140px] pt-1" id="manualsList">
-                    <!-- Manuals populated dynamically -->
                 </div>
             </div>
 
-        </section>
+            <div id="modalApprovalError" class="hidden bg-red-tint border border-red p-2.5 rounded text-[11px] text-red font-mono"></div>
 
-    </main>
+            <div class="flex gap-3 pt-2">
+                <button data-action="modal-approve" class="flex-1 bg-green hover:bg-emerald-400 text-surface font-bold py-2 rounded text-xs transition cursor-pointer flex items-center justify-center gap-1.5">
+                    ✓ AUTHORIZE ACTION
+                </button>
+                <button data-action="modal-reject" class="flex-1 bg-red-tint hover:bg-red-tint/80 text-red border border-red font-bold py-2 rounded text-xs transition cursor-pointer flex items-center justify-center gap-1.5">
+                    ✕ REJECT
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Artifact Preview & SHA-256 Inspector -->
+    <div id="artifactModal" class="hidden modal-backdrop">
+        <div class="modal-window p-5 space-y-4 font-mono">
+            <div class="flex justify-between items-center border-b border-subtle pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-green font-bold text-xs">📦</span>
+                    <span id="artifactModalTitle" class="text-white font-bold text-sm">Artifact Details</span>
+                </div>
+                <button data-action="close-artifact-modal" class="text-muted hover:text-white cursor-pointer font-bold">✕</button>
+            </div>
+
+            <div class="space-y-2 text-xs">
+                <div class="bg-card p-3 rounded border border-subtle space-y-1">
+                    <div class="text-[10px] text-muted uppercase">SHA-256 Cryptographic Hash (Integrity Verification)</div>
+                    <div id="artifactModalHash" class="text-green text-[11px] break-all font-mono"></div>
+                    <p class="text-[10px] text-dark">SHA-256 verifies artifact integrity after local generation.</p>
+                </div>
+                <div class="bg-card p-3 rounded border border-subtle space-y-1">
+                    <div class="text-[10px] text-muted uppercase">Workspace & Metadata</div>
+                    <div id="artifactModalInfo" class="text-slate-300 text-[11px]">Workspace: <b class="text-white">MRPL_OPS_WS (ID: 1)</b></div>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button data-action="close-artifact-modal" class="bg-card hover:bg-card-hover text-slate-200 px-4 py-1.5 rounded border border-subtle text-xs cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Evidence / Provenance Inspector -->
+    <div id="provenanceModal" class="hidden modal-backdrop">
+        <div class="modal-window p-5 space-y-4 font-mono max-w-2xl">
+            <div class="flex justify-between items-center border-b border-subtle pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-cyan font-bold text-xs">🔍</span>
+                    <span id="provenanceModalTitle" class="text-white font-bold text-sm">Full Source Provenance Trace</span>
+                </div>
+                <button data-action="close-provenance-modal" class="text-muted hover:text-white cursor-pointer font-bold">✕</button>
+            </div>
+
+            <div id="provenanceModalBody" class="space-y-2 text-xs max-h-[60vh] overflow-y-auto pr-1">
+                <div class="text-muted italic">Loading page provenance...</div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button data-action="close-provenance-modal" class="bg-card hover:bg-card-hover text-slate-200 px-4 py-1.5 rounded border border-subtle text-xs cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    <!-- Global Persistent Command Dock (Available Outside Dashboard) -->
+    <div id="globalCommandDock" class="hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur border-t border-subtle p-3 px-6 shadow-2xl">
+        <div class="max-w-7xl mx-auto flex items-center gap-3 font-mono text-xs">
+            <span class="text-green font-bold select-none">&gt;</span>
+            <input type="text" id="globalConsoleCmdInput" placeholder="Enter operational command, question, or navigation..." class="flex-1 bg-card border border-subtle rounded px-3 py-2 text-white placeholder-muted focus:outline-none focus:border-green">
+            <button data-action="console-submit" data-input="globalConsoleCmdInput" class="bg-green hover:bg-emerald-400 text-surface font-bold px-4 py-2 rounded transition cursor-pointer">
+                SEND
+            </button>
+        </div>
+    </div>
 
     <!-- ========================================================================= -->
-    <!-- JAVASCRIPT: ARCH INTERACTIVE WORKSPACE ENGINE                             -->
+    <!-- 5. APPLICATION ENGINE JAVASCRIPT (AUTHENTICATED, ZERO-CLOUD)              -->
     <!-- ========================================================================= -->
-    <script>
-        const API_BASE = "/api/v1";
-        let activeRunId = null;
 
-        // Live 24-HR Clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('liveClock').innerText = now.toLocaleTimeString('en-GB');
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
 
-        // Preset Scenarios
-        function setScenario(n) {
-            const p = document.getElementById('promptInput');
-            if (n === 1) p.value = "What is the normal operating pressure for sensor PT-101 according to our SOP? Please check current pressure telemetry.";
-            if (n === 2) p.value = "Pressure transmitter PT-101 is reading 495 PSI! This exceeds 450 PSI! Actuate emergency pressure relief on chamber Reactor-B!";
-            if (n === 3) p.value = "Please check temperature telemetry on thermocouple TT-204 and verify against API 610 trip thresholds.";
-        }
-
-        // Keyboard Shortcut: Ctrl + Enter to Run
-        document.getElementById('promptInput').addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                e.preventDefault();
-                dispatchRun();
-            }
-        });
-
-        // Dispatch Run
-        async function dispatchRun() {
-            const input = document.getElementById('promptInput');
-            const agentSelect = document.getElementById('agentSelect');
-            const btn = document.getElementById('dispatchBtn');
-            const indicator = document.getElementById('runStateIndicator');
-            const badge = document.getElementById('runBadge');
-            const stream = document.getElementById('eventStream');
-            const reportBox = document.getElementById('reportBox');
-            const sourcesBox = document.getElementById('sourcesCitationBox');
-
-            const text = input.value.trim();
-            if (!text) return;
-
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> RUNNING';
-            indicator.innerText = "● EXECUTING";
-            indicator.className = "text-cyan-400 font-medium";
-
-            badge.innerText = "DISPATCHED";
-            badge.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800";
-
-            reportBox.classList.add('hidden');
-            sourcesBox.classList.add('hidden');
-            stream.innerHTML = `<div class="text-slate-500 py-1">[${new Date().toLocaleTimeString('en-GB')}] >> DISPATCHING OPERATOR QUERY TO INFERENCE LOOP...</div>`;
-
-            try {
-                const res = await fetch(`${API_BASE}/runs`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        workspace_id: 1,
-                        agent_id: parseInt(agentSelect.value),
-                        input_text: text,
-                        user_id: "operator_sitanshu"
-                    })
-                });
-
-                if (res.ok) {
-                    const run = await res.json();
-                    activeRunId = run.id;
-                    renderRunOutcome(run);
-                    fetchApprovals();
-                } else {
-                    const err = await res.json();
-                    stream.innerHTML += `<div class="text-red-400">[ERR] Execution rejected: ${err.detail || 'Failed'}</div>`;
-                    badge.innerText = "FAILED";
-                    badge.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800";
-                }
-            } catch (err) {
-                stream.innerHTML += `<div class="text-red-400">[ERR] Network timeout or connection refusal: ${err.message}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-play text-[10px]"></i> EXECUTE';
-                indicator.innerText = "● IDLE";
-                indicator.className = "text-slate-500 font-medium";
-            }
-        }
-
-        // Render Run Outcome & Fetch Events
-        async function renderRunOutcome(run) {
-            const badge = document.getElementById('runBadge');
-            const stream = document.getElementById('eventStream');
-            const reportBox = document.getElementById('reportBox');
-            const reportContent = document.getElementById('reportContent');
-            const sourcesBox = document.getElementById('sourcesCitationBox');
-            const sourcesList = document.getElementById('sourcesListText');
-
-            if (run.status === 'completed') {
-                badge.innerText = "COMPLETED";
-                badge.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700";
-            } else if (run.status === 'paused') {
-                badge.innerText = "PAUSED (AWAITING HITL APPROVAL)";
-                badge.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700 beacon-active";
-            }
-
-            // Render Events
-            try {
-                const evRes = await fetch(`${API_BASE}/runs/${run.id}/events`);
-                const events = await evRes.json();
-                stream.innerHTML = '';
-                
-                events.forEach(e => {
-                    let tag = "[SYS]";
-                    let tagColor = "text-slate-400 bg-slate-800";
-                    let msgColor = "text-slate-300";
-
-                    if (e.event_type === 'retrieval_completed') {
-                        tag = "[RAG]";
-                        tagColor = "text-indigo-400 bg-indigo-950/80";
-                        msgColor = "text-indigo-200";
-                    } else if (e.event_type === 'model_prompt' || e.event_type === 'model_response') {
-                        tag = "[LLM]";
-                        tagColor = "text-blue-400 bg-blue-950/80";
-                    } else if (e.event_type === 'tool_executing' || e.event_type === 'tool_executed') {
-                        tag = "[TOOL]";
-                        tagColor = "text-cyan-400 bg-cyan-950/80";
-                        msgColor = "text-cyan-200";
-                    } else if (e.event_type === 'approval_requested') {
-                        tag = "[HITL]";
-                        tagColor = "text-amber-400 bg-amber-950/80 font-bold";
-                        msgColor = "text-amber-200 font-semibold";
-                    } else if (e.event_type === 'completed') {
-                        tag = "[DONE]";
-                        tagColor = "text-emerald-400 bg-emerald-950 font-bold";
-                        msgColor = "text-emerald-200";
-                    }
-
-                    stream.innerHTML += `
-                        <div class="flex items-start gap-2 py-0.5">
-                            <span class="text-[9px] px-1 py-0.2 rounded font-bold ${tagColor} shrink-0 select-none">${tag}</span>
-                            <span class="${msgColor}">${e.message}</span>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error(err);
-            }
-
-            // Citations
-            if (run.sources_used && run.sources_used !== 'None') {
-                sourcesBox.classList.remove('hidden');
-                sourcesList.innerText = run.sources_used;
-            }
-
-            // Report
-            if (run.result_text) {
-                reportBox.classList.remove('hidden');
-                reportContent.innerText = run.result_text;
-            }
-        }
-
-        // Fetch Approvals Inbox
-        async function fetchApprovals() {
-            try {
-                const res = await fetch(`${API_BASE}/approvals`);
-                const data = await res.json();
-                const container = document.getElementById('approvalsContainer');
-                const badge = document.getElementById('pendingCountBadge');
-
-                if (!data || data.length === 0) {
-                    badge.innerText = "0 PENDING";
-                    badge.className = "text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700";
-                    container.innerHTML = `
-                        <p class="text-slate-600 text-center text-xs italic font-mono py-6">
-                            <i class="fa-solid fa-lock text-slate-700 block text-lg mb-1"></i>
-                            ALL SAFETY INTERLOCKS NOMINAL<br>
-                            <span class="text-[10px] text-slate-700">ZERO HIGH-RISK INTERVENTIONS GATED</span>
-                        </p>
-                    `;
-                    return;
-                }
-
-                badge.innerText = `${data.length} GATED ACTION${data.length > 1 ? 'S' : ''}`;
-                badge.className = "text-[10px] font-mono bg-amber-950 text-amber-300 px-2 py-0.5 rounded border border-amber-700 font-bold beacon-active";
-                container.innerHTML = '';
-
-                data.forEach(req => {
-                    container.innerHTML += `
-                        <div class="p-3 bg-[#120b0b] rounded border border-amber-700/80 space-y-2 text-xs font-mono">
-                            <div class="flex justify-between items-center">
-                                <span class="text-amber-400 font-bold tracking-wider uppercase">
-                                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> INTERLOCK #${req.id}
-                                </span>
-                                <span class="text-[9px] bg-red-950 text-red-300 px-1.5 py-0.5 rounded uppercase font-bold border border-red-800">
-                                    ${req.risk_level || 'HIGH_RISK'}
-                                </span>
-                            </div>
-                            <p class="text-slate-300 font-sans text-xs">${req.request_reason}</p>
-                            <div class="bg-[#080d14] p-2 rounded text-[10px] text-slate-400 border border-slate-800 font-mono">
-                                PARAMS: ${req.parameters || '{}'}
-                            </div>
-                            <div class="flex gap-2 pt-1">
-                                <button onclick="executeApproval(${req.id}, ${req.run_id}, 'approve')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-1.5 rounded transition text-xs flex items-center justify-center gap-1.5">
-                                    <i class="fa-solid fa-check"></i> AUTHORIZE [A]
-                                </button>
-                                <button onclick="executeApproval(${req.id}, ${req.run_id}, 'reject')" class="flex-1 bg-red-900/60 hover:bg-red-800 text-red-200 font-bold py-1.5 rounded transition text-xs border border-red-700 flex items-center justify-center gap-1.5">
-                                    <i class="fa-solid fa-xmark"></i> REJECT [R]
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        // Execute Approval & Auto-Resume
-        async function executeApproval(approvalId, runId, action) {
-            try {
-                await fetch(`${API_BASE}/approvals/${approvalId}/${action}`, { method: 'POST' });
-                fetchApprovals();
-
-                if (runId) {
-                    const res = await fetch(`${API_BASE}/runs/${runId}/resume`, { method: 'POST' });
-                    if (res.ok) {
-                        const resumedRun = await res.json();
-                        renderRunOutcome(resumedRun);
-                    }
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        // Fetch Knowledge Sources
-        async function fetchKnowledge() {
-            try {
-                const res = await fetch(`${API_BASE}/knowledge?workspace_id=1`);
-                const data = await res.json();
-                const list = document.getElementById('manualsList');
-                const badge = document.getElementById('docsCountBadge');
-                const topChip = document.getElementById('topVectorsChip');
-
-                list.innerHTML = '';
-                if (!data || data.length === 0) {
-                    list.innerHTML = '<div class="text-slate-600 italic py-2">No documents indexed.</div>';
-                    badge.innerText = '0 MANUALS';
-                    return;
-                }
-
-                badge.innerText = `${data.length} MANUALS`;
-                let totalChunks = 0;
-
-                data.forEach(item => {
-                    totalChunks += item.chunk_count || 0;
-                    list.innerHTML += `
-                        <div class="flex justify-between items-center p-1.5 bg-[#080d14] rounded border border-slate-800 hover:border-slate-700 transition">
-                            <span class="text-slate-300 truncate pr-2 max-w-[220px]" title="${item.original_filename || item.name}">${item.original_filename || item.name}</span>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-900">${item.chunk_count} Chunks</span>
-                                <button onclick="purgeDoc(${item.id})" class="text-slate-600 hover:text-red-400 font-bold"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                topChip.innerText = `${totalChunks} VEC`;
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        async function purgeDoc(id) {
-            if (!confirm("Purge vector embeddings for this manual?")) return;
-            try {
-                await fetch(`${API_BASE}/knowledge/${id}`, { method: 'DELETE' });
-                fetchKnowledge();
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        // Upload Form
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('uploadBtn');
-            const status = document.getElementById('uploadStatus');
-            const formData = new FormData(e.target);
-
-            if (!formData.get('file') || !formData.get('file').name) return;
-
-            btn.disabled = true;
-            btn.innerText = "VECTORIZING...";
-            status.innerText = "";
-
-            try {
-                const res = await fetch(`${API_BASE}/knowledge/upload`, {
-                    method: 'POST',
-                    body: formData
-                });
-                if (res.ok) {
-                    const result = await res.json();
-                    status.innerText = `✅ Embedded ${result.chunk_count} chunks into ChromaDB`;
-                    status.className = "text-[10px] font-mono text-emerald-400";
-                    e.target.reset();
-                    fetchKnowledge();
-                } else {
-                    const err = await res.json();
-                    status.innerText = "❌ " + (err.detail || "Upload failed");
-                    status.className = "text-[10px] font-mono text-red-400";
-                }
-            } catch (err) {
-                status.innerText = "❌ Server error";
-                status.className = "text-[10px] font-mono text-red-400";
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "INGEST";
-            }
-        });
-
-        // Initialize
-        fetchKnowledge();
-        fetchApprovals();
-        setInterval(fetchApprovals, 4000);
-    </script>
 </body>
 </html>

@@ -131,8 +131,8 @@ class DocumentProcessingService:
                             native_count += 1
                         else:
                             # Targeted OCR fallback for unreadable/scanned page
-                            page_png = render_page_to_png_bytes(doc, page_num, dpi=settings.max_raster_dpi)
-                            proc_png = preprocess_image_for_ocr(page_png)
+                            page_png = await asyncio.to_thread(render_page_to_png_bytes, doc, page_num, dpi=settings.max_raster_dpi)
+                            proc_png = await asyncio.to_thread(preprocess_image_for_ocr, page_png)
                             ocr_res = await self.ocr_provider.extract(proc_png)
 
                             avg_conf = ocr_res.confidence if ocr_res.confidence is not None else 1.0

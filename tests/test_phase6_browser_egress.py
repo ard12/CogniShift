@@ -14,6 +14,7 @@ from cognishift.app.main import app
 
 INDEX_HTML_PATH = Path("src/cognishift/app/static/index.html")
 APP_CSS_PATH = Path("src/cognishift/app/static/app.css")
+APP_JS_PATH = Path("src/cognishift/app/static/app.js")
 
 # Match URLs starting with http://, https://, or protocol-relative //
 EXTERNAL_URL_PATTERN = re.compile(r'https?://[a-zA-Z0-9.-]+|//[a-zA-Z0-9.-]+')
@@ -37,13 +38,20 @@ def test_index_html_contains_zero_external_links():
 
 
 def test_local_static_assets_exist():
-    """Verify that all referenced local assets in index.html exist on disk."""
+    """Verify that all referenced local assets in index.html exist on disk and have zero external URLs."""
     assert APP_CSS_PATH.exists(), f"Missing {APP_CSS_PATH}"
     css_content = APP_CSS_PATH.read_text(encoding="utf-8")
     assert len(css_content.strip()) > 500, "app.css is unexpectedly small or empty"
 
     external_css_refs = scan_for_external_urls(css_content)
     assert len(external_css_refs) == 0, f"Found external references in app.css: {external_css_refs}"
+
+    assert APP_JS_PATH.exists(), f"Missing {APP_JS_PATH}"
+    js_content = APP_JS_PATH.read_text(encoding="utf-8")
+    assert len(js_content.strip()) > 500, "app.js is unexpectedly small or empty"
+
+    external_js_refs = scan_for_external_urls(js_content)
+    assert len(external_js_refs) == 0, f"Found external references in app.js: {external_js_refs}"
 
 
 def test_browser_scanner_negative_control():

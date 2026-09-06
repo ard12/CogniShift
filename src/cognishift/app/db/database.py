@@ -8,6 +8,7 @@ async def init_db() -> None:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA synchronous=NORMAL")
         await db.execute("PRAGMA busy_timeout=30000")
+        await db.execute("PRAGMA foreign_keys = ON")
         
         await db.execute('''
             CREATE TABLE IF NOT EXISTS workspaces (
@@ -84,6 +85,7 @@ async def init_db() -> None:
                 started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
                 completed_at TIMESTAMP, 
                 error_message TEXT,
+                routing_info TEXT,
                 structured_plan TEXT
             )
         ''')
@@ -172,6 +174,28 @@ async def init_db() -> None:
                 UNIQUE(workspace_id, relative_path)
             )
         ''')
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS pending_tasks (
+                id TEXT PRIMARY KEY,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                user_id TEXT NOT NULL,
+                originating_run_id INTEGER REFERENCES agent_runs(id),
+                intent TEXT NOT NULL,
+                requested_goal TEXT NOT NULL,
+                source_references TEXT DEFAULT '{}',
+                proposed_steps TEXT DEFAULT '[]',
+                confirmation_required INTEGER DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'AWAITING_CONFIRMATION',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                version INTEGER DEFAULT 1,
+                execution_started_at TEXT,
+                execution_completed_at TEXT,
+                resulting_run_id INTEGER REFERENCES agent_runs(id)
+            )
+        ''')
         
         try:
             await db.execute("ALTER TABLE agent_runs ADD COLUMN structured_plan TEXT")
@@ -243,6 +267,11 @@ async def init_db() -> None:
                 await db.execute(f"ALTER TABLE approval_requests ADD COLUMN {col} {col_def}")
             except Exception:
                 pass
+
+        try:
+            await db.execute("ALTER TABLE agent_runs ADD COLUMN routing_info TEXT")
+        except Exception:
+            pass
 
         await db.commit()
 

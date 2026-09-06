@@ -47,6 +47,29 @@ DEFAULT_MODELS: Dict[str, ModelDefinition] = {
         enabled=True,
         priority=100
     ),
+    "qwen2.5:7b": ModelDefinition(
+        id="qwen2.5:7b",
+        name="qwen2.5:7b",
+        display_name="Qwen 2.5 7B (General SLM & Industrial Reasoning)",
+        provider="ollama",
+        model_identifier="qwen2.5:7b",
+        capabilities=[
+            "reasoning",
+            "document_analysis",
+            "summarization",
+            "structured_data",
+            "spreadsheet_analysis"
+        ],
+        context_window=32768,
+        vram_requirement_mb=4600,
+        quality_score=0.94,
+        latency_score=0.88,
+        supports_tools=True,
+        supports_images=False,
+        supports_json_schema=True,
+        enabled=True,
+        priority=125
+    ),
     "moondream": ModelDefinition(
         id="moondream",
         name="moondream",

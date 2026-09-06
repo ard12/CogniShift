@@ -1,5 +1,6 @@
+import json
 from fastapi import APIRouter, HTTPException, Query, Depends, status
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import RunCreate, RunResponse, RunEventResponse
@@ -7,6 +8,16 @@ from cognishift.app.core.auth import get_current_user, verify_workspace_access, 
 from cognishift.core.engine import execute_agent_run, resume_agent_run
 
 router = APIRouter(prefix="/api/v1/runs", tags=["Runs"])
+
+
+def _format_run_response(row: Any) -> RunResponse:
+    d = dict(row)
+    if d.get("routing_info") and isinstance(d["routing_info"], str):
+        try:
+            d["routing_info"] = json.loads(d["routing_info"])
+        except Exception:
+            d["routing_info"] = None
+    return RunResponse.model_validate(d)
 
 
 @router.post("", response_model=RunResponse)
@@ -27,7 +38,8 @@ async def create_run(
             agent_id=run_req.agent_id,
             input_text=run_req.input_text or "",
             user_id=user.user_id,
-            input_image_path=run_req.input_image_path
+            input_image_path=run_req.input_image_path,
+            conversation_history=run_req.conversation_history
         )
         return run_res
     except ValueError as ve:
@@ -68,7 +80,7 @@ async def list_runs(
         query = f"SELECT * FROM agent_runs {where_sql} ORDER BY started_at DESC"
         cursor = await db.execute(query, tuple(params))
         rows = await cursor.fetchall()
-        return [RunResponse.model_validate(dict(r)) for r in rows]
+        return [_format_run_response(r) for r in rows]
 
 
 @router.get("/{run_id}", response_model=RunResponse)
@@ -83,7 +95,7 @@ async def get_run(
         if not row:
             raise HTTPException(status_code=404, detail="Run not found")
         verify_workspace_access(row["workspace_id"], user)
-        return RunResponse.model_validate(dict(row))
+        return _format_run_response(row)
 
 
 @router.get("/{run_id}/events", response_model=List[RunEventResponse])

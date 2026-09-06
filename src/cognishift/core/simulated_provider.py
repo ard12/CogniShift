@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Dict
 from cognishift.core.providers import ModelProvider, ModelResponse
 
 class SimulatedProvider(ModelProvider):
@@ -9,11 +9,16 @@ class SimulatedProvider(ModelProvider):
         prompt: str,
         system_prompt: str = "",
         context: str = "",
-        model_name: str = None
+        model_name: str = None,
+        history: Optional[List[Dict[str, str]]] = None
     ) -> ModelResponse:
         """Return a simulated text response adhering to the structured AgentAction protocol."""
         chosen_model = model_name or "simulated-text"
-        prompt_lower = prompt.lower()
+        target_text = prompt
+        if "Operator Current Input:" in prompt:
+            parts = prompt.split("Operator Current Input:", 1)
+            target_text = parts[1].split("\n\n", 1)[0]
+        prompt_lower = target_text.lower()
         
         # 1. Explanatory or refusal queries must strictly return natural prose (ZERO tool calls)
         if (

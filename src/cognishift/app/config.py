@@ -13,14 +13,14 @@ class Settings(BaseSettings):
     """Configuration settings for CogniShift."""
     operating_mode: str = "local"
     ollama_base_url: str = "http://127.0.0.1:11434"
-    text_model: str = "llama3.2:3b"
+    text_model: str = "qwen2.5:7b"
     vision_model: str = "moondream"
     data_dir: Path = PROJECT_ROOT / "data"
     database_path: Path = PROJECT_ROOT / "data" / "cognishift.db"
     chroma_path: Path = PROJECT_ROOT / "data" / "chroma"
     upload_dir: Path = PROJECT_ROOT / "data" / "uploads"
     auth_store_path: Path = PROJECT_ROOT / "data" / "private" / "auth_store.json"
-    cognishift_demo_mode: bool = False
+    cognishift_demo_mode: bool = True
     demo_session_ttl_seconds: int = 1800
     max_upload_size_mb: int = 50
     log_level: str = "INFO"
@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     sandbox_max_input_bytes: int = 10485760
     sandbox_max_output_files: int = 10
     sandbox_max_output_file_bytes: int = 10485760
+    sandbox_max_output_aggregate_bytes: int = 52428800  # 50 MiB aggregate cap
 
     # Phase 5 Multimodal Document Ingestion, OCR & Vision Configuration
     ocr_enabled: bool = True
@@ -67,6 +68,15 @@ class Settings(BaseSettings):
     fastembed_cache_dir: Path = PROJECT_ROOT / "data" / "models" / "fastembed"
     network_audit_max_records: int = 5000
     network_audit_retention_days: int = 7
+
+    # Phase 7 Semantic Intent Router Configuration
+    semantic_router_enabled: bool = True
+    semantic_router_confidence_threshold: float = 0.70
+    semantic_router_margin_threshold: float = 0.10
+    semantic_router_control_confidence_threshold: float = 0.75
+    semantic_router_control_margin_threshold: float = 0.12
+    semantic_router_max_history_turns: int = 8
+    semantic_retrieval_max_distance: float = 0.78  # Squared L2 distance threshold on unit vectors (~0.61 cosine similarity)
 
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore")
 

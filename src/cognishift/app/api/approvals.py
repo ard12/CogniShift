@@ -77,7 +77,7 @@ async def approve_request(
             cursor_update = await db.execute(
                 """UPDATE approval_requests 
                    SET reviewed_by = ?, reviewed_at = ? 
-                   WHERE id = ? AND status = 'pending' RETURNING *""",
+                   WHERE id = ? AND status = 'pending' AND reviewed_by IS NULL RETURNING *""",
                 (approver.user_id, now, request_id)
             )
             updated_row = await cursor_update.fetchone()
@@ -108,8 +108,9 @@ async def approve_request(
             cursor_update = await db.execute(
                 """UPDATE approval_requests 
                    SET status = 'approved', reviewed_by_2 = ?, reviewed_at_2 = ? 
-                   WHERE id = ? AND status = 'pending' RETURNING *""",
-                (approver.user_id, now, request_id)
+                   WHERE id = ? AND status = 'pending' AND reviewed_by = ?
+                   AND reviewed_by_2 IS NULL RETURNING *""",
+                (approver.user_id, now, request_id, approval["reviewed_by"])
             )
             updated_row = await cursor_update.fetchone()
             if not updated_row:

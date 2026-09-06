@@ -2,9 +2,9 @@
 import json
 import re
 import logging
-from typing import Dict, Any, Optional, List, Literal, Union, Type
+from typing import Dict, Any, Optional, List, Literal, Union, Type, Tuple
 from typing_extensions import Annotated
-from pydantic import BaseModel, Field, ValidationError, AfterValidator
+from pydantic import BaseModel, Field, ValidationError, AfterValidator, AliasChoices
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,10 @@ class FinalAnswer(BaseModel):
     content: str
     citations: List[str] = Field(default_factory=list)
 
+    @property
+    def answer(self) -> str:
+        return self.content
+
 
 class ClarificationRequest(BaseModel):
     """The agent requests additional clarification from the human operator."""
@@ -76,40 +80,46 @@ class ClarificationRequest(BaseModel):
     question: str
 
 
-AgentAction = Union[ToolCallProposal, FinalAnswer, ClarificationRequest]
+class StepObservation(BaseModel):
+    """The agent records an intermediate step observation/status without terminating the run."""
+    action: Literal["step_observation", "observation"] = "step_observation"
+    content: str
+
+
+AgentAction = Union[ToolCallProposal, FinalAnswer, ClarificationRequest, StepObservation]
 
 
 # -----------------------------------------------------------------------------
 # 3. PER-TOOL PYDANTIC ARGUMENT SCHEMAS (Strict Bound & Regex Checked)
 # -----------------------------------------------------------------------------
 class CheckPressureArgs(BaseModel):
-    sensor_id: EquipmentIdentifier
+    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor", "sensor_name", "equipment_id"))
 
 
 class CheckTemperatureArgs(BaseModel):
-    sensor_id: EquipmentIdentifier
+    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor", "sensor_name", "equipment_id"))
 
 
 class RunDiagnosticArgs(BaseModel):
-    equipment_id: EquipmentIdentifier
+    equipment_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("equipment_id", "equipment", "component_id", "component", "sensor_id", "sensor"))
 
 
 class EmergencyPressureReliefArgs(BaseModel):
-    chamber_id: EquipmentIdentifier
-    reason: OperationalReason
+    chamber_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("chamber_id", "chamber", "equipment_id", "component_id"))
+    reason: OperationalReason = Field(default="Emergency pressure relief intervention")
 
 
 class RestartComponentArgs(BaseModel):
-    component_id: EquipmentIdentifier
-    reason: OperationalReason
+    component_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("component_id", "component_name", "component", "equipment_id"))
+    reason: OperationalReason = Field(..., validation_alias=AliasChoices("reason", "justification", "operational_reason"))
 
 
 class CheckNetworkArgs(BaseModel):
-    target_host: NetworkHostIdentifier
+    target_host: NetworkHostIdentifier = Field(..., validation_alias=AliasChoices("target_host", "host", "target", "hostname", "ip"))
 
 
 class RestartServiceArgs(BaseModel):
-    service_name: ServiceNameIdentifier
+    service_name: ServiceNameIdentifier = Field(..., validation_alias=AliasChoices("service_name", "service", "name"))
 
 
 def validate_safe_relative_path(v: str) -> str:
@@ -255,6 +265,109 @@ TOOL_RISK_LEVELS = {
 }
 
 
+SUPPORTED_SIMULATED_TARGETS = {
+    "P-101A": "Crude Feed Booster Pump A (API 610 Centrifugal Between-Bearings)",
+    "P-101B": "Crude Feed Booster Pump B (Bypass Redundancy)",
+    "Reactor-B": "Catalytic Hydrotreater Reactor Vessel (Fixed Bed Downflow)",
+    "SV-402": "Pilot-Operated Pressure Relief Valve",
+    "TK-01": "Atmospheric Crude Storage Tank",
+    "Flare-Header": "High-Pressure Acid Gas Flare Header",
+    "PT-101": "Discharge Header Pressure Transmitter",
+    "TT-204": "Outboard Journal Bearing Thermocouple"
+}
+
+
+def is_supported_equipment_target(target_id: str) -> Tuple[bool, str]:
+    """Check if target equipment is supported in the simulated plant topology."""
+    cleaned = (target_id or "").strip().upper()
+    for supported_tag, desc in SUPPORTED_SIMULATED_TARGETS.items():
+        if cleaned == supported_tag.upper():
+            return True, desc
+    supported_list = ", ".join(sorted(SUPPORTED_SIMULATED_TARGETS.keys()))
+    return False, f"Equipment '{target_id}' is not registered in the refinery topology. Supported components: {supported_list}."
+
+
+def get_authoritative_tool_json_schema(tool_name: str) -> Dict[str, Any]:
+    """Export single-source-of-truth JSON Schema from authoritative Pydantic model.
+    
+    Zero schema drift guarantee:
+    Prompt generation reads directly from this authoritative schema.
+    """
+    if tool_name in TOOL_SCHEMAS:
+        schema = TOOL_SCHEMAS[tool_name].model_json_schema()
+        props = {}
+        required = schema.get("required", [])
+        for k, v in schema.get("properties", {}).items():
+            props[k] = {
+                "type": v.get("type", "string"),
+                "description": v.get("description", ""),
+                "required": k in required
+            }
+        return {
+            "type": "object",
+            "properties": props,
+            "required": required
+        }
+    return {"type": "object", "properties": {}}
+
+
+def bounded_repair_tool_parameters(
+    tool_name: str,
+    raw_parameters: Dict[str, Any],
+    references: Optional[Any] = None
+) -> Tuple[Dict[str, Any], Optional[str]]:
+    """
+    Deterministic bounded structured argument repair from explicit user references.
+    
+    CRITICAL RULE (P0 Spec 12 & 13):
+    Only repairs when unambiguous user reference was explicitly supplied in current turn.
+    Returns (repaired_params, argument_source).
+    """
+    params = dict(raw_parameters)
+    arg_source = None
+
+    if references is None:
+        return params, None
+
+    # Handle restart_component missing component_id
+    if tool_name == "restart_component":
+        has_comp = any(params.get(k) for k in ["component_id", "component_name", "component", "equipment_id"])
+        if not has_comp:
+            eq_ids = getattr(references, "equipment_ids", []) or []
+            if len(eq_ids) == 1:
+                params["component_id"] = eq_ids[0]
+                arg_source = "USER_REFERENCE"
+
+    # Handle check_pressure / check_temperature missing sensor_id
+    elif tool_name in ("check_pressure", "check_temperature"):
+        has_sensor = any(params.get(k) for k in ["sensor_id", "sensor", "sensor_name", "equipment_id"])
+        if not has_sensor:
+            eq_ids = getattr(references, "equipment_ids", []) or []
+            if len(eq_ids) == 1:
+                params["sensor_id"] = eq_ids[0]
+                arg_source = "USER_REFERENCE"
+
+    # Handle emergency_pressure_relief missing chamber_id
+    elif tool_name == "emergency_pressure_relief":
+        has_chamber = any(params.get(k) for k in ["chamber_id", "chamber", "equipment_id"])
+        if not has_chamber:
+            eq_ids = getattr(references, "equipment_ids", []) or []
+            if len(eq_ids) == 1:
+                params["chamber_id"] = eq_ids[0]
+                arg_source = "USER_REFERENCE"
+
+    # Handle run_diagnostic missing equipment_id
+    elif tool_name == "run_diagnostic":
+        has_eq = any(params.get(k) for k in ["equipment_id", "equipment", "component_id"])
+        if not has_eq:
+            eq_ids = getattr(references, "equipment_ids", []) or []
+            if len(eq_ids) == 1:
+                params["equipment_id"] = eq_ids[0]
+                arg_source = "USER_REFERENCE"
+
+    return params, arg_source
+
+
 class ToolValidationResult(BaseModel):
     """Result of deterministic tool call validation."""
     valid: bool
@@ -262,19 +375,22 @@ class ToolValidationResult(BaseModel):
     risk_level: str
     validated_parameters: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+    argument_source: Optional[str] = None
 
 
 def validate_proposed_tool_call(
     tool_name: str,
     raw_parameters: Dict[str, Any],
-    allowed_tools: List[str]
+    allowed_tools: List[str],
+    references: Optional[Any] = None
 ) -> ToolValidationResult:
     """
     Deterministically validates a proposed tool call:
     1. Verifies tool exists.
     2. Verifies calling agent has permission for this tool.
-    3. Validates parameters against tool's dedicated Pydantic schema.
-    4. Evaluates Central Risk Policy (HITL pause rule).
+    3. Performs bounded parameter repair from explicit user references if unambiguous.
+    4. Validates parameters against tool's dedicated Pydantic schema.
+    5. Evaluates Central Risk Policy (HITL pause rule).
     """
     # 1. Existence check
     if tool_name not in TOOL_SCHEMAS:
@@ -294,10 +410,13 @@ def validate_proposed_tool_call(
             error_message=f"Tool '{tool_name}' is not in the allowed tools list for this agent."
         )
 
-    # 3. Schema validation
+    # 3. Bounded Parameter Repair
+    repaired_params, arg_source = bounded_repair_tool_parameters(tool_name, raw_parameters, references)
+
+    # 4. Schema validation
     schema_cls = TOOL_SCHEMAS[tool_name]
     try:
-        validated_obj = schema_cls.model_validate(raw_parameters)
+        validated_obj = schema_cls.model_validate(repaired_params)
         validated_dict = validated_obj.model_dump()
     except ValidationError as e:
         error_details = []
@@ -311,7 +430,7 @@ def validate_proposed_tool_call(
             error_message=f"Invalid parameters for tool '{tool_name}': " + "; ".join(error_details)
         )
 
-    # 4. Central Risk Policy evaluation (Deterministic HITL interception)
+    # 5. Central Risk Policy evaluation (Deterministic HITL interception)
     is_high_risk = tool_name in HIGH_RISK_TOOLS
     risk_level = TOOL_RISK_LEVELS.get(tool_name, "read_only")
 
@@ -319,7 +438,8 @@ def validate_proposed_tool_call(
         valid=True,
         requires_approval=is_high_risk,
         risk_level=risk_level,
-        validated_parameters=validated_dict
+        validated_parameters=validated_dict,
+        argument_source=arg_source
     )
 
 
@@ -348,23 +468,32 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
             candidate_json = brace_match.group(1)
 
     if candidate_json:
+        # Pre-clean backticks used by SLM as quotation delimiters for string values
+        candidate_json_clean = re.sub(r':\s*`([\s\S]*?)`', lambda m: ': ' + json.dumps(m.group(1)), candidate_json)
         try:
-            data = json.loads(candidate_json)
+            data = json.loads(candidate_json_clean)
             if isinstance(data, dict):
-                action = str(data.get("action", "")).strip()
+                action = str(data.get("action") or data.get("type") or "").strip().lower()
                 if action == "final_answer":
-                    content = data.get("content", "")
+                    content = data.get("content") if data.get("content") is not None else data.get("answer", "")
                     if not content and strict:
                         return None
                     return FinalAnswer(
                         action="final_answer",
-                        content=content,
+                        content=str(content),
                         citations=data.get("citations", [])
                     )
+                elif action in ("step_observation", "observation"):
+                    content = data.get("content") if data.get("content") is not None else data.get("observation", "")
+                    return StepObservation(
+                        action="step_observation",
+                        content=str(content)
+                    )
                 elif action == "clarification_request":
+                    question = data.get("question") if data.get("question") is not None else data.get("content", "")
                     return ClarificationRequest(
                         action="clarification_request",
-                        question=data.get("question", "")
+                        question=str(question)
                     )
 
                 # Tool call detection: explicit action="tool_call"/"tool",
@@ -393,6 +522,14 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                         if not isinstance(raw_params, dict):
                             raw_params = {}
 
+                        # Safeguard: if model wrapped natural explanatory text inside execute_code
+                        if tool_name == "execute_code":
+                            code_str = str(raw_params.get("code") or raw_params.get("script") or "").strip()
+                            python_keywords = ["import ", "def ", "class ", "print(", "=", "return ", "for ", "while ", "try:", "if "]
+                            if len(code_str) > 20 and not any(kw in code_str for kw in python_keywords):
+                                citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", code_str)))
+                                return FinalAnswer(action="final_answer", content=code_str, citations=citations)
+
                         reason = data.get("reason") or "Autonomous plan execution"
                         return ToolCallProposal(
                             action="tool_call",
@@ -402,6 +539,62 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                         )
                 return None
         except Exception:
+            # Resilient fallback for SLM outputs with unescaped internal quotes inside JSON strings
+            try:
+                action_m = re.search(r'"(?:action|type)"\s*:\s*"final_answer"', candidate_json, re.IGNORECASE)
+                if action_m:
+                    content_m = re.search(r'"(?:content|answer)"\s*:\s*"(.*?)(?:"\s*,\s*"(?:citations|action|type)"|"\s*\})', candidate_json, re.DOTALL)
+                    citations_m = re.search(r'"citations"\s*:\s*\[(.*?)\]', candidate_json, re.DOTALL)
+                    citations = []
+                    if citations_m:
+                        citations = [c.strip().strip('"').strip("'") for c in citations_m.group(1).split(",") if c.strip().strip('"').strip("'")]
+                    if content_m:
+                        return FinalAnswer(
+                            action="final_answer",
+                            content=content_m.group(1),
+                            citations=citations
+                        )
+
+                action_obs = re.search(r'"(?:action|type)"\s*:\s*"(?:step_observation|observation)"', candidate_json, re.IGNORECASE)
+                if action_obs:
+                    content_m = re.search(r'"(?:content|observation)"\s*:\s*"(.*?)(?:"\s*,\s*"|"\s*\})', candidate_json, re.DOTALL)
+                    if content_m:
+                        return StepObservation(
+                            action="step_observation",
+                            content=content_m.group(1)
+                        )
+                
+                tool_m = re.search(r'"(?:tool_name|tool)"\s*:\s*"([^"]+)"', candidate_json)
+                if tool_m:
+                    tool_name = tool_m.group(1).strip()
+                    reason_m = re.search(r'"reason"\s*:\s*"(.*?)(?:"\s*,\s*"|"\s*\})', candidate_json, re.DOTALL)
+                    reason = reason_m.group(1) if reason_m else "Autonomous plan execution"
+                    extracted_params = {}
+                    params_m = re.search(r'"(?:parameters|arguments)"\s*:\s*(\{[\s\S]*?\})', candidate_json)
+                    if params_m:
+                        try:
+                            extracted_params = json.loads(params_m.group(1))
+                        except Exception:
+                            kv_matches = re.findall(r'"([A-Za-z0-9_]+)"\s*:\s*(?:"([^"]*)"|`([^`]*)`|([0-9.]+)|(true|false))', params_m.group(1))
+                            for k, v1, v2, v3, v4 in kv_matches:
+                                val = v1 or v2 or v3 or (v4.lower() == "true" if v4 else "")
+                                extracted_params[k] = val
+
+                    if tool_name == "execute_code":
+                        code_str = str(extracted_params.get("code") or extracted_params.get("script") or "").strip()
+                        python_keywords = ["import ", "def ", "class ", "print(", "=", "return ", "for ", "while ", "try:", "if "]
+                        if len(code_str) > 20 and not any(kw in code_str for kw in python_keywords):
+                            citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", code_str)))
+                            return FinalAnswer(action="final_answer", content=code_str, citations=citations)
+
+                    return ToolCallProposal(
+                        action="tool_call",
+                        tool_name=tool_name,
+                        parameters=extracted_params,
+                        reason=reason
+                    )
+            except Exception:
+                pass
             return None
 
     # Non-strict prose fallback: require meaningful prose (not code blocks, JSON, markup)
@@ -413,7 +606,7 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
         and not clean_text.startswith("`")
         and '"action"' not in clean_text
     ):
-        citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", clean_text)))
+        citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", clean_text)))
         return FinalAnswer(content=clean_text, citations=citations)
 
     return None

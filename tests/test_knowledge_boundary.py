@@ -9,7 +9,7 @@ import asyncio
 import json
 from unittest.mock import patch, MagicMock
 
-from cognishift.core.retriever import retrieve_context, purge_knowledge_source, chroma_client
+from cognishift.core.retriever import retrieve_context, purge_knowledge_source, chroma_client, embedding_model
 from cognishift.app.db.database import get_db, init_db
 from cognishift.core.engine import execute_agent_run
 from cognishift.core.providers import ModelResponse
@@ -75,9 +75,11 @@ async def test_agent_allowed_source_filtering():
     except Exception:
         pass
 
+    docs = ["Turbine overspeed trip setpoint is 3600 RPM equipment parameters.", "Pump impeller diameter is 250mm equipment parameters."]
+    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in embedding_model.embed(docs)]
     collection.add(
-        documents=["Turbine overspeed trip setpoint is 3600 RPM.", "Pump impeller diameter is 250mm."],
-        embeddings=[[0.1] * 384, [0.9] * 384],
+        documents=docs,
+        embeddings=embs,
         metadatas=[
             {"source_id": 1, "workspace_id": 1, "filename": "Turbine_Manual.pdf", "page": 12},
             {"source_id": 2, "workspace_id": 1, "filename": "Pump_Manual.pdf", "page": 4}

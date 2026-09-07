@@ -45,7 +45,7 @@ from cognishift.core.document_processing.lifecycle import (
 )
 from cognishift.core.document_processing.service import DocumentProcessingService
 from cognishift.core.security import get_workspace_root
-from cognishift.core.retriever import retrieve_context, chroma_client
+from cognishift.core.retriever import retrieve_context, chroma_client, embedding_model
 
 
 @pytest.fixture(autouse=True)
@@ -759,12 +759,14 @@ async def test_stale_generation_excluded_by_active_version_filter():
         pass
 
     # Add Stale Gen 1 chunk and Active Gen 2 chunk directly into Chroma
+    docs = [
+        "STALE_GEN1_LEAK: Obsolete calibration limit is 120 PSI. DO NOT USE.",
+        "ACTIVE_GEN2_VALID: Current certified calibration limit is 450 PSI."
+    ]
+    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in embedding_model.embed(docs)]
     collection.add(
-        documents=[
-            "STALE_GEN1_LEAK: Obsolete calibration limit is 120 PSI. DO NOT USE.",
-            "ACTIVE_GEN2_VALID: Current certified calibration limit is 450 PSI."
-        ],
-        embeddings=[[0.1] * 384, [0.1] * 384],
+        documents=docs,
+        embeddings=embs,
         metadatas=[
             {"source_id": sid, "workspace_id": ws_id, "processing_version": "gen1_stale_uuid", "filename": "calibration.pdf", "page": 1, "extraction_method": "native"},
             {"source_id": sid, "workspace_id": ws_id, "processing_version": "gen2_active_uuid", "filename": "calibration.pdf", "page": 1, "extraction_method": "native"}
@@ -823,15 +825,17 @@ async def test_multi_source_paired_active_version_filter():
         pass
 
     # Insert valid and stale chunks for both sources into Chroma
+    docs = [
+        "SOURCE_A_STALE_LEAK: old spec for unit A.",
+        "SOURCE_A_ACTIVE_VALID: certified spec for unit A.",
+        "SOURCE_B_STALE_LEAK: old spec for unit B.",
+        "SOURCE_B_ACTIVE_VALID: certified spec for unit B.",
+        "CROSS_PRODUCT_ANOMALY: source A with version from source B."
+    ]
+    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in embedding_model.embed(docs)]
     collection.add(
-        documents=[
-            "SOURCE_A_STALE_LEAK: old spec for unit A.",
-            "SOURCE_A_ACTIVE_VALID: certified spec for unit A.",
-            "SOURCE_B_STALE_LEAK: old spec for unit B.",
-            "SOURCE_B_ACTIVE_VALID: certified spec for unit B.",
-            "CROSS_PRODUCT_ANOMALY: source A with version from source B."
-        ],
-        embeddings=[[0.1] * 384, [0.1] * 384, [0.1] * 384, [0.1] * 384, [0.1] * 384],
+        documents=docs,
+        embeddings=embs,
         metadatas=[
             {"source_id": sid_a, "workspace_id": ws_id, "processing_version": "vA_stale_gen1", "filename": "source_a.pdf", "page": 1, "extraction_method": "native"},
             {"source_id": sid_a, "workspace_id": ws_id, "processing_version": "vA_active_gen2", "filename": "source_a.pdf", "page": 1, "extraction_method": "native"},

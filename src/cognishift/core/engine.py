@@ -425,13 +425,20 @@ async def execute_agent_run(
                 plan_prompt_section = format_plan_for_prompt(plan)
 
                 # Build step prompt incorporating accumulated observations
-                step_prompt = (
-                    f"Operator Goal: {input_text}\n\n"
-                    f"{plan_prompt_section}\n\n"
-                    f"Current Step to Execute: #{current_step.id} - {current_step.description}\n"
-                    f"If you need an allowed tool to proceed, output a structured tool_call JSON.\n"
-                    f"If this step requires analysis or final response, provide your answer."
-                )
+                if task_info.task_type == "conversational":
+                    step_prompt = (
+                        f"Operator Question: {input_text}\n\n"
+                        "Provide a direct, conversational, and helpful response answering the question. "
+                        "Do NOT output a tool_call. Explain your role and capabilities clearly."
+                    )
+                else:
+                    step_prompt = (
+                        f"Operator Goal: {input_text}\n\n"
+                        f"{plan_prompt_section}\n\n"
+                        f"Current Step to Execute: #{current_step.id} - {current_step.description}\n"
+                        f"If you need an allowed tool to proceed, output a structured tool_call JSON.\n"
+                        f"If this step requires analysis or final response, provide your answer."
+                    )
 
                 await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {selected_model_id} for step #{current_step.id}")
 
@@ -526,7 +533,7 @@ async def execute_agent_run(
                     if tool_name_clean not in [t.lower() for t in allowed_tool_names]:
                         current_step.status = "failed"
                         current_step.error_message = f"Tool '{action.tool_name}' is not in allowed tools list."
-                        current_step.observation = f"Unauthorized tool attempt: {action.tool_name}"
+                        current_step.observation = f"Tool '{action.tool_name}' is not in allowed tools list."
                         await log_event(db, run_id, "tool_unauthorized", current_step.error_message)
                         plan.advance_to_next_step()
                         continue

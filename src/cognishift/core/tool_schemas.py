@@ -351,15 +351,27 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
         try:
             data = json.loads(candidate_json)
             if isinstance(data, dict):
-                action = str(data.get("action", "")).strip()
-                if action == "final_answer":
-                    content = data.get("content", "")
+                action = str(data.get("action", "")).strip().lower()
+                if any(kw in action for kw in ("final", "answer", "response", "reply", "speak", "human", "synthesize", "output")):
+                    params = data.get("parameters") if isinstance(data.get("parameters"), dict) else {}
+                    content = (
+                        data.get("content")
+                        or data.get("message")
+                        or data.get("response")
+                        or data.get("answer")
+                        or data.get("text")
+                        or params.get("response")
+                        or params.get("context")
+                        or params.get("message")
+                        or params.get("text")
+                        or ""
+                    )
                     if not content and strict:
                         return None
                     return FinalAnswer(
                         action="final_answer",
-                        content=content,
-                        citations=data.get("citations", [])
+                        content=str(content),
+                        citations=data.get("citations", []) if isinstance(data.get("citations"), list) else []
                     )
                 elif action == "clarification_request":
                     return ClarificationRequest(
@@ -400,8 +412,22 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                             parameters=raw_params,
                             reason=reason
                         )
+
+                # If no tool call detected, check if data has a conversational text message
+                for key in ("content", "message", "response", "answer", "text"):
+                    val = data.get(key)
+                    if val and isinstance(val, str) and len(val.strip()) >= 5:
+                        return FinalAnswer(
+                            action="final_answer",
+                            content=val.strip(),
+                            citations=data.get("citations", []) if isinstance(data.get("citations"), list) else []
+                        )
                 return None
         except Exception:
+            # Fallback regex extraction for malformed JSON strings from small SLMs
+            msg_match = re.search(r'["\'](?:message|content|response|answer|context)["\']\s*:\s*["\']([\s\S]*?)["\']\s*[,}]', candidate_json)
+            if msg_match and len(msg_match.group(1).strip()) >= 5:
+                return FinalAnswer(action="final_answer", content=msg_match.group(1).strip())
             return None
 
     # Non-strict prose fallback: require meaningful prose (not code blocks, JSON, markup)

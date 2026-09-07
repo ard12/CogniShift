@@ -40,6 +40,15 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
     Analyze incoming user instruction and attached modalities to infer required capabilities.
     """
     text = (prompt or "").lower()
+
+    # 0. Conversational & Capability Meta-Queries (Not an autonomous code execution job)
+    if any(q in text for q in ["can you", "what can you", "who are you", "what tools", "what are your", "how do you", "hello", "hi ", "hey"]):
+        return TaskClassification(
+            task_type="conversational",
+            required_capabilities=["reasoning"],
+            requires_vision=False,
+            confidence=0.95
+        )
     
     # 1. Vision & Multimodal Tasks
     if has_image or any(w in text for w in ["photo", "image", "scanned", "diagram", "gauge", "dial", "nameplate", "drawing"]):

@@ -172,9 +172,9 @@ async def upload_document(
                 # Save page/sheet records in document_pages table for direct page retrieval
                 for idx, chunk_text in enumerate(chunks, start=1):
                     await db.execute(
-                        """INSERT INTO document_pages (source_id, page_number, text_content, extraction_method)
-                           VALUES (?, ?, ?, 'spreadsheet')""",
-                        (source_id, idx, chunk_text)
+                        """INSERT INTO document_pages (source_id, workspace_id, processing_version, page_number, text_content, extraction_method)
+                           VALUES (?, ?, 'v1', ?, ?, 'spreadsheet')""",
+                        (source_id, workspace_id, idx, chunk_text)
                     )
                 await db.execute(
                     "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ? WHERE id = ?",

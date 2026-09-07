@@ -223,7 +223,13 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "what does our remote work policy say",
         "what does our policy say about remote work",
         "what is the company policy on remote work",
-        "what does the remote work policy say"
+        "what does the remote work policy say",
+        "what kind of PPE and safety gear do we need before opening the pump casing",
+        "what safety gear and PPE is required by the standard",
+        "what is the procedure for lock out tag out on the pump",
+        "what is the lockout tagout LOTO protocol",
+        "what are the main steps to service the pump according to the manual",
+        "how often do we need to inspect the pressure relief valves according to OISD"
     ],
     SemanticIntent.ARTIFACT_INSPECTION: [
         "explain <file>",
@@ -554,13 +560,17 @@ class SemanticIntentRouter:
             text_lower
         ))
         is_visualization_cmd = bool(re.search(
-            r'\b(?:visualize|plot|chart|graph)\b.*?\b(?:matplotlib|seaborn|telemetry|readings|sensor|data|png|image|excel|history|trend|metric)\b',
+            r'\b(?:visualize|visual|plot|chart|graph)\b.*?\b(?:matplotlib|seaborn|telemetry|readings|sensor|data|png|image|excel|history|trend|metric|breakdown)\b',
             text_lower
-        ))
-        is_analysis_or_audit_cmd = bool(re.search(
+        )) or any(p in text_lower for p in [
+            "visual breakdown", "simple chart", "make a chart", "generate a chart", "plot the", "visual chart"
+        ])
+        is_analysis_or_audit_cmd = (bool(re.search(
             r'\b(?:data\s+analysis|financial\s+(?:audit|history|performance)|deep\s+(?:financial\s+)?audit|audit\s+on|quantitative\s+audit)\b',
             text_lower
-        )) and any(w in text_lower for w in ["excel", "xlsx", "spreadsheet", "csv", "data", "history", "financial", "png", "image", "chart", "file"])
+        )) and any(w in text_lower for w in ["excel", "xlsx", "spreadsheet", "csv", "data", "history", "financial", "png", "image", "chart", "file"])) or any(p in text_lower for p in [
+            "make me a report", "generate a report", "make a report", "compare our operating ebitda", "urgent maintenance jobs in the sap"
+        ])
 
         if (is_imperative_code or is_document_conversion or is_visualization_cmd or is_analysis_or_audit_cmd) and not is_pure_capability_question:
             return SemanticRoutingResult(
@@ -596,7 +606,18 @@ class SemanticIntentRouter:
             "is there a", "are there any", "do we have", "how do we",
             "how can we", "why is", "why do", "why should", "when is", "when do"
         ]
-        if any(text_lower.startswith(qo) for qo in question_openers):
+        is_informational_inquiry = (
+            any(text_lower.startswith(qo) for qo in question_openers)
+            or any(text_lower.startswith(w) for w in [
+                "what ", "how ", "why ", "when ", "where ", "which ", "who ",
+                "is there", "are there", "do we", "can you explain", "can you tell",
+                "explain ", "describe ", "cite ", "summarize ", "list "
+            ])
+            or text_lower.endswith("?")
+        )
+        # Ensure that active imperative control actions (restart, trip, override, open valve) are not suppressed
+        is_explicit_control_imperative = any(text_lower.startswith(w) for w in ["restart ", "trip ", "override ", "depressurize ", "reboot "])
+        if is_informational_inquiry and not is_explicit_control_imperative:
             if SemanticIntent.CONTROL_ACTION in scores:
                 scores[SemanticIntent.CONTROL_ACTION] = 0.0
 

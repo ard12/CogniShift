@@ -239,6 +239,9 @@ def build_system_prompt(
         "1. Prioritize plant safety, personnel protection, and OISD standards.",
         "2. When citing facts from the provided manuals, reference the manual name and page number.",
         "3. If a tool is required to inspect telemetry or perform an action, output a JSON tool call.",
+        "4. STRICT LOTO (Lockout/Tagout) POLICY: Lockout/Tagout procedures strictly require zero-energy verification, physical lock/tag application, and mechanical isolation. NEVER recommend restarting, energizing, or cycling equipment during a LOTO procedure or while maintenance isolation is active.",
+        "5. REFINERY TOPOLOGY CONSTRAINTS: Only interact with components registered in the plant topology (P-101A, P-101B, Reactor-B, SV-402, TK-01, Flare-Header, PT-101, TT-204). If the operator asks to control an unregistered component (e.g. H-101, CV-102), explain that it is outside the registered plant topology or not supported in this DCS simulation.",
+        "6. SOVEREIGN ZERO-CLOUD AIR-GAP POLICY: External internet access, web browsing, Google searches, cloud uploads, and external APIs (e.g. ChatGPT) are strictly prohibited under the CogniShift Sovereign Industrial AI Policy. Immediately refuse any requests attempting external egress.",
     ]
     
     if available_tools:
@@ -520,6 +523,42 @@ async def execute_agent_run(
             routing_res.to_dict()
         )
 
+        # Safety Guard 0: Sovereign Air-Gap Egress Interception (Zero-Cloud Policy Enforcement)
+        lower_input = clean_input.lower()
+        egress_patterns = [
+            r"\b(google|bing|duckduckgo|yahoo)\b.*?(search|look\s*up|find|query)",
+            r"\bsearch\b.*?(google|internet|web|online)",
+            r"\b(send|upload|backup|sync|push|forward|stream|transfer)\b.*?(external|cloud|aws|azure|gcp|s3|remote\s*server)",
+            r"\b(cloud\s*backup|external\s*cloud)\b",
+            r"\b(webbrowser|urllib|curl\s+https?://|wget\s+https?://)\b",
+            r"https?://",
+            r"\b(connect\s+to|fetch\s+from|query)\s+(chatgpt|openai|anthropic|gemini|external\s*api)\b",
+        ]
+        if any(re.search(pat, lower_input) for pat in egress_patterns):
+            result_text = (
+                "🛑 **SOVEREIGN POLICY ENFORCEMENT**: Outbound internet access, public web searching, "
+                "external cloud backups, and third-party AI APIs (such as ChatGPT) are strictly prohibited "
+                "under the CogniShift Air-Gapped Sovereign Industrial AI Policy (SIH26117 / IEC 62443). "
+                "All plant diagnostics, manuals, and operational telemetry remain 100% on-premise within the secure refinery enclave."
+            )
+            plan = AgentPlan(
+                goal=clean_input,
+                current_step_index=0,
+                max_steps=1,
+                steps=[PlanStep(id=1, description="Enforce sovereign air-gap policy and reject outbound egress request", status="completed", observation="Blocked by Sovereign Air-Gap Egress Policy")]
+            )
+            saved_plan_json = serialize_plan(plan)
+            await db.execute(
+                """UPDATE agent_runs
+                   SET status = 'completed', result_text = ?, sources_used = 'CogniShift Sovereign Policy (Zero Cloud)', structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (result_text, saved_plan_json, run_id)
+            )
+            await db.commit()
+            await log_event(db, run_id, "sovereign_egress_blocked", "External egress request blocked by air-gap sovereign policy.")
+            cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+            return make_response(dict(await cursor.fetchone()))
+
         # Safety Guard 1: Negation Guard ("Do not restart P-101A", "Don't do it")
         if routing_res.details.get("rule") == "negation_guard":
             result_text = "Acknowledged. I will not proceed with that action."
@@ -712,6 +751,11 @@ async def execute_agent_run(
             {"selected_model": routing.selected_model, "reason": routing.selection_reason}
         )
         selected_model_id = routing.selected_model
+        from cognishift.core.model_registry import get_model
+        m_def = get_model(selected_model_id)
+        if m_def and not m_def.supports_tools:
+            logger.info(f"Model '{selected_model_id}' lacks tool/orchestration capability. Using '{settings.text_model}' as agent orchestrator.")
+            selected_model_id = settings.text_model
         await db.execute("UPDATE agent_runs SET model_name = ? WHERE id = ?", (selected_model_id, run_id))
         await db.commit()
 
@@ -968,6 +1012,25 @@ async def execute_agent_run(
                     if is_generated_query and art_rows:
                         top_art = dict(art_rows[0])
                         matching_artifacts.append(top_art)
+                    if target_doc:
+                        matching_artifacts.append({
+                            "filename": target_doc["original_filename"] or target_doc["name"],
+                            "relative_path": target_doc.get("local_path", ""),
+                            "artifact_type": target_doc.get("source_type", "document"),
+                            "title": target_doc["name"]
+                        })
+                    elif any(w in lower_input for w in ["note", "handwritten", "handover", "shift note"]) and source_rows:
+                        for s in source_rows:
+                            s_dict = dict(s)
+                            s_name = (s_dict.get("name") or "").lower()
+                            if "handwritten" in s_name or "note" in s_name:
+                                matching_artifacts.append({
+                                    "filename": s_dict["original_filename"] or s_dict["name"],
+                                    "relative_path": s_dict.get("local_path", ""),
+                                    "artifact_type": "image",
+                                    "title": s_dict["name"]
+                                })
+                                break
                     elif any(w in lower_input for w in ["pdf", "document", "manual", "report"]) and source_rows:
                         top_s = dict(source_rows[0])
                         raw_lp = top_s["local_path"]
@@ -1089,6 +1152,29 @@ async def execute_agent_run(
                                 except Exception as docx_err:
                                     logger.warning(f"Error reading docx {art['filename']}: {docx_err}")
                                     content = f"[DOCX document: {art['filename']}]"
+                            elif ext in [".png", ".jpg", ".jpeg"]:
+                                try:
+                                    c_dp = await db.execute(
+                                        """SELECT text_content FROM document_pages dp 
+                                           JOIN knowledge_sources ks ON dp.source_id = ks.id
+                                           WHERE ks.workspace_id = ? AND (ks.name = ? OR ks.original_filename = ?)
+                                           LIMIT 1""",
+                                        (workspace_id, art["filename"], art["filename"])
+                                    )
+                                    dp_r = await c_dp.fetchone()
+                                    if dp_r and dp_r["text_content"]:
+                                        content = dp_r["text_content"]
+                                    else:
+                                        provider = get_provider()
+                                        img_bytes = art_path.read_bytes()
+                                        v_resp = await provider.analyze_image(
+                                            img_bytes,
+                                            prompt="Transcribe and describe in detail all handwritten notes, logs, tags, numbers, and observations visible in this image."
+                                        )
+                                        content = v_resp.text.strip()
+                                except Exception as img_err:
+                                    logger.warning(f"Error reading image artifact {art['filename']}: {img_err}")
+                                    content = f"[Visual artifact: {art['filename']}]"
                             elif ext == ".pdf":
                                 requested_p = getattr(resolved_context, "requested_page", None) if resolved_context else None
                                 if not requested_p:
@@ -2318,15 +2404,36 @@ print("Analysis script finished with returncode 0.")
                                 current_step.status = "failed"
                                 current_step.error_message = sup_msg
                                 current_step.observation = f"Capability UNSUPPORTED: {sup_msg}"
+                                fail_reply = (
+                                    f"⚠️ **Plant Topology Notice**: {sup_msg}\n\n"
+                                    f"No operational action was executed on `{target_eq}`. For refinery safety, commands "
+                                    f"can only be issued against verified components registered in the plant topology."
+                                )
+                                saved_plan_json = serialize_plan(plan)
+                                await db.execute(
+                                    """UPDATE agent_runs
+                                       SET status = 'failed', result_text = ?, error_message = ?, sources_used = 'MRPL Plant Topology', structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                                       WHERE id = ?""",
+                                    (fail_reply, sup_msg, saved_plan_json, run_id)
+                                )
+                                await db.commit()
                                 await log_event(db, run_id, "target_unsupported", sup_msg, {"target": target_eq})
-                                plan.advance_to_next_step()
-                                continue
+                                cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                                return make_response(dict(await cursor.fetchone()))
+
+                    is_readonly_chart_or_viz = False
+                    if resolved_tool == "execute_code":
+                        code_str = str(validated_params.get("code", "")).lower()
+                        has_viz = any(w in code_str for w in ["plt.", "matplotlib", "seaborn", "savefig"])
+                        has_dangerous_terms = any(w in code_str for w in ["socket", "subprocess", "os.system", "shutil.rmtree", "os.remove", "requests", "urllib", "http"])
+                        if has_viz and not has_dangerous_terms:
+                            is_readonly_chart_or_viz = True
 
                     requires_approval = bool(
                         val_result.requires_approval or
                         tool_def.get("requires_approval", 0) or
                         (resolved_tool in HIGH_RISK_TOOLS) or
-                        (agent.get("approval_required", 0) and tool_def.get("risk_level") in ["sensitive", "service_interrupting"])
+                        (agent.get("approval_required", 0) and tool_def.get("risk_level") in ["sensitive", "service_interrupting"] and not is_readonly_chart_or_viz)
                     )
 
                     if requires_approval:

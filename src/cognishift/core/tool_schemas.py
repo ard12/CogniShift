@@ -123,6 +123,14 @@ class RestartServiceArgs(BaseModel):
     service_name: ServiceNameIdentifier = Field(..., validation_alias=AliasChoices("service_name", "service", "name"))
 
 
+class CheckInterlockStatusArgs(BaseModel):
+    subsystem: EquipmentIdentifier = Field(
+        default="P-101A",
+        validation_alias=AliasChoices("subsystem", "equipment_id", "component_id", "sensor_id", "system", "component"),
+        description="Subsystem or equipment to check interlock status for"
+    )
+
+
 def validate_safe_relative_path(v: str) -> str:
     if not v or not v.strip():
         raise ValueError("Relative path cannot be empty.")
@@ -247,6 +255,7 @@ TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "restart_component": RestartComponentArgs,
     "check_network": CheckNetworkArgs,
     "restart_service": RestartServiceArgs,
+    "check_interlock_status": CheckInterlockStatusArgs,
     "file_list": FileListArgs,
     "file_read": FileReadArgs,
     "file_write": FileWriteArgs,
@@ -280,7 +289,8 @@ TOOL_RISK_LEVELS = {
     "generate_pptx": "low_risk",
     "generate_pdf": "low_risk",
     "render_document_page": "low_risk",
-    "run_diagnostic": "low_risk"
+    "run_diagnostic": "low_risk",
+    "check_interlock_status": "low_risk"
 }
 
 
@@ -296,9 +306,28 @@ SUPPORTED_SIMULATED_TARGETS = {
 }
 
 
+EQUIPMENT_ALIASES = {
+    "P-101A-PRESS": "PT-101",
+    "P-101A_PRESS": "PT-101",
+    "P-101A_INLET": "P-101A",
+    "P-101A-INLET": "P-101A",
+    "CDU-MANIFOLD-PRESSURE-SENSOR": "PT-101",
+    "CDU_MANIFOLD_PRESSURE_SENSOR": "PT-101",
+    "PRESSURE_SENSOR": "PT-101",
+    "PUMP-A": "P-101A",
+    "PUMP-B": "P-101B",
+}
+
+
+def resolve_equipment_alias(target_id: str) -> str:
+    cleaned = (target_id or "").strip().upper()
+    return EQUIPMENT_ALIASES.get(cleaned, target_id)
+
+
 def is_supported_equipment_target(target_id: str) -> Tuple[bool, str]:
     """Check if target equipment is supported in the simulated plant topology."""
-    cleaned = (target_id or "").strip().upper()
+    resolved = resolve_equipment_alias(target_id)
+    cleaned = (resolved or "").strip().upper()
     for supported_tag, desc in SUPPORTED_SIMULATED_TARGETS.items():
         if cleaned == supported_tag.upper():
             return True, desc

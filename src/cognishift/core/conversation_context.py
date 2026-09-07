@@ -207,8 +207,9 @@ async def resolve_target_document_for_query(
         "pid", "schematic", "cdu", "hydrocracker", "manifold",
         "pump", "p-101", "p-101a", "sop", "maintenance", "inspection",
         "gauge", "meter", "dial", "photo",
-        "handwritten", "note",
-        "oisd", "prv", "relief", "pressure"
+        "handwritten", "note", "shift", "handover",
+        "oisd", "prv", "relief", "pressure",
+        "scada", "telemetry", "readings", "sap", "work order"
     ]
 
     scored_candidates = []
@@ -241,6 +242,12 @@ async def resolve_target_document_for_query(
         scored_candidates.append((score, r))
 
     scored_candidates.sort(key=lambda x: x[0], reverse=True)
+
+    if scored_candidates and scored_candidates[0][0] > 0:
+        return scored_candidates[0][1]
+
+    return None
+
 
 def extract_requested_page(text: str) -> Optional[int]:
     """Extract 1-indexed target page number from natural language queries."""
@@ -319,8 +326,9 @@ def resolve_target_document_for_query_sync(
         "pid", "schematic", "cdu", "hydrocracker", "manifold",
         "pump", "p-101", "p-101a", "sop", "maintenance", "inspection", "report",
         "gauge", "meter", "dial", "photo",
-        "handwritten", "note",
-        "oisd", "prv", "relief", "pressure"
+        "handwritten", "note", "shift", "handover",
+        "oisd", "prv", "relief", "pressure",
+        "scada", "telemetry", "readings", "sap", "work order"
     ]
 
     scored_candidates = []

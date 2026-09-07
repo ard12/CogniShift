@@ -44,6 +44,7 @@ export const runsApi = {
         input_text: payload.input_text,
         input_type: payload.input_image_path ? "multimodal" : payload.input_type ?? "text",
         input_image_path: payload.input_image_path ?? null,
+        conversation_history: payload.conversation_history ?? [],
       },
       signal,
     }),

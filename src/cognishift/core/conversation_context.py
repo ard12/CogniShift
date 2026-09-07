@@ -58,7 +58,19 @@ ANAPHORA_TRIGGERS = [
     r'\bthe pdf\b',
     r'\bthat manual\b',
     r'\bthis manual\b',
-    r'\bthe manual\b'
+    r'\bthe manual\b',
+    r'\btoo\b',
+    r'\balso\b',
+    r'\banother\b',
+    r'\bsame\s+file\b',
+    r'\bsame\s+workbook\b',
+    r'\bnow\s+chart\b',
+    r'\bvisualize\s+it\b',
+    r'\bmake\s+a\s+png\b',
+    r'\bmake\s+it\s+a\b',
+    r'\banother\s+chart\b',
+    r'\banother\s+visualization\b',
+    r'\banother\s+png\b'
 ]
 ANAPHORA_PATTERN = re.compile('|'.join(ANAPHORA_TRIGGERS), re.IGNORECASE)
 

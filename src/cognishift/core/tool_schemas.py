@@ -763,7 +763,8 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                             parameters=raw_params,
                             reason=reason
                         )
-                return None
+                if strict:
+                    return None
         except Exception:
             # Resilient fallback for SLM outputs with unescaped internal quotes inside JSON strings
             try:
@@ -819,9 +820,9 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                         parameters=extracted_params,
                         reason=reason
                     )
+                # candidate JSON was not a recognized action; fall through
             except Exception:
                 pass
-            return None
 
     # 3. Detect SLM pseudo-action tags (e.g. [action: 'final_answer'], [Action: final_answer], Action: final_answer)
     pseudo_final = re.search(

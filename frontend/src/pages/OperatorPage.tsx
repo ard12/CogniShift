@@ -257,6 +257,7 @@ export function OperatorPage() {
 
     setLifecycle("dispatching");
     setDispatchError(null);
+    const priorRun = run;
     setRun(null);
     setEvents([]);
     setArtifacts([]);
@@ -277,11 +278,18 @@ export function OperatorPage() {
       clearImage();
 
       setDispatchStage("Dispatching to agent runtime…");
+      const history: Array<{ role: string; content: string }> = [];
+      if (priorRun && priorRun.input_text && priorRun.result_text) {
+        history.push({ role: "user", content: priorRun.input_text });
+        history.push({ role: "assistant", content: priorRun.result_text });
+      }
+
       const created = await runsApi.create({
         workspace_id: selectedWorkspaceId,
         agent_id: selectedAgentId,
         input_text: prompt.trim(),
         input_image_path: inputImagePath,
+        conversation_history: history,
       });
 
       // Persist active runId in sessionStorage

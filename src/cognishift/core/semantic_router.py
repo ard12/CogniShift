@@ -202,7 +202,15 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "can you convert documents to powerpoint",
         "do you support pptx export",
         "can you export presentations",
-        "can you convert a pdf to pptx"
+        "can you convert a pdf to pptx",
+        "confirm that cognishift is operational",
+        "is cognishift operational",
+        "confirm that cognishift is operational and explain that processing is performed locally",
+        "explain that processing is performed locally",
+        "explain in two sentences what cognishift does",
+        "explain what cognishift does",
+        "confirm local processing and operational status",
+        "confirm system status and offline sovereign execution"
     ],
     SemanticIntent.KNOWLEDGE_QUERY: [
         "what does our procedure say about this issue",
@@ -523,6 +531,30 @@ class SemanticIntentRouter:
                 abstained=False,
                 references=refs,
                 details={"rule": "action_inquiry_guard"}
+            )
+
+        # 3.2. Deterministic Rule: System Status, General Conversation, and Operational Capability Inquiries
+        is_system_or_conversation = (
+            any(p in text_lower for p in [
+                "confirm that cognishift is operational", "is cognishift operational",
+                "explain that processing is performed locally", "processing is performed locally",
+                "what does cognishift do", "explain in two sentences what cognishift does",
+                "what is cognishift", "who are you", "what can you do", "hello", "good morning", "good evening"
+            ])
+            and not refs.files
+            and not refs.equipment_ids
+            and not any(w in text_lower for w in ["sop", "manual", "scada", "telemetry", "sap", "audit"])
+        )
+        if is_system_or_conversation:
+            return SemanticRoutingResult(
+                intent=SemanticIntent.CONVERSATION,
+                decision_method=DecisionMethod.RULE,
+                confidence=1.0,
+                runner_up=None,
+                margin=None,
+                abstained=False,
+                references=refs,
+                details={"rule": "system_or_conversation_guard"}
             )
 
         # Ambiguous Modal Directives on Actions (Safe Abstention to COMPLEX_AGENT)
@@ -951,7 +983,16 @@ class SemanticIntentRouter:
         if is_code:
             return False
 
-        if any(w in text for w in ["export", "convert", "generate two", "two deliverables", "two different files", "both docx", "both pdf", "and export", "and generate"]):
+        if any(w in text for w in [
+            "export", "convert", "generate two", "two deliverables", "two different files",
+            "both docx", "both pdf", "and export", "and generate",
+            "generate a pdf", "generate a png", "generate a docx", "generate a chart",
+            "generate an audit", "generate a visualization", "generate a report", "generate an excel",
+            "generate pdf", "generate png", "generate docx", "generate chart", "generate audit", "generate visualization",
+            "create a png", "create another png", "create a chart", "create another chart", "create a visualization",
+            "create another visualization", "create a pdf", "create an audit", "create a report",
+            "make a png", "make another png", "make a chart", "make another chart", "make a visualization"
+        ]):
             return False
 
         # Conversational inquiry about generated artifacts or files

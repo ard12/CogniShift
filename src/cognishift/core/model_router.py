@@ -204,14 +204,28 @@ def route_model(
         overlap = len(required_set.intersection(model_set))
         cap_ratio = overlap / max(1, len(required_set))
 
-        # Preference bonus if user or agent specified preferred model
-        pref_bonus = 0.05 if (preferred_model and model.model_identifier == preferred_model) else 0.0
+        # Specialist bonus for dedicated domain specialists
+        specialist_bonus = 0.0
+        m_id_lower = model.model_identifier.lower()
+        if task.task_type == "coding":
+            if "coder" in m_id_lower:
+                specialist_bonus = 0.25
+        elif task.task_type == "heavy_reasoning":
+            if "deepseek" in m_id_lower or "r1" in m_id_lower:
+                specialist_bonus = 0.25
+        elif task.task_type == "vision_inspection":
+            if "moondream" in m_id_lower:
+                specialist_bonus = 0.25
+
+        # Preference bonus if user or agent specified preferred model (tie-breaker only, cannot override specialist)
+        pref_bonus = 0.005 if (preferred_model and model.model_identifier == preferred_model) else 0.0
 
         # Composite score
         composite_score = (
             cap_ratio * 0.70 +
             model.quality_score * 0.20 +
             model.latency_score * 0.10 +
+            specialist_bonus +
             pref_bonus
         )
 

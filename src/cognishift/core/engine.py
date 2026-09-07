@@ -469,24 +469,69 @@ async def _resolve_knowledge_and_page_context(
 
     # Authorize documents explicitly resolved from the query or conversation history
     target_doc = await resolve_target_document_for_query(workspace_id, clean_input, db=db)
-    if target_doc and target_doc.get("id"):
-        td_id = int(target_doc["id"])
-        if td_id not in allowed_source_ids:
-            allowed_source_ids.append(td_id)
+    
+    # Check for colloquial document references (e.g. "what does inspection file say?")
+    colloquial_match = None
+    lower_input = clean_input.lower()
+    for phrase in [
+        "inspection file", "inspection report", "the inspection", "that inspection",
+        "maintenance sop", "pump sop", "the sop", "that sop",
+        "financial history", "financial spreadsheet", "that spreadsheet", "the spreadsheet", "financial file", "financial workbook"
+    ]:
+        if phrase in lower_input:
+            colloquial_match = phrase
+            break
 
-    if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
-        ps_id = int(resolved_context.pinned_source["id"])
-        if ps_id not in allowed_source_ids:
-            allowed_source_ids.append(ps_id)
+    is_cross_doc = any(w in lower_input for w in ["compare", "both", "all documents", "cross-reference", "against", "recommendation", "correlat"])
 
-    for rf in (resolved_context.files if resolved_context else []):
-        c_rf = await db.execute(
-            "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
-            (workspace_id, rf, rf)
-        )
-        for r_rf in await c_rf.fetchall():
-            if r_rf["id"] not in allowed_source_ids:
-                allowed_source_ids.append(r_rf["id"])
+    if target_doc and colloquial_match and not is_cross_doc:
+        # PIN the single matching document and suppress unrelated knowledge sources
+        allowed_source_ids = [int(target_doc["id"])]
+        active_doc_for_page = target_doc
+        if run_id is not None:
+            await log_event(
+                db, run_id, "document_reference_resolved",
+                f"Colloquial reference '{colloquial_match}' resolved to {target_doc['name']}",
+                {
+                    "user_reference": colloquial_match,
+                    "resolved_filename": target_doc["name"],
+                    "confidence": 1.0,
+                    "strict_single_source": True
+                }
+            )
+    else:
+        if target_doc and target_doc.get("id"):
+            td_id = int(target_doc["id"])
+            if td_id not in allowed_source_ids:
+                allowed_source_ids.append(td_id)
+
+        if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
+            ps_id = int(resolved_context.pinned_source["id"])
+            if ps_id not in allowed_source_ids:
+                allowed_source_ids.append(ps_id)
+
+        for rf in (resolved_context.files if resolved_context else []):
+            c_rf = await db.execute(
+                "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
+                (workspace_id, rf, rf)
+            )
+            for r_rf in await c_rf.fetchall():
+                if r_rf["id"] not in allowed_source_ids:
+                    allowed_source_ids.append(r_rf["id"])
+
+    # Follow-up source logging
+    if resolved_context and resolved_context.files and not re.findall(r'\b([a-zA-Z0-9_\-\.]+\.(?:xlsx|xls|csv|pdf))\b', clean_input, re.IGNORECASE):
+        prior_fn = resolved_context.files[0]
+        if run_id is not None:
+            await log_event(
+                db, run_id, "followup_source_resolved",
+                f"Reused previous source '{prior_fn}' for follow-up query",
+                {
+                    "previous_run_id": getattr(resolved_context, "source_turn", None),
+                    "resolved_filename": prior_fn,
+                    "resolution_reason": "anaphora_followup_continuity"
+                }
+            )
 
     active_doc_for_page = None
     # Authoritative Single-Source Resolution & Strict Scope Enforcement
@@ -1188,7 +1233,23 @@ async def execute_agent_run(
                     f"Inspection Telemetry: {vision_analysis}"
                 )
 
-            if routing_res.intent == SemanticIntent.CONVERSATION:
+            is_cross_inspection = any(w in clean_input.lower() for w in ["compare", "sop", "manual", "procedure", "against", "cross-reference", "correlat"])
+            strict_visual_scope = bool(input_image_path) and not is_cross_inspection
+
+            if strict_visual_scope:
+                sources_used = f"Visual Artifact | {Path(input_image_path).name}"
+                await log_event(
+                    db, run_id, "retrieval_bypassed",
+                    f"Strict visual scope active for {Path(input_image_path).name}: RAG, Plant Graph, and external artifacts bypassed.",
+                    {"image": Path(input_image_path).name}
+                )
+                if plan.steps and len(plan.steps) > 1:
+                    for s in plan.steps[1:]:
+                        if "retriev" in s.description.lower() or "context" in s.description.lower():
+                            s.status = "completed"
+                            s.observation = f"Visual telemetry isolated ({Path(input_image_path).name})"
+
+            elif routing_res.intent == SemanticIntent.CONVERSATION:
                 # Anti-Pollution Policy: Zero ChromaDB, Zero Plant Graph, Zero Artifacts
                 sources_used = "None (Direct Conversation)"
                 await log_event(
@@ -1199,18 +1260,21 @@ async def execute_agent_run(
 
             elif routing_res.intent == SemanticIntent.ARTIFACT_INSPECTION:
                 # Targeted Artifact Resolution ONLY: Zero ChromaDB, Zero Plant Graph
-                cursor_artifacts = await db.execute(
-                    "SELECT id, filename, relative_path, file_size, artifact_type, title, description FROM workspace_artifacts WHERE workspace_id = ? ORDER BY id DESC LIMIT 30",
-                    (workspace_id,)
-                )
-                art_rows = await cursor_artifacts.fetchall()
+                ws_root = get_workspace_root(workspace_id).resolve()
 
-                # Also search knowledge_sources for PDFs/documents uploaded in the workspace
+                # Search knowledge_sources first for authoritative documents uploaded in Knowledge Vault
                 cursor_sources = await db.execute(
                     "SELECT id, name, original_filename, local_path, source_type FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' ORDER BY id DESC LIMIT 30",
                     (workspace_id,)
                 )
                 source_rows = await cursor_sources.fetchall()
+
+                # Search workspace_artifacts second for generated files
+                cursor_artifacts = await db.execute(
+                    "SELECT id, filename, relative_path, file_size, artifact_type, title, description FROM workspace_artifacts WHERE workspace_id = ? ORDER BY id DESC LIMIT 30",
+                    (workspace_id,)
+                )
+                art_rows = await cursor_artifacts.fetchall()
 
                 matching_artifacts = []
                 lower_input = clean_input.lower()
@@ -1231,16 +1295,27 @@ async def execute_agent_run(
                 GENERIC_STEMS = {"report", "reading", "readings", "file", "document", "artifact", "data", "sheet", "table", "summary", "test", "plan", "output", "input", "result", "results", "status", "logs", "log", "pdf"}
                 ref_files = [f.lower() for f in target_files]
 
-                for art in art_rows:
-                    fname = art["filename"].lower()
-                    stem = Path(art["filename"]).stem.lower()
-                    if fname in lower_input or fname in ref_files:
-                        matching_artifacts.append(dict(art))
-                    elif stem not in GENERIC_STEMS and len(stem) > 4:
-                        if stem in lower_input or stem in [Path(rf).stem.lower() for rf in ref_files]:
-                            matching_artifacts.append(dict(art))
+                # 1. Authoritative resolved document from Knowledge Vault takes top precedence
+                if target_doc and target_doc.get("local_path"):
+                    raw_lp = target_doc.get("local_path", "")
+                    rel_p = raw_lp
+                    if raw_lp:
+                        try:
+                            p = Path(raw_lp)
+                            if p.is_absolute():
+                                rel_p = str(p.resolve().relative_to(ws_root)).replace("\\", "/")
+                        except Exception:
+                            rel_p = Path(raw_lp).name
+                    matching_artifacts.append({
+                        "id": target_doc.get("id"),
+                        "filename": target_doc.get("original_filename") or target_doc.get("name"),
+                        "relative_path": rel_p,
+                        "artifact_type": target_doc.get("source_type") or "file",
+                        "title": target_doc.get("name"),
+                        "is_knowledge_source": True
+                    })
 
-                ws_root = get_workspace_root(workspace_id).resolve()
+                # 2. Match Knowledge Sources before Workspace Artifacts
                 for src in source_rows:
                     s_fname = (src["original_filename"] or src["name"]).lower()
                     s_stem = Path(s_fname).stem.lower()
@@ -1255,19 +1330,37 @@ async def execute_agent_run(
                             rel_p = Path(raw_lp).name
                     if s_fname in lower_input or s_fname in ref_files:
                         matching_artifacts.append({
+                            "id": src["id"],
                             "filename": src["original_filename"] or src["name"],
                             "relative_path": rel_p,
                             "artifact_type": src["source_type"] or "pdf",
-                            "title": src["name"]
+                            "title": src["name"],
+                            "is_knowledge_source": True
                         })
                     elif s_stem not in GENERIC_STEMS and len(s_stem) > 4:
                         if s_stem in lower_input or s_stem in [Path(rf).stem.lower() for rf in ref_files]:
                             matching_artifacts.append({
+                                "id": src["id"],
                                 "filename": src["original_filename"] or src["name"],
                                 "relative_path": rel_p,
                                 "artifact_type": src["source_type"] or "pdf",
-                                "title": src["name"]
+                                "title": src["name"],
+                                "is_knowledge_source": True
                             })
+
+                # 3. Match Workspace Artifacts second
+                for art in art_rows:
+                    fname = art["filename"].lower()
+                    stem = Path(art["filename"]).stem.lower()
+                    if fname in lower_input or fname in ref_files:
+                        art_dict = dict(art)
+                        art_dict["is_knowledge_source"] = False
+                        matching_artifacts.append(art_dict)
+                    elif stem not in GENERIC_STEMS and len(stem) > 4:
+                        if stem in lower_input or stem in [Path(rf).stem.lower() for rf in ref_files]:
+                            art_dict = dict(art)
+                            art_dict["is_knowledge_source"] = False
+                            matching_artifacts.append(art_dict)
 
                 # Check physical disk if not found in tables
                 if not matching_artifacts and target_files:
@@ -1528,23 +1621,26 @@ async def execute_agent_run(
                                         artifact_citations.append(f"{art['filename']} | Page {requested_p}")
                                 else:
                                     content = await asyncio.to_thread(_extract_pdf_preview_sync, art_path, 10, 1500, art["filename"])
-                                    artifact_citations.append(f"Workspace Artifact | {art['filename']}")
+                                    prefix = "Knowledge Source" if art.get("is_knowledge_source") else "Workspace Artifact"
+                                    artifact_citations.append(f"{prefix} | {art['filename']}")
 
                             if content:
                                 preview = content[:4000]
                                 if len(content) > 4000:
                                     preview += f"\n... [Truncated: {len(content)} total characters]"
+                                prefix = "KNOWLEDGE SOURCE" if art.get("is_knowledge_source") else "WORKSPACE ARTIFACT"
                                 combined_context_parts.append(
-                                    f"--- WORKSPACE ARTIFACT: {art['filename']} ({art.get('artifact_type', 'file')}) ---\n"
+                                    f"--- {prefix}: {art['filename']} ({art.get('artifact_type', 'file')}) ---\n"
                                     f"Path: {art['relative_path']}\n"
                                     f"Content:\n{preview}"
                                 )
                                 if not any(art["filename"] in c for c in artifact_citations):
-                                    artifact_citations.append(f"Workspace Artifact | {art['filename']}")
+                                    cite_prefix = "Knowledge Source" if art.get("is_knowledge_source") else "Workspace Artifact"
+                                    artifact_citations.append(f"{cite_prefix} | {art['filename']}")
                     except Exception as ex:
                         logger.warning(f"Could not load artifact {art.get('relative_path')}: {ex}")
 
-                sources_used = ", ".join(artifact_citations) if artifact_citations else "Workspace Artifacts"
+                sources_used = ", ".join(artifact_citations) if artifact_citations else ("Knowledge Sources" if any(a.get("is_knowledge_source") for a in matching_artifacts) else "Workspace Artifacts")
                 if len(plan.steps) >= 5:
                     plan.steps[1].status = "completed"
                     plan.steps[1].observation = f"Resolved: {sources_used}"
@@ -2173,20 +2269,22 @@ async def execute_agent_run(
                         display_title = f"Engineering Analysis Report: {doc_title}"
 
                     # Determine target format
-                    wants_both_docx_and_pdf = ("docx" in lower_input or "word" in lower_input) and "pdf" in lower_input
+                    wants_docx = any(w in lower_input for w in ["docx", "word"])
+                    wants_pdf = "pdf" in lower_input
+                    wants_both_docx_and_pdf = (wants_docx and wants_pdf) or any(w in lower_input for w in ["both docx and pdf", "docx and pdf", "two different files"])
                     wants_convert_excel = any(w in lower_input for w in ["convert to excel", "export to excel", "into excel", "as excel", "as xlsx", "as spreadsheet"])
                     wants_pptx = any(w in lower_input for w in ["ppt", "pptx", "powerpoint", "slides", "presentation"])
-                    wants_png_viz = any(w in lower_input for w in ["png", "jpg", "jpeg", "image"]) and not any(w in lower_input for w in ["audit", "report", "document", "docx", "word", "pdf", "ppt", "pptx"])
+                    wants_png_viz = any(w in lower_input for w in ["png", "jpg", "jpeg", "image", "visualize", "plot", "chart", "graph"])
 
                     if wants_both_docx_and_pdf:
                         target_fmt = "both"
                     elif wants_pptx:
                         target_fmt = "pptx"
-                    elif "pdf" in lower_input and not any(w in lower_input for w in ["convert to docx", "docx", "word", "ppt", "pptx"]):
+                    elif wants_pdf:
                         target_fmt = "pdf"
                     elif wants_convert_excel:
                         target_fmt = "xlsx"
-                    elif wants_png_viz:
+                    elif wants_png_viz and not (wants_docx or wants_pptx or wants_convert_excel):
                         target_fmt = "image"
                     else:
                         target_fmt = "docx"
@@ -2202,7 +2300,7 @@ async def execute_agent_run(
                     growth_map = insights.get("growth", {})
 
                     if current_step.id == 2:
-                        wants_chart = any(w in lower_input for w in ["visualize", "plot", "chart", "graph", "matplotlib", "seaborn"]) or is_financial_task
+                        wants_chart = wants_png_viz or is_financial_task
                         wants_excel = target_fmt == "xlsx"
 
                         if is_financial_task:
@@ -2657,32 +2755,56 @@ print("Analysis script finished with returncode 0.")
                         continue
 
                     elif current_step.id >= 4:
-                        # Validate generated artifacts and synthesize final response
+                        # Validate generated artifacts strictly scoped to current run_id and synthesize final response
                         cursor_chk = await db.execute(
-                            "SELECT * FROM workspace_artifacts WHERE workspace_id = ? ORDER BY id DESC LIMIT 10",
-                            (workspace_id,)
+                            "SELECT * FROM workspace_artifacts WHERE workspace_id = ? AND run_id = ? ORDER BY id ASC",
+                            (workspace_id, run_id)
                         )
                         art_rows = await cursor_chk.fetchall()
-                        recent_artifacts = [dict(a) for a in art_rows]
+                        current_run_artifacts = [dict(a) for a in art_rows]
 
-                        if target_fmt == "both":
-                            docx_art = next((a for a in recent_artifacts if a.get("artifact_type") == "docx"), {})
-                            pdf_art = next((a for a in recent_artifacts if a.get("artifact_type") == "pdf"), {})
-                            chart_art = next((a for a in recent_artifacts if "chart" in a.get("filename", "").lower() or a.get("artifact_type") == "png"), {})
-                            json_art = next((a for a in recent_artifacts if "metrics" in a.get("filename", "").lower() or a.get("artifact_type") == "json"), {})
+                        docx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "docx" or str(a.get("filename", "")).endswith(".docx")), None)
+                        pdf_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "pdf" or str(a.get("filename", "")).endswith(".pdf")), None)
+                        chart_art = next((a for a in current_run_artifacts if "chart" in str(a.get("filename", "")).lower() or a.get("artifact_type") == "png" or str(a.get("filename", "")).endswith(".png")), None)
+                        json_art = next((a for a in current_run_artifacts if "metrics" in str(a.get("filename", "")).lower() or a.get("artifact_type") == "json" or str(a.get("filename", "")).endswith(".json")), None)
+                        pptx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "pptx" or str(a.get("filename", "")).endswith(".pptx")), None)
+                        xlsx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "xlsx" or str(a.get("filename", "")).endswith(".xlsx")), None)
 
+                        deliverables_list = []
+                        item_num = 1
+                        if docx_art:
+                            deliverables_list.append(f"{item_num}. **Word Document (`.docx`)**: `{docx_art['filename']}` ({docx_art.get('file_size', 0)} bytes) — Artifact #{docx_art['id']}")
+                            item_num += 1
+                        if pdf_art:
+                            deliverables_list.append(f"{item_num}. **PDF Audit Report (`.pdf`)**: `{pdf_art['filename']}` ({pdf_art.get('file_size', 0)} bytes) — Artifact #{pdf_art['id']}")
+                            item_num += 1
+                        if pptx_art:
+                            deliverables_list.append(f"{item_num}. **PowerPoint Presentation (`.pptx`)**: `{pptx_art['filename']}` ({pptx_art.get('file_size', 0)} bytes) — Artifact #{pptx_art['id']}")
+                            item_num += 1
+                        if xlsx_art:
+                            deliverables_list.append(f"{item_num}. **Excel Workbook (`.xlsx`)**: `{xlsx_art['filename']}` ({xlsx_art.get('file_size', 0)} bytes) — Artifact #{xlsx_art['id']}")
+                            item_num += 1
+                        if chart_art:
+                            deliverables_list.append(f"{item_num}. **Visualization Chart (`.png`)**: `{chart_art['filename']}` ({chart_art.get('file_size', 0)} bytes) — Artifact #{chart_art['id']}")
+                            item_num += 1
+                        if json_art:
+                            deliverables_list.append(f"{item_num}. **Quantitative Metrics Ledger (`.json`)**: `{json_art['filename']}` ({json_art.get('file_size', 0)} bytes) — Artifact #{json_art['id']}")
+                            item_num += 1
+
+                        if not deliverables_list and current_run_artifacts:
+                            for a in current_run_artifacts:
+                                deliverables_list.append(f"{item_num}. **Deliverable**: `{a['filename']}` ({a.get('file_size', 0)} bytes) — Artifact #{a['id']}")
+                                item_num += 1
+
+                        deliv_str = "\n".join(deliverables_list) if deliverables_list else "None generated"
+
+                        if is_financial_task:
                             final_text = (
-                                f"I have executed the quantitative analysis script on `{doc_title}` and generated dual deliverables:\n\n"
+                                f"I have executed the quantitative analysis script on `{doc_title}` and generated the requested deliverable{'s' if len(deliverables_list) > 1 else ''}:\n\n"
                                 f"### 📊 Generated Deliverables:\n"
-                                f"1. **Word Document (`.docx`)**: `{docx_art.get('filename', f'{stem_name}.docx')}` ({docx_art.get('file_size', 0)} bytes) — Artifact #{docx_art.get('id', 'N/A')}\n"
-                                f"2. **PDF Audit Report (`.pdf`)**: `{pdf_art.get('filename', f'{stem_name}.pdf')}` ({pdf_art.get('file_size', 0)} bytes) — Artifact #{pdf_art.get('id', 'N/A')}\n"
+                                f"{deliv_str}\n\n"
                             )
-                            if chart_art:
-                                final_text += f"3. **Analysis Chart (`.png`)**: `{chart_art.get('filename', chart_filename)}` ({chart_art.get('file_size', 0)} bytes)\n"
-                            if json_art:
-                                final_text += f"4. **Metrics Ledger (`.json`)**: `{json_art.get('filename', 'metrics.json')}` ({json_art.get('file_size', 0)} bytes)\n\n"
-
-                            if is_financial_task and metrics_map:
+                            if metrics_map:
                                 final_text += f"### 📈 Key Quantitative Findings (Extracted from `{doc_title}`):\n"
                                 for m_key, m_info in metrics_map.items():
                                     lbl = m_info["matched_label"]
@@ -2696,100 +2818,105 @@ print("Analysis script finished with returncode 0.")
                                     f"- **Compliance**: Computed in isolated local sandbox with 100% air-gapped sovereign verification."
                                 )
                             else:
-                                final_text += (
-                                    f"- **Resolved Document:** `{doc_title}`\n"
-                                    f"- **Document Type:** {insights.get('doc_type', 'General').upper()}\n"
-                                    f"- **Sandbox Script:** Executed in isolated Python container (exit code 0)\n"
-                                    f"- **Sources Cited:** `[{doc_title} | Page 1]`"
-                                )
-                            current_step.status = "completed"
-                            current_step.observation = f"Validated dual artifacts: {docx_art.get('filename')} and {pdf_art.get('filename')}"
-                            sources_used = f"Knowledge Source #{target_doc['id'] if target_doc else '1'} | {doc_title}"
-                            break
+                                final_text += f"\nAnalysis completed for `{doc_title}`."
                         else:
-                            primary_art = recent_artifacts[0] if recent_artifacts else {}
-                            report_filename = primary_art.get("filename", "deliverable")
-                            chart_art = next((a for a in recent_artifacts if "chart" in a.get("filename", "").lower() or a.get("artifact_type") == "png"), {})
-                            json_art = next((a for a in recent_artifacts if "metrics" in a.get("filename", "").lower() or a.get("artifact_type") == "json"), {})
+                            final_text = (
+                                f"I have executed the Python analysis script in the isolated sandbox and generated the official deliverable{'s' if len(deliverables_list) > 1 else ''} for '{doc_title}'.\n\n"
+                                f"### 📊 Generated Deliverables:\n"
+                                f"{deliv_str}\n\n"
+                                f"### 📋 Key Findings (Extracted from `{doc_title}`):\n"
+                                f"- **Resolved Document:** `{doc_title}`\n"
+                                f"- **Document Type:** {insights.get('doc_type', 'General').upper()}\n"
+                            )
+                            if insights.get("table_headers"):
+                                final_text += f"- **Extracted Schema / Columns:** {', '.join(insights['table_headers'][:8])}\n"
+                            if insights.get("row_count"):
+                                final_text += f"- **Data Rows Evaluated:** {insights['row_count']} rows\n"
+                            elif insights.get("page_count"):
+                                final_text += f"- **Pages Analyzed:** {insights['page_count']} pages\n"
 
-                            current_step.status = "completed"
-                            current_step.observation = f"Validated artifact #{primary_art.get('id', 'N/A')}: {report_filename} ({primary_art.get('file_size', 0)} bytes)"
-                            sources_used = f"Knowledge Source #{target_doc['id'] if target_doc else '1'} | {doc_title}"
+                            final_text += (
+                                f"- **Sandbox Script:** Executed in isolated Python container (exit code 0)\n"
+                                f"- **Sources Cited:** `[{doc_title} | Page 1]`\n"
+                                f"- **Compliance:** 100% air-gapped sovereign execution."
+                            )
 
-                            if is_financial_task:
-                                final_text = (
-                                    f"I have executed the quantitative analysis script on `{doc_title}` and generated the official audit deliverable:\n\n"
-                                    f"### 📊 Generated Deliverables:\n"
-                                    f"1. **Audit Report**: `{report_filename}` ({primary_art.get('file_size', 0)} bytes) — Artifact #{primary_art.get('id', 'N/A')}\n"
-                                )
-                                if chart_art:
-                                    final_text += f"2. **Visualization Chart (`.png`)**: `{chart_art.get('filename', chart_filename)}` ({chart_art.get('file_size', 0)} bytes) — Artifact #{chart_art.get('id', 'N/A')}\n"
-                                if json_art:
-                                    final_text += f"3. **Quantitative Metrics Ledger (`.json`)**: `{json_art.get('filename', 'metrics.json')}` ({json_art.get('file_size', 0)} bytes)\n"
-
-                                if metrics_map:
-                                    final_text += f"\n### 📈 Key Quantitative Findings (Extracted from `{doc_title}`):\n"
-                                    for m_key, m_info in metrics_map.items():
-                                        lbl = m_info["matched_label"]
-                                        latest = m_info["latest"]
-                                        col = m_info["latest_col"]
-                                        growth_val = growth_map.get(f"{m_key}_cagr_pct", growth_map.get(f"{m_key}_yoy_pct"))
-                                        growth_str = f" with growth of **{growth_val}%**" if growth_val is not None else ""
-                                        final_text += f"- **{lbl}**: Reported at **{format_number_display(latest, is_currency=(m_key != 'grm'))}** ({col}){growth_str}.\n"
-                                    final_text += (
-                                        f"- **Lead Auditor / Sign-off**: `{custom_author if custom_author else 'Plant Operations Agent'}`\n"
-                                        f"- **Compliance**: Computed in isolated local sandbox with 100% air-gapped sovereign verification."
-                                    )
-                                else:
-                                    final_text += f"\nAnalysis completed for `{doc_title}`."
-                            else:
-                                final_text = (
-                                    f"I have executed the Python analysis script in the isolated sandbox and generated the official deliverable for '{doc_title}'.\n\n"
-                                    f"### 📊 Generated Deliverables:\n"
-                                    f"1. **Analysis Report**: `{report_filename}` ({primary_art.get('file_size', 0)} bytes) — Artifact #{primary_art.get('id', 'N/A')}\n"
-                                )
-                                if chart_art:
-                                    final_text += f"2. **Analysis Chart (`.png`)**: `{chart_art.get('filename', chart_filename)}` ({chart_art.get('file_size', 0)} bytes)\n"
-                                if json_art:
-                                    final_text += f"3. **Metrics Ledger (`.json`)**: `{json_art.get('filename', 'metrics.json')}` ({json_art.get('file_size', 0)} bytes)\n"
-
-                                final_text += (
-                                    f"\n### 📋 Key Findings (Extracted from `{doc_title}`):\n"
-                                    f"- **Resolved Document:** `{doc_title}`\n"
-                                    f"- **Document Type:** {insights.get('doc_type', 'General').upper()}\n"
-                                )
-                                if insights.get("table_headers"):
-                                    final_text += f"- **Extracted Schema / Columns:** {', '.join(insights['table_headers'][:8])}\n"
-                                if insights.get("row_count"):
-                                    final_text += f"- **Data Rows Evaluated:** {insights['row_count']} rows\n"
-                                elif insights.get("page_count"):
-                                    final_text += f"- **Pages Analyzed:** {insights['page_count']} pages\n"
-
-                                final_text += (
-                                    f"- **Sandbox Script:** Executed in isolated Python container (exit code 0)\n"
-                                    f"- **Sources Cited:** `[{doc_title} | Page 1]`\n"
-                                    f"- **Compliance:** 100% air-gapped sovereign execution."
-                                )
-                            break
+                        current_step.status = "completed"
+                        current_step.observation = f"Validated {len(current_run_artifacts)} artifacts produced by current run"
+                        sources_used = f"Knowledge Source #{target_doc['id'] if target_doc else '1'} | {doc_title}"
+                        break
 
                 elif action is None:
                     # ModelProtocolFailure: Output is unparseable (e.g. malformed JSON, truncated tokens, invalid action type)
-                    err_msg = f"Model protocol failure on step #{current_step.id}: Unparseable or malformed output from {selected_model_id}."
-                    logger.warning(err_msg)
-                    current_step.status = "failed"
-                    current_step.error_message = err_msg
-                    _block_unexecuted_pending_steps(plan, "Blocked due to unparseable model output")
-                    await log_event(db, run_id, "model_protocol_failure", err_msg, {"step_id": current_step.id, "preview": clean_output[:150]})
-                    saved_plan_json = serialize_plan(plan)
-                    await db.execute(
-                        """UPDATE agent_runs
-                           SET status = 'failed', error_message = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
-                           WHERE id = ?""",
-                        (err_msg, saved_plan_json, run_id)
+                    await log_event(
+                        db, run_id, "model_protocol_parse_failed",
+                        f"Failed to parse model output from {selected_model_id} on step #{current_step.id}",
+                        {"step_id": current_step.id, "preview": clean_output[:200]}
                     )
-                    await db.commit()
-                    cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
-                    return make_response(dict(await cursor.fetchone()))
+
+                    # Bounded protocol repair retry: One attempt with strict format prompt
+                    await log_event(
+                        db, run_id, "protocol_repair_attempted",
+                        f"Attempting bounded protocol repair prompt with {selected_model_id} on step #{current_step.id}...",
+                        {"step_id": current_step.id}
+                    )
+
+                    repair_prompt = (
+                        f"Your previous response on step #{current_step.id} could not be parsed into a valid action. "
+                        f"Your previous output was:\n{clean_output[:600]}\n\n"
+                        f"You must reformat your response immediately into ONE valid JSON object conforming to one of these schemas:\n\n"
+                        f'Option 1 (Tool Call):\n'
+                        f'{{"thought": "<brief reasoning>", "action": "tool_call", "tool_name": "<tool_name>", "parameters": {{...}}}}\n\n'
+                        f'Option 2 (Final Response):\n'
+                        f'{{"thought": "<brief reasoning>", "action": "final_response", "answer": "<your complete final answer>"}}\n\n'
+                        f"Available tools: {json.dumps(allowed_tool_names)}\n"
+                        f"Respond ONLY with the JSON object. Do not include markdown formatting or commentary outside the JSON."
+                    )
+
+                    repair_action = None
+                    try:
+                        provider = get_provider()
+                        repair_resp = await provider.generate_text(
+                            prompt=repair_prompt,
+                            system_prompt="You are a protocol recovery assistant. You must output only valid JSON.",
+                            model_name=selected_model_id
+                        )
+                        repair_text = repair_resp.text.strip()
+                        repair_action = parse_agent_action(repair_text, strict=False)
+                    except Exception as rep_err:
+                        logger.warning(f"Protocol repair LLM call failed: {rep_err}")
+                        repair_action = None
+
+                    if repair_action is not None:
+                        await log_event(
+                            db, run_id, "protocol_repair_succeeded",
+                            f"Protocol repair succeeded for step #{current_step.id}",
+                            {"action_type": repair_action.action}
+                        )
+                        action = repair_action
+                        clean_output = repair_text
+                    else:
+                        await log_event(
+                            db, run_id, "protocol_repair_failed",
+                            f"Protocol repair retry failed for step #{current_step.id}",
+                            {"step_id": current_step.id}
+                        )
+                        err_msg = f"Model protocol failure on step #{current_step.id}: Unparseable or malformed output from {selected_model_id}."
+                        logger.warning(err_msg)
+                        current_step.status = "failed"
+                        current_step.error_message = err_msg
+                        _block_unexecuted_pending_steps(plan, "Blocked due to unparseable model output")
+                        await log_event(db, run_id, "model_protocol_failure", err_msg, {"step_id": current_step.id, "preview": clean_output[:150]})
+                        saved_plan_json = serialize_plan(plan)
+                        await db.execute(
+                            """UPDATE agent_runs
+                               SET status = 'failed', error_message = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                               WHERE id = ?""",
+                            (err_msg, saved_plan_json, run_id)
+                        )
+                        await db.commit()
+                        cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                        return make_response(dict(await cursor.fetchone()))
 
                 if isinstance(action, ToolCallProposal) and action.tool_name:
                     tool_name_clean = action.tool_name.lower().strip()

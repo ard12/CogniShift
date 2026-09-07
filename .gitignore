@@ -20,3 +20,5 @@ work/
 node_modules/
 frontend/dist/
 .pytest-tmp*
+*.ppt
+*.pptx

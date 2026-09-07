@@ -649,18 +649,7 @@ CogniShift maps to **Purdue Model Level 3/3.5 (Industrial DMZ / Operations Manag
 
 ---
 
-## Demonstration & Simulation Guides
-
-* **[SIH_JURY_MASTER_SHOWCASE.md](SIH_JURY_MASTER_SHOWCASE.md):** The complete 7-Act theatrical jury demonstration playbook, stage scripts, exact prompts, SIH scoring rubric alignment, and 20-question jury Q&A defense bible.
-* **[SIMULATION.md](SIMULATION.md):** Full mathematical and engineering specification of the simulated MRPL Hydrocracker, Tennessee Eastman dynamics, Modbus registers, ISO 14224 failure modes, and P&ID topology graph.
-* **[ARCHITECTURE.md](ARCHITECTURE.md):** Deep system architecture, pre-socket security guard, and CAS pending task state machine.
-* **[frontend/README.md](frontend/README.md):** Specification of the React 19 + TypeScript Operator Console.
-* **[CLI.md](CLI.md):** Complete terminal CLI command-line reference.
-
----
-
 ## License
 
 Developed under the Smart India Hackathon 2024 / 2026 Initiative (SIH26117).  
 Proprietary to Mangalore Refinery and Petrochemicals Limited (MRPL) and Team Den of Devs. All rights reserved.
-

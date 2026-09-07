@@ -127,7 +127,7 @@ def assess_native_page_quality(page_text: str, image_count: int = 0) -> bool:
     if len(cleaned) < 50:
         return False
 
-    printable_count = sum(1 for c in cleaned if c.isprintable() and not c.isspace())
+    printable_count = sum(1 for c in cleaned if c.isprintable() or c in ('\n', '\r', '\t', ' '))
     if printable_count / max(len(cleaned), 1) < 0.85:
         return False
 

@@ -91,7 +91,7 @@ export function KnowledgePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg"
+                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
                 className="hidden"
                 onChange={(e) => void handleFileSelected(e.target.files?.[0])}
               />

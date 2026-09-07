@@ -1,6 +1,13 @@
 import os
 from pathlib import Path
 from typing import Optional, List, TYPE_CHECKING, Any
+
+# Enforce strict offline sovereign environment at process initialization time
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+os.environ.setdefault("CHROMA_TELEMETRY", "0")
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if TYPE_CHECKING:

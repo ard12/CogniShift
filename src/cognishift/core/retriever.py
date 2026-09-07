@@ -47,11 +47,21 @@ os.environ["ANONYMIZED_TELEMETRY"] = "False"
 chroma_settings = chromadb.config.Settings(anonymized_telemetry=False, is_persistent=True)
 chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path), settings=chroma_settings)
 
+def _resolve_fastembed_cache_dir() -> str:
+    import tempfile
+    target = settings.fastembed_cache_dir
+    model_dir_name = "models--qdrant--bge-small-en-v1.5-onnx-q"
+    if (target / model_dir_name).exists():
+        return str(target)
+    alt = Path(tempfile.gettempdir()) / "fastembed_cache"
+    if (alt / model_dir_name).exists():
+        return str(alt)
+    return str(target)
+
 # Initialize FastEmbed locally (CPU optimized, 100% offline in sovereign mode)
-os.environ["HF_HUB_OFFLINE"] = "1"
 embedding_model = TextEmbedding(
     model_name="BAAI/bge-small-en-v1.5",
-    cache_dir=str(settings.fastembed_cache_dir),
+    cache_dir=_resolve_fastembed_cache_dir(),
     local_files_only=settings.fastembed_offline,
 )
 

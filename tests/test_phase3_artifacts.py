@@ -50,6 +50,7 @@ async def setup_artifacts_db():
     async with get_db() as db:
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Refinery-1', 'MRPL')")
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (2, 'Refinery-2', 'Mangalore')")
+        await db.execute("INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name, description) VALUES (1, 1, 'Refinery Agent', 'Maintenance')")
         await db.execute(
             "INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (10, 1, 1, 'completed', 'operator_sam')"
         )

@@ -194,7 +194,15 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "hello and good morning",
         "explain your architecture",
         "how does the equipment diagnostic tool work",
-        "how do you check sensor telemetry"
+        "how do you check sensor telemetry",
+        "can you convert a pdf file to a ppt",
+        "can you convert a pdf to a ppt",
+        "can you convert pdfs to pptx",
+        "can you convert files to presentations",
+        "can you convert documents to powerpoint",
+        "do you support pptx export",
+        "can you export presentations",
+        "can you convert a pdf to pptx"
     ],
     SemanticIntent.KNOWLEDGE_QUERY: [
         "what does our procedure say about this issue",
@@ -229,7 +237,13 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "what is the procedure for lock out tag out on the pump",
         "what is the lockout tagout LOTO protocol",
         "what are the main steps to service the pump according to the manual",
-        "how often do we need to inspect the pressure relief valves according to OISD"
+        "how often do we need to inspect the pressure relief valves according to OISD",
+        "what was MRPL's gross refining margin trend over the last 3 years? break it down simply",
+        "what was the gross refining margin trend over the last 3 years",
+        "what is MRPL's gross refining margin GRM",
+        "what was our gross refining margin over the past three years",
+        "break down the gross refining margin trend simply",
+        "what were the gross refining margins and trends"
     ],
     SemanticIntent.ARTIFACT_INSPECTION: [
         "explain <file>",
@@ -542,12 +556,23 @@ class SemanticIntentRouter:
         is_pure_capability_question = (
             any(text_lower.startswith(qo) for qo in [
                 "can you", "could you", "would you", "how do you", "how can", "is it possible",
-                "what can", "what is", "explain how"
+                "what can", "what is", "explain how", "do you support", "are you able to"
             ])
-            and len(text_lower.split()) <= 6
+            and not refs.files
+            and not refs.equipment_ids
+            and not any(text_lower.startswith(p) for p in [
+                "can you please convert this", "can you please generate", "can you please run",
+                "can you please create", "can you please execute", "can you convert the latest"
+            ])
+            and (
+                len(text_lower.split()) <= 8
+                or any(w in text_lower for w in [
+                    "what can you do", "who are you", "your capabilities", "can you convert",
+                    "can you run", "can you execute", "do you support", "can you work with"
+                ])
+            )
             and not any(w in text_lower for w in [
-                "excel", "xlsx", "csv", "spreadsheet", "file", "financial", "audit", "telemetry",
-                "data", "png", "docx", "pdf", "chart", "do a", "create an", "generate a", "plot", "visualiz"
+                "financial audit", "deep audit", "operating ebitda", "urgent maintenance"
             ])
         )
 
@@ -556,7 +581,10 @@ class SemanticIntentRouter:
             text_lower
         ))
         is_document_conversion = bool(re.search(
-            r'\b(?:convert|transform|export|create|generate|render|review.*?and\s+(?:convert|create|generate|export|render))\b.*?\b(?:into|to|as|in)?\s*(?:docx|pdf|excel|xlsx|spreadsheet|jpg|jpeg|png|image)\b',
+            r'\b(?:convert|transform)\b.*?\b(?:into|to|as)\s*(?:docx|pdf|excel|xlsx|spreadsheet|csv|jpg|jpeg|png|image|ppt|pptx|powerpoint|slides|presentation)\b',
+            text_lower
+        )) or bool(re.search(
+            r'\b(?:export|create|generate|render|review.*?and\s+(?:convert|create|generate|export|render))\b.*?\b(?:into|to|as|in)?\s*(?:docx|pdf|excel|xlsx|spreadsheet|csv|jpg|jpeg|png|image|ppt|pptx|powerpoint|slides|presentation)\b',
             text_lower
         ))
         is_visualization_cmd = bool(re.search(

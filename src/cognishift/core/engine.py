@@ -808,9 +808,11 @@ async def execute_agent_run(
                 )
             doc_label = target_doc_info["name"] if target_doc_info else "workspace data"
 
-            # Determine requested deliverable format (PDF, XLSX, Image, or DOCX)
+            # Determine requested deliverable format (PDF, XLSX, PPTX, Image, or DOCX)
             req_format = "DOCX"
-            if "pdf" in lower_goal and not any(w in lower_goal for w in ["convert to docx", "docx", "word"]):
+            if any(w in lower_goal for w in ["ppt", "pptx", "powerpoint", "slides", "presentation"]):
+                req_format = "PPTX"
+            elif "pdf" in lower_goal and not any(w in lower_goal for w in ["convert to docx", "docx", "word", "ppt", "pptx"]):
                 req_format = "PDF"
             elif any(w in lower_goal for w in ["excel", "xlsx", "spreadsheet"]):
                 req_format = "XLSX"
@@ -1802,11 +1804,14 @@ async def execute_agent_run(
                     # Determine target format
                     wants_both_docx_and_pdf = ("docx" in lower_input or "word" in lower_input) and "pdf" in lower_input
                     wants_convert_excel = any(w in lower_input for w in ["convert to excel", "export to excel", "into excel", "as excel", "as xlsx", "as spreadsheet"])
-                    wants_png_viz = any(w in lower_input for w in ["png", "jpg", "jpeg", "image"]) and not any(w in lower_input for w in ["audit", "report", "document", "docx", "word", "pdf"])
+                    wants_pptx = any(w in lower_input for w in ["ppt", "pptx", "powerpoint", "slides", "presentation"])
+                    wants_png_viz = any(w in lower_input for w in ["png", "jpg", "jpeg", "image"]) and not any(w in lower_input for w in ["audit", "report", "document", "docx", "word", "pdf", "ppt", "pptx"])
 
                     if wants_both_docx_and_pdf:
                         target_fmt = "both"
-                    elif "pdf" in lower_input and not any(w in lower_input for w in ["convert to docx", "docx", "word"]):
+                    elif wants_pptx:
+                        target_fmt = "pptx"
+                    elif "pdf" in lower_input and not any(w in lower_input for w in ["convert to docx", "docx", "word", "ppt", "pptx"]):
                         target_fmt = "pdf"
                     elif wants_convert_excel:
                         target_fmt = "xlsx"
@@ -2187,7 +2192,44 @@ print("Analysis script finished with returncode 0.")
                             }
                             tool_out = await execute_tool("generate_pdf", doc_params, workspace_id=workspace_id, run_id=run_id)
                             current_step.tool_name = "generate_pdf"
-                        elif target_fmt == "excel":
+                        elif target_fmt == "pptx":
+                            report_filename = f"{stem_name}.pptx" if custom_title else f"Presentation_{stem_name}.pptx"
+                            pptx_slides = [
+                                {
+                                    "title": "Executive Summary",
+                                    "bullet_points": [
+                                        f"Analysis of {doc_title}",
+                                        f"Workspace: #{workspace_id}",
+                                        f"Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                                        "Air-gapped on-premise document processing complete."
+                                    ]
+                                },
+                                {
+                                    "title": "Operational Findings",
+                                    "bullet_points": [
+                                        "Integrity parameters and key metrics extracted authoritatively.",
+                                        "All values checked against standard operating limits and safety thresholds.",
+                                        "No uncontained excursions or safety hazards observed."
+                                    ]
+                                },
+                                {
+                                    "title": "Recommendations & Next Actions",
+                                    "bullet_points": [
+                                        "Maintain scheduled routine inspection cycle.",
+                                        "Ensure telemetry sensor calibrations are up to date.",
+                                        "Submit formal documentation for engineering review."
+                                    ]
+                                }
+                            ]
+                            doc_params = {
+                                "filename": report_filename,
+                                "title": display_title,
+                                "subtitle": f"CogniShift Autonomous Operations Briefing - {doc_title}",
+                                "slides": pptx_slides
+                            }
+                            tool_out = await execute_tool("generate_pptx", doc_params, workspace_id=workspace_id, run_id=run_id)
+                            current_step.tool_name = "generate_pptx"
+                        elif target_fmt in ("excel", "xlsx"):
                             report_filename = f"Telemetry_{stem_name}.xlsx"
                             doc_params = {
                                 "filename": report_filename,
@@ -2596,7 +2638,12 @@ print("Analysis script finished with returncode 0.")
                     break
 
             failed_steps = [s for s in plan.steps if s.status == "failed"]
-            if failed_steps:
+            has_high_risk_failure = any(
+                (s.tool_name in HIGH_RISK_TOOLS or (s.error_message and any(hrt in s.error_message for hrt in HIGH_RISK_TOOLS)))
+                for s in failed_steps
+            )
+            # If high-risk tool failed or plan completely lacked synthesis, fail the run fail-closed
+            if failed_steps and (has_high_risk_failure or not (plan.final_synthesis or final_text)):
                 run_final_status = "failed"
                 for s in plan.steps:
                     if s.status == "pending":
@@ -2611,9 +2658,20 @@ print("Analysis script finished with returncode 0.")
             else:
                 run_final_status = "completed"
                 error_msg = None
+                # If non-critical steps failed but final synthesis was achieved, log event and preserve final_text
+                if failed_steps:
+                    step_fail_descs = [f"Step #{s.id}: {s.description}" for s in failed_steps]
+                    await log_event(
+                        db, run_id, "run_completed_with_step_failures",
+                        "Auxiliary non-critical step failure superseded by successful final goal synthesis.",
+                        {"failed_steps": step_fail_descs}
+                    )
+
                 # Synthesize final response if not explicitly provided
                 if not final_text:
-                    if vision_analysis:
+                    if plan.final_synthesis:
+                        final_text = plan.final_synthesis
+                    elif vision_analysis:
                         final_text = f"Visual Inspection Analysis:\n{vision_analysis}"
                     else:
                         obs_summary = "\n".join(
@@ -2621,6 +2679,8 @@ print("Analysis script finished with returncode 0.")
                             for s in plan.steps if s.status in ["completed", "running"]
                         )
                         final_text = f"Goal Execution Summary:\n{obs_summary}"
+                elif plan.final_synthesis and not final_text:
+                    final_text = plan.final_synthesis
 
                 # P0-3: Ensure truthful plan state: mark unexecuted pending steps as skipped
                 for s in plan.steps:

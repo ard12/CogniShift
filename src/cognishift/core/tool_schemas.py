@@ -4,7 +4,7 @@ import re
 import logging
 from typing import Dict, Any, Optional, List, Literal, Union, Type, Tuple
 from typing_extensions import Annotated
-from pydantic import BaseModel, Field, ValidationError, AfterValidator, AliasChoices
+from pydantic import BaseModel, Field, ValidationError, AfterValidator, AliasChoices, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,8 @@ def validate_safe_relative_path(v: str) -> str:
     if not v or not v.strip():
         raise ValueError("Relative path cannot be empty.")
     v = v.strip()
+    if v.startswith("./") or v.startswith(".\\"):
+        v = v[2:]
     if v.startswith("/") or v.startswith("\\"):
         raise ValueError("Leading slash forbidden in relative path.")
     if ".." in v or "//" in v or "\\\\" in v or "\x00" in v:
@@ -187,9 +189,23 @@ class DocxSection(BaseModel):
 
 
 class GenerateDocxArgs(BaseModel):
-    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.docx$", description="Target filename (must end in .docx)")
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.(?i:docx)$", description="Target filename (must end in .docx)")
     title: str = Field(..., min_length=1, max_length=200, description="Document title")
     sections: List[DocxSection] = Field(..., min_length=1, max_length=50, description="Document sections")
+
+    @field_validator("filename", mode="before")
+    @classmethod
+    def normalize_filename(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "document.docx"
+            if clean.lower().endswith(".docx"):
+                clean = clean[:-5] + ".docx"
+            else:
+                clean = f"{clean}.docx"
+            return clean
+        return "document.docx"
 
 
 class XlsxRow(BaseModel):
@@ -203,9 +219,23 @@ class XlsxSheet(BaseModel):
 
 
 class GenerateXlsxArgs(BaseModel):
-    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.xlsx$", description="Target filename (must end in .xlsx)")
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.(?i:xlsx)$", description="Target filename (must end in .xlsx)")
     title: str = Field(..., min_length=1, max_length=200, description="Workbook title")
     sheets: List[XlsxSheet] = Field(..., min_length=1, max_length=10, description="Workbook sheets")
+
+    @field_validator("filename", mode="before")
+    @classmethod
+    def normalize_filename(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "workbook.xlsx"
+            if clean.lower().endswith(".xlsx"):
+                clean = clean[:-5] + ".xlsx"
+            else:
+                clean = f"{clean}.xlsx"
+            return clean
+        return "workbook.xlsx"
 
 
 class PptxSlide(BaseModel):
@@ -214,10 +244,24 @@ class PptxSlide(BaseModel):
 
 
 class GeneratePptxArgs(BaseModel):
-    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.pptx$", description="Target filename (must end in .pptx)")
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.(?i:pptx)$", description="Target filename (must end in .pptx)")
     title: str = Field(..., min_length=1, max_length=200, description="Presentation title")
     subtitle: Optional[str] = Field(None, max_length=200, description="Optional subtitle")
     slides: List[PptxSlide] = Field(..., min_length=1, max_length=25, description="Presentation slides")
+
+    @field_validator("filename", mode="before")
+    @classmethod
+    def normalize_filename(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "presentation.pptx"
+            if clean.lower().endswith(".pptx"):
+                clean = clean[:-5] + ".pptx"
+            else:
+                clean = f"{clean}.pptx"
+            return clean
+        return "presentation.pptx"
 
 
 class SandboxInputReference(BaseModel):
@@ -227,23 +271,80 @@ class SandboxInputReference(BaseModel):
 
 class ExecuteCodeArgs(BaseModel):
     code: str = Field(..., min_length=1, max_length=100000, description="Python code to execute inside isolated container")
-    entrypoint: str = Field(default="main.py", pattern=r"^[A-Za-z0-9_.-]+\.py$", description="Script entrypoint filename")
+    entrypoint: str = Field(default="main.py", pattern=r"^[A-Za-z0-9_.-]+\.(?i:py)$", description="Script entrypoint filename")
     timeout_seconds: int = Field(default=30, ge=5, le=120, description="Execution timeout in seconds")
     input_files: List[SandboxInputReference] = Field(default_factory=list, max_length=10, description="Optional input files")
     promote_outputs_to_artifacts: bool = Field(default=False, description="Promote outputs to permanent artifacts")
 
+    @field_validator("entrypoint", mode="before")
+    @classmethod
+    def normalize_entrypoint(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "main.py"
+            if clean.lower().endswith(".py"):
+                clean = clean[:-3] + ".py"
+            else:
+                clean = f"{clean}.py"
+            return clean
+        return "main.py"
+
 
 class GeneratePdfArgs(BaseModel):
-    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.pdf$", description="Target filename (must end in .pdf)")
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.(?i:pdf)$", description="Target filename (must end in .pdf)")
     title: str = Field(..., min_length=1, max_length=200, description="Document title")
     sections: List[DocxSection] = Field(..., min_length=1, max_length=50, description="Document sections")
+
+    @field_validator("filename", mode="before")
+    @classmethod
+    def normalize_filename(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "document.pdf"
+            if clean.lower().endswith(".pdf"):
+                clean = clean[:-4] + ".pdf"
+            else:
+                clean = f"{clean}.pdf"
+            return clean
+        return "document.pdf"
 
 
 class RenderDocumentPageArgs(BaseModel):
     source_path_or_id: str = Field(..., description="Path to PDF in workspace documents/ or knowledge source ID")
     page_number: int = Field(default=1, ge=1, le=1000, description="1-indexed page number to render")
-    output_filename: str = Field(default="page_1.png", pattern=r"^[A-Za-z0-9_.\-]+\.(png|jpg|jpeg)$", description="Output image filename")
-    format: str = Field(default="png", pattern=r"^(png|jpg|jpeg)$", description="Target image format")
+    output_filename: str = Field(default="page_1.png", pattern=r"^[A-Za-z0-9_.\-]+\.(?i:png|jpg|jpeg)$", description="Output image filename")
+    format: str = Field(default="png", pattern=r"^(?i:png|jpg|jpeg)$", description="Target image format")
+
+    @field_validator("format", mode="before")
+    @classmethod
+    def normalize_format(cls, v: Any) -> str:
+        if isinstance(v, str):
+            val = v.strip().lower()
+            if val.startswith("."):
+                val = val[1:]
+            if val.startswith("image/"):
+                val = val[6:]
+            if val in ("png", "jpg", "jpeg"):
+                return val
+        return "png"
+
+    @field_validator("output_filename", mode="before")
+    @classmethod
+    def normalize_output_filename(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "page_1.png"
+            for ext in (".png", ".jpg", ".jpeg"):
+                if clean.lower().endswith(ext):
+                    clean = clean[:-len(ext)] + ext
+                    break
+            else:
+                clean = f"{clean}.png"
+            return clean
+        return "page_1.png"
 
 
 # Tool Name -> Pydantic Schema mapping
@@ -365,7 +466,8 @@ def bounded_repair_tool_parameters(
     references: Optional[Any] = None
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     """
-    Deterministic bounded structured argument repair from explicit user references.
+    Deterministic bounded structured argument repair from explicit user references
+    and robust parameter normalization.
     
     CRITICAL RULE (P0 Spec 12 & 13):
     Only repairs when unambiguous user reference was explicitly supplied in current turn.
@@ -373,6 +475,84 @@ def bounded_repair_tool_parameters(
     """
     params = dict(raw_parameters)
     arg_source = None
+
+    # Universal parameter hygiene / normalization across all tools
+    if tool_name == "render_document_page":
+        if "format" in params:
+            fmt = str(params["format"]).strip().lower()
+            if fmt.startswith("."):
+                fmt = fmt[1:]
+            if fmt.startswith("image/"):
+                fmt = fmt[6:]
+            if fmt in ("png", "jpg", "jpeg"):
+                params["format"] = fmt
+            else:
+                params["format"] = "png"
+        else:
+            params["format"] = "png"
+
+        if "output_filename" in params and isinstance(params["output_filename"], str):
+            fname = params["output_filename"].strip().replace("\\", "/").split("/")[-1]
+            for ext in (".png", ".jpg", ".jpeg"):
+                if fname.lower().endswith(ext):
+                    fname = fname[:-len(ext)] + ext
+                    break
+            else:
+                fname = f"{fname}.png"
+            params["output_filename"] = fname
+        elif "output_filename" not in params:
+            page_num = params.get("page_number", 1)
+            params["output_filename"] = f"page_{page_num}.png"
+
+        if "page_number" in params:
+            try:
+                params["page_number"] = int(params["page_number"])
+            except (ValueError, TypeError):
+                params["page_number"] = 1
+
+    elif tool_name in ("generate_docx", "generate_xlsx", "generate_pptx", "generate_pdf"):
+        ext_map = {
+            "generate_docx": ".docx",
+            "generate_xlsx": ".xlsx",
+            "generate_pptx": ".pptx",
+            "generate_pdf": ".pdf",
+        }
+        expected_ext = ext_map[tool_name]
+        if "filename" in params and isinstance(params["filename"], str):
+            fname = params["filename"].strip().replace("\\", "/").split("/")[-1]
+            if fname.lower().endswith(expected_ext):
+                fname = fname[:-len(expected_ext)] + expected_ext
+            else:
+                fname = f"{fname}{expected_ext}"
+            params["filename"] = fname
+        elif "filename" not in params:
+            params["filename"] = f"deliverable{expected_ext}"
+
+        if "title" in params and isinstance(params["title"], str):
+            params["title"] = params["title"].strip() or "Operational Deliverable"
+        elif "title" not in params:
+            params["title"] = "Operational Deliverable"
+
+    elif tool_name == "execute_code":
+        if "entrypoint" in params and isinstance(params["entrypoint"], str):
+            ep = params["entrypoint"].strip().replace("\\", "/").split("/")[-1]
+            if ep.lower().endswith(".py"):
+                ep = ep[:-3] + ".py"
+            else:
+                ep = f"{ep}.py"
+            params["entrypoint"] = ep
+        elif "entrypoint" not in params:
+            params["entrypoint"] = "main.py"
+
+    for eq_key in ("sensor_id", "equipment_id", "component_id", "chamber_id", "subsystem"):
+        if eq_key in params and isinstance(params[eq_key], str):
+            params[eq_key] = params[eq_key].strip().rstrip(".")
+
+    if "file_path" in params and isinstance(params["file_path"], str):
+        fp = params["file_path"].strip()
+        if fp.startswith("./") or fp.startswith(".\\"):
+            fp = fp[2:]
+        params["file_path"] = fp
 
     if references is None:
         return params, None
@@ -645,19 +825,53 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                 pass
             return None
 
+    # 3. Detect SLM pseudo-action tags (e.g. [action: 'final_answer'], [Action: final_answer], Action: final_answer)
+    pseudo_final = re.search(
+        r"\[?\s*(?:action|type)\s*[:=]\s*['\"]?final_answer['\"]?\s*\]?",
+        clean_text,
+        re.IGNORECASE
+    )
+    if pseudo_final:
+        cleaned = re.sub(
+            r"\[?\s*(?:action|type)\s*[:=]\s*['\"]?final_answer['\"]?\s*\]?",
+            "",
+            clean_text,
+            flags=re.IGNORECASE
+        ).strip()
+        cleaned = re.sub(r"^(?:content|answer)\s*[:=]\s*", "", cleaned, flags=re.IGNORECASE).strip()
+        if len(cleaned) >= 5 or not strict:
+            citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", cleaned)))
+            return FinalAnswer(action="final_answer", content=cleaned, citations=citations)
+
+    pseudo_obs = re.search(
+        r"\[?\s*(?:action|type)\s*[:=]\s*['\"]?(?:step_observation|observation)['\"]?\s*\]?",
+        clean_text,
+        re.IGNORECASE
+    )
+    if pseudo_obs:
+        cleaned = re.sub(
+            r"\[?\s*(?:action|type)\s*[:=]\s*['\"]?(?:step_observation|observation)['\"]?\s*\]?",
+            "",
+            clean_text,
+            flags=re.IGNORECASE
+        ).strip()
+        cleaned = re.sub(r"^(?:content|observation)\s*[:=]\s*", "", cleaned, flags=re.IGNORECASE).strip()
+        return StepObservation(action="step_observation", content=cleaned)
+
     # Non-strict prose fallback: require meaningful prose (not code blocks, JSON, markup, or action tokens)
     clean_stripped = clean_text.strip()
     is_simulated = clean_stripped.startswith("[SIMULATED")
+    is_json_block = clean_stripped.startswith("{") or (clean_stripped.startswith("[") and clean_stripped.endswith("]") and any(c in clean_stripped for c in [":", "{", "}"]))
     if (
         not strict
         and len(clean_stripped) >= 15
         and not clean_stripped.startswith("<")
-        and not clean_stripped.startswith("{")
-        and (is_simulated or not clean_stripped.startswith("["))
+        and not is_json_block
         and not re.search(r"['\"](?:action|step_observation|tool_call)['\"]\s*:", clean_stripped, re.IGNORECASE)
-        and not re.search(r":\s*['\"](?:step_observation|tool_call|final_answer)['\"]", clean_stripped, re.IGNORECASE)
+        and not re.search(r":\s*['\"](?:step_observation|tool_call)['\"]", clean_stripped, re.IGNORECASE)
     ):
         citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", clean_text)))
         return FinalAnswer(content=clean_text, citations=citations)
 
     return None
+

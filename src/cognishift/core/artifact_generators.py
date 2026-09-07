@@ -379,29 +379,102 @@ def render_document_page_to_image(
     image_format: str = "png",
     dpi: int = 150
 ) -> Path:
-    """Renders a single page of a PDF document to a PNG or JPEG image file."""
-    import fitz
+    """Renders a single page of a PDF or spreadsheet document to a PNG or JPEG image file."""
     if not doc_path.exists():
         raise FileNotFoundError(f"Source document '{doc_path}' does not exist.")
 
     dest_image_path.parent.mkdir(parents=True, exist_ok=True)
-    doc = fitz.open(str(doc_path))
-    try:
-        total_pages = len(doc)
-        if total_pages == 0:
-            raise ValueError(f"Document '{doc_path.name}' contains zero pages.")
-        target_idx = max(0, min(page_number - 1, total_pages - 1))
-        page = doc.load_page(target_idx)
-        zoom = dpi / 72.0
-        mat = fitz.Matrix(zoom, zoom)
-        pix = page.get_pixmap(matrix=mat, alpha=False)
-        if image_format.lower() in ["jpg", "jpeg"]:
-            pix.save(str(dest_image_path), output="jpeg")
-        else:
-            pix.save(str(dest_image_path), output="png")
+    suffix = doc_path.suffix.lower()
+
+    if suffix in [".xlsx", ".xls"]:
+        import openpyxl
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        wb = openpyxl.load_workbook(str(doc_path), data_only=True)
+        try:
+            sheet_names = wb.sheetnames
+            if not sheet_names:
+                raise ValueError(f"Workbook '{doc_path.name}' contains no sheets.")
+            sheet_idx = max(0, min(page_number - 1, len(sheet_names) - 1))
+            sheet = wb[sheet_names[sheet_idx]]
+
+            raw_rows = list(sheet.iter_rows(values_only=True))
+            if not raw_rows:
+                raw_rows = [["(Empty Sheet)"]]
+
+            table_data = []
+            for r in raw_rows[:25]:
+                row_cells = [str(c) if c is not None else "" for c in r[:10]]
+                table_data.append(row_cells)
+
+            fig, ax = plt.subplots(figsize=(12, 7), dpi=dpi)
+            ax.axis("off")
+            ax.axis("tight")
+
+            headers = [str(h) for h in table_data[0]]
+            data_rows = table_data[1:] if len(table_data) > 1 else [[""] * len(headers)]
+
+            table = ax.table(cellText=data_rows, colLabels=headers, loc="center", cellLoc="center")
+            table.auto_set_font_size(False)
+            table.set_fontsize(9)
+            table.scale(1.2, 1.2)
+            ax.set_title(f"{doc_path.name} — Sheet: {sheet_names[sheet_idx]}", fontsize=12, pad=12, weight="bold")
+
+            plt.tight_layout()
+            save_fmt = "jpeg" if image_format.lower() in ["jpg", "jpeg"] else "png"
+            fig.savefig(str(dest_image_path), format=save_fmt, bbox_inches="tight")
+            plt.close(fig)
+            return dest_image_path
+        finally:
+            wb.close()
+
+    elif suffix == ".csv":
+        import pandas as pd
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        df = pd.read_csv(doc_path)
+        fig, ax = plt.subplots(figsize=(12, 7), dpi=dpi)
+        ax.axis("off")
+        ax.axis("tight")
+
+        headers = list(df.columns)[:10]
+        data_rows = [[str(c) if pd.notna(c) else "" for c in r] for r in df.head(25).values[:, :10]]
+
+        table = ax.table(cellText=data_rows, colLabels=headers, loc="center", cellLoc="center")
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1.2, 1.2)
+        ax.set_title(f"{doc_path.name} — Top 25 Rows", fontsize=12, pad=12, weight="bold")
+
+        plt.tight_layout()
+        save_fmt = "jpeg" if image_format.lower() in ["jpg", "jpeg"] else "png"
+        fig.savefig(str(dest_image_path), format=save_fmt, bbox_inches="tight")
+        plt.close(fig)
         return dest_image_path
-    finally:
-        doc.close()
+
+    else:
+        import fitz
+        doc = fitz.open(str(doc_path))
+        try:
+            total_pages = len(doc)
+            if total_pages == 0:
+                raise ValueError(f"Document '{doc_path.name}' contains zero pages.")
+            target_idx = max(0, min(page_number - 1, total_pages - 1))
+            page = doc.load_page(target_idx)
+            zoom = dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            if image_format.lower() in ["jpg", "jpeg"]:
+                pix.save(str(dest_image_path), output="jpeg")
+            else:
+                pix.save(str(dest_image_path), output="png")
+            return dest_image_path
+        finally:
+            doc.close()
 
 
 async def create_and_register_artifact(

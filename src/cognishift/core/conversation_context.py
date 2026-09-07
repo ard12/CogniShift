@@ -369,6 +369,194 @@ def resolve_target_document_for_query_sync(
 
 
 @dataclass
+class ResolvedSource:
+    """Authoritative canonical source reference object."""
+    origin_type: str  # 'knowledge_source' | 'workspace_artifact' | 'file'
+    workspace_id: int
+    source_id: Optional[int]
+    artifact_id: Optional[int]
+    filename: str
+    original_filename: str
+    workspace_relative_path: str
+    sha256: str
+    processing_status: str
+    processing_version: Optional[str] = None
+    selected_by: str = "exact_filename"  # 'exact_filename' | 'pinned' | 'anaphora' | 'latest' | 'explicit_prompt'
+    strict_source_scope: bool = False
+    sheet_name: Optional[str] = None
+    table_range: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "origin_type": self.origin_type,
+            "workspace_id": self.workspace_id,
+            "source_id": self.source_id,
+            "artifact_id": self.artifact_id,
+            "filename": self.filename,
+            "original_filename": self.original_filename,
+            "workspace_relative_path": self.workspace_relative_path,
+            "sha256": self.sha256,
+            "processing_status": self.processing_status,
+            "processing_version": self.processing_version,
+            "selected_by": self.selected_by,
+            "strict_source_scope": self.strict_source_scope,
+            "sheet_name": self.sheet_name,
+            "table_range": self.table_range
+        }
+
+
+async def resolve_authoritative_source(
+    workspace_id: int,
+    query: str,
+    target_filename: Optional[str] = None,
+    db: Optional[aiosqlite.Connection] = None
+) -> Optional[ResolvedSource]:
+    """
+    Authoritative single-source resolver.
+    Disambiguates between Knowledge Vault sources and generated Workspace Artifacts.
+    Enforces strict source scope when queries specify 'Using only X...'.
+    """
+    from cognishift.core.security import get_workspace_root
+    import hashlib
+
+    q_lower = (query or "").lower()
+    is_strict = any(w in q_lower for w in ["using only", "strictly from", "only use", "do not use other", "using that workbook only", "using that file only"])
+
+    # Determine target filename candidate
+    fn_cand = target_filename
+    if not fn_cand:
+        file_matches = FILE_REGEX.findall(query or "")
+        if file_matches:
+            fn_cand = file_matches[0]
+
+    ws_root = get_workspace_root(workspace_id).resolve()
+
+    # 1. Search knowledge_sources first (Knowledge Vault ALWAYS has authority for uploaded data)
+    ks_query = """SELECT id, name, original_filename, local_path, source_type, checksum, 
+                         processing_status, active_processing_version 
+                  FROM knowledge_sources 
+                  WHERE workspace_id = ? AND processing_status = 'completed'
+                  ORDER BY id DESC"""
+    
+    source_rows = []
+    if db is not None:
+        cursor = await db.execute(ks_query, (workspace_id,))
+        source_rows = [dict(r) for r in await cursor.fetchall()]
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(ks_query, (workspace_id,))
+            source_rows = [dict(r) for r in await cursor.fetchall()]
+
+    for src in source_rows:
+        s_name = (src.get("name") or "").lower()
+        s_orig = (src.get("original_filename") or "").lower()
+        matched = False
+        selected_by = "exact_filename"
+
+        if fn_cand and (fn_cand.lower() == s_name or fn_cand.lower() == s_orig):
+            matched = True
+            selected_by = "exact_filename"
+        elif fn_cand and (Path(fn_cand).stem.lower() == Path(s_name).stem or Path(fn_cand).stem.lower() == Path(s_orig).stem):
+            matched = True
+            selected_by = "stem_match"
+        elif not fn_cand and (s_name in q_lower or s_orig in q_lower):
+            matched = True
+            selected_by = "query_mention"
+
+        if matched:
+            raw_lp = src.get("local_path", "")
+            rel_p = raw_lp
+            full_p = None
+            if raw_lp:
+                try:
+                    p = Path(raw_lp)
+                    if p.is_absolute():
+                        full_p = p
+                        rel_p = str(p.resolve().relative_to(ws_root)).replace("\\", "/")
+                    else:
+                        full_p = ws_root / p
+                        rel_p = str(p).replace("\\", "/")
+                except Exception:
+                    rel_p = Path(raw_lp).name
+                    full_p = ws_root / "uploads" / Path(raw_lp).name
+
+            # Checksum
+            csum = src.get("checksum") or ""
+            if not csum and full_p and full_p.exists():
+                try:
+                    csum = hashlib.sha256(full_p.read_bytes()).hexdigest()
+                except Exception:
+                    csum = ""
+
+            return ResolvedSource(
+                origin_type="knowledge_source",
+                workspace_id=workspace_id,
+                source_id=src["id"],
+                artifact_id=None,
+                filename=src["original_filename"] or src["name"],
+                original_filename=src["original_filename"] or src["name"],
+                workspace_relative_path=rel_p,
+                sha256=csum,
+                processing_status=src["processing_status"],
+                processing_version=src.get("active_processing_version"),
+                selected_by=selected_by,
+                strict_source_scope=is_strict
+            )
+
+    # 2. Search workspace_artifacts if asking about generated files or when not in knowledge_sources
+    art_query = """SELECT id, filename, relative_path, file_size, artifact_type, sha256_hash 
+                   FROM workspace_artifacts 
+                   WHERE workspace_id = ? 
+                   ORDER BY id DESC"""
+    art_rows = []
+    if db is not None:
+        cursor = await db.execute(art_query, (workspace_id,))
+        art_rows = [dict(r) for r in await cursor.fetchall()]
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(art_query, (workspace_id,))
+            art_rows = [dict(r) for r in await cursor.fetchall()]
+
+    for art in art_rows:
+        a_name = art.get("filename", "").lower()
+        matched = False
+        selected_by = "exact_filename"
+
+        if fn_cand and (fn_cand.lower() == a_name or Path(fn_cand).stem.lower() == Path(a_name).stem):
+            matched = True
+        elif not fn_cand and (a_name in q_lower):
+            matched = True
+            selected_by = "query_mention"
+
+        if matched:
+            rel_p = art["relative_path"]
+            full_p = ws_root / rel_p
+            csum = art.get("sha256_hash") or ""
+            if not csum and full_p.exists():
+                try:
+                    csum = hashlib.sha256(full_p.read_bytes()).hexdigest()
+                except Exception:
+                    csum = ""
+
+            return ResolvedSource(
+                origin_type="workspace_artifact",
+                workspace_id=workspace_id,
+                source_id=None,
+                artifact_id=art["id"],
+                filename=art["filename"],
+                original_filename=art["filename"],
+                workspace_relative_path=rel_p,
+                sha256=csum,
+                processing_status="completed",
+                processing_version="1.0",
+                selected_by=selected_by,
+                strict_source_scope=is_strict
+            )
+
+    return None
+
+
+@dataclass
 class ResolvedContext:
     """Structured context resolved from conversation history."""
     files: List[str] = field(default_factory=list)
@@ -378,6 +566,7 @@ class ResolvedContext:
     has_anaphora: bool = False
     prior_citations: List[str] = field(default_factory=list)
     pinned_source: Optional[Dict[str, Any]] = None
+    resolved_source: Optional[ResolvedSource] = None
     is_affirmation: bool = False
     is_cancellation: bool = False
     pending_task_id: Optional[str] = None
@@ -392,6 +581,7 @@ class ResolvedContext:
             "has_anaphora": self.has_anaphora,
             "prior_citations": self.prior_citations,
             "pinned_source": self.pinned_source,
+            "resolved_source": self.resolved_source.to_dict() if self.resolved_source else None,
             "is_affirmation": self.is_affirmation,
             "is_cancellation": self.is_cancellation,
             "pending_task_id": self.pending_task_id,

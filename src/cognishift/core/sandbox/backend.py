@@ -304,7 +304,7 @@ class SimulatedSandboxBackend(SandboxBackend):
                         lines.append(",".join(str(c) for c in r))
                     sim_file.write_text("\n".join(lines), encoding="utf-8")
                 else:
-                    sim_file.write_text("Sensor,Value,Unit\nPT-101,102.5,PSI\nTT-101,68.4,C\n", encoding="utf-8")
+                    logger.warning("Simulated sandbox: No staged telemetry tabular data found. Failing closed without fake rows.")
 
             # 3. Dynamic Chart Generation
             if wants_chart:
@@ -369,24 +369,6 @@ class SimulatedSandboxBackend(SandboxBackend):
                             plt.tight_layout()
                             plt.savefig(str(chart_file))
                             plt.close()
-                        else:
-                            # Fallback clean chart
-                            fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
-                            ax.plot([1, 2, 3], [10, 20, 15], color="#1F4E79", label="Execution Telemetry")
-                            ax.set_title("Analysis Trend", fontsize=10)
-                            ax.legend()
-                            fig.tight_layout()
-                            fig.savefig(chart_file)
-                            plt.close(fig)
-                    else:
-                        # Fallback clean chart without hardcoded numbers
-                        fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
-                        ax.plot([1, 2, 3], [10, 20, 15], color="#1F4E79", label="Execution Telemetry")
-                        ax.set_title("Operational Analysis", fontsize=10)
-                        ax.legend()
-                        fig.tight_layout()
-                        fig.savefig(chart_file)
-                        plt.close(fig)
                 except Exception as e:
                     logger.warning(f"Error generating simulated chart: {e}")
 
@@ -414,11 +396,9 @@ class SimulatedSandboxBackend(SandboxBackend):
                         ws.append(doc_insights["table_headers"])
                         for r in doc_insights.get("table_rows", [])[:50]:
                             ws.append(r)
+                        wb.save(excel_file)
                     else:
-                        ws.append(["Item", "Value", "Status"])
-                        ws.append(["Reading_A", 100.0, "NORMAL"])
-                        ws.append(["Reading_B", 200.0, "NORMAL"])
-                    wb.save(excel_file)
+                        logger.warning("Simulated sandbox: No tabular data to export to telemetry_data.xlsx. Skipping fake export.")
                 except Exception:
                     pass
 

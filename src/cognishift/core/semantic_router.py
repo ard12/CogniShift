@@ -976,13 +976,21 @@ class SemanticIntentRouter:
         if not refs.files:
             return False
 
+        # If an explicit file is referenced, check for reading, extraction, inspection, or comparison triggers
         inquiry_triggers = [
-            "what is", "tell me about", "summarize", "what does", "what's in",
-            "explain", "describe", "contents of", "show me the readings", "inspect",
-            "what information is in", "show me the summary", "what is inside", "about",
-            "report on", "generate a report", "create a report", "review"
+            "what is", "what are", "what was", "what were", "tell me", "summarize", "what does", "what's in",
+            "explain", "describe", "contents of", "show me", "show the", "inspect", "find", "extract",
+            "list", "identify", "compare", "what row", "which row", "which work order", "which reading", "which",
+            "largest", "highest", "lowest", "maximum", "max", "minimum", "min", "abnormal", "anomaly",
+            "readings", "read", "values", "value", "using only", "strictly from", "from the file",
+            "from the workbook", "from this file", "cite the workbook", "cite the source", "how many"
         ]
-        return any(t in text for t in inquiry_triggers)
+        if any(t in text for t in inquiry_triggers):
+            return True
+
+        # Fallback: if explicit file is referenced and no operational action is commanded, route to ARTIFACT_INSPECTION
+        has_operational_action = any(w in text for w in ["restart", "trip", "relief", "depressurize", "reboot", "open valve", "close valve"])
+        return not has_operational_action
 
 
 _router_instance: Optional[SemanticIntentRouter] = None

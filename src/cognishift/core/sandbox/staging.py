@@ -98,9 +98,25 @@ def stage_execution_environment(
                     f"Total input bytes ({total_input_bytes}) exceeds maximum allowed of {settings.sandbox_max_input_bytes} bytes."
                 )
 
-            # Copy to staging input directory
-            dest_path = input_dir / input_ref.dest_name
+            # Copy to staging input directory with sanitized destination name
+            clean_dest_name = Path(input_ref.dest_name).name
+            if not clean_dest_name:
+                clean_dest_name = resolved_src.name
+            dest_path = input_dir / clean_dest_name
             shutil.copy2(str(resolved_src), str(dest_path))
+
+            # Cryptographic Staging Integrity Check
+            import hashlib
+            src_sha256 = hashlib.sha256(resolved_src.read_bytes()).hexdigest()
+            staged_sha256 = hashlib.sha256(dest_path.read_bytes()).hexdigest()
+            if src_sha256 != staged_sha256:
+                raise SecurityError(
+                    f"Staging integrity check failed for '{input_ref.source_path}': "
+                    f"Source SHA256 ({src_sha256}) != Staged SHA256 ({staged_sha256})"
+                )
+            logger.info(
+                f"Sandbox input staged and verified: {clean_dest_name} (SHA-256: {staged_sha256[:16]}...)"
+            )
 
         return staging_dir
     except BaseException:

@@ -118,29 +118,26 @@ def route_model(
     candidates = list_models(enabled_only=True)
     evaluations: Dict[str, RoutingCandidateEvaluation] = {}
     
-    # Normalize installed model names for quick lookup
-    installed_set = None
-    if installed_models is not None:
-        installed_set = set()
-        for m in installed_models:
-            clean = m.strip().lower()
-            installed_set.add(clean)
-            if ":" in clean:
-                installed_set.add(clean.split(":")[0])
+    # Exact tag matching helper
+    def _is_installed(mid: str) -> bool:
+        if installed_models is None:
+            return True
+        mid_clean = mid.strip().lower()
+        inst_clean = [m.strip().lower() for m in installed_models]
+        if mid_clean in inst_clean:
+            return True
+        if ":" not in mid_clean and f"{mid_clean}:latest" in inst_clean:
+            return True
+        if mid_clean.endswith(":latest") and mid_clean[:-7] in inst_clean:
+            return True
+        return False
 
     best_candidate: Optional[ModelDefinition] = None
     highest_score = -1.0
     
     for model in candidates:
-        # Local Installation Availability check
-        is_installed = True
-        if installed_set is not None:
-            mid = model.model_identifier.strip().lower()
-            is_installed = (
-                (mid in installed_set)
-                or (f"{mid}:latest" in installed_set)
-                or (mid.split(":")[0] in installed_set)
-            )
+        # Local Installation Availability check (strict exact tag matching)
+        is_installed = _is_installed(model.model_identifier)
 
         # VRAM Feasibility
         is_vram_feasible = model.vram_requirement_mb <= available_vram_mb
@@ -168,7 +165,9 @@ def route_model(
             pref_bonus
         )
 
-        eligible = is_installed and is_vram_feasible and has_vision_capability and (overlap > 0 or not task.requires_vision)
+        # Candidate must have >0 capability overlap to be normally eligible
+        has_capability_overlap = (overlap > 0)
+        eligible = is_installed and is_vram_feasible and has_vision_capability and has_capability_overlap
 
         rationale = "Eligible candidate"
         if not is_installed:
@@ -177,8 +176,8 @@ def route_model(
             rationale = f"Infeasible (Requires {model.vram_requirement_mb}MB, VRAM budget is {available_vram_mb}MB)"
         elif not has_vision_capability:
             rationale = "Excluded (Task requires vision capability, model lacks vision)"
-        elif overlap == 0:
-            rationale = "Low suitability (0 matching capabilities)"
+        elif not has_capability_overlap:
+            rationale = "Excluded (Zero overlap with required capabilities)"
         else:
             rationale = f"Capability match: {overlap}/{len(required_set)} ({composite_score:.2f})"
             
@@ -200,13 +199,7 @@ def route_model(
     # Fallback to general model if no candidate matched
     if not best_candidate:
         installed_candidates = [
-            m for m in candidates
-            if (
-                installed_set is None
-                or m.model_identifier.strip().lower() in installed_set
-                or f"{m.model_identifier.strip().lower()}:latest" in installed_set
-                or m.model_identifier.strip().lower().split(":")[0] in installed_set
-            )
+            m for m in candidates if _is_installed(m.model_identifier)
         ] if candidates else []
         best_candidate = installed_candidates[0] if installed_candidates else (candidates[0] if candidates else ModelDefinition(
             id="llama3.2:3b",

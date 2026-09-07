@@ -146,3 +146,57 @@ def test_model_registry_extensibility():
     decision = route_model(task, available_vram_mb=6000)
     assert "custom-sensor-agent:8b" in decision.candidate_evaluations
     assert decision.selected_model == "custom-sensor-agent:8b"
+
+
+def test_model_routing_exact_tag_matching():
+    """Edge Case A: Installing deepseek-r1:14b must NOT make deepseek-r1:7b eligible."""
+    task = classify_task("Perform root cause analysis on the cooling pump tripping incident")
+    # Host has ONLY the 14b variant installed
+    installed = ["deepseek-r1:14b", "qwen2.5:7b", "llama3.2:3b"]
+    decision = route_model(task, available_vram_mb=6000, installed_models=installed)
+
+    # 7b variant must be marked uninstalled
+    eval_7b = decision.candidate_evaluations["deepseek-r1:7b"]
+    assert eval_7b.eligible is False
+    assert "Excluded (Model not installed on local sovereign runtime)" in eval_7b.rationale
+
+    # 14b variant is infeasible within 6000MB budget (requires 14000MB)
+    eval_14b = decision.candidate_evaluations["deepseek-r1:14b"]
+    assert eval_14b.eligible is False
+    assert "Infeasible" in eval_14b.rationale
+
+    # Router must fall back to feasible installed model (qwen2.5:7b)
+    assert decision.selected_model == "qwen2.5:7b"
+
+
+def test_model_routing_zero_overlap_ineligibility():
+    """Edge Case B: Models with zero capability overlap must be marked eligible=False."""
+    # Task with a specialized capability not possessed by general SLMs
+    task = TaskClassification(
+        task_type="isolated_test_task",
+        required_capabilities=["sensor_diagnostics"],
+        requires_vision=False
+    )
+    decision = route_model(task, available_vram_mb=6000, installed_models=["qwen2.5:7b", "llama3.2:3b"])
+
+    # qwen2.5:7b has no "sensor_diagnostics" in default registry
+    qwen_eval = decision.candidate_evaluations["qwen2.5:7b"]
+    # If custom-sensor-agent:8b is in registry, it matches, otherwise zero-overlap models are ineligible
+    if "sensor_diagnostics" not in get_model("qwen2.5:7b").capabilities:
+        assert qwen_eval.eligible is False
+        assert "Zero overlap" in qwen_eval.rationale
+
+
+def test_model_routing_inventory_lookup_failure():
+    """Edge Case C: If local inventory lookup yields empty list or fails, router falls back safely."""
+    task = classify_task("Analyze log data")
+    decision = route_model(task, available_vram_mb=6000, installed_models=[])
+
+    # With no models installed, all candidates are marked ineligible
+    for cand_eval in decision.candidate_evaluations.values():
+        assert cand_eval.eligible is False
+
+    # Still selects a safe fallback definition without crashing
+    assert decision.selected_model is not None
+    assert "Fallback" in decision.selection_reason
+

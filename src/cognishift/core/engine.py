@@ -42,6 +42,8 @@ from cognishift.core.tool_schemas import (
 from cognishift.core.conversation_context import (
     ConversationContextResolver,
     ResolvedContext,
+    ResolvedSource,
+    resolve_authoritative_source,
     get_latest_ingested_document,
     get_latest_ingested_document_async,
     resolve_target_document_for_query,
@@ -68,10 +70,81 @@ from cognishift.core.planner import (
 from cognishift.core.document_insights import (
     extract_document_insights,
     detect_dataframe_anomalies,
-    format_dataframe_as_explicit_records
+    format_dataframe_as_explicit_records,
+    format_number_display,
+    StructuredAnomalyResult,
+    build_authoritative_anomaly_response,
+    validate_scada_anomaly_prose
 )
 
 logger = logging.getLogger("cognishift.engine")
+
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class GoalContract:
+    """Explicit contract specifying required quantitative or deliverable outputs for multi-step goals."""
+    required_fields: List[str]
+    extracted_fields: Dict[str, Any] = field(default_factory=dict)
+
+    def is_satisfied(self) -> bool:
+        return all(k in self.extracted_fields and self.extracted_fields[k] is not None for k in self.required_fields)
+
+
+def extract_and_strip_thinking(text: str) -> Tuple[str, Optional[str]]:
+    """
+    Strips and sanitizes <think>...</think> blocks from model output.
+    Returns (cleaned_text, reasoning_summary).
+    Guarantees raw thinking tokens never leak to the operator UI or result_text.
+    """
+    if not text:
+        return "", None
+    think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
+    thinks = think_pattern.findall(text)
+    cleaned = think_pattern.sub('', text).strip()
+    reasoning_summary = "\n".join(t.strip() for t in thinks if t.strip()) if thinks else None
+    return cleaned, reasoning_summary
+
+
+def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[bool, str]:
+    """
+    Topical and factual evidence sufficiency gate.
+    Uses regex word boundaries for acronyms (NDE, NDT, MPY, WFH) to avoid substring false positives
+    (e.g., preventing 'nde' in 'independent', 'rendered', or 'understanding' from spoofing corrosion evidence).
+    Returns (is_sufficient, reason).
+    """
+    lower_clean = (query or "").lower()
+    is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
+    is_procurement = "procurement" in lower_clean
+    is_corrosion_query = any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "corrosion"]) or bool(re.search(r'\b(?:mpy|nde|ndt)\b', lower_clean))
+    is_inspection_report = any(k in lower_clean for k in ["inspection report", "metallurgical report"]) or bool(re.search(r'\b(?:nde|ndt)\s+report\b', lower_clean))
+
+    if not (is_remote_work or is_procurement or is_corrosion_query or is_inspection_report):
+        return True, "Standard query"
+
+    if not retrieved_context or not retrieved_context.strip():
+        return False, "No context retrieved"
+
+    lower_ctx = retrieved_context.lower()
+    if is_remote_work:
+        has_rw = any(k in lower_ctx for k in ["remote work", "telework", "work from home", "home office", "telecommuting"]) or bool(re.search(r'\bwfh\b', lower_ctx))
+        if not has_rw:
+            return False, "Query is for remote work policy, but retrieved context contains no remote work evidence."
+
+    if is_procurement:
+        has_proc = any(k in lower_ctx for k in ["procurement", "purchase requisition", "tender", "rfp", "vendor contract"])
+        if not has_proc:
+            return False, "Query is for procurement policy, but retrieved context contains no procurement evidence."
+
+    if is_corrosion_query or is_inspection_report:
+        has_corr_terms = any(k in lower_ctx for k in ["corrosion", "wall thickness", "remaining life", "inspection report", "ultrasonic"])
+        has_acronyms = bool(re.search(r'\b(?:nde|ndt|mpy)\b', lower_ctx, re.IGNORECASE))
+        if not (has_corr_terms or has_acronyms):
+            return False, "Query is for corrosion life / inspection report, but retrieved context contains no corrosion or inspection evidence."
+
+    return True, "Sufficient topical evidence verified"
 
 
 def tool_output_failed(output: Any) -> bool:
@@ -306,7 +379,8 @@ async def _resolve_knowledge_and_page_context(
     agent: dict,
     clean_input: str,
     resolved_context: Any,
-    vision_analysis: Optional[str] = None
+    vision_analysis: Optional[str] = None,
+    run_id: Optional[int] = None
 ) -> tuple[List[int], str, str]:
     """
     Authoritatively resolve allowed knowledge sources, dynamic document bindings,
@@ -366,7 +440,7 @@ async def _resolve_knowledge_and_page_context(
                 allowed_source_ids.append(r_rf["id"])
 
     active_doc_for_page = None
-    # Exact-source hard constraint (e.g. "using only X.xlsx", "from only X", "in only X", or explicit filename mention with "only")
+    # Authoritative Single-Source Resolution & Strict Scope Enforcement
     only_source_match = re.search(
         r'\b(?:using\s+only|only\s+from|from\s+only|in\s+only|based\s+only\s+on)\s+([A-Za-z0-9_\-\.]+\.[A-Za-z0-9]+)\b',
         clean_input,
@@ -377,7 +451,31 @@ async def _resolve_knowledge_and_page_context(
         if fn_cand:
             only_source_match = fn_cand
 
-    if only_source_match:
+    target_fn_hint = only_source_match.group(1).strip() if only_source_match else None
+    resolved_source = await resolve_authoritative_source(
+        workspace_id=workspace_id,
+        query=clean_input,
+        target_filename=target_fn_hint,
+        db=db
+    )
+
+    if resolved_source:
+        if run_id is not None:
+            await log_event(
+                db, run_id, "resolved_source",
+                f"Authoritative source resolved: {resolved_source.filename} (Origin: {resolved_source.origin_type}, Selected By: {resolved_source.selected_by})",
+                resolved_source.to_dict()
+            )
+        if resolved_source.strict_source_scope and resolved_source.source_id:
+            allowed_source_ids = [resolved_source.source_id]
+        if resolved_source.origin_type == "knowledge_source" and resolved_source.source_id:
+            active_doc_for_page = {
+                "id": resolved_source.source_id,
+                "name": resolved_source.filename,
+                "local_path": resolved_source.workspace_relative_path
+            }
+            target_doc = active_doc_for_page
+    elif only_source_match:
         cand_name = only_source_match.group(1).strip()
         c_iso = await db.execute(
             "SELECT * FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (LOWER(name) = LOWER(?) OR LOWER(original_filename) = LOWER(?)) ORDER BY id DESC LIMIT 1",
@@ -436,7 +534,6 @@ async def _resolve_knowledge_and_page_context(
             if not p_ss.is_absolute():
                 p_ss = ws_root / p_ss
             if p_ss.exists() and p_ss.suffix.lower() in [".xlsx", ".xls", ".csv"]:
-                from cognishift.core.document_insights import extract_document_insights
                 ss_insights = extract_document_insights(p_ss, query_hint=clean_input)
                 if ss_insights.get("structured_text"):
                     trace_parts = [
@@ -472,6 +569,8 @@ async def execute_agent_run(
 ) -> RunResponse:
     """Execute an end-to-end agent reasoning run with text and multimodal vision support."""
     routing_res: Optional[SemanticRoutingResult] = None
+    frozen_scada_anomaly: Optional[Dict[str, Any]] = None
+    frozen_scada_source: str = ""
 
     async with get_db() as db:
         # 1. Fetch Workspace and Agent Definition
@@ -1238,6 +1337,8 @@ async def execute_agent_run(
                                     content_blocks = []
 
                                     if anomaly_report and anomaly_report.get("has_anomaly"):
+                                        frozen_scada_anomaly = anomaly_report
+                                        frozen_scada_source = art["filename"]
                                         ar = anomaly_report
                                         spiked_lines = []
                                         for sc in ar["spiked_columns"]:
@@ -1265,8 +1366,13 @@ async def execute_agent_run(
                                             f"3. State the exact timestamp, spiked measurements, baseline comparison, and valve state."
                                         )
 
-                                    content_blocks.append(insights.get("structured_text", ""))
-                                    content = "\n\n".join(content_blocks)
+                                    if ext in [".csv", ".tsv"]:
+                                        raw_csv_text = art_path.read_text(encoding="utf-8", errors="replace")
+                                        if raw_csv_text.strip():
+                                            content_blocks.append(raw_csv_text)
+                                    if insights.get("structured_text"):
+                                        content_blocks.append(insights.get("structured_text", ""))
+                                    content = "\n\n".join(b for b in content_blocks if b)
                                 except Exception as sp_err:
                                     logger.warning(f"Error extracting spreadsheet insights for {art['filename']}: {sp_err}")
                                     content = f"[Spreadsheet: {art['filename']} (could not extract content)]"
@@ -1363,7 +1469,8 @@ async def execute_agent_run(
                     agent=agent,
                     clean_input=clean_input,
                     resolved_context=resolved_context,
-                    vision_analysis=vision_analysis
+                    vision_analysis=vision_analysis,
+                    run_id=run_id
                 )
 
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids})...")
@@ -1402,17 +1509,11 @@ async def execute_agent_run(
                     "policy", "standard operating procedure", "our sop", "leave rule", "travel rule", "reimbursement"
                 ])
 
-                # Verify topical relevance of retrieved context to prevent irrelevant fragments from bypassing fail-closed guard
+                # Verify topical relevance and factual sufficiency of retrieved context
                 if context_str:
-                    lower_ctx = context_str.lower()
-                    if is_remote_work and not any(k in lower_ctx for k in ["remote", "telework", "work from home", "wfh", "home office", "telecommuting"]):
-                        logger.info("Discarding context: Query is for remote work policy, but retrieved context contains no remote work evidence.")
-                        context_str = ""
-                    elif is_procurement and not any(k in lower_ctx for k in ["procurement", "vendor", "purchase", "tender", "bid", "rfp", "contract"]):
-                        logger.info("Discarding context: Query is for procurement policy, but retrieved context contains no procurement evidence.")
-                        context_str = ""
-                    elif (is_corrosion_query or is_inspection_report) and not any(k in lower_ctx for k in ["corrosion", "wall thickness", "remaining life", "inspection report", "mpy", "ndt", "nde"]):
-                        logger.info("Discarding context: Query is for corrosion life / inspection report, but retrieved context contains no corrosion evidence.")
+                    is_suff, suff_reason = validate_evidence_sufficiency(clean_input, context_str)
+                    if not is_suff:
+                        logger.info(f"Discarding context: {suff_reason}")
                         context_str = ""
 
                 if not context_str and not graph_context and is_policy_query:
@@ -1581,7 +1682,8 @@ async def execute_agent_run(
                     agent=agent,
                     clean_input=clean_input,
                     resolved_context=resolved_context,
-                    vision_analysis=vision_analysis
+                    vision_analysis=vision_analysis,
+                    run_id=run_id
                 )
 
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids}) and plant topology graph...")
@@ -1606,17 +1708,11 @@ async def execute_agent_run(
                     "policy", "standard operating procedure", "our sop", "leave rule", "travel rule", "reimbursement"
                 ])
 
-                # Verify topical relevance of retrieved context
+                # Verify topical relevance and factual sufficiency of retrieved context
                 if context_str:
-                    lower_ctx = context_str.lower()
-                    if is_remote_work and not any(k in lower_ctx for k in ["remote", "telework", "work from home", "wfh", "home office", "telecommuting"]):
-                        logger.info("Discarding context: Query is for remote work policy, but retrieved context contains no remote work evidence.")
-                        context_str = ""
-                    elif is_procurement and not any(k in lower_ctx for k in ["procurement", "vendor", "purchase", "tender", "bid", "rfp", "contract"]):
-                        logger.info("Discarding context: Query is for procurement policy, but retrieved context contains no procurement evidence.")
-                        context_str = ""
-                    elif (is_corrosion_query or is_inspection_report) and not any(k in lower_ctx for k in ["corrosion", "wall thickness", "remaining life", "inspection report", "mpy", "ndt", "nde"]):
-                        logger.info("Discarding context: Query is for corrosion life / inspection report, but retrieved context contains no corrosion evidence.")
+                    is_suff, suff_reason = validate_evidence_sufficiency(clean_input, context_str)
+                    if not is_suff:
+                        logger.info(f"Discarding context: {suff_reason}")
                         context_str = ""
 
                 if not context_str and not graph_context and is_policy_query:
@@ -1879,7 +1975,13 @@ async def execute_agent_run(
                         return make_response(dict(await cursor.fetchone()))
 
                     raw_output = model_response.text or ""
-                    clean_output = raw_output.strip()
+                    clean_output, think_summary = extract_and_strip_thinking(raw_output)
+                    if think_summary:
+                        await log_event(
+                            db, run_id, "model_reasoning",
+                            f"Step #{current_step.id} internal reasoning extracted ({len(think_summary)} chars)",
+                            {"step_id": current_step.id, "summary": think_summary[:1500]}
+                        )
 
                     # Blocker 6: Empty or whitespace response must FAIL rather than complete
                     if not clean_output:
@@ -1900,7 +2002,7 @@ async def execute_agent_run(
                         cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
                         return make_response(dict(await cursor.fetchone()))
 
-                await log_event(db, run_id, "model_response", f"Step #{current_step.id} reasoning received", {"text": raw_output})
+                await log_event(db, run_id, "model_response", f"Step #{current_step.id} reasoning received", {"text": clean_output})
 
                 # Strict Action Parsing (Blocker 6: Valid AgentAction schema or verified readable prose only)
                 action = parse_agent_action(clean_output, strict=False)
@@ -1940,7 +2042,6 @@ async def execute_agent_run(
                                 target_doc_path = cand
                                 break
 
-                    from cognishift.core.document_insights import extract_document_insights, format_number_display
                     insights = extract_document_insights(target_doc_path, query_hint=clean_input) if target_doc_path else {}
 
                     is_financial_task = (
@@ -2186,7 +2287,11 @@ print("Analysis script finished with returncode 0.")
                             "promote_outputs_to_artifacts": True
                         }
                         if target_doc_path:
-                            tool_params["input_files"] = [{"source_path": str(target_doc_path), "dest_name": target_doc_path.name}]
+                            try:
+                                rel_input_path = str(target_doc_path.resolve().relative_to(ws_root)).replace("\\", "/")
+                            except Exception:
+                                rel_input_path = f"uploads/{target_doc_path.name}"
+                            tool_params["input_files"] = [{"source_path": rel_input_path, "dest_name": target_doc_path.name}]
 
                         tool_out = await execute_tool("execute_code", tool_params, workspace_id=workspace_id, run_id=run_id)
                         current_step.status = "completed"
@@ -2806,8 +2911,30 @@ print("Analysis script finished with returncode 0.")
                     is_direct_flow = routing_res.intent in (
                         SemanticIntent.CONVERSATION,
                         SemanticIntent.UI_NAVIGATION,
-                        SemanticIntent.ARTIFACT_INSPECTION
+                        SemanticIntent.ARTIFACT_INSPECTION,
+                        SemanticIntent.KNOWLEDGE_QUERY
                     )
+                    is_final_step = (current_step.id == len(plan.steps))
+
+                    # Multi-Step Goal Protection: Intermediate step must not abort plan before required outputs exist
+                    if not is_final_step and not is_direct_flow:
+                        logger.info(
+                            f"Step #{current_step.id} of {len(plan.steps)}: Intercepted intermediate FinalAnswer; "
+                            f"converting to StepObservation to protect plan execution."
+                        )
+                        current_step.status = "completed"
+                        current_step.observation = action.content
+                        await log_event(
+                            db, run_id, "step_observation",
+                            f"Step #{current_step.id} intermediate synthesis recorded: {action.content[:150]}",
+                            {"step_id": current_step.id, "observation": action.content}
+                        )
+                        saved_plan_json = serialize_plan(plan)
+                        await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                        await db.commit()
+                        plan.advance_to_next_step()
+                        continue
+
                     current_step.status = "completed"
                     current_step.observation = action.content
                     plan.final_synthesis = action.content
@@ -2897,6 +3024,25 @@ print("Analysis script finished with returncode 0.")
                 timing_block = f"\n\n---\n**Execution Timing & Provenance (Authoritative Backend Clock):**\n- Execution Completed: `{execution_finish_utc}`\n- Operating Mode: `{settings.operating_mode}`\n- Verified Zero Egress: 100% On-Premise Sovereign Execution"
                 if timing_block not in final_text:
                     final_text += timing_block
+            # DeepSeek & LLM Output Hygiene: Ensure <think>...</think> blocks never leak to result_text
+            final_text, _ = extract_and_strip_thinking(final_text)
+
+            # SCADA Anomaly Grounding Authority:
+            # If an anomalous tabular event was detected, ensure model prose conforms to frozen facts.
+            # If the model introduced unsupported facts, wrong years, or contradictory valve states,
+            # enforce the deterministic authoritative report.
+            if frozen_scada_anomaly:
+                is_valid, validated_text = validate_scada_anomaly_prose(
+                    final_text, frozen_scada_anomaly, source_filename=frozen_scada_source
+                )
+                if not is_valid:
+                    logger.warning("Overriding contradictory model prose with authoritative SCADA anomaly report.")
+                    final_text = validated_text
+                    await log_event(
+                        db, run_id, "anomaly_facts_enforced",
+                        "Authoritative SCADA anomaly facts enforced over contradictory/hallucinated model generation.",
+                        {"timestamp": frozen_scada_anomaly.get("timestamp"), "source": frozen_scada_source}
+                    )
 
             saved_plan_json = serialize_plan(plan)
             routing_json = json.dumps(routing_res.to_dict()) if routing_res else None

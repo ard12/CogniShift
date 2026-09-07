@@ -9,6 +9,8 @@ import os
 import re
 import csv
 import logging
+import statistics
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
@@ -281,11 +283,15 @@ def extract_spreadsheet_insights(file_path: Path, query_hint: str = "") -> Dict[
                     if num is not None:
                         metric_vals[col_name] = num
             if metric_vals:
+                vals_list = list(metric_vals.values())
+                keys_list = list(metric_vals.keys())
                 metrics_map[metric_key] = {
                     "matched_label": r_data[0],
                     "values": metric_vals,
-                    "latest": list(metric_vals.values())[-1],
-                    "latest_col": list(metric_vals.keys())[-1]
+                    "latest": vals_list[-1],
+                    "latest_col": keys_list[-1],
+                    "previous": vals_list[-2] if len(vals_list) >= 2 else None,
+                    "previous_col": keys_list[-2] if len(keys_list) >= 2 else None
                 }
 
     # If financial metrics found, calculate CAGRs & YoY growth
@@ -539,13 +545,39 @@ def format_dataframe_as_explicit_records(file_path: Path, max_rows: Optional[int
     return headers, records
 
 
+def parse_timestamp_epoch(ts_val: Any) -> Optional[float]:
+    """Parse a timestamp value into Unix epoch seconds if possible."""
+    if not ts_val:
+        return None
+    s = str(ts_val).strip()
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%d-%m-%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M:%S",
+        "%m/%d/%Y %H:%M:%S",
+    ):
+        try:
+            return datetime.strptime(s, fmt).timestamp()
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(s.replace("Z", "")).timestamp()
+    except Exception:
+        return None
+
+
 def detect_dataframe_anomalies(file_path: Path, max_rows: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
-    Deterministic SCADA / tabular anomaly detector.
-    Scans entire workbook/CSV to find the true outlier event, its timestamp,
-    spiking signals with baseline comparisons (before/after), and valve states.
+    Deterministic SCADA / tabular multi-anomaly detector and episode ranker.
+    Scans complete datasets to find the true outlier event, ranking candidates using:
+    - Discrete severity tiers: TRIP (1000), CRITICAL (750), ALARM (500), ABNORMAL (250)
+    - Robust z-scores with MAD zero-division guard and capped deviation scores (<= 50.0)
+    - Temporal episode grouping (groups candidate rows within a 30-minute window)
+    - Freezes exact measurements, units, baselines before/after, component, and valve states.
     Prevents LLM column-scrambling and hallucinated nominal anomalies.
-    Scans complete datasets (including records past row 500) and exposes analysis_scope.
     """
     file_path = Path(file_path)
     if not file_path.exists():
@@ -555,51 +587,147 @@ def detect_dataframe_anomalies(file_path: Path, max_rows: Optional[int] = None) 
     if not records:
         return None
 
-    # 1. Search for explicit alarm/critical status flags in any column
-    status_cols = [h for h in headers if any(k in h.lower() for k in ["status", "alarm", "indicator", "event", "flag", "state"])]
-    candidate_idx = None
-    matched_flag = None
+    # Severity tier definitions
+    tier_scores = {
+        "TRIP": 1000.0,
+        "CRITICAL": 750.0,
+        "ALARM": 500.0,
+        "ABNORMAL": 250.0,
+        "SPIKE": 250.0,
+        "ALERT": 250.0,
+        "EXCURSION": 250.0,
+        "DANGER": 250.0,
+    }
 
+    status_cols = [h for h in headers if any(k in h.lower() for k in ["status", "alarm", "indicator", "event", "flag", "state"])]
+
+    # Compute median, MAD, and std_dev for numeric columns for robust z-scoring
+    numeric_stats: Dict[str, Tuple[float, float, float]] = {}
+    for h in headers:
+        vals = [clean_numeric_value(r.get(h)) for r in records]
+        valid_vals = [v for v in vals if v is not None]
+        if len(valid_vals) >= len(records) * 0.5 and len(valid_vals) > 5:
+            med = statistics.median(valid_vals)
+            mad = statistics.median([abs(x - med) for x in valid_vals])
+            mean_v = sum(valid_vals) / len(valid_vals)
+            std_v = (sum((x - mean_v) ** 2 for x in valid_vals) / len(valid_vals)) ** 0.5
+            numeric_stats[h] = (med, mad, std_v)
+
+    ts_key = next((h for h in headers if "time" in h.lower() or "date" in h.lower()), None)
+    valve_key = next((h for h in headers if "valve" in h.lower() or "relief" in h.lower() or "sv" in h.lower()), None)
+    comp_key = next((h for h in headers if "component" in h.lower() or "equipment" in h.lower() or "tag" in h.lower()), None)
+
+    # 1. Collect all candidates
+    candidates: List[Dict[str, Any]] = []
     for idx, rec in enumerate(records):
+        matched_flag = None
+        tier_score = 0.0
+        tier_name = "NOMINAL"
+
         for col in status_cols:
             val = str(rec.get(col, "") or "")
-            if any(k in val.upper() for k in ["CRITICAL", "SPIKE", "EXCURSION", "ALARM", "ALERT", "TRIP", "ABNORMAL", "DANGER"]):
-                candidate_idx = idx
-                matched_flag = val
-                break
-        if candidate_idx is not None:
-            break
+            upper_val = val.upper()
+            for k, s_score in tier_scores.items():
+                if k in upper_val:
+                    if s_score > tier_score:
+                        tier_score = s_score
+                        tier_name = k
+                        matched_flag = val
 
-    # 2. If no explicit status string, compute numeric outlier z-scores
-    if candidate_idx is None:
-        numeric_cols = []
-        for h in headers:
-            vals = [clean_numeric_value(r.get(h)) for r in records]
-            valid_vals = [v for v in vals if v is not None]
-            if len(valid_vals) >= len(records) * 0.5 and len(valid_vals) > 5:
-                mean_v = sum(valid_vals) / len(valid_vals)
-                variance = sum((x - mean_v) ** 2 for x in valid_vals) / len(valid_vals)
-                std_v = variance ** 0.5
-                if std_v > 0.0001:
-                    numeric_cols.append((h, mean_v, std_v))
+        # Calculate max robust z-score across numeric channels
+        max_robust_z = 0.0
+        max_z_col = ""
+        for h, (med, mad, std_v) in numeric_stats.items():
+            curr_v = clean_numeric_value(rec.get(h))
+            if curr_v is not None:
+                if mad > 1e-6:
+                    rz = min(abs(curr_v - med) / (1.4826 * mad), 50.0)
+                elif std_v > 1e-6:
+                    rz = min(abs(curr_v - med) / std_v, 50.0)
+                else:
+                    rz = 0.0
+                if rz > max_robust_z:
+                    max_robust_z = rz
+                    max_z_col = h
 
-        max_z = 0.0
-        best_row = None
-        for idx, rec in enumerate(records):
-            for h, m, s in numeric_cols:
-                v = clean_numeric_value(rec.get(h))
-                if v is not None:
-                    z = abs(v - m) / s
-                    if z > max_z and z > 2.5:
-                        max_z = z
-                        best_row = idx
+        # If has status flag or high robust z-score (z > 2.5), it's a candidate
+        if tier_score > 0.0 or max_robust_z > 2.5:
+            if not matched_flag:
+                matched_flag = f"STATISTICAL_Z_SPIKE (z={max_robust_z:.2f} on {max_z_col})"
+            combined_score = tier_score + max_robust_z
+            ts_str = str(rec.get(ts_key, "Unknown") if ts_key else "Unknown")
+            candidates.append({
+                "row_index": idx + 1,
+                "record_idx": idx,
+                "timestamp": ts_str,
+                "epoch": parse_timestamp_epoch(ts_str),
+                "tier_name": tier_name,
+                "tier_score": tier_score,
+                "matched_flag": matched_flag,
+                "max_robust_z": max_robust_z,
+                "max_z_col": max_z_col,
+                "combined_score": combined_score,
+                "record": rec,
+            })
 
-        if best_row is not None:
-            candidate_idx = best_row
-            matched_flag = f"STATISTICAL_Z_SPIKE (z={max_z:.2f})"
-
-    if candidate_idx is None:
+    if not candidates:
         return None
+
+    # 2. Temporal Episode Grouping (30-minute window = 1800s, or within 5 rows if epoch unavailable)
+    episodes: List[List[Dict[str, Any]]] = []
+    sorted_candidates = sorted(candidates, key=lambda c: c["record_idx"])
+
+    current_episode: List[Dict[str, Any]] = [sorted_candidates[0]]
+    for cand in sorted_candidates[1:]:
+        prev_cand = current_episode[-1]
+        is_same_episode = False
+
+        if cand["epoch"] is not None and prev_cand["epoch"] is not None:
+            if abs(cand["epoch"] - prev_cand["epoch"]) <= 1800:
+                is_same_episode = True
+        elif abs(cand["record_idx"] - prev_cand["record_idx"]) <= 5:
+            is_same_episode = True
+
+        if is_same_episode:
+            current_episode.append(cand)
+        else:
+            episodes.append(current_episode)
+            current_episode = [cand]
+    if current_episode:
+        episodes.append(current_episode)
+
+    # In each episode, select the peak anomaly candidate (highest combined score)
+    episode_peaks: List[Dict[str, Any]] = []
+    for ep in episodes:
+        peak = max(ep, key=lambda c: c["combined_score"])
+        peak["episode_size"] = len(ep)
+        episode_peaks.append(peak)
+
+    # Rank episodes by combined score descending
+    episode_peaks.sort(key=lambda c: c["combined_score"], reverse=True)
+    primary_candidate = episode_peaks[0]
+    candidate_idx = primary_candidate["record_idx"]
+
+    # Candidate rankings list for top 5 episodes
+    candidate_rankings: List[Dict[str, Any]] = []
+    for rank_i, ep_peak in enumerate(episode_peaks[:5], start=1):
+        candidate_rankings.append({
+            "rank": rank_i,
+            "row_index": ep_peak["row_index"],
+            "timestamp": ep_peak["timestamp"],
+            "combined_score": round(ep_peak["combined_score"], 2),
+            "tier": ep_peak["tier_name"],
+            "robust_z": round(ep_peak["max_robust_z"], 2),
+            "status_flag": ep_peak["matched_flag"],
+            "episode_size": ep_peak.get("episode_size", 1)
+        })
+
+    scoring_rationale = (
+        f"Ranked #1 incident with combined score {primary_candidate['combined_score']:.2f} "
+        f"(Tier: {primary_candidate['tier_name']} [{primary_candidate['tier_score']:.0f}] + "
+        f"Robust Z: {primary_candidate['max_robust_z']:.2f} on {primary_candidate['max_z_col'] or 'status'}) "
+        f"spanning {primary_candidate.get('episode_size', 1)} episode record(s)."
+    )
 
     candidate_rec = records[candidate_idx]
     prev_rec = records[candidate_idx - 1] if candidate_idx > 0 else None
@@ -626,15 +754,9 @@ def detect_dataframe_anomalies(file_path: Path, max_rows: Optional[int] = None) 
                     "pct_change_vs_before": round(((curr_v - prev_v) / abs(prev_v)) * 100, 2)
                 })
 
-    # Find timestamp, component, valve status
-    ts_key = next((h for h in headers if "time" in h.lower() or "date" in h.lower()), None)
     timestamp = candidate_rec.get(ts_key) if ts_key else "Unknown"
-
-    valve_key = next((h for h in headers if "valve" in h.lower() or "relief" in h.lower() or "sv" in h.lower()), None)
     valve_val = candidate_rec.get(valve_key) if valve_key else "N/A"
-
-    comp_key = next((h for h in headers if "component" in h.lower() or "equipment" in h.lower() or "tag" in h.lower()), None)
-    comp_val = candidate_rec.get(comp_key) if comp_key else "P-101A"
+    comp_val = candidate_rec.get(comp_key) if comp_key else "Unspecified component"
 
     return {
         "has_anomaly": True,
@@ -642,13 +764,15 @@ def detect_dataframe_anomalies(file_path: Path, max_rows: Optional[int] = None) 
         "timestamp": str(timestamp),
         "anomaly_timestamp": str(timestamp),
         "component_id": str(comp_val),
-        "status_indicator": matched_flag,
+        "status_indicator": primary_candidate["matched_flag"],
         "valve_status": str(valve_val),
         "valve_column": valve_key,
         "anomalous_record": candidate_rec,
         "preceding_record": prev_rec,
         "succeeding_record": next_rec,
         "spiked_columns": spiked_cols,
+        "candidate_rankings": candidate_rankings,
+        "scoring_rationale": scoring_rationale,
         "analysis_scope": {
             "total_rows_scanned": len(records),
             "complete": True
@@ -677,6 +801,8 @@ class StructuredAnomalyResult:
     spiked_columns: List[Dict[str, Any]]
     analysis_scope: Dict[str, Any]
     source_filename: str = ""
+    candidate_rankings: List[Dict[str, Any]] = field(default_factory=list)
+    scoring_rationale: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -692,6 +818,8 @@ class StructuredAnomalyResult:
             "preceding_record": self.preceding_record,
             "succeeding_record": self.succeeding_record,
             "spiked_columns": self.spiked_columns,
+            "candidate_rankings": self.candidate_rankings,
+            "scoring_rationale": self.scoring_rationale,
             "analysis_scope": self.analysis_scope,
             "source_filename": self.source_filename
         }
@@ -704,7 +832,7 @@ def build_authoritative_anomaly_response(anomaly_data: Dict[str, Any], source_fi
     before/after records, and source identity.
     """
     ts = anomaly_data.get("timestamp", "Unknown")
-    comp = anomaly_data.get("component_id", "Component")
+    comp = anomaly_data.get("component_id", "Unspecified component")
     valve_col = anomaly_data.get("valve_column", "sv402_relief_valve_status") or "Relief Valve"
     valve_st = anomaly_data.get("valve_status", "N/A")
     flag = anomaly_data.get("status_indicator", "CRITICAL")
@@ -712,16 +840,19 @@ def build_authoritative_anomaly_response(anomaly_data: Dict[str, Any], source_fi
     scope = anomaly_data.get("analysis_scope", {})
     total_scanned = scope.get("total_rows_scanned", "all")
     src = source_filename or anomaly_data.get("source_filename", "SCADA Telemetry File")
+    rationale = anomaly_data.get("scoring_rationale", "")
 
     lines = [
         f"### 🚨 Authoritative SCADA Anomaly Detection Report",
         f"- **Source File**: `{src}`",
         f"- **Anomaly Timestamp**: **{ts}** (Row #{row_idx} of {total_scanned})",
-        f"- **Affected Component**: `{comp}` (Machine Component)",
+        f"- **Affected Component**: `{comp}`",
         f"- **Status Indicator**: `{flag}`",
-        f"- **Actuator / Relief Valve ({valve_col})**: **{valve_st}**\n",
-        f"#### 📊 Telemetry Excursion Analysis:"
+        f"- **Actuator / Relief Valve ({valve_col})**: **{valve_st}**",
     ]
+    if rationale:
+        lines.append(f"- **Severity Ranking & Rationale**: {rationale}")
+    lines.append("\n#### 📊 Telemetry Excursion Analysis:")
 
     spiked = anomaly_data.get("spiked_columns", [])
     if spiked:
@@ -757,11 +888,12 @@ def validate_scada_anomaly_prose(model_prose: str, anomaly: Dict[str, Any], sour
     """
     Validates generated model prose against frozen authoritative SCADA anomaly facts.
     If the model contradicts frozen facts (e.g. hallucinated timestamp, false valve state,
-    scrambled component tag, or invented years like 2023/2024), rejects prose and returns
-    the authoritative deterministic response.
+    scrambled component tag, invented years like 2023/2024, or introduces unsupported telemetry numbers),
+    rejects prose and returns the authoritative deterministic response.
     """
+    auth_card = build_authoritative_anomaly_response(anomaly, source_filename)
     if not model_prose or not model_prose.strip():
-        return False, build_authoritative_anomaly_response(anomaly, source_filename)
+        return False, auth_card
 
     ts = str(anomaly.get("timestamp", ""))
     valve_st = str(anomaly.get("valve_status", "")).lower()
@@ -772,24 +904,84 @@ def validate_scada_anomaly_prose(model_prose: str, anomaly: Dict[str, Any], sour
         ts_parts = ts.split()
         if not any(p in model_prose for p in ts_parts if len(p) >= 4):
             logger.warning(f"Rejecting model prose: Anomaly timestamp '{ts}' missing from explanation.")
-            return False, build_authoritative_anomaly_response(anomaly, source_filename)
+            return False, auth_card
 
     # 2. Conflicting historical year check (e.g. model claims 2023 or 2024 when timestamp is 2026)
     if "2026" in ts:
         if re.search(r'\b202[0-5]\b', model_prose):
             logger.warning("Rejecting model prose: Hallucinated historical year found in explanation.")
-            return False, build_authoritative_anomaly_response(anomaly, source_filename)
+            return False, auth_card
 
     # 3. Valve status contradiction check
     if valve_st == "closed":
         if re.search(r'\bvalve\s+(?:is|was|opened)\s+open\b', prose_lower) or "valve open" in prose_lower:
             logger.warning("Rejecting model prose: Valve claimed to be OPEN when authoritative fact is CLOSED.")
-            return False, build_authoritative_anomaly_response(anomaly, source_filename)
+            return False, auth_card
     elif valve_st == "open":
         if "valve closed" in prose_lower:
             logger.warning("Rejecting model prose: Valve claimed to be CLOSED when authoritative fact is OPEN.")
-            return False, build_authoritative_anomaly_response(anomaly, source_filename)
+            return False, auth_card
+
+    # 4. Telemetry Integrity: Discard prose if it introduces unsupported telemetry numbers
+    authorized_numbers = set()
+    authorized_tags = set()
+
+    def _collect_numbers(obj: Any):
+        if isinstance(obj, (int, float)):
+            authorized_numbers.add(round(float(obj), 2))
+            authorized_numbers.add(round(float(obj), 1))
+            authorized_numbers.add(round(float(obj), 0))
+        elif isinstance(obj, dict):
+            for k, v in obj.items():
+                _collect_numbers(k)
+                _collect_numbers(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                _collect_numbers(item)
+        elif isinstance(obj, str):
+            authorized_tags.add(obj.lower().strip())
+            for m in re.findall(r'\d+(?:\.\d+)?', obj):
+                try:
+                    f = float(m)
+                    authorized_numbers.add(round(f, 2))
+                    authorized_numbers.add(round(f, 1))
+                    authorized_numbers.add(round(f, 0))
+                except ValueError:
+                    pass
+
+    _collect_numbers(anomaly)
+
+    # Collect numbers that are part of equipment/valve/line tags in the prose (e.g., SV-402, P-101A)
+    tag_pattern = re.compile(r'\b[A-Za-z]+[-_]?\d+[A-Za-z0-9]*\b')
+    prose_tags = set(tag_pattern.findall(model_prose))
+    tag_embedded_numbers = set()
+    for tag in prose_tags:
+        for m in re.findall(r'\d+', tag):
+            try:
+                tag_embedded_numbers.add(float(m))
+            except ValueError:
+                pass
+
+    # Safe formatting numbers (small counters, timestamps, 100% etc.)
+    safe_small_ints = {0, 1, 2, 3, 4, 5, 10, 24, 30, 60, 100, 2026}
+    prose_numbers = re.findall(r'\b\d+(?:\.\d+)?\b', model_prose)
+    for num_s in prose_numbers:
+        try:
+            num_f = float(num_s)
+            r2 = round(num_f, 2)
+            r1 = round(num_f, 1)
+            r0 = round(num_f, 0)
+            if num_f in safe_small_ints or r0 in safe_small_ints:
+                continue
+            if num_f in tag_embedded_numbers or r0 in tag_embedded_numbers:
+                continue
+            if r2 not in authorized_numbers and r1 not in authorized_numbers and r0 not in authorized_numbers:
+                logger.warning(f"Rejecting model prose: Unsupported telemetry measurement '{num_s}' introduced.")
+                return False, auth_card
+        except ValueError:
+            pass
 
     return True, model_prose
+
 
 

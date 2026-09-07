@@ -4,6 +4,10 @@ __pycache__/
 data/*
 !data/demo/
 !data/demo/**
+!data/benchmarks/
+!data/benchmarks/**
+!data/vision_test/
+!data/vision_test/**
 *.db
 .venv/
 venv/

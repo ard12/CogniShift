@@ -28,10 +28,15 @@ async def upload_document(
     # 1. Validate file extension (case-insensitive)
     filename = file.filename or "document.pdf"
     ext = Path(filename).suffix.lower()
-    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".xls", ".csv"]:
+    if ext == ".xls":
         raise HTTPException(
             status_code=400,
-            detail="Supported formats: PDF (.pdf), PNG (.png), JPEG (.jpg/.jpeg), Excel (.xlsx/.xls), and CSV (.csv)."
+            detail="Legacy .xls format is unsupported. Please convert your spreadsheet to modern .xlsx or .csv format."
+        )
+    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Supported formats: PDF (.pdf), PNG (.png), JPEG (.jpg/.jpeg), Excel (.xlsx), and CSV (.csv)."
         )
 
     # 2. Validate workspace existence BEFORE saving to disk
@@ -83,81 +88,162 @@ async def upload_document(
         source_id = row["id"]
 
     # 5. Process document
-    if ext in [".xlsx", ".xls", ".csv"]:
+    if ext in [".xlsx", ".csv"]:
         # Spreadsheet Ingestion: Parse sheets, create structured markdown tables, embed and index
         try:
             import openpyxl
-            import pandas as pd
+            import csv
             import asyncio
             from cognishift.core.retriever import chroma_client, embedding_model
+            from cognishift.core.document_insights import detect_header_row_index
 
             chunks = []
             metadatas = []
             ids = []
+            MAX_WINDOW_CHARS = 3500
+
+            def _process_sheet_rows(sheet_name: str, raw_rows: list, sheet_idx: int):
+                if not raw_rows:
+                    return
+                header_idx = detect_header_row_index(raw_rows)
+                raw_header = raw_rows[header_idx]
+                headers = [str(c).strip() if c is not None and str(c).strip() else f"Col_{i+1}" for i, c in enumerate(raw_header)]
+                header_row_num = header_idx + 1
+                data_rows = raw_rows[header_idx + 1:]
+
+                header_prefix = f"=== SPREADSHEET: {safe_basename} | SHEET: {sheet_name} (Header Row: #{header_row_num}) ===\nColumns: {', '.join(headers)}\n"
+
+                current_lines = []
+                current_chars = len(header_prefix)
+                chunk_start_row = None
+                chunk_end_row = None
+
+                for r_idx, row in enumerate(data_rows):
+                    orig_row = header_row_num + 1 + r_idx
+                    if not any(c is not None and str(c).strip() for c in row):
+                        continue
+
+                    row_str = f"Row #{orig_row}: " + " | ".join(str(c).strip() if c is not None else "" for c in row)
+                    row_chars = len(row_str) + 1
+
+                    # If an individual row exceeds the budget, subsegment it without dropping
+                    if row_chars > MAX_WINDOW_CHARS - 500:
+                        if current_lines:
+                            chunk_text = header_prefix + "\n".join(current_lines)
+                            chunks.append(chunk_text)
+                            metadatas.append({
+                                "source_id": int(source_id),
+                                "filename": safe_basename,
+                                "document_name": safe_basename,
+                                "sheet_name": sheet_name,
+                                "header_row": header_row_num,
+                                "row_start": chunk_start_row,
+                                "row_end": chunk_end_row,
+                                "segment_index": 1,
+                                "segment_count": 1,
+                                "checksum": checksum,
+                                "workspace_id": int(workspace_id),
+                                "extraction_method": "spreadsheet",
+                                "processing_version": "v1"
+                            })
+                            ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+                            current_lines = []
+                            current_chars = len(header_prefix)
+                            chunk_start_row = None
+                            chunk_end_row = None
+
+                        cols_per_slice = 10
+                        total_cols = len(row)
+                        slices = [row[i:i+cols_per_slice] for i in range(0, total_cols, cols_per_slice)]
+                        num_segs = max(1, len(slices))
+                        for seg_idx, sl in enumerate(slices, start=1):
+                            sl_headers = headers[(seg_idx-1)*cols_per_slice : seg_idx*cols_per_slice]
+                            seg_text = (
+                                f"=== SPREADSHEET: {safe_basename} | SHEET: {sheet_name} (Row #{orig_row} Segment {seg_idx}/{num_segs}) ===\n"
+                                f"Columns: {', '.join(sl_headers)}\n"
+                                f"Values: {' | '.join(str(c).strip() if c is not None else '' for c in sl)}"
+                            )
+                            chunks.append(seg_text)
+                            metadatas.append({
+                                "source_id": int(source_id),
+                                "filename": safe_basename,
+                                "document_name": safe_basename,
+                                "sheet_name": sheet_name,
+                                "header_row": header_row_num,
+                                "row_start": orig_row,
+                                "row_end": orig_row,
+                                "segment_index": seg_idx,
+                                "segment_count": num_segs,
+                                "checksum": checksum,
+                                "workspace_id": int(workspace_id),
+                                "extraction_method": "spreadsheet",
+                                "processing_version": "v1"
+                            })
+                            ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{orig_row}_{orig_row}_seg_{seg_idx}")
+                        continue
+
+                    # Regular row accumulation
+                    if current_chars + row_chars > MAX_WINDOW_CHARS and current_lines:
+                        chunk_text = header_prefix + "\n".join(current_lines)
+                        chunks.append(chunk_text)
+                        metadatas.append({
+                            "source_id": int(source_id),
+                            "filename": safe_basename,
+                            "document_name": safe_basename,
+                            "sheet_name": sheet_name,
+                            "header_row": header_row_num,
+                            "row_start": chunk_start_row,
+                            "row_end": chunk_end_row,
+                            "segment_index": 1,
+                            "segment_count": 1,
+                            "checksum": checksum,
+                            "workspace_id": int(workspace_id),
+                            "extraction_method": "spreadsheet",
+                            "processing_version": "v1"
+                        })
+                        ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+
+                        current_lines = [row_str]
+                        current_chars = len(header_prefix) + row_chars
+                        chunk_start_row = orig_row
+                        chunk_end_row = orig_row
+                    else:
+                        if not current_lines:
+                            chunk_start_row = orig_row
+                        current_lines.append(row_str)
+                        current_chars += row_chars
+                        chunk_end_row = orig_row
+
+                if current_lines:
+                    chunk_text = header_prefix + "\n".join(current_lines)
+                    chunks.append(chunk_text)
+                    metadatas.append({
+                        "source_id": int(source_id),
+                        "filename": safe_basename,
+                        "document_name": safe_basename,
+                        "sheet_name": sheet_name,
+                        "header_row": header_row_num,
+                        "row_start": chunk_start_row,
+                        "row_end": chunk_end_row,
+                        "segment_index": 1,
+                        "segment_count": 1,
+                        "checksum": checksum,
+                        "workspace_id": int(workspace_id),
+                        "extraction_method": "spreadsheet",
+                        "processing_version": "v1"
+                    })
+                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
 
             if ext == ".xlsx":
                 wb = openpyxl.load_workbook(file_path, data_only=True)
                 for sheet_idx, sname in enumerate(wb.sheetnames):
                     ws = wb[sname]
-                    rows = list(ws.iter_rows(values_only=True))
-                    if not rows:
-                        continue
-                    sheet_lines = [f"=== SPREADSHEET: {safe_basename} | SHEET: {sname} ==="]
-                    headers = [str(c or '') for c in rows[0]]
-                    sheet_lines.append("Columns: " + ", ".join([h for h in headers if h]))
-                    for r in rows[1:150]:
-                        vals = [str(c) for c in r if c is not None]
-                        if vals:
-                            sheet_lines.append(" | ".join(vals))
-                    sheet_text = "\n".join(sheet_lines)
-                    chunks.append(sheet_text)
-                    metadatas.append({
-                        "source_id": int(source_id),
-                        "filename": safe_basename,
-                        "document_name": safe_basename,
-                        "page": sheet_idx + 1,
-                        "page_number": sheet_idx + 1,
-                        "sheet_name": sname,
-                        "workspace_id": int(workspace_id),
-                        "extraction_method": "spreadsheet"
-                    })
-                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}")
-            elif ext == ".xls":
-                xl = pd.ExcelFile(file_path)
-                for sheet_idx, sname in enumerate(xl.sheet_names):
-                    df_sheet = pd.read_excel(xl, sheet_name=sname)
-                    sheet_lines = [f"=== SPREADSHEET: {safe_basename} | SHEET: {sname} ==="]
-                    sheet_lines.append("Columns: " + ", ".join(str(c) for c in df_sheet.columns))
-                    for _, r in df_sheet.head(150).iterrows():
-                        sheet_lines.append(" | ".join(str(c) for c in r.values if pd.notna(c)))
-                    sheet_text = "\n".join(sheet_lines)
-                    chunks.append(sheet_text)
-                    metadatas.append({
-                        "source_id": int(source_id),
-                        "filename": safe_basename,
-                        "document_name": safe_basename,
-                        "page": sheet_idx + 1,
-                        "page_number": sheet_idx + 1,
-                        "sheet_name": sname,
-                        "workspace_id": int(workspace_id),
-                        "extraction_method": "spreadsheet"
-                    })
-                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}")
+                    raw_rows = list(ws.iter_rows(values_only=True))
+                    _process_sheet_rows(sname, raw_rows, sheet_idx)
             else:
-                df = pd.read_csv(file_path)
-                csv_text = f"=== SPREADSHEET: {safe_basename} ===\nColumns: {', '.join(df.columns)}\n" + df.head(150).to_string()
-                chunks.append(csv_text)
-                metadatas.append({
-                    "source_id": int(source_id),
-                    "filename": safe_basename,
-                    "document_name": safe_basename,
-                    "page": 1,
-                    "page_number": 1,
-                    "sheet_name": "CSV_Data",
-                    "workspace_id": int(workspace_id),
-                    "extraction_method": "spreadsheet"
-                })
-                ids.append(f"src_{source_id}_csv_1")
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                    raw_rows = list(csv.reader(f))
+                _process_sheet_rows("CSV_Data", raw_rows, 0)
 
             def _embed_and_upsert():
                 if chunks:
@@ -177,7 +263,7 @@ async def upload_document(
                         (source_id, workspace_id, idx, chunk_text)
                     )
                 await db.execute(
-                    "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ? WHERE id = ?",
+                    "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ?, active_processing_version = 'v1' WHERE id = ?",
                     (len(chunks), source_id)
                 )
                 # Auto-append source_id to agents in this workspace so newly ingested knowledge is immediately accessible

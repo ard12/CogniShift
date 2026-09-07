@@ -275,11 +275,25 @@ class SimulatedSandboxBackend(SandboxBackend):
                 error_message="Process exited with return code 1."
             )
 
+        # Validate input_requirement contract
+        input_req = getattr(request, "input_requirement", "none") or "none"
+        input_dir = staging_dir / "input"
+        staged_files = [f for f in input_dir.iterdir() if f.is_file()] if input_dir.exists() else []
+
+        if input_req in ("file", "tabular", "numeric_series") and not staged_files:
+            return CodeExecutionResult(
+                execution_id=request.execution_id,
+                status=SandboxStatus.VALIDATION_FAILED,
+                exit_code=1,
+                stderr=f"Contract validation failed: input_requirement='{input_req}' but zero input files staged.",
+                duration_ms=20,
+                timed_out=False,
+                error_message=f"Missing required '{input_req}' input file."
+            )
+
         # Default Success Simulation (Dynamic, Data-Grounded):
         if request.promote_outputs or "GENERATE_OUTPUT" in code_str:
             from cognishift.core.document_insights import extract_document_insights, clean_numeric_value
-            input_dir = staging_dir / "input"
-            staged_files = [f for f in input_dir.iterdir() if f.is_file()] if input_dir.exists() else []
 
             is_financial = any(w in code_str.lower() for w in ["financial", "revenue", "ebitda", "pat", "cagr", "grm", "profit", "balance", "p&l"])
             wants_chart = any(w in code_str.lower() for w in ["chart", "plot", "matplotlib", "seaborn", "savefig", ".png"])
@@ -293,6 +307,18 @@ class SimulatedSandboxBackend(SandboxBackend):
                     doc_insights = extract_document_insights(target_input, query_hint=code_str)
                 except Exception as ex:
                     logger.warning(f"Error extracting insights in simulated sandbox: {ex}")
+
+            if input_req in ("tabular", "numeric_series"):
+                if not doc_insights or not doc_insights.get("table_rows"):
+                    return CodeExecutionResult(
+                        execution_id=request.execution_id,
+                        status=SandboxStatus.VALIDATION_FAILED,
+                        exit_code=1,
+                        stderr=f"Contract validation failed: input_requirement='{input_req}' but staged input has no tabular data rows.",
+                        duration_ms=25,
+                        timed_out=False,
+                        error_message=f"No tabular data rows found in staged input for '{input_req}' contract."
+                    )
 
             # 2. Emit telemetry_summary.csv strictly when appropriate (never in financial runs!)
             if wants_telemetry_csv and not is_financial:

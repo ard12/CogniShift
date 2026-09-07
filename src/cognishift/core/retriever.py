@@ -245,6 +245,7 @@ async def retrieve_context(
     max_dist = distance_threshold if distance_threshold is not None else getattr(settings, "semantic_retrieval_max_distance", 0.78)
     formatted_context_parts = []
     distances = results.get('distances', [[]])[0] if results.get('distances') else []
+    seen_chunk_keys = set()
 
     for i, doc in enumerate(results['documents'][0]):
         dist = distances[i] if i < len(distances) else 0.0
@@ -259,6 +260,19 @@ async def retrieve_context(
             continue
 
         meta = results['metadatas'][0][i] if results.get('metadatas') and len(results['metadatas']) > 0 else {}
+        # Deduplicate overlapping spreadsheet windows or repeated chunk coordinates
+        chunk_key = (
+            meta.get("source_id"),
+            meta.get("sheet_name"),
+            meta.get("row_start"),
+            meta.get("row_end"),
+            meta.get("segment_index")
+        )
+        if any(v is not None for v in chunk_key[2:]):
+            if chunk_key in seen_chunk_keys:
+                continue
+            seen_chunk_keys.add(chunk_key)
+
         citation = format_grounded_citation(meta)
         wrapped_doc = wrap_document_data_for_prompt(doc, meta)
         formatted_context_parts.append(f"{citation}\n{wrapped_doc}")

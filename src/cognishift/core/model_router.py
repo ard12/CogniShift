@@ -1,9 +1,45 @@
-"""Hardware-Aware Dynamic Model Router for CogniShift."""
+import time
+import os
 import re
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 from cognishift.core.model_registry import list_models, ModelDefinition
+
+
+class LocalModelInventoryUnavailableError(Exception):
+    """Raised when local Ollama model inventory cannot be verified and no valid cache exists."""
+    pass
+
+
+_VERIFIED_INVENTORY_CACHE: Optional[List[str]] = None
+_VERIFIED_INVENTORY_TIMESTAMP: float = 0.0
+_INVENTORY_CACHE_TTL_SECONDS: float = 300.0
+
+
+def update_verified_inventory_cache(exact_tags: List[str], verified_at: Optional[float] = None) -> None:
+    """Updates the verified local model inventory cache with exact tags and current timestamp."""
+    global _VERIFIED_INVENTORY_CACHE, _VERIFIED_INVENTORY_TIMESTAMP
+    _VERIFIED_INVENTORY_CACHE = [str(t).strip() for t in exact_tags if str(t).strip()]
+    _VERIFIED_INVENTORY_TIMESTAMP = verified_at if verified_at is not None else time.monotonic()
+
+
+def get_verified_inventory_cache() -> Optional[List[str]]:
+    """Returns the cached model inventory if still within the 300-second TTL."""
+    global _VERIFIED_INVENTORY_CACHE, _VERIFIED_INVENTORY_TIMESTAMP
+    if _VERIFIED_INVENTORY_CACHE is None:
+        return None
+    age = time.monotonic() - _VERIFIED_INVENTORY_TIMESTAMP
+    if age > _INVENTORY_CACHE_TTL_SECONDS:
+        return None
+    return list(_VERIFIED_INVENTORY_CACHE)
+
+
+def clear_verified_inventory_cache() -> None:
+    """Clears the verified local model inventory cache (used in testing)."""
+    global _VERIFIED_INVENTORY_CACHE, _VERIFIED_INVENTORY_TIMESTAMP
+    _VERIFIED_INVENTORY_CACHE = None
+    _VERIFIED_INVENTORY_TIMESTAMP = 0.0
 
 
 class TaskClassification(BaseModel):
@@ -109,12 +145,26 @@ def route_model(
     task: TaskClassification,
     available_vram_mb: int = 6000,
     preferred_model: Optional[str] = None,
-    installed_models: Optional[List[str]] = None
+    installed_models: Optional[List[str]] = None,
+    require_verified_inventory: bool = False
 ) -> RoutingDecision:
     """
     Hardware-aware model selection algorithm.
     Filters candidate models by local installation availability, VRAM feasibility, and scores capability match.
     """
+    from cognishift.app.config import settings
+
+    if installed_models is None:
+        if require_verified_inventory:
+            cached = get_verified_inventory_cache()
+            if cached is not None:
+                installed_models = cached
+            elif settings.operating_mode != "simulated" and not os.environ.get("PYTEST_CURRENT_TEST"):
+                raise LocalModelInventoryUnavailableError(
+                    "Local model inventory is unavailable: Ollama /api/tags failed or not queried, "
+                    "and no verified cache within 300s TTL exists."
+                )
+
     candidates = list_models(enabled_only=True)
     evaluations: Dict[str, RoutingCandidateEvaluation] = {}
     

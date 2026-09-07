@@ -67,7 +67,19 @@ async def execute_sandbox_code(
 
     try:
         # 1. Staging
-        staging_dir = stage_execution_environment(workspace_id, execution_id, request)
+        staging_res = stage_execution_environment(workspace_id, execution_id, request, return_manifest=True)
+        if isinstance(staging_res, tuple):
+            staging_dir, staging_manifest = staging_res
+        else:
+            staging_dir = staging_res
+            staging_manifest = None
+
+        if staging_manifest and staging_manifest.entries:
+            await log_event(
+                "input_integrity_manifest",
+                f"Verified {len(staging_manifest.entries)} staged input file(s) with 3-part SHA-256 provenance chain.",
+                staging_manifest.model_dump()
+            )
 
         await log_event(
             "sandbox_execution_started",

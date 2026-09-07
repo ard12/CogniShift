@@ -11,8 +11,16 @@ from cognishift.core.model_router import (
     classify_task,
     route_model,
     TaskClassification,
-    RoutingDecision
+    RoutingDecision,
+    clear_verified_inventory_cache
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_inventory_cache():
+    clear_verified_inventory_cache()
+    yield
+    clear_verified_inventory_cache()
 
 
 def test_task_classification():

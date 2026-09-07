@@ -26,7 +26,13 @@ from cognishift.core.graph_memory import query_graph_context
 from cognishift.core.security import resolve_workspace_path, get_workspace_root
 from cognishift.core.tools import execute_tool
 from cognishift.core.providers import get_provider
-from cognishift.core.model_router import classify_task, route_model, TaskClassification
+from cognishift.core.model_router import (
+    classify_task,
+    route_model,
+    TaskClassification,
+    LocalModelInventoryUnavailableError,
+    update_verified_inventory_cache
+)
 from cognishift.core.semantic_router import get_semantic_router, SemanticIntent, SemanticRoutingResult
 from cognishift.core.tool_schemas import (
     parse_agent_action,
@@ -93,17 +99,58 @@ class GoalContract:
         return all(k in self.extracted_fields and self.extracted_fields[k] is not None for k in self.required_fields)
 
 
+def populate_goal_contract_from_insights(contract: GoalContract, insights: Dict[str, Any]) -> None:
+    """Populates GoalContract strictly from authoritative structured calculations, never LLM prose."""
+    metrics_map = insights.get("metrics", {})
+    growth_map = insights.get("growth", {})
+    if "revenue" in metrics_map:
+        r = metrics_map["revenue"]
+        contract.extracted_fields["revenue_previous"] = r.get("previous")
+        contract.extracted_fields["revenue_current"] = r.get("latest")
+        if "revenue_yoy_pct" in growth_map:
+            contract.extracted_fields["revenue_yoy_pct"] = growth_map["revenue_yoy_pct"]
+        elif "revenue_cagr_pct" in growth_map:
+            contract.extracted_fields["revenue_yoy_pct"] = growth_map["revenue_cagr_pct"]
+    if "ebitda" in metrics_map:
+        e = metrics_map["ebitda"]
+        contract.extracted_fields["ebitda_previous"] = e.get("previous")
+        contract.extracted_fields["ebitda_current"] = e.get("latest")
+        if "ebitda_yoy_pct" in growth_map:
+            contract.extracted_fields["ebitda_yoy_pct"] = growth_map["ebitda_yoy_pct"]
+        elif "ebitda_cagr_pct" in growth_map:
+            contract.extracted_fields["ebitda_yoy_pct"] = growth_map["ebitda_cagr_pct"]
+    if "pat" in metrics_map:
+        p = metrics_map["pat"]
+        contract.extracted_fields["pat_previous"] = p.get("previous")
+        contract.extracted_fields["pat_current"] = p.get("latest")
+        if "pat_yoy_pct" in growth_map:
+            contract.extracted_fields["pat_yoy_pct"] = growth_map["pat_yoy_pct"]
+        elif "pat_cagr_pct" in growth_map:
+            contract.extracted_fields["pat_yoy_pct"] = growth_map["pat_cagr_pct"]
+
+
 def extract_and_strip_thinking(text: str) -> Tuple[str, Optional[str]]:
     """
     Strips and sanitizes <think>...</think> blocks from model output.
+    Handles case variants (<think>, <THINK>) and unclosed <think> tags through EOF.
     Returns (cleaned_text, reasoning_summary).
     Guarantees raw thinking tokens never leak to the operator UI or result_text.
     """
     if not text:
         return "", None
-    think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
-    thinks = think_pattern.findall(text)
-    cleaned = think_pattern.sub('', text).strip()
+    # 1. Strip closed tags (case-insensitive)
+    closed_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL | re.IGNORECASE)
+    thinks = closed_pattern.findall(text)
+    cleaned = closed_pattern.sub('', text)
+
+    # 2. Strip unclosed tag through EOF (case-insensitive)
+    unclosed_pattern = re.compile(r'<think>(.*)$', re.DOTALL | re.IGNORECASE)
+    unclosed_match = unclosed_pattern.search(cleaned)
+    if unclosed_match:
+        thinks.append(unclosed_match.group(1))
+        cleaned = unclosed_pattern.sub('', cleaned)
+
+    cleaned = cleaned.strip()
     reasoning_summary = "\n".join(t.strip() for t in thinks if t.strip()) if thinks else None
     return cleaned, reasoning_summary
 
@@ -571,6 +618,7 @@ async def execute_agent_run(
     routing_res: Optional[SemanticRoutingResult] = None
     frozen_scada_anomaly: Optional[Dict[str, Any]] = None
     frozen_scada_source: str = ""
+    goal_contract: Optional[GoalContract] = None
 
     async with get_db() as db:
         # 1. Fetch Workspace and Agent Definition
@@ -911,15 +959,32 @@ async def execute_agent_run(
                 info = await provider.model_info()
                 if info and info.get("status") == "available":
                     installed_models = info.get("models", [])
+                    import time
+                    update_verified_inventory_cache(exact_tags=installed_models, verified_at=time.monotonic())
             except Exception as e:
                 logger.warning(f"Could not query installed models from Ollama: {e}")
 
-        routing = route_model(
-            task_info,
-            available_vram_mb=6000,
-            preferred_model=agent.get("model_name"),
-            installed_models=installed_models
-        )
+        try:
+            routing = route_model(
+                task_info,
+                available_vram_mb=6000,
+                preferred_model=agent.get("model_name"),
+                installed_models=installed_models,
+                require_verified_inventory=(settings.operating_mode != "simulated")
+            )
+        except LocalModelInventoryUnavailableError as inv_err:
+            fail_msg = f"Model routing failure: local model inventory is unavailable ({inv_err})."
+            logger.error(fail_msg)
+            await log_event(db, run_id, "model_inventory_unavailable", fail_msg, {"error": str(inv_err)})
+            await db.execute(
+                """UPDATE agent_runs
+                   SET status = 'failed', result_text = ?, error_message = ?, completed_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (fail_msg, str(inv_err), run_id)
+            )
+            await db.commit()
+            cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+            return make_response(dict(await cursor.fetchone()))
         await log_event(
             db,
             run_id,
@@ -951,6 +1016,20 @@ async def execute_agent_run(
 
         await db.execute("UPDATE agent_runs SET model_name = ? WHERE id = ?", (selected_model_id, run_id))
         await db.commit()
+
+        # --- TASK-SCOPED GOAL CONTRACT INITIALIZATION ---
+        is_financial_yoy_task = (
+            any(w in lower_input for w in ["yoy", "year over year", "year-on-year", "growth rate", "cagr", "growth"])
+            and any(w in lower_input for w in ["revenue", "ebitda", "pat", "financial", "performance", "p&l"])
+        )
+        if is_financial_yoy_task:
+            goal_contract = GoalContract(
+                required_fields=[
+                    "revenue_previous", "revenue_current", "revenue_yoy_pct",
+                    "ebitda_previous", "ebitda_current", "ebitda_yoy_pct",
+                    "pat_previous", "pat_current", "pat_yoy_pct"
+                ]
+            )
 
         # --- PHASE 2B: BOUNDED STRUCTURED PLAN CREATION ---
         if routing_res.intent == SemanticIntent.CONVERSATION:
@@ -1334,11 +1413,21 @@ async def execute_agent_run(
                                             logger.warning(f"Anomaly detection error: {a_err}")
 
                                     insights = extract_document_insights(art_path, query_hint=clean_input)
+                                    if goal_contract and "revenue_previous" in goal_contract.required_fields and insights:
+                                        populate_goal_contract_from_insights(goal_contract, insights)
                                     content_blocks = []
 
                                     if anomaly_report and anomaly_report.get("has_anomaly"):
                                         frozen_scada_anomaly = anomaly_report
                                         frozen_scada_source = art["filename"]
+                                        if not goal_contract:
+                                            goal_contract = GoalContract(
+                                                required_fields=["timestamp", "component_id", "valve_status", "status_indicator"]
+                                            )
+                                            goal_contract.extracted_fields["timestamp"] = anomaly_report.get("timestamp")
+                                            goal_contract.extracted_fields["component_id"] = anomaly_report.get("component_id")
+                                            goal_contract.extracted_fields["valve_status"] = anomaly_report.get("valve_status")
+                                            goal_contract.extracted_fields["status_indicator"] = anomaly_report.get("status_indicator")
                                         ar = anomaly_report
                                         spiked_lines = []
                                         for sc in ar["spiked_columns"]:
@@ -1979,8 +2068,14 @@ async def execute_agent_run(
                     if think_summary:
                         await log_event(
                             db, run_id, "model_reasoning",
-                            f"Step #{current_step.id} internal reasoning extracted ({len(think_summary)} chars)",
-                            {"step_id": current_step.id, "summary": think_summary[:1500]}
+                            f"Step #{current_step.id} internal reasoning detected and stripped ({len(think_summary)} chars)",
+                            {
+                                "step_id": current_step.id,
+                                "reasoning_detected": True,
+                                "reasoning_stripped": True,
+                                "selected_model": selected_model_id,
+                                "reasoning_character_count": len(think_summary)
+                            }
                         )
 
                     # Blocker 6: Empty or whitespace response must FAIL rather than complete
@@ -2043,6 +2138,8 @@ async def execute_agent_run(
                                 break
 
                     insights = extract_document_insights(target_doc_path, query_hint=clean_input) if target_doc_path else {}
+                    if goal_contract and "revenue_previous" in goal_contract.required_fields and insights:
+                        populate_goal_contract_from_insights(goal_contract, insights)
 
                     is_financial_task = (
                         insights.get("is_financial", False)
@@ -3005,6 +3102,26 @@ print("Analysis script finished with returncode 0.")
                         else:
                             s.status = "skipped"
                             s.observation = "Bypassed - satisfied by prior execution steps"
+
+            # --- GOAL CONTRACT VERIFICATION GATE ---
+            if goal_contract is not None and run_final_status == "completed":
+                if not goal_contract.is_satisfied():
+                    missing_fields = [k for k in goal_contract.required_fields if k not in goal_contract.extracted_fields or goal_contract.extracted_fields[k] is None]
+                    run_final_status = "failed"
+                    error_msg = f"Goal contract verification failed: missing required analytical deliverables {missing_fields}."
+                    final_text = f"Execution Incomplete: Goal contract unsatisfied. Required fields missing: {', '.join(missing_fields)}."
+                    logger.warning(f"Run {run_id} failed goal contract verification: {missing_fields}")
+                    await log_event(
+                        db, run_id, "goal_contract_violation",
+                        f"Goal contract unsatisfied: missing {missing_fields}",
+                        {"required": goal_contract.required_fields, "missing": missing_fields, "extracted": goal_contract.extracted_fields}
+                    )
+                else:
+                    await log_event(
+                        db, run_id, "goal_contract_satisfied",
+                        f"All {len(goal_contract.required_fields)} goal contract deliverables verified from structured facts.",
+                        {"fields": list(goal_contract.extracted_fields.keys())}
+                    )
 
             # Complete or fail claimed pending task
             if claimed_task:

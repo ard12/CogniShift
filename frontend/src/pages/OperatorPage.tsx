@@ -439,7 +439,7 @@ export function OperatorPage() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg"
+                      accept=".xlsx,.csv,.pdf,.png,.jpg,.jpeg"
                       className="hidden"
                       onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
                     />

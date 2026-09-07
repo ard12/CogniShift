@@ -3,9 +3,10 @@ Secure Input Staging for Phase 4 Sandbox.
 Handles server-controlled staging of source code and authorized input files into ephemeral directories.
 """
 import shutil
+import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple, Union
 
 from cognishift.app.config import settings
 from cognishift.core.security import (
@@ -14,7 +15,11 @@ from cognishift.core.security import (
     SecurityError,
     GENERIC_READABLE_ROOTS
 )
-from cognishift.core.sandbox.schemas import CodeExecutionRequest
+from cognishift.core.sandbox.schemas import (
+    CodeExecutionRequest,
+    StagingManifestEntry,
+    StagingIntegrityManifest
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +27,9 @@ logger = logging.getLogger(__name__)
 def stage_execution_environment(
     workspace_id: int,
     execution_id: str,
-    request: CodeExecutionRequest
-) -> Path:
+    request: CodeExecutionRequest,
+    return_manifest: bool = False
+) -> Union[Path, Tuple[Path, StagingIntegrityManifest]]:
     """
     Creates an isolated ephemeral staging directory for this execution:
     data/workspaces/<ws_id>/temporary/sandbox_<id>/
@@ -39,6 +45,7 @@ def stage_execution_environment(
     3. Special files (symlinks, junctions, devices, fifos) are strictly rejected.
     4. Input size limits (per-file and aggregate) are strictly enforced.
     5. Source code is written directly to source/ with restricted permissions.
+    6. 3-Part SHA-256 Provenance: expected_sha256 == source_sha256 == staged_sha256.
     """
     ws_root = get_workspace_root(workspace_id)
     staging_rel = f"temporary/sandbox_{execution_id}"
@@ -66,6 +73,7 @@ def stage_execution_environment(
                 f"Input file count ({len(request.input_files)}) exceeds server limit of {settings.sandbox_max_input_files}."
             )
 
+        manifest_entries: List[StagingManifestEntry] = []
         total_input_bytes = 0
         for input_ref in request.input_files:
             # Resolve source through canonical resolver
@@ -105,8 +113,7 @@ def stage_execution_environment(
             dest_path = input_dir / clean_dest_name
             shutil.copy2(str(resolved_src), str(dest_path))
 
-            # Cryptographic Staging Integrity Check
-            import hashlib
+            # Cryptographic 3-Part SHA-256 Provenance Check
             src_sha256 = hashlib.sha256(resolved_src.read_bytes()).hexdigest()
             staged_sha256 = hashlib.sha256(dest_path.read_bytes()).hexdigest()
             if src_sha256 != staged_sha256:
@@ -114,10 +121,42 @@ def stage_execution_environment(
                     f"Staging integrity check failed for '{input_ref.source_path}': "
                     f"Source SHA256 ({src_sha256}) != Staged SHA256 ({staged_sha256})"
                 )
+
+            if input_ref.expected_sha256:
+                exp_clean = input_ref.expected_sha256.lower().strip()
+                if exp_clean != src_sha256.lower().strip():
+                    raise SecurityError(
+                        f"Cryptographic Provenance Violation: Expected SHA-256 ({input_ref.expected_sha256}) "
+                        f"does not match source file SHA-256 ({src_sha256}) for '{input_ref.source_path}'."
+                    )
+
+            manifest_entries.append(
+                StagingManifestEntry(
+                    source_path=input_ref.source_path,
+                    dest_name=clean_dest_name,
+                    source_kind=input_ref.source_kind,
+                    source_id=input_ref.source_id,
+                    artifact_id=input_ref.artifact_id,
+                    expected_sha256=input_ref.expected_sha256,
+                    source_sha256=src_sha256,
+                    staged_sha256=staged_sha256,
+                    verified=True
+                )
+            )
+
             logger.info(
                 f"Sandbox input staged and verified: {clean_dest_name} (SHA-256: {staged_sha256[:16]}...)"
             )
 
+        manifest = StagingIntegrityManifest(
+            execution_id=execution_id,
+            workspace_id=workspace_id,
+            entries=manifest_entries,
+            all_verified=all(e.verified for e in manifest_entries)
+        )
+
+        if return_manifest:
+            return staging_dir, manifest
         return staging_dir
     except BaseException:
         cleanup_staging_environment(staging_dir)

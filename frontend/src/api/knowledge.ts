@@ -21,7 +21,7 @@ export const knowledgeApi = {
 
   get: (id: number, signal?: AbortSignal) => apiFetch<KnowledgeSource>(PATHS.detail(id), { signal }),
 
-  /** Accepts .pdf, .png, .jpg/.jpeg, .xlsx, .xls, and .csv files. */
+  /** Accepts .pdf, .png, .jpg/.jpeg, .xlsx, and .csv files. */
   upload: (file: File, workspaceId: number, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append("workspace_id", String(workspaceId));

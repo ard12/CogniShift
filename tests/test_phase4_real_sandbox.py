@@ -49,10 +49,13 @@ requires_container_runtime = pytest.mark.skipif(
 
 
 @pytest.fixture(autouse=True)
-async def setup_sandbox_db():
+async def setup_sandbox_db(monkeypatch):
+    monkeypatch.setattr(settings, "operating_mode", "sovereign")
+    monkeypatch.setattr(settings, "sandbox_runtime", "docker")
     await init_db()
     async with get_db() as db:
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Refinery-1', 'MRPL')")
+        await db.execute("INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name) VALUES (1, 1, 'Default Sandbox Agent')")
         await db.execute(
             "INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (1, 1, 1, 'completed', 'operator_sam')"
         )

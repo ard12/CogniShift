@@ -17,7 +17,11 @@ from cognishift.core.simulated_provider import SimulatedProvider
 from fastapi.testclient import TestClient
 from cognishift.app.main import app
 from cognishift.app.config import settings
-settings.operating_mode = "simulated"
+
+@pytest.fixture(autouse=True)
+def ensure_simulated_mode(monkeypatch):
+    monkeypatch.setattr(settings, "operating_mode", "simulated")
+
 from tests.conftest import TEST_SUPERVISOR_TOKEN
 
 

@@ -266,7 +266,16 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "write a python program to filter rows in <file>",
         "execute python code to generate summary metrics",
         "compute statistical 3-sigma values using python",
-        "execute data processing script in the sandbox"
+        "execute data processing script in the sandbox",
+        "can you do a data analysis on the excel file",
+        "perform data analysis and generate visualization",
+        "do a deep financial audit on the excel file",
+        "analyze the spreadsheet and generate png visualization",
+        "visualize financial history in png format",
+        "do a quantitative audit on the financial history file",
+        "create an audit on financial history excel file",
+        "plot the financial metrics in png format",
+        "write python to analyze the financial spreadsheet"
     ],
     SemanticIntent.CONTROL_ACTION: [
         "check discharge pressure on <equipment_id>",
@@ -523,13 +532,21 @@ class SemanticIntentRouter:
                 }
             )
 
-        # 4.5. Deterministic Rule: Explicit Imperative Code Execution & Document Conversion Request
-        is_question = any(text_lower.startswith(qo) for qo in [
-            "can you", "could you", "would you", "how do you", "how can", "is it possible",
-            "what can", "what is", "explain", "tell me"
-        ])
+        # 4.5. Deterministic Rule: Explicit Imperative Code Execution, Data Analysis & Document Conversion
+        is_pure_capability_question = (
+            any(text_lower.startswith(qo) for qo in [
+                "can you", "could you", "would you", "how do you", "how can", "is it possible",
+                "what can", "what is", "explain how"
+            ])
+            and len(text_lower.split()) <= 6
+            and not any(w in text_lower for w in [
+                "excel", "xlsx", "csv", "spreadsheet", "file", "financial", "audit", "telemetry",
+                "data", "png", "docx", "pdf", "chart", "do a", "create an", "generate a", "plot", "visualiz"
+            ])
+        )
+
         is_imperative_code = bool(re.search(
-            r'^\s*(?:please\s+)?(?:run|execute|write|generate|make\s+(?:the\s+)?(?:ai|agent)\s+write)\b.*?\b(?:python|code|script|program)\b',
+            r'(?:run|execute|write|generate|make\s+(?:the\s+)?(?:ai|agent)\s+write)\b.*?\b(?:python|code|script|program)\b',
             text_lower
         ))
         is_document_conversion = bool(re.search(
@@ -537,10 +554,15 @@ class SemanticIntentRouter:
             text_lower
         ))
         is_visualization_cmd = bool(re.search(
-            r'\b(?:visualize|plot|chart|graph)\b.*?\b(?:matplotlib|seaborn|telemetry|readings|sensor|data)\b',
+            r'\b(?:visualize|plot|chart|graph)\b.*?\b(?:matplotlib|seaborn|telemetry|readings|sensor|data|png|image|excel|history|trend|metric)\b',
             text_lower
         ))
-        if (is_imperative_code or is_document_conversion or is_visualization_cmd) and not is_question:
+        is_analysis_or_audit_cmd = bool(re.search(
+            r'\b(?:data\s+analysis|financial\s+(?:audit|history|performance)|deep\s+(?:financial\s+)?audit|audit\s+on|quantitative\s+audit)\b',
+            text_lower
+        )) and any(w in text_lower for w in ["excel", "xlsx", "spreadsheet", "csv", "data", "history", "financial", "png", "image", "chart", "file"])
+
+        if (is_imperative_code or is_document_conversion or is_visualization_cmd or is_analysis_or_audit_cmd) and not is_pure_capability_question:
             return SemanticRoutingResult(
                 intent=SemanticIntent.CODE_EXECUTION,
                 decision_method=DecisionMethod.RULE,

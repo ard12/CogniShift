@@ -10,7 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cognishift.app.config import settings
-settings.operating_mode = "simulated"
+
+@pytest.fixture(autouse=True)
+def ensure_simulated_mode(monkeypatch):
+    monkeypatch.setattr(settings, "operating_mode", "simulated")
 
 from cognishift.core.security import (
     ensure_workspace_layout,

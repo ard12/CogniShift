@@ -82,7 +82,16 @@ async def execute_sandbox_code(
 
         # 2. Execution
         backend = get_sandbox_backend()
-        result = await backend.execute(request, staging_dir)
+        try:
+            result = await backend.execute(request, staging_dir)
+        except SandboxUnavailableError as e:
+            if settings.cognishift_demo_mode:
+                logger.warning(f"Container runtime unavailable ({e}). Falling back to SimulatedSandboxBackend.")
+                from cognishift.core.sandbox.backend import SimulatedSandboxBackend
+                backend = SimulatedSandboxBackend()
+                result = await backend.execute(request, staging_dir)
+            else:
+                raise
 
         # 3. Output Validation & Promotion
         if result.status == SandboxStatus.SUCCESS and request.promote_outputs:

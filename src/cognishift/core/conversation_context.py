@@ -6,6 +6,7 @@ Current turn remains authoritative; history never injects stale operational inte
 from dataclasses import dataclass, field
 import logging
 import re
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 import sqlite3
@@ -123,6 +124,130 @@ def get_latest_ingested_document(workspace_id: int) -> Optional[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Error querying latest ingested document: {e}")
         return None
+
+
+async def resolve_target_document_for_query(
+    workspace_id: int,
+    query: str,
+    db: Optional[aiosqlite.Connection] = None
+) -> Optional[Dict[str, Any]]:
+    """Intelligently resolves the target knowledge source document referenced in a user query.
+
+    Prevents modality cross-contamination (e.g. returning a P&ID PNG image when the operator
+    explicitly requested an Excel financial audit).
+
+    Matching Pipeline:
+    1. Exact filename or stem match in query text.
+    2. Modality alignment (spreadsheets vs images vs PDFs).
+    3. Semantic domain keyword scoring across document names.
+    4. Fallback to latest ingested document if query requests 'latest' or has no modality conflict.
+    """
+    db_path = settings.database_path
+    if not db_path.exists():
+        return None
+
+    fetch_query = """SELECT id, workspace_id, name, original_filename, local_path, 
+                            source_type, checksum, chunk_count, created_at, active_processing_version
+                     FROM knowledge_sources 
+                     WHERE workspace_id = ? AND processing_status = 'completed'
+                     ORDER BY created_at DESC, id DESC"""
+    try:
+        if db is not None:
+            cursor = await db.execute(fetch_query, (workspace_id,))
+            rows = [dict(r) for r in await cursor.fetchall()]
+        else:
+            async with get_db() as conn:
+                cursor = await conn.execute(fetch_query, (workspace_id,))
+                rows = [dict(r) for r in await cursor.fetchall()]
+    except Exception as e:
+        logger.warning(f"Error fetching knowledge sources for resolution: {e}")
+        return None
+
+    if not rows:
+        return None
+
+    q_lower = (query or "").lower().strip()
+
+    # If query explicitly specifies 'latest document' or 'newest', return the most recent doc
+    is_explicit_latest = bool(LATEST_DOC_REGEX.search(q_lower))
+
+    # 1. Exact filename or stem match in query
+    for r in rows:
+        name = (r.get("name") or "").lower()
+        orig_name = (r.get("original_filename") or "").lower()
+        stem = Path(name).stem.lower()
+        if (name and name in q_lower) or (orig_name and orig_name in q_lower):
+            return r
+        if stem and len(stem) > 5 and stem in q_lower:
+            return r
+
+    wants_spreadsheet = any(w in q_lower for w in ["excel", "xlsx", "xls", "csv", "spreadsheet", "spreadsheets", "sheets", "workbook"])
+    wants_image = any(w in q_lower for w in ["image", "photo", "png", "jpg", "jpeg", "schematic", "p&id", "pid", "diagram", "gauge", "meter", "dial"])
+    wants_pdf = any(w in q_lower for w in ["pdf", "manual", "sop", "standard", "policy"])
+
+    # If explicit latest with modality constraint:
+    if is_explicit_latest:
+        if wants_spreadsheet:
+            for r in rows:
+                if (r.get("source_type") or "").lower() == "spreadsheet" or (r.get("name") or "").lower().endswith((".xlsx", ".xls", ".csv")):
+                    return r
+        elif wants_image:
+            for r in rows:
+                if (r.get("source_type") or "").lower() == "image" or (r.get("name") or "").lower().endswith((".png", ".jpg", ".jpeg")):
+                    return r
+        elif wants_pdf:
+            for r in rows:
+                if (r.get("source_type") or "").lower() == "pdf" or (r.get("name") or "").lower().endswith(".pdf"):
+                    return r
+        return rows[0]
+
+    # Domain keywords for semantic matching
+    domain_keywords = [
+        "financial", "history", "audit", "revenue", "ebitda", "pat", "cagr", "p&l", "profit",
+        "pid", "schematic", "cdu", "hydrocracker", "manifold",
+        "pump", "p-101", "p-101a", "sop", "maintenance", "inspection",
+        "gauge", "meter", "dial", "photo",
+        "handwritten", "note",
+        "oisd", "prv", "relief", "pressure"
+    ]
+
+    scored_candidates = []
+    for r in rows:
+        name = (r.get("name") or "").lower()
+        stype = (r.get("source_type") or "").lower()
+        ext = Path(name).suffix.lower()
+        score = 0
+
+        # Modality alignment
+        if wants_spreadsheet:
+            if stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
+                score += 50
+            elif stype == "image" or ext in (".png", ".jpg", ".jpeg"):
+                score -= 60
+        elif wants_image:
+            if stype == "image" or ext in (".png", ".jpg", ".jpeg"):
+                score += 50
+            elif stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
+                score -= 40
+        elif wants_pdf:
+            if stype == "pdf" or ext == ".pdf":
+                score += 30
+
+        # Domain keyword matching
+        for kw in domain_keywords:
+            if kw in q_lower and kw in name:
+                score += 35
+
+        scored_candidates.append((score, r))
+
+    scored_candidates.sort(key=lambda x: x[0], reverse=True)
+
+    if scored_candidates and scored_candidates[0][0] > 0:
+        return scored_candidates[0][1]
+
+    # Fallback to latest document
+    return rows[0]
+
 
 
 @dataclass

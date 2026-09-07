@@ -57,6 +57,39 @@ def test_model_routing_coding():
     assert decision.candidate_evaluations["qwen2.5-coder:7b"].eligible is True
 
 
+def test_model_routing_local_installation_filtering():
+    """Verify that router excludes uninstalled models and routes to available installed general SLM."""
+    task = classify_task("Write a python data processing script")
+    # Simulate host where qwen2.5-coder:7b is NOT installed
+    installed = ["qwen2.5:7b", "llama3.2:3b", "moondream:latest"]
+    decision = route_model(task, available_vram_mb=6000, installed_models=installed)
+
+    # qwen2.5-coder:7b must be marked ineligible
+    assert decision.candidate_evaluations["qwen2.5-coder:7b"].eligible is False
+    assert "Excluded" in decision.candidate_evaluations["qwen2.5-coder:7b"].rationale
+    # Must cleanly select installed qwen2.5:7b without throwing 404
+    assert decision.selected_model == "qwen2.5:7b"
+    assert decision.candidate_evaluations["qwen2.5:7b"].eligible is True
+
+
+def test_model_routing_heavy_reasoning():
+    """Verify that root cause analysis and heavy reasoning route to DeepSeek R1 within VRAM budget."""
+    task = classify_task("Perform root cause analysis on the cooling pump tripping incident")
+    assert task.task_type == "heavy_reasoning"
+    assert "heavy_reasoning" in task.required_capabilities
+
+    # 1. When DeepSeek is available in catalog within 6GB budget
+    decision = route_model(task, available_vram_mb=6000)
+    assert decision.selected_model == "deepseek-r1:7b"
+    assert decision.candidate_evaluations["deepseek-r1:7b"].eligible is True
+
+    # 2. When DeepSeek is not installed on the local machine
+    installed = ["qwen2.5:7b", "llama3.2:3b", "moondream:latest"]
+    decision_fallback = route_model(task, available_vram_mb=6000, installed_models=installed)
+    assert decision_fallback.selected_model == "qwen2.5:7b"
+    assert decision_fallback.candidate_evaluations["deepseek-r1:7b"].eligible is False
+
+
 def test_model_routing_vram_constraint():
     """Verify that models exceeding VRAM budget are marked infeasible."""
     task = classify_task("Analyze complex refinery hydrocracker failure modes")

@@ -804,7 +804,23 @@ async def execute_agent_run(
 
         await log_event(db, run_id, "task_classified", f"Classified task as '{task_info.task_type}'", task_info.model_dump())
 
-        routing = route_model(task_info, available_vram_mb=6000)
+        # Inspect currently installed models on the sovereign Ollama instance
+        installed_models = None
+        if settings.operating_mode != "simulated":
+            try:
+                provider = get_provider()
+                info = await provider.model_info()
+                if info and info.get("status") == "available":
+                    installed_models = info.get("models", [])
+            except Exception as e:
+                logger.warning(f"Could not query installed models from Ollama: {e}")
+
+        routing = route_model(
+            task_info,
+            available_vram_mb=6000,
+            preferred_model=agent.get("model_name"),
+            installed_models=installed_models
+        )
         await log_event(
             db,
             run_id,
@@ -825,6 +841,15 @@ async def execute_agent_run(
         if m_def and not m_def.supports_tools:
             logger.info(f"Model '{selected_model_id}' lacks tool/orchestration capability. Using '{settings.text_model}' as agent orchestrator.")
             selected_model_id = settings.text_model
+
+        # Pre-verify that selected_model_id is actually installed locally; if not, immediately use settings.text_model
+        if installed_models:
+            installed_clean = set(m.strip().lower() for m in installed_models) | set(m.strip().lower().split(":")[0] for m in installed_models)
+            sel_clean = selected_model_id.strip().lower()
+            if sel_clean not in installed_clean and f"{sel_clean}:latest" not in installed_clean and sel_clean.split(":")[0] not in installed_clean:
+                logger.warning(f"Selected model '{selected_model_id}' is not installed locally in Ollama ({installed_models}). Using '{settings.text_model}' to prevent 404.")
+                selected_model_id = settings.text_model
+
         await db.execute("UPDATE agent_runs SET model_name = ? WHERE id = ?", (selected_model_id, run_id))
         await db.commit()
 

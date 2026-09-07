@@ -58,7 +58,9 @@ DEFAULT_MODELS: Dict[str, ModelDefinition] = {
             "document_analysis",
             "summarization",
             "structured_data",
-            "spreadsheet_analysis"
+            "spreadsheet_analysis",
+            "coding",
+            "debugging"
         ],
         context_window=32768,
         vram_requirement_mb=4600,
@@ -112,6 +114,29 @@ DEFAULT_MODELS: Dict[str, ModelDefinition] = {
         enabled=True,
         priority=130
     ),
+    "deepseek-r1:7b": ModelDefinition(
+        id="deepseek-r1:7b",
+        name="deepseek-r1:7b",
+        display_name="DeepSeek R1 7B (Distilled Reasoning Engine)",
+        provider="ollama",
+        model_identifier="deepseek-r1:7b",
+        capabilities=[
+            "heavy_reasoning",
+            "root_cause_analysis",
+            "reasoning",
+            "coding",
+            "debugging"
+        ],
+        context_window=32768,
+        vram_requirement_mb=4800,
+        quality_score=0.96,
+        latency_score=0.80,
+        supports_tools=True,
+        supports_images=False,
+        supports_json_schema=True,
+        enabled=True,
+        priority=140
+    ),
     "deepseek-r1:14b": ModelDefinition(
         id="deepseek-r1:14b",
         name="deepseek-r1:14b",
@@ -119,6 +144,8 @@ DEFAULT_MODELS: Dict[str, ModelDefinition] = {
         provider="ollama",
         model_identifier="deepseek-r1:14b",
         capabilities=[
+            "heavy_reasoning",
+            "root_cause_analysis",
             "reasoning",
             "coding",
             "debugging"

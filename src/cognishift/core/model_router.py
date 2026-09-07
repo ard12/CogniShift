@@ -68,7 +68,22 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.92
         )
 
-    # 3. Document Analysis & Technical Manual / Artifact Interpretation
+    # 3. Heavy Reasoning, Root Cause Analysis (RCA) & Complex Incident Diagnostics
+    heavy_reasoning_triggers = [
+        "root cause", "rca", "failure investigation", "investigate failure",
+        "incident investigation", "hazop", "hazard analysis", "deep reasoning",
+        "chain of thought", "step-by-step reasoning", "cascading failure",
+        "complex diagnosis", "troubleshoot complex", "why did it fail", "why did the system trip"
+    ]
+    if any(trigger in text for trigger in heavy_reasoning_triggers):
+        return TaskClassification(
+            task_type="heavy_reasoning",
+            required_capabilities=["heavy_reasoning", "reasoning"],
+            requires_vision=False,
+            confidence=0.95
+        )
+
+    # 4. Document Analysis & Technical Manual / Artifact Interpretation
     if any(w in text for w in [
         "sop", "manual", "inspection report", "oisd", "standard", "procedure", 
         "guideline", ".csv", ".pdf", ".txt", ".json", ".yaml", ".log", "report", 
@@ -81,7 +96,7 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.88
         )
 
-    # 4. Default: General Industrial Reasoning
+    # 5. Default: General Industrial Reasoning
     return TaskClassification(
         task_type="general_reasoning",
         required_capabilities=["reasoning"],
@@ -93,19 +108,40 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
 def route_model(
     task: TaskClassification,
     available_vram_mb: int = 6000,
-    preferred_model: Optional[str] = None
+    preferred_model: Optional[str] = None,
+    installed_models: Optional[List[str]] = None
 ) -> RoutingDecision:
     """
     Hardware-aware model selection algorithm.
-    Filters candidate models by VRAM feasibility and scores capability match.
+    Filters candidate models by local installation availability, VRAM feasibility, and scores capability match.
     """
     candidates = list_models(enabled_only=True)
     evaluations: Dict[str, RoutingCandidateEvaluation] = {}
     
+    # Normalize installed model names for quick lookup
+    installed_set = None
+    if installed_models is not None:
+        installed_set = set()
+        for m in installed_models:
+            clean = m.strip().lower()
+            installed_set.add(clean)
+            if ":" in clean:
+                installed_set.add(clean.split(":")[0])
+
     best_candidate: Optional[ModelDefinition] = None
     highest_score = -1.0
     
     for model in candidates:
+        # Local Installation Availability check
+        is_installed = True
+        if installed_set is not None:
+            mid = model.model_identifier.strip().lower()
+            is_installed = (
+                (mid in installed_set)
+                or (f"{mid}:latest" in installed_set)
+                or (mid.split(":")[0] in installed_set)
+            )
+
         # VRAM Feasibility
         is_vram_feasible = model.vram_requirement_mb <= available_vram_mb
         
@@ -121,17 +157,23 @@ def route_model(
         overlap = len(required_set.intersection(model_set))
         cap_ratio = overlap / max(1, len(required_set))
 
+        # Preference bonus if user or agent specified preferred model
+        pref_bonus = 0.05 if (preferred_model and model.model_identifier == preferred_model) else 0.0
+
         # Composite score
         composite_score = (
             cap_ratio * 0.70 +
             model.quality_score * 0.20 +
-            model.latency_score * 0.10
+            model.latency_score * 0.10 +
+            pref_bonus
         )
 
-        eligible = is_vram_feasible and has_vision_capability and (overlap > 0 or not task.requires_vision)
+        eligible = is_installed and is_vram_feasible and has_vision_capability and (overlap > 0 or not task.requires_vision)
 
         rationale = "Eligible candidate"
-        if not is_vram_feasible:
+        if not is_installed:
+            rationale = "Excluded (Model not installed on local sovereign runtime)"
+        elif not is_vram_feasible:
             rationale = f"Infeasible (Requires {model.vram_requirement_mb}MB, VRAM budget is {available_vram_mb}MB)"
         elif not has_vision_capability:
             rationale = "Excluded (Task requires vision capability, model lacks vision)"
@@ -157,12 +199,21 @@ def route_model(
 
     # Fallback to general model if no candidate matched
     if not best_candidate:
-        best_candidate = candidates[0] if candidates else ModelDefinition(
+        installed_candidates = [
+            m for m in candidates
+            if (
+                installed_set is None
+                or m.model_identifier.strip().lower() in installed_set
+                or f"{m.model_identifier.strip().lower()}:latest" in installed_set
+                or m.model_identifier.strip().lower().split(":")[0] in installed_set
+            )
+        ] if candidates else []
+        best_candidate = installed_candidates[0] if installed_candidates else (candidates[0] if candidates else ModelDefinition(
             id="llama3.2:3b",
             name="llama3.2:3b",
             display_name="Fallback Model",
             model_identifier="llama3.2:3b"
-        )
+        ))
         selection_reason = "Fallback model selected (No optimal candidate satisfied all constraints)"
     else:
         selection_reason = f"Highest capability match ({highest_score:.2f}) among hardware-feasible local models"

@@ -16,6 +16,7 @@ from enum import Enum
 from typing import Optional, List, Dict, Any, Tuple
 from pydantic import BaseModel, Field
 
+import aiosqlite
 from cognishift.app.db.database import get_db
 
 logger = logging.getLogger("cognishift.pending_tasks")
@@ -69,7 +70,7 @@ class PendingTask(BaseModel):
                 exp = exp.replace(tzinfo=timezone.utc)
             return now >= exp
         except Exception:
-            return False
+            return True  # Fail-closed: corrupted timestamps are treated as expired
 
 
 AFFIRMATION_PATTERNS = [
@@ -80,7 +81,8 @@ AFFIRMATION_PATTERNS = [
 ]
 
 CANCELLATION_PATTERNS = [
-    r"\b(?:don'?t\s+do\s+it|do\s+not\s+do\s+it|cancel\s+that|cancel|never\s*mind|stop|just\s+explain\s+it\s+instead|do\s+not\s+execute|abort)\b",
+    r"^\s*(?:cancel|stop|abort|never\s*mind|no)\s*$",
+    r"\b(?:don'?t\s+do\s+it|do\s+not\s+do\s+it|cancel\s+that|never\s*mind|just\s+explain\s+it\s+instead|do\s+not\s+execute|abort\s+it|stop\s+(?:the\s+)?task|stop\s+it)\b",
     r"^\s*no\b"
 ]
 
@@ -111,7 +113,8 @@ async def create_pending_task(
     source_references: Optional[Dict[str, Any]] = None,
     proposed_steps: Optional[List[str]] = None,
     originating_run_id: Optional[int] = None,
-    ttl_seconds: int = 900
+    ttl_seconds: int = 900,
+    db: Optional[aiosqlite.Connection] = None
 ) -> PendingTask:
     """Create and persist a new PendingTask with pinned source metadata and expiration TTL."""
     now_utc = datetime.now(timezone.utc)
@@ -124,28 +127,32 @@ async def create_pending_task(
     source_refs_dict = source_references or {}
     steps_list = proposed_steps or []
 
-    async with get_db() as db:
-        await db.execute(
-            """INSERT INTO pending_tasks 
-               (id, workspace_id, user_id, originating_run_id, intent, requested_goal,
-                source_references, proposed_steps, confirmation_required, status,
-                created_at, updated_at, expires_at, version)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'AWAITING_CONFIRMATION', ?, ?, ?, 1)""",
-            (
-                task_id,
-                workspace_id,
-                user_id,
-                originating_run_id,
-                intent,
-                requested_goal,
-                json.dumps(source_refs_dict),
-                json.dumps(steps_list),
-                now_iso,
-                now_iso,
-                exp_iso
-            )
-        )
+    insert_sql = """INSERT INTO pending_tasks 
+                    (id, workspace_id, user_id, originating_run_id, intent, requested_goal,
+                     source_references, proposed_steps, confirmation_required, status,
+                     created_at, updated_at, expires_at, version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'AWAITING_CONFIRMATION', ?, ?, ?, 1)"""
+    params = (
+        task_id,
+        workspace_id,
+        user_id,
+        originating_run_id,
+        intent,
+        requested_goal,
+        json.dumps(source_refs_dict),
+        json.dumps(steps_list),
+        now_iso,
+        now_iso,
+        exp_iso
+    )
+
+    if db is not None:
+        await db.execute(insert_sql, params)
         await db.commit()
+    else:
+        async with get_db() as conn:
+            await conn.execute(insert_sql, params)
+            await conn.commit()
 
     return PendingTask(
         id=task_id,
@@ -165,19 +172,27 @@ async def create_pending_task(
     )
 
 
-async def get_pending_task(task_id: str) -> Optional[PendingTask]:
+async def get_pending_task(
+    task_id: str,
+    db: Optional[aiosqlite.Connection] = None
+) -> Optional[PendingTask]:
     """Retrieve a pending task by ID."""
-    async with get_db() as db:
-        cursor = await db.execute("SELECT * FROM pending_tasks WHERE id = ?", (task_id,))
+    query = "SELECT * FROM pending_tasks WHERE id = ?"
+    if db is not None:
+        cursor = await db.execute(query, (task_id,))
         row = await cursor.fetchone()
-        if not row:
-            return None
-        return _row_to_pending_task(dict(row))
+        return _row_to_pending_task(dict(row)) if row else None
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(query, (task_id,))
+            row = await cursor.fetchone()
+            return _row_to_pending_task(dict(row)) if row else None
 
 
 async def get_active_pending_task(
     workspace_id: int,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    db: Optional[aiosqlite.Connection] = None
 ) -> Optional[PendingTask]:
     """Retrieve the most recent active PendingTask awaiting confirmation within TTL.
     
@@ -185,35 +200,37 @@ async def get_active_pending_task(
     If user_id is provided, only returns tasks belonging to that user.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
-    async with get_db() as db:
-        if user_id:
-            cursor = await db.execute(
-                """SELECT * FROM pending_tasks 
+    if user_id:
+        query = """SELECT * FROM pending_tasks 
                    WHERE workspace_id = ? AND user_id = ? 
                      AND status IN ('AWAITING_CONFIRMATION', 'PROPOSED')
                      AND expires_at > ?
-                   ORDER BY created_at DESC LIMIT 1""",
-                (workspace_id, user_id, now_iso)
-            )
-        else:
-            cursor = await db.execute(
-                """SELECT * FROM pending_tasks 
+                   ORDER BY created_at DESC LIMIT 1"""
+        params = (workspace_id, user_id, now_iso)
+    else:
+        query = """SELECT * FROM pending_tasks 
                    WHERE workspace_id = ? 
                      AND status IN ('AWAITING_CONFIRMATION', 'PROPOSED')
                      AND expires_at > ?
-                   ORDER BY created_at DESC LIMIT 1""",
-                (workspace_id, now_iso)
-            )
+                   ORDER BY created_at DESC LIMIT 1"""
+        params = (workspace_id, now_iso)
+
+    if db is not None:
+        cursor = await db.execute(query, params)
         row = await cursor.fetchone()
-        if not row:
-            return None
-        return _row_to_pending_task(dict(row))
+        return _row_to_pending_task(dict(row)) if row else None
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(query, params)
+            row = await cursor.fetchone()
+            return _row_to_pending_task(dict(row)) if row else None
 
 
 async def claim_pending_task_atomic(
     task_id: str,
     expected_version: int,
-    claiming_user_id: str
+    claiming_user_id: str,
+    db: Optional[aiosqlite.Connection] = None
 ) -> bool:
     """Atomic Compare-And-Swap (CAS) transition from AWAITING_CONFIRMATION -> EXECUTING.
     
@@ -221,9 +238,7 @@ async def claim_pending_task_atomic(
     Two simultaneous confirmations will only succeed once.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
-    async with get_db() as db:
-        cursor = await db.execute(
-            """UPDATE pending_tasks
+    query = """UPDATE pending_tasks
                SET status = 'EXECUTING',
                    version = version + 1,
                    updated_at = ?,
@@ -232,65 +247,95 @@ async def claim_pending_task_atomic(
                  AND status IN ('AWAITING_CONFIRMATION', 'PROPOSED')
                  AND version = ?
                  AND user_id = ?
-                 AND expires_at > ?""",
-            (now_iso, now_iso, task_id, expected_version, claiming_user_id, now_iso)
-        )
+                 AND expires_at > ?"""
+    params = (now_iso, now_iso, task_id, expected_version, claiming_user_id, now_iso)
+
+    if db is not None:
+        cursor = await db.execute(query, params)
         await db.commit()
         return cursor.rowcount > 0
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(query, params)
+            await conn.commit()
+            return cursor.rowcount > 0
 
 
-async def cancel_pending_task(task_id: str, user_id: str) -> bool:
+async def cancel_pending_task(
+    task_id: str,
+    user_id: str,
+    db: Optional[aiosqlite.Connection] = None
+) -> bool:
     """Mark a pending task as CANCELLED."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    async with get_db() as db:
-        cursor = await db.execute(
-            """UPDATE pending_tasks
+    query = """UPDATE pending_tasks
                SET status = 'CANCELLED',
                    version = version + 1,
                    updated_at = ?
                WHERE id = ? AND user_id = ?
-                 AND status IN ('AWAITING_CONFIRMATION', 'PROPOSED', 'READY')""",
-            (now_iso, task_id, user_id)
-        )
+                 AND status IN ('AWAITING_CONFIRMATION', 'PROPOSED', 'READY')"""
+    params = (now_iso, task_id, user_id)
+
+    if db is not None:
+        cursor = await db.execute(query, params)
         await db.commit()
         return cursor.rowcount > 0
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(query, params)
+            await conn.commit()
+            return cursor.rowcount > 0
 
 
 async def complete_pending_task(
     task_id: str,
-    resulting_run_id: int
+    resulting_run_id: int,
+    db: Optional[aiosqlite.Connection] = None
 ) -> bool:
     """Mark a pending task as COMPLETED with the resulting execution run ID."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    async with get_db() as db:
-        cursor = await db.execute(
-            """UPDATE pending_tasks
+    query = """UPDATE pending_tasks
                SET status = 'COMPLETED',
                    version = version + 1,
                    resulting_run_id = ?,
                    updated_at = ?,
                    execution_completed_at = ?
-               WHERE id = ?""",
-            (resulting_run_id, now_iso, now_iso, task_id)
-        )
+               WHERE id = ? AND status = 'EXECUTING'"""
+    params = (resulting_run_id, now_iso, now_iso, task_id)
+
+    if db is not None:
+        cursor = await db.execute(query, params)
         await db.commit()
         return cursor.rowcount > 0
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(query, params)
+            await conn.commit()
+            return cursor.rowcount > 0
 
 
-async def fail_pending_task(task_id: str) -> bool:
+async def fail_pending_task(
+    task_id: str,
+    db: Optional[aiosqlite.Connection] = None
+) -> bool:
     """Mark a pending task as FAILED."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    async with get_db() as db:
-        cursor = await db.execute(
-            """UPDATE pending_tasks
+    query = """UPDATE pending_tasks
                SET status = 'FAILED',
                    version = version + 1,
                    updated_at = ?
-               WHERE id = ?""",
-            (now_iso, task_id)
-        )
+               WHERE id = ? AND status IN ('EXECUTING', 'AWAITING_CONFIRMATION', 'PROPOSED')"""
+    params = (now_iso, task_id)
+
+    if db is not None:
+        cursor = await db.execute(query, params)
         await db.commit()
         return cursor.rowcount > 0
+    else:
+        async with get_db() as conn:
+            cursor = await conn.execute(query, params)
+            await conn.commit()
+            return cursor.rowcount > 0
 
 
 def _row_to_pending_task(row: dict) -> PendingTask:

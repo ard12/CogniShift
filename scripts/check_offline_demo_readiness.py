@@ -76,8 +76,9 @@ def main():
 
     # 5. Check Ollama Service & Models
     try:
-        import httpx
-        resp = httpx.get(f"{settings.ollama_base_url}/api/tags", timeout=3.0)
+        from cognishift.core.network.client import get_sovereign_client
+        with get_sovereign_client(timeout=3.0, component="readiness_probe") as client:
+            resp = client.get(f"{settings.ollama_base_url}/api/tags")
         if resp.status_code == 200:
             models_data = resp.json().get("models", [])
             model_names = [m.get("name", "") for m in models_data]
@@ -127,15 +128,15 @@ def main():
     else:
         check("Demo Credentials Store", False, f"Missing at {auth_store}")
 
-    # 8. Check Frontend Static Assets
-    static_dir = ROOT_DIR / "src" / "cognishift" / "app" / "static"
-    html_path = static_dir / "index.html"
-    css_path = static_dir / "app.css"
-    js_path = static_dir / "app.js"
-    if html_path.exists() and css_path.exists() and js_path.exists():
-        check("Frontend Static Assets", True, "(Local index.html, app.css & app.js verified)")
+    # 8. Check Frontend Assets (Vite React application)
+    frontend_dir = ROOT_DIR / "frontend"
+    vite_entry = frontend_dir / "src" / "App.tsx"
+    vite_html = frontend_dir / "index.html"
+    dist_html = frontend_dir / "dist" / "index.html"
+    if (vite_entry.exists() and vite_html.exists()) or dist_html.exists():
+        check("Frontend Assets", True, "(React 19 + Vite frontend verified)")
     else:
-        check("Frontend Static Assets", False, "Missing static assets")
+        check("Frontend Assets", False, "Missing frontend assets")
 
     # 9. Authentication configuration and optional local demo capability
     canonical_auth_store = (ROOT_DIR / "data" / "private" / "auth_store.json").resolve()

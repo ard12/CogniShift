@@ -23,7 +23,11 @@ ALLOWED_OUTPUT_EXTENSIONS = {
     ".json": "json",
     ".docx": "docx",
     ".xlsx": "xlsx",
-    ".pptx": "pptx"
+    ".pptx": "pptx",
+    ".pdf": "pdf",
+    ".png": "png",
+    ".jpg": "jpg",
+    ".jpeg": "jpeg"
 }
 
 # Strictly prohibited executable extensions that must NEVER be promoted

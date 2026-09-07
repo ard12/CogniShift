@@ -15,4 +15,8 @@ data/private/
 *.auth.json
 auth_store.json
 .env.local
-
+scratch/
+work/
+node_modules/
+frontend/dist/
+.pytest-tmp*

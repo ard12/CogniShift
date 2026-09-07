@@ -42,8 +42,10 @@ class RecursiveCharacterTextSplitter:
 # Industrial-grade recursive text splitter with overlap
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
 
-# Initialize ChromaDB locally
-chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path))
+# Initialize ChromaDB locally (with telemetry strictly disabled in air-gapped sovereign mode)
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+chroma_settings = chromadb.config.Settings(anonymized_telemetry=False, is_persistent=True)
+chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path), settings=chroma_settings)
 
 # Initialize FastEmbed locally (CPU optimized, 100% offline in sovereign mode)
 os.environ["HF_HUB_OFFLINE"] = "1"
@@ -242,9 +244,10 @@ async def retrieve_context(
         # Discard trivial or garbled fragments with insufficient substance (< 25 characters)
         if not doc or len(doc.strip()) < 25:
             continue
-        if dist is not None and max_dist < dist <= 2.0:
+        if dist is not None and dist > max_dist and dist <= 2.0:
             logger.info(f"Retriever discarded distant chunk: distance={dist:.4f} > {max_dist:.4f}")
             continue
+
         meta = results['metadatas'][0][i] if results.get('metadatas') and len(results['metadatas']) > 0 else {}
         citation = format_grounded_citation(meta)
         wrapped_doc = wrap_document_data_for_prompt(doc, meta)

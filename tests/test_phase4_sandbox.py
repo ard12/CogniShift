@@ -62,6 +62,9 @@ async def initialize_isolated_sandbox_database():
             "INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Sandbox Test', 'Isolated pytest workspace')"
         )
         await db.execute(
+            "INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name) VALUES (1, 1, 'Default Sandbox Agent')"
+        )
+        await db.execute(
             "INSERT OR IGNORE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (10, 1, 1, 'completed', 'test_operator')"
         )
         await db.commit()

@@ -4,23 +4,27 @@
 [![Organization](https://img.shields.io/badge/Use%20Case-MRPL%20Refinery-blue.svg)](https://www.mrpl.co.in/)
 [![Python](https://img.shields.io/badge/Python-3.12-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-teal.svg)](https://fastapi.tiangolo.com/)
+[![Frontend](https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite%20%7C%20Tailwind-blueviolet.svg)](frontend/)
 [![Local AI](https://img.shields.io/badge/Ollama-Llama%203.2%20%7C%20Moondream-purple.svg)](https://ollama.com/)
-[![Tests](https://img.shields.io/badge/Tests-219%20Passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-401%2B%20Passing%20(100%25)-brightgreen.svg)]()
 
-CogniShift is a self-hosted agentic AI workbench designed for confidential industrial operations. It runs open-weight language and vision models on local hardware without requiring external cloud AI APIs.
+CogniShift is a sovereign, self-hosted agentic AI workbench engineered for safety-critical industrial operations (Purdue Level 3/3.5). It runs open-weight language, vision, and embedding models on local air-gapped hardware without requiring external cloud APIs or leaking telemetry.
 
-Developed for Smart India Hackathon problem statement **SIH26117** (Mangalore Refinery and Petrochemicals Limited).
+Developed for Smart India Hackathon problem statement **SIH26117** (Mangalore Refinery and Petrochemicals Limited - MRPL).
 
 ---
 
 ## What CogniShift Does
 
 * **Answers operational questions** using local documentation, standard operating procedures, and equipment manuals.
+* **Classifies user intent** via an offline 7-intent Semantic Intent Router powered by CPU FastEmbed with entity normalization and safe abstention.
 * **Cites exact source locations** with page-level references (`[Filename | Page X]`).
-* **Understands physical connections** between plant equipment using a local topology graph.
-* **Inspects photos and diagrams** using a local vision model to read analog dials and equipment nameplates.
-* **Enforces human review** for sensitive or high-risk actions through an infrastructure approval gate before execution.
-* **Executes generated code safely** inside an isolated Docker container with no network access.
+* **Understands physical connections** between plant equipment using a local topology graph (SQLite Graph memory).
+* **Inspects photos and diagrams** using a local vision model (`moondream:latest`) to read analog dials, Bourdon gauges, and equipment nameplates.
+* **Enforces Four-Eyes supervisor review** for sensitive or high-risk actions through dual independent authorization gates (`reviewed_by` + `reviewed_by_2`).
+* **Manages multi-turn conversations** with atomic Compare-And-Swap (CAS) pending tasks, affirmation resumption (*"yes do it"*), and 15-minute TTL expiration.
+* **Generates professional engineering deliverables** across spreadsheets (`.xlsx`), reports (`.docx`, `.pdf`), charts (`.png`), and structured datasets (`.json`) with SHA-256 tamper verification.
+* **Executes generated code safely** inside an isolated Docker container with zero network access (`--network none`) and read-only filesystem boundaries.
 
 ---
 
@@ -135,7 +139,7 @@ CogniShift enforces strict network boundaries to prevent accidental or malicious
 * **Pre-Socket Transport Guard:** Outbound HTTP calls pass through `SovereignAsyncTransport` and `SovereignTransport`. Public IP destinations, link-local addresses (`169.254.0.0/16`, `fe80::/10`), and unlisted RFC 1918 private networks are intercepted and blocked prior to establishing TCP handshakes.
 * **DNS & Redirect Interception:** Hostnames are resolved pre-connection. If any resolved IP is public or unapproved, the request fails closed. HTTP redirects (`301`, `302`, `307`, `308`) are intercepted with destinations re-evaluated against the policy.
 * **Offline Vector Cache:** FastEmbed embeddings operate 100% offline (`local_files_only=True`) using local model cache (`data/models/fastembed`). If assets are missing, the system fails closed without attempting online downloads.
-* **CDN-Free Frontend & Strict CSP:** The web dashboard (`/static/index.html`) contains zero external CDN dependencies (served via local `/static/app.css` and system fonts). All HTTP responses carry strict Content Security Policy (`default-src 'self'`, `frame-ancestors 'none'`, `connect-src 'self'`).
+* **CDN-Free Frontend & Strict CSP:** The web dashboard (`frontend/`) contains zero external CDN dependencies (built with local React 19, Tailwind CSS, and system typography). All HTTP responses carry strict Content Security Policy (`default-src 'self'`, `frame-ancestors 'none'`, `connect-src 'self'`).
 * **Persistent Network Audit Ledger:** All network attempts are logged to the `network_events` SQLite table with metadata only (no prompt text, authorization headers, or response payloads are stored).
 * **Independent Host-Level Observer:** Sockets are monitored at the OS level via `scripts/observe_network.py` with an executable negative control to prove detection accuracy.
 * **Operator Firewall Scripts:** PowerShell scripts (`scripts/enable_strict_network_policy.ps1` and `scripts/disable_strict_network_policy.ps1`) configure process-scoped Windows Defender Firewall rules targeting the Python runtime.
@@ -146,6 +150,7 @@ CogniShift enforces strict network boundaries to prevent accidental or malicious
 
 ### 1. Prerequisites
 * **Python 3.12**
+* **Node.js 18+ & npm** (required for the Vite + React 19 Operator Console)
 * **Ollama** installed and running locally (`http://localhost:11434`)
 * **Docker Desktop** (required for the containerized code execution sandbox)
 * Recommended: Local NVIDIA GPU (tested on NVIDIA GeForce RTX 3050 Laptop GPU, 6GB VRAM)
@@ -156,16 +161,22 @@ ollama pull llama3.2:3b
 ollama pull moondream
 ```
 
-### 2. Install Python Dependencies
+### 2. Install Backend & Frontend Dependencies
 ```bash
 git clone https://github.com/sitanshukr08/CogniShift.git
 cd CogniShift
 
+# Setup Python environment
 python -m venv .venv
 .venv\Scripts\activate    # Windows
 # source .venv/bin/activate # Linux / macOS
 
 pip install -r requirements.txt
+
+# Setup React Operator Console
+cd frontend
+npm install
+cd ..
 ```
 
 ### 3. Initialize & Seed Database
@@ -178,12 +189,27 @@ Creates local tables and seeds simulated refinery workspaces, agents, tool defin
 
 ## Running the Application
 
-### Web Server & Operator Console
+### 1. Start the Backend API
 ```bash
 python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-* **Operator Console:** [http://127.0.0.1:8000](http://127.0.0.1:8000) (redirects to `/static/index.html`)
 * **Interactive API Documentation (Swagger):** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### 2. Launch the Operator Console (Choose Option A or B)
+
+#### Option A: Vite Development Server (Recommended for active workflow)
+```bash
+cd frontend
+npm run dev
+```
+Open [http://localhost:5173](http://localhost:5173) in your browser. All API requests to `/api` are automatically proxied to the backend at port 8000.
+
+#### Option B: Production Build (Served directly via FastAPI root)
+```bash
+cd frontend
+npm run build
+```
+Once built to `frontend/dist`, open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) directly. The FastAPI backend automatically serves the compiled SPA.
 
 ### Local SIH Demo Authentication
 
@@ -194,7 +220,7 @@ $env:COGNISHIFT_DEMO_MODE='true'
 python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/` and select Sam, Jane, or Rohit. The server returns a random short-lived credential held only in server memory and browser `sessionStorage`; it never exposes the long-lived API keys. Demo session creation returns 404 unless the flag is enabled in local operating mode, and 403 for non-loopback clients. Keep `COGNISHIFT_DEMO_MODE=false` (the default) for strict deployments.
+Open the console and select Sam (Field Operator), Jane (Safety Supervisor), or Rohit (Lead Process Engineer). The server returns a random short-lived credential held only in server memory and browser `sessionStorage`; it never exposes long-lived API keys. Demo session creation returns 404 unless the flag is enabled in local operating mode, and 403 for non-loopback clients. Keep `COGNISHIFT_DEMO_MODE=false` (the default) for strict deployments.
 
 For manual bearer testing, run `python scripts/bootstrap_demo_auth.py`. Re-running it explicitly rotates the four demo credentials; the server automatically reloads the changed credential store, so a restart is not required. The Advanced / Manual Bearer Authentication section remains available in the auth console.
 
@@ -253,41 +279,75 @@ pytest tests/test_phase4_real_sandbox.py -v
 CogniShift/
 ├── cli.py                              # Terminal CLI entry point
 ├── pytest.ini                          # Test configuration
-├── requirements.txt                    # Project dependencies
+├── requirements.txt                    # Python project dependencies
+├── docker/
+│   └── Dockerfile                      # Air-gapped code execution sandbox container
+├── frontend/                           # React 19 + TypeScript + Vite Operator Console
+│   ├── package.json                    # Frontend scripts and dependencies
+│   ├── vite.config.ts                  # Vite build and reverse proxy configuration
+│   ├── index.html                      # Clean SPA HTML template (zero CDN)
+│   └── src/
+│       ├── App.tsx                     # Top-level client router and AuthGate
+│       ├── components/                 # Shared UI primitives and widgets
+│       │   ├── AppShell.tsx            # Navigation layout and sidebar
+│       │   ├── ApprovalCard.tsx        # Four-Eyes dual approval card
+│       │   ├── EventTimeline.tsx       # Live reasoning step-by-step timeline
+│       │   └── StatusBeacon.tsx        # System health and air-gap status
+│       └── pages/                      # Primary application views
+│           ├── DashboardPage.tsx       # Plant operational overview
+│           ├── OperatorPage.tsx        # Agent execution console and scenarios
+│           ├── WorkspacesPage.tsx      # Multi-tenant workspace configuration
+│           ├── KnowledgePage.tsx       # Document management and vector status
+│           ├── RunsPage.tsx            # Execution history and event inspection
+│           ├── ApprovalsPage.tsx       # Four-Eyes supervisor queue
+│           ├── ArtifactsPage.tsx       # Deliverable preview and download
+│           └── SystemPage.tsx          # Air-gap integrity and GPU telemetry
 ├── scripts/
-│   └── seed.py                         # Database initialization and sample data
+│   ├── seed.py                         # Database initialization and plant topology
+│   └── check_offline_demo_readiness.py # Sovereign air-gap preflight diagnostic
 ├── src/
 │   └── cognishift/
 │       ├── app/
-│       │   ├── main.py                 # FastAPI application setup
+│       │   ├── main.py                 # FastAPI setup and 3-tier SPA serving
 │       │   ├── config.py               # Settings and configuration
 │       │   ├── api/                    # API route handlers
 │       │   │   ├── workspaces.py       # Workspace endpoints
 │       │   │   ├── agents.py           # Agent definition endpoints
 │       │   │   ├── knowledge.py        # Document upload and search
 │       │   │   ├── runs.py             # Agent execution and events
-│       │   │   ├── approvals.py        # Supervisor approval endpoints
-│       │   │   └── system.py           # Status endpoints
-│       │   ├── db/
-│       │   │   ├── database.py         # aiosqlite connection management
-│       │   │   └── models.py           # Pydantic schemas
-│       │   └── static/
-│       │       └── index.html          # Web operator console
+│       │   │   ├── approvals.py        # Four-Eyes supervisor approval endpoints
+│       │   │   ├── artifacts.py        # Deliverable download and preview
+│       │   │   └── system.py           # Health and telemetry endpoints
+│       │   └── db/
+│       │       ├── database.py         # aiosqlite connection management (WAL mode)
+│       │       └── models.py           # Pydantic v2 schemas
 │       └── core/
-│           ├── engine.py               # Reasoning loop and approval pause logic
+│           ├── engine.py               # Agentic reasoning loop and safety interlocks
+│           ├── semantic_router.py      # FastEmbed 7-intent classification router
+│           ├── pending_tasks.py        # CAS atomic state machine and TTL eviction
+│           ├── conversation_context.py # Multi-turn context resolution
+│           ├── artifact_generators.py  # .docx, .pdf, .xlsx, .png deliverable pipeline
+│           ├── retriever.py            # FastEmbed and ChromaDB vector retrieval
+│           ├── graph_memory.py         # SQLite equipment topology traversal
+│           ├── tools.py                # Simulated industrial tool implementations
+│           ├── tool_schemas.py         # Authoritative tool definitions and JSON schemas
 │           ├── providers.py            # ModelProvider base class and factory
 │           ├── ollama_provider.py      # Ollama HTTP client (LLM and VLM)
 │           ├── simulated_provider.py   # Test mock provider
-│           ├── retriever.py            # FastEmbed and ChromaDB retrieval
-│           ├── graph_memory.py         # SQLite equipment topology traversal
-│           ├── tools.py                # Simulated industrial tool implementations
-│           └── document_processing/   # Phase 5 document pipeline
+│           ├── sandbox/                # Docker containerized execution sandbox
+│           │   ├── backend.py          # Docker subprocess execution engine
+│           │   └── promoter.py         # Workspace artifact promotion
+│           ├── network/                # Phase 6 network sovereignty
+│           │   ├── guard.py            # Pre-socket transport guard
+│           │   ├── policy.py           # Strict loopback policy
+│           │   └── preflight.py        # Air-gap readiness verification
+│           └── document_processing/   # Multimodal document pipeline
 │               ├── service.py          # Processing router (native, OCR, vision)
-│               ├── native_pdf.py       # PyPDF text extraction
-│               ├── ocr_provider.py     # RapidOCR wrapper
+│               ├── native_pdf.py       # PyPDF digital text extraction
+│               ├── ocr_provider.py     # RapidOCR local wrapper
 │               ├── vision_service.py   # Moondream visual analysis wrapper
-│               └── provenance.py       # Page metadata and untrusted prompt wrapper
-└── tests/                              # Unit, integration, and sandbox tests
+│               └── provenance.py       # Delimiter escaping and untrusted context wrapper
+└── tests/                              # 401+ automated tests (100% passing)
 ```
 
 ---

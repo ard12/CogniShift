@@ -109,31 +109,32 @@ def route_model(
         # VRAM Feasibility
         is_vram_feasible = model.vram_requirement_mb <= available_vram_mb
         
-        # Vision constraint
-        has_vision_capability = True
-        if task.requires_vision and not model.supports_images:
-            has_vision_capability = False
-            
+        # Vision constraint:
+        if task.requires_vision:
+            has_vision_capability = model.supports_images or "vision" in model.capabilities
+        else:
+            has_vision_capability = True
+
         # Capability overlap calculation
         required_set = set(task.required_capabilities)
         model_set = set(model.capabilities)
         overlap = len(required_set.intersection(model_set))
-        cap_ratio = overlap / len(required_set) if required_set else 0.5
-        
+        cap_ratio = overlap / max(1, len(required_set))
+
         # Composite score
         composite_score = (
             cap_ratio * 0.70 +
             model.quality_score * 0.20 +
             model.latency_score * 0.10
         )
-        
+
         eligible = is_vram_feasible and has_vision_capability and (overlap > 0 or not task.requires_vision)
-        
+
         rationale = "Eligible candidate"
         if not is_vram_feasible:
             rationale = f"Infeasible (Requires {model.vram_requirement_mb}MB, VRAM budget is {available_vram_mb}MB)"
         elif not has_vision_capability:
-            rationale = "Excluded (Task requires vision modality, model is text-only)"
+            rationale = "Excluded (Task requires vision capability, model lacks vision)"
         elif overlap == 0:
             rationale = "Low suitability (0 matching capabilities)"
         else:

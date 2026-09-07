@@ -47,6 +47,10 @@ MIME_TYPES = {
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
     "txt": "text/plain",
     "json": "application/json",
     "csv": "text/csv",
@@ -98,6 +102,16 @@ def validate_artifact_structure(file_path: Path, artifact_type: str) -> Artifact
         elif artifact_type == "pptx":
             prs = pptx.Presentation(str(file_path))
             _ = len(prs.slides)
+        elif artifact_type == "pdf":
+            import fitz
+            pdf_doc = fitz.open(str(file_path))
+            if len(pdf_doc) == 0:
+                raise ValueError("PDF document has 0 pages.")
+            pdf_doc.close()
+        elif artifact_type in ["png", "jpg", "jpeg"]:
+            from PIL import Image
+            with Image.open(str(file_path)) as im:
+                im.verify()
         elif artifact_type in ["txt", "json", "csv"]:
             with open(file_path, "r", encoding="utf-8") as f:
                 _ = f.read(100)
@@ -240,6 +254,154 @@ def generate_pptx_presentation(dest_path: Path, title: str, subtitle: Optional[s
 
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(dest_path))
+
+
+def generate_pdf_document(dest_path: Path, title: str, sections: List[Dict[str, Any]]) -> None:
+    """Generate professional formatted PDF engineering report using reportlab."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    doc = SimpleDocTemplate(
+        str(dest_path),
+        pagesize=letter,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        leading=22,
+        alignment=1,
+        textColor=colors.HexColor('#1F4E79'),
+        spaceAfter=6
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Italic'],
+        fontSize=9,
+        leading=12,
+        alignment=1,
+        textColor=colors.HexColor('#555555'),
+        spaceAfter=15
+    )
+    h1_style = ParagraphStyle(
+        'H1',
+        parent=styles['Heading2'],
+        fontSize=13,
+        leading=16,
+        textColor=colors.HexColor('#1F4E79'),
+        spaceBefore=10,
+        spaceAfter=6
+    )
+    body_style = ParagraphStyle(
+        'Body',
+        parent=styles['BodyText'],
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor('#222222'),
+        spaceAfter=4
+    )
+    cell_style = ParagraphStyle(
+        'Cell',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor('#222222')
+    )
+    header_cell_style = ParagraphStyle(
+        'HeaderCell',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=11,
+        fontName='Helvetica-Bold',
+        textColor=colors.white
+    )
+
+    story = [
+        Paragraph(title, title_style),
+        Paragraph("CogniShift Sovereign Plant Operations Workbench - Official Deliverable", subtitle_style),
+        Spacer(1, 10)
+    ]
+
+    def _clean_pdf_text(text: Any) -> str:
+        return str(text).replace("₹", "INR ").replace("€", "EUR ").replace("£", "GBP ")
+
+    for sec in sections:
+        heading = _clean_pdf_text(sec.get("heading", "Section"))
+        story.append(Paragraph(heading, h1_style))
+
+        for p_text in sec.get("paragraphs", []):
+            story.append(Paragraph(_clean_pdf_text(p_text), body_style))
+
+        table_data = sec.get("table")
+        if table_data and "headers" in table_data and "rows" in table_data:
+            headers = [Paragraph(_clean_pdf_text(h), header_cell_style) for h in table_data["headers"]]
+            t_rows = [headers]
+            for row in table_data["rows"]:
+                t_rows.append([Paragraph(_clean_pdf_text(cell), cell_style) for cell in row])
+
+            col_count = len(table_data["headers"])
+            col_width = (letter[0] - 80) / max(col_count, 1)
+            t = Table(t_rows, colWidths=[col_width] * col_count)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E79')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D0D0D0')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
+            ]))
+            story.append(Spacer(1, 4))
+            story.append(t)
+            story.append(Spacer(1, 6))
+
+        story.append(Spacer(1, 6))
+
+    doc.build(story)
+
+
+def render_document_page_to_image(
+    doc_path: Path,
+    dest_image_path: Path,
+    page_number: int = 1,
+    image_format: str = "png",
+    dpi: int = 150
+) -> Path:
+    """Renders a single page of a PDF document to a PNG or JPEG image file."""
+    import fitz
+    if not doc_path.exists():
+        raise FileNotFoundError(f"Source document '{doc_path}' does not exist.")
+
+    dest_image_path.parent.mkdir(parents=True, exist_ok=True)
+    doc = fitz.open(str(doc_path))
+    try:
+        total_pages = len(doc)
+        if total_pages == 0:
+            raise ValueError(f"Document '{doc_path.name}' contains zero pages.")
+        target_idx = max(0, min(page_number - 1, total_pages - 1))
+        page = doc.load_page(target_idx)
+        zoom = dpi / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        if image_format.lower() in ["jpg", "jpeg"]:
+            pix.save(str(dest_image_path), output="jpeg")
+        else:
+            pix.save(str(dest_image_path), output="png")
+        return dest_image_path
+    finally:
+        doc.close()
 
 
 async def create_and_register_artifact(

@@ -4,7 +4,8 @@ from cognishift.app.config import settings
 
 async def init_db() -> None:
     """Initialize the database by creating all required tables."""
-    async with aiosqlite.connect(settings.database_path) as db:
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(settings.database_path, timeout=30.0) as db:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA synchronous=NORMAL")
         await db.execute("PRAGMA busy_timeout=30000")
@@ -70,8 +71,8 @@ async def init_db() -> None:
         await db.execute('''
             CREATE TABLE IF NOT EXISTS agent_runs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                workspace_id INTEGER NOT NULL, 
-                agent_id INTEGER NOT NULL, 
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id), 
+                agent_id INTEGER NOT NULL REFERENCES agent_definitions(id), 
                 user_id TEXT DEFAULT 'operator', 
                 input_text TEXT, 
                 input_type TEXT DEFAULT 'text', 
@@ -268,6 +269,15 @@ async def init_db() -> None:
             except Exception:
                 pass
 
+        for table, col, col_def in [
+            ("workspaces", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ("agent_definitions", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+            except Exception:
+                pass
+
         try:
             await db.execute("ALTER TABLE agent_runs ADD COLUMN routing_info TEXT")
         except Exception:
@@ -278,7 +288,7 @@ async def init_db() -> None:
 @asynccontextmanager
 async def get_db():
     """Context manager that yields an aiosqlite connection with Row factory."""
-    async with aiosqlite.connect(settings.database_path) as db:
+    async with aiosqlite.connect(settings.database_path, timeout=30.0) as db:
         await db.execute("PRAGMA foreign_keys = ON;")
         await db.execute("PRAGMA busy_timeout = 30000;")
         await db.execute("PRAGMA synchronous = NORMAL;")

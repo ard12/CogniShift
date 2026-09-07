@@ -27,8 +27,11 @@ async def upload_document(
     # 1. Validate file extension (case-insensitive)
     filename = file.filename or "document.pdf"
     ext = Path(filename).suffix.lower()
-    if ext not in [".pdf", ".png", ".jpg", ".jpeg"]:
-        raise HTTPException(status_code=400, detail="Only PDF (.pdf), PNG (.png), and JPEG (.jpg/.jpeg) files are supported.")
+    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".xls", ".csv"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Supported formats: PDF (.pdf), PNG (.png), JPEG (.jpg/.jpeg), Excel (.xlsx/.xls), and CSV (.csv)."
+        )
 
     # 2. Validate workspace existence BEFORE saving to disk
     async with get_db() as db:
@@ -66,7 +69,7 @@ async def upload_document(
     checksum = hasher.hexdigest()
 
     # 4. Insert record into database as 'processing'
-    source_type = "pdf" if ext == ".pdf" else "image"
+    source_type = "spreadsheet" if ext in [".xlsx", ".xls", ".csv"] else ("pdf" if ext == ".pdf" else "image")
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO knowledge_sources 
@@ -78,7 +81,81 @@ async def upload_document(
         await db.commit()
         source_id = row["id"]
 
-    # 6. Process document (Native PDF, OCR, or Vision)
+    # 5. Process document
+    if ext in [".xlsx", ".xls", ".csv"]:
+        # Spreadsheet Ingestion: Parse sheets, create structured markdown tables, embed and index
+        try:
+            import openpyxl
+            import pandas as pd
+            import asyncio
+            from cognishift.core.retriever import chroma_client, embedding_model
+
+            chunks = []
+            metadatas = []
+            ids = []
+
+            if ext in [".xlsx", ".xls"]:
+                wb = openpyxl.load_workbook(file_path, data_only=True)
+                for sheet_idx, sname in enumerate(wb.sheetnames):
+                    ws = wb[sname]
+                    rows = list(ws.iter_rows(values_only=True))
+                    if not rows:
+                        continue
+                    sheet_lines = [f"=== SPREADSHEET: {safe_basename} | SHEET: {sname} ==="]
+                    headers = [str(c or '') for c in rows[0]]
+                    sheet_lines.append("Columns: " + ", ".join([h for h in headers if h]))
+                    for r in rows[1:150]:
+                        vals = [str(c) for c in r if c is not None]
+                        if vals:
+                            sheet_lines.append(" | ".join(vals))
+                    sheet_text = "\n".join(sheet_lines)
+                    chunks.append(sheet_text)
+                    metadatas.append({
+                        "source_id": int(source_id),
+                        "document_name": safe_basename,
+                        "page_number": sheet_idx + 1,
+                        "sheet_name": sname,
+                        "workspace_id": int(workspace_id)
+                    })
+                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}")
+            else:
+                df = pd.read_csv(file_path)
+                csv_text = f"=== SPREADSHEET: {safe_basename} ===\nColumns: {', '.join(df.columns)}\n" + df.head(150).to_string()
+                chunks.append(csv_text)
+                metadatas.append({
+                    "source_id": int(source_id),
+                    "document_name": safe_basename,
+                    "page_number": 1,
+                    "sheet_name": "CSV_Data",
+                    "workspace_id": int(workspace_id)
+                })
+                ids.append(f"src_{source_id}_csv_1")
+
+            def _embed_and_upsert():
+                if chunks:
+                    gen = embedding_model.embed(chunks)
+                    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in gen]
+                    col = chroma_client.get_or_create_collection(f"workspace_{workspace_id}")
+                    col.upsert(documents=chunks, embeddings=embs, metadatas=metadatas, ids=ids)
+
+            await asyncio.to_thread(_embed_and_upsert)
+
+            async with get_db() as db:
+                await db.execute(
+                    "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ? WHERE id = ?",
+                    (len(chunks), source_id)
+                )
+                await db.commit()
+                cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
+                updated_row = await cursor.fetchone()
+                return KnowledgeSourceResponse.model_validate(dict(updated_row))
+        except Exception as e:
+            async with get_db() as db:
+                await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
+                await db.commit()
+            raise HTTPException(status_code=500, detail=f"Failed to process spreadsheet: {str(e)}")
+
+    # 6. Native PDF, OCR, or Vision
     try:
         from cognishift.core.document_processing.service import DocumentProcessingService
         service = DocumentProcessingService()

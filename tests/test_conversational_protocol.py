@@ -47,21 +47,20 @@ async def setup_test_db():
 # 1. FRONTEND COMMAND RECOGNITION MATRIX (Deterministic vs Agent Routing)
 # -----------------------------------------------------------------------------
 def test_frontend_deterministic_commands_vs_agent_queries():
-    """Verify in JavaScript file that exact matches intercept and questions route to agent."""
+    """Verify in React Operator page that quick scenarios and agent dispatch markers exist."""
     from pathlib import Path
-    app_js = Path(__file__).resolve().parents[1] / "src" / "cognishift" / "app" / "static" / "app.js"
-    content = app_js.read_text(encoding="utf-8")
+    operator_page = Path(__file__).resolve().parents[1] / "frontend" / "src" / "pages" / "OperatorPage.tsx"
+    content = operator_page.read_text(encoding="utf-8")
 
-    # Assert strict greeting set exists
-    assert "GREETINGS = new Set(['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'])" in content
-
-    # Assert exact nav map exists
-    assert "EXACT_NAV_RULES" in content
-    assert "rule.commands.includes(normalized)" in content
+    # Assert quick scenario definitions exist
+    assert "QUICK_SCENARIOS" in content
+    assert "check-pt101-telemetry" in content
+    assert "trip-495psi-emergency" in content
 
     # Assert agent dispatch markers exist
-    assert "Sending request to local agent..." in content
-    assert "Local inference in progress..." in content
+    assert "runsApi.create" in content
+    assert "dispatchStage" in content
+
 
 
 # -----------------------------------------------------------------------------

@@ -40,6 +40,12 @@ def pytest_sessionfinish(session, exitstatus):
     shutil.rmtree(TEST_RUNTIME_ROOT, ignore_errors=True)
 
 @pytest.fixture(autouse=True)
+async def auto_init_db():
+    """Ensure database schema is created in isolated test environment."""
+    from cognishift.app.db.database import init_db
+    await init_db()
+
+@pytest.fixture(autouse=True)
 def setup_test_auth_credentials(tmp_path, monkeypatch):
     """Provision isolated test credentials into memory during tests only."""
     monkeypatch.setattr(settings, "auth_store_path", tmp_path / "test_auth_store.json")

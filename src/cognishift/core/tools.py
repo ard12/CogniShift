@@ -112,7 +112,7 @@ async def execute_tool(
         return f"Thermocouple {sensor_id} reports bearing temperature is 68.4 C (Normal Operating Range: 60.0 - 80.0 C). Status: NORMAL."
 
     elif tool_name == "run_diagnostic":
-        subsystem = parameters.get("subsystem", "P-101A Crude Feed Booster Pump")
+        subsystem = parameters.get("equipment_id") or parameters.get("subsystem", "P-101A Crude Feed Booster Pump")
         maint_data = _load_json(MAINTENANCE_PATH)
         past_order = ""
         if maint_data and "orders" in maint_data:
@@ -158,7 +158,7 @@ async def execute_tool(
         return f"SAP PM Order #{order_no} not found in current plant maintenance ledger."
 
     elif tool_name == "check_network":
-        segment = parameters.get("segment", "SCADA-VLAN-10")
+        segment = parameters.get("target_host") or parameters.get("segment", "SCADA-VLAN-10")
         return f"Industrial Ethernet segment {segment} is ONLINE. Gateway: 10.14.0.1, Round-trip latency: 1.8ms, Packet drop: 0%."
 
     elif tool_name == "restart_service":
@@ -343,6 +343,92 @@ async def execute_tool(
             )
         except Exception as e:
             return f"Error generating PPTX artifact: {str(e)}"
+
+    elif tool_name == "generate_pdf":
+        from cognishift.core.artifact_generators import create_and_register_artifact, generate_pdf_document
+        filename = parameters.get("filename", "report.pdf")
+        title = parameters.get("title", "Plant Engineering Report")
+        sections = parameters.get("sections", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="pdf",
+                generator_fn=lambda p: generate_pdf_document(p, title, sections),
+                title=title,
+                description="Generated PDF Engineering Report",
+                run_id=run_id
+            )
+            return (
+                f"Successfully generated and registered PDF artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating PDF artifact: {str(e)}"
+
+    elif tool_name == "render_document_page":
+        from cognishift.core.artifact_generators import create_and_register_artifact, render_document_page_to_image
+        from cognishift.core.security import resolve_workspace_path, get_workspace_root
+        from cognishift.app.db.database import get_db
+        src_ref = str(parameters.get("source_path_or_id") or parameters.get("source_id") or "")
+        page_num = int(parameters.get("page_number", 1))
+        out_fname = parameters.get("output_filename", f"page_{page_num}.png")
+        img_fmt = parameters.get("format", "png").lower()
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        doc_path = None
+        ws_root = get_workspace_root(ws_id)
+        if src_ref.isdigit():
+            async with get_db() as db:
+                c = await db.execute("SELECT local_path FROM knowledge_sources WHERE id = ? AND workspace_id = ?", (int(src_ref), ws_id))
+                row = await c.fetchone()
+                if row and row["local_path"]:
+                    p = Path(row["local_path"])
+                    doc_path = p if p.is_absolute() else (ws_root / p)
+        if not doc_path:
+            # First check if src_ref matches an original_filename in knowledge_sources
+            async with get_db() as db:
+                c = await db.execute(
+                    "SELECT local_path FROM knowledge_sources WHERE workspace_id = ? AND original_filename = ? ORDER BY id DESC LIMIT 1",
+                    (ws_id, src_ref)
+                )
+                row = await c.fetchone()
+                if row and row["local_path"]:
+                    p = Path(row["local_path"])
+                    cand = p if p.is_absolute() else (ws_root / p)
+                    if cand.resolve().is_relative_to(ws_root) and cand.exists():
+                        doc_path = cand
+
+        if not doc_path:
+            # Resolve securely within workspace boundary
+            try:
+                doc_path = resolve_workspace_path(ws_id, src_ref, purpose="read")
+            except Exception:
+                try:
+                    doc_path = resolve_workspace_path(ws_id, f"documents/{src_ref}", purpose="read")
+                except Exception:
+                    doc_path = None
+
+        if not doc_path or not doc_path.exists():
+            return f"Error: Source document '{src_ref}' not found in workspace {ws_id}."
+
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=out_fname,
+                artifact_type=img_fmt,
+                generator_fn=lambda p: render_document_page_to_image(doc_path, p, page_num, img_fmt),
+                title=f"Rendered Page {page_num} of {doc_path.name}",
+                description=f"Rasterized page {page_num} from {doc_path.name} to {img_fmt.upper()}",
+                run_id=run_id
+            )
+            return (
+                f"Successfully rendered and registered image artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error rendering document page: {str(e)}"
 
     elif tool_name == "execute_code":
         from cognishift.core.sandbox.schemas import CodeExecutionRequest, SandboxInputFile, SandboxStatus

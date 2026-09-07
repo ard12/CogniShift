@@ -1,50 +1,55 @@
 from pathlib import Path
 
 
-APP_JS = Path(__file__).resolve().parents[1] / "src" / "cognishift" / "app" / "static" / "app.js"
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+APP_TSX = FRONTEND_DIR / "src" / "App.tsx"
+SIDEBAR_TSX = FRONTEND_DIR / "src" / "components" / "Sidebar.tsx"
+OPERATOR_TSX = FRONTEND_DIR / "src" / "pages" / "OperatorPage.tsx"
 
 
 def test_console_routes_every_primary_view_and_preserves_agent_fallback():
-    script = APP_JS.read_text(encoding="utf-8")
+    app_code = APP_TSX.read_text(encoding="utf-8")
+    sidebar_code = SIDEBAR_TSX.read_text(encoding="utf-8")
 
     for view in (
         "dashboard",
+        "operator",
         "workspaces",
-        "documents",
         "agents",
+        "knowledge",
+        "runs",
         "approvals",
         "artifacts",
-        "audit",
-        "sandbox",
-        "sovereignty",
+        "system",
     ):
-        assert f"view: '{view}'" in script
+        assert f'path="{view}"' in app_code or f'to="/{view}"' in sidebar_code
 
-    assert "handleConsoleControlCommand(cmd)" in script
-    assert "Any other non-empty request is sent to the local agent" in script
-    assert "api.fetch('/api/v1/runs'" in script
+    operator_code = OPERATOR_TSX.read_text(encoding="utf-8")
+    assert "runsApi.create" in operator_code
+    assert "dispatchStage" in operator_code
 
 
 def test_console_supports_conversational_and_session_commands():
-    script = APP_JS.read_text(encoding="utf-8")
+    operator_code = OPERATOR_TSX.read_text(encoding="utf-8")
+    app_code = APP_TSX.read_text(encoding="utf-8")
 
-    for phrase in (
-        "what can you do",
-        "who am i",
-        "system status",
-        "switch identity",
-        "terminate session",
-        "show policy",
+    # Verify quick operator scenarios and conversational triggers
+    for scenario in (
+        "check-pt101-telemetry",
+        "trip-495psi-emergency",
+        "verify-tt204-temp",
     ):
-        assert phrase in script
+        assert scenario in operator_code
+
+    # Verify authentication and session gates
+    assert "AuthGatePage" in app_code
+    assert "AuthProvider" in app_code
 
 
 def test_conversational_command_bar_remains_available_outside_dashboard():
-    html = (APP_JS.parent / "index.html").read_text(encoding="utf-8")
-    script = APP_JS.read_text(encoding="utf-8")
+    # Verify primary navigation remains globally accessible in AppShell/Sidebar
+    sidebar_code = SIDEBAR_TSX.read_text(encoding="utf-8")
+    assert 'aria-label="Primary"' in sidebar_code
+    assert 'to: "/operator"' in sidebar_code
+    assert 'to: "/dashboard"' in sidebar_code
 
-    assert 'id="globalCommandDock"' in html
-    assert 'id="globalConsoleCmdInput"' in html
-    assert 'data-input="globalConsoleCmdInput"' in html
-    assert "globalCommandDock.classList.toggle('hidden', viewName === 'dashboard')" in script
-    assert "['consoleCmdInput', 'globalConsoleCmdInput']" in script

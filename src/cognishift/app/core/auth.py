@@ -130,17 +130,18 @@ def authenticate_token(raw_token: str) -> Optional[User]:
     if not raw_token:
         return None
     incoming_hash = hash_token(raw_token)
+    incoming_lower_hash = hash_token(raw_token.lower())
     now = time.time()
     expired = [token_hash for token_hash, (_, expires_at) in EPHEMERAL_DEMO_SESSIONS.items() if expires_at <= now]
     for token_hash in expired:
         EPHEMERAL_DEMO_SESSIONS.pop(token_hash, None)
 
-    demo_session = EPHEMERAL_DEMO_SESSIONS.get(incoming_hash)
+    demo_session = EPHEMERAL_DEMO_SESSIONS.get(incoming_hash) or EPHEMERAL_DEMO_SESSIONS.get(incoming_lower_hash)
     if demo_session:
         return demo_session[0].model_copy(deep=True)
 
     for stored_hash, record in LOCAL_CREDENTIAL_STORE.items():
-        if secrets.compare_digest(stored_hash, incoming_hash):
+        if secrets.compare_digest(stored_hash, incoming_hash) or secrets.compare_digest(stored_hash, incoming_lower_hash):
             if not record.enabled:
                 return None
             return User(

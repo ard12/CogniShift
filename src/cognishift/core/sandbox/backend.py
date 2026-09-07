@@ -281,6 +281,36 @@ class SimulatedSandboxBackend(SandboxBackend):
             sim_file = output_dir / "telemetry_summary.csv"
             sim_file.write_text("Sensor,Value,Unit\nPT-101,102.5,PSI\nTT-101,68.4,C\n", encoding="utf-8")
 
+            if "telemetry_chart.png" in code_str or "matplotlib" in code_str:
+                chart_file = output_dir / "telemetry_chart.png"
+                try:
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    import matplotlib.pyplot as plt
+                    fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+                    ax.plot([1, 2, 3, 4], [100, 105, 102, 108], color="#1F4E79", label="PT-101 (PSI)")
+                    ax.set_title("Sensor Telemetry Trend", fontsize=10)
+                    ax.legend()
+                    fig.tight_layout()
+                    fig.savefig(chart_file)
+                    plt.close(fig)
+                except Exception:
+                    pass
+
+            if "telemetry_data.xlsx" in code_str or "openpyxl" in code_str:
+                excel_file = output_dir / "telemetry_data.xlsx"
+                try:
+                    import openpyxl
+                    wb = openpyxl.Workbook()
+                    ws = wb.active
+                    ws.title = "Telemetry"
+                    ws.append(["Sensor", "Value", "Unit"])
+                    ws.append(["PT-101", 102.5, "PSI"])
+                    ws.append(["TT-204", 74.2, "C"])
+                    wb.save(excel_file)
+                except Exception:
+                    pass
+
         return CodeExecutionResult(
             execution_id=request.execution_id,
             status=SandboxStatus.SUCCESS,

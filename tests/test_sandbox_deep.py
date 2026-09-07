@@ -19,7 +19,7 @@ PROBES = [
     ("csv_json_sqlite", "import csv,io,json,sqlite3; rows=list(csv.DictReader(io.StringIO('x,y\\n2,3\\n'))); db=sqlite3.connect(':memory:'); assert db.execute('select 2+3').fetchone()[0]==5; assert json.loads(json.dumps(rows))[0]['x']=='2'; print('OK')", "success"),
     ("subprocess_inside_container", "import subprocess; assert subprocess.check_output(['python3','-c','print(42)'],text=True).strip()=='42'; print('OK')", "success"),
     ("temporary_files", "import tempfile; f=tempfile.TemporaryFile(); f.write(b'hello'); f.seek(0); assert f.read()==b'hello'; print('OK')", "success"),
-    ("missing_pandas", "import pandas", "runtime_error"),
+    ("missing_package", "import non_existent_package_xyz", "runtime_error"),
     ("syntax_error", "def broken(", "runtime_error"),
     ("runtime_traceback", "raise ValueError('intentional probe')", "runtime_error"),
     ("bounded_streams", "import sys; print('x'*200000); print('e'*200000,file=sys.stderr)", "success"),

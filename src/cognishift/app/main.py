@@ -2,11 +2,11 @@ import os
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
-from cognishift.app.config import settings
+from fastapi.responses import RedirectResponse, FileResponse
+from cognishift.app.config import settings, PROJECT_ROOT
 from cognishift.core.network.client import get_sovereign_async_client
 from cognishift import __version__
 
@@ -78,7 +78,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.url.path.startswith("/static") or request.url.path == "/":
+    if request.url.path.startswith(("/static", "/assets")) or request.url.path == "/":
         response.headers["Cache-Control"] = "no-cache, must-revalidate"
     return response
 
@@ -96,14 +96,40 @@ app.include_router(sovereignty.router)
 app.include_router(sandbox.router)
 app.include_router(audit.router)
 
-# Setup Static UI
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-os.makedirs(static_dir, exist_ok=True)
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+# Setup Frontend UI (Tiered: Built Vite SPA -> Legacy Static -> API Welcome JSON)
+vite_dist_dir = PROJECT_ROOT / "frontend" / "dist"
+legacy_static_dir = PROJECT_ROOT / "src" / "cognishift" / "app" / "static"
 
-@app.get("/")
-async def root():
-    return RedirectResponse(url="/static/index.html")
+
+if vite_dist_dir.exists() and (vite_dist_dir / "index.html").exists():
+    if (vite_dist_dir / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(vite_dist_dir / "assets")), name="vite_assets")
+
+    @app.get("/")
+    async def root_spa():
+        return FileResponse(str(vite_dist_dir / "index.html"))
+
+elif legacy_static_dir.exists() and (legacy_static_dir / "index.html").exists():
+    app.mount("/static", StaticFiles(directory=str(legacy_static_dir)), name="static")
+
+    @app.get("/")
+    async def root_legacy():
+        return RedirectResponse(url="/static/index.html")
+
+else:
+    @app.get("/")
+    async def root_api():
+        return {
+            "app": "CogniShift API",
+            "version": __version__,
+            "status": "online",
+            "operating_mode": settings.operating_mode,
+            "docs": "/docs",
+            "frontend": {
+                "vite_dev_server": "http://127.0.0.1:5173",
+                "note": "React 19 + Vite frontend available. Run 'npm run dev' or 'npm run build' in frontend/."
+            }
+        }
 
 async def check_ollama() -> tuple[bool, List[Dict[str, Any]]]:
     try:
@@ -133,7 +159,7 @@ async def privacy_status():
     return {
         "operating_mode": settings.operating_mode,
         "external_apis_blocked": external_blocked,
-        "data_directory": str(settings.data_dir.absolute())
+        "data_directory": "data"
     }
 
 @app.get("/api/v1/system/models")

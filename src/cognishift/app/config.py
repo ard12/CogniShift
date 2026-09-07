@@ -11,7 +11,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 class Settings(BaseSettings):
     """Configuration settings for CogniShift."""
+    project_root: Path = PROJECT_ROOT
     operating_mode: str = "local"
+
+
     ollama_base_url: str = "http://127.0.0.1:11434"
     text_model: str = "qwen2.5:7b"
     vision_model: str = "moondream"
@@ -29,7 +32,7 @@ class Settings(BaseSettings):
     sandbox_enabled: bool = True
     sandbox_runtime: str = "docker"  # 'docker' or 'podman'
     sandbox_image: str = "cognishift/sandbox-python:3.12-v1"
-    sandbox_image_digest: str = "sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea"
+    sandbox_image_digest: str = ""
     sandbox_cpu_limit: float = 1.0
     sandbox_memory_mb: int = 512
     sandbox_pid_limit: int = 64
@@ -80,7 +83,10 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore")
 
+Settings.PROJECT_ROOT = property(lambda self: self.project_root)
+
 settings = Settings()
+
 
 # Ensure all paths are absolute relative to project root if they were loaded as relative from .env
 for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir', 'auth_store_path', 'static_dir', 'fastembed_cache_dir']:

@@ -12,9 +12,9 @@ from httpx import AsyncClient, ASGITransport
 
 from cognishift.app.main import app
 
-INDEX_HTML_PATH = Path("src/cognishift/app/static/index.html")
-APP_CSS_PATH = Path("src/cognishift/app/static/app.css")
-APP_JS_PATH = Path("src/cognishift/app/static/app.js")
+INDEX_HTML_PATH = Path("frontend/index.html")
+APP_CSS_PATH = Path("frontend/src/index.css")
+APP_JS_PATH = Path("frontend/src/App.tsx")
 
 # Match URLs starting with http://, https://, or protocol-relative //
 EXTERNAL_URL_PATTERN = re.compile(r'https?://[a-zA-Z0-9.-]+|//[a-zA-Z0-9.-]+')

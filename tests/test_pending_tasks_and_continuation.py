@@ -277,7 +277,7 @@ async def test_stale_task_ttl_rejection():
     # Create task with negative TTL (already expired)
     task = await create_pending_task(
         workspace_id=1,
-        user_id="operator_sam",
+        user_id="operator_sam_stale",
         intent="CODE_EXECUTION",
         requested_goal="Old stale task",
         ttl_seconds=-10
@@ -285,7 +285,7 @@ async def test_stale_task_ttl_rejection():
     assert task.is_expired() is True
 
     # Active pending task query should return None for expired tasks
-    active_task = await get_active_pending_task(workspace_id=1, user_id="operator_sam")
+    active_task = await get_active_pending_task(workspace_id=1, user_id="operator_sam_stale")
     assert active_task is None
 
     # Affirmation will not claim stale task

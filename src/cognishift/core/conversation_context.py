@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional
 import sqlite3
 import aiosqlite
 from cognishift.app.config import settings
+from cognishift.app.db.database import get_db
 from cognishift.core.pending_tasks import detect_affirmation_or_cancellation
 
 logger = logging.getLogger(__name__)
@@ -84,8 +85,7 @@ async def get_latest_ingested_document_async(
             row = await cursor.fetchone()
             return dict(row) if row else None
         else:
-            async with aiosqlite.connect(db_path) as conn:
-                conn.row_factory = aiosqlite.Row
+            async with get_db() as conn:
                 cursor = await conn.execute(query, (workspace_id,))
                 row = await cursor.fetchone()
                 return dict(row) if row else None

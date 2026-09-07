@@ -259,6 +259,64 @@ async def test_generate_and_validate_pptx():
     assert len(prs.slides) == 2  # Title slide + 1 content slide
 
 
+@pytest.mark.asyncio
+async def test_generate_and_validate_pdf():
+    res = await execute_tool(
+        "generate_pdf",
+        {
+            "filename": "operations_report.pdf",
+            "title": "MRPL Unit 1 Operations Report",
+            "sections": [
+                {
+                    "heading": "1. Operational Status",
+                    "level": 1,
+                    "paragraphs": ["Reactor-B pressure nominal at 105.2 PSI.", "Safety interlocks fully armed."],
+                    "table": {
+                        "headers": ["Sensor", "Reading", "Status"],
+                        "rows": [["PT-101", "105.2 PSI", "NOMINAL"], ["TT-204", "78.4 °C", "NOMINAL"]]
+                    }
+                }
+            ]
+        },
+        workspace_id=1,
+        run_id=10
+    )
+    assert "Successfully generated" in res
+    pdf_path = resolve_workspace_path(1, "generated/run_10/operations_report.pdf", purpose="read")
+    assert pdf_path.exists() and pdf_path.stat().st_size > 0
+    import fitz
+    doc = fitz.open(str(pdf_path))
+    assert len(doc) >= 1
+    doc.close()
+
+
+@pytest.mark.asyncio
+async def test_render_document_page_to_image():
+    # First generate a PDF document
+    pdf_p = resolve_workspace_path(1, "documents/test_source.pdf", purpose="write", allow_create_parent=True)
+    from cognishift.core.artifact_generators import generate_pdf_document
+    generate_pdf_document(pdf_p, "Test Page Render", [{"heading": "Page 1 Content", "paragraphs": ["Telemetry reading 105.2 PSI"]}])
+
+    res = await execute_tool(
+        "render_document_page",
+        {
+            "source_path_or_id": "documents/test_source.pdf",
+            "page_number": 1,
+            "output_filename": "rendered_page_1.png",
+            "format": "png"
+        },
+        workspace_id=1,
+        run_id=10
+    )
+    assert "Successfully rendered" in res
+    img_path = resolve_workspace_path(1, "generated/run_10/rendered_page_1.png", purpose="read")
+    assert img_path.exists() and img_path.stat().st_size > 0
+    from PIL import Image
+    with Image.open(str(img_path)) as im:
+        assert im.format == "PNG"
+        assert im.size[0] > 100
+
+
 # -----------------------------------------------------------------------------
 # 5. ATOMIC ARTIFACT LIFECYCLE FAILURES
 # -----------------------------------------------------------------------------

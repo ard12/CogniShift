@@ -106,6 +106,7 @@ class RunDiagnosticArgs(BaseModel):
 
 class EmergencyPressureReliefArgs(BaseModel):
     chamber_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("chamber_id", "chamber", "equipment_id", "component_id"))
+    valve_tag: Optional[EquipmentIdentifier] = Field(default="SV-402", validation_alias=AliasChoices("valve_tag", "valve", "valve_id", "tag"))
     reason: OperationalReason = Field(default="Emergency pressure relief intervention")
 
 
@@ -224,6 +225,19 @@ class ExecuteCodeArgs(BaseModel):
     promote_outputs_to_artifacts: bool = Field(default=False, description="Promote outputs to permanent artifacts")
 
 
+class GeneratePdfArgs(BaseModel):
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.pdf$", description="Target filename (must end in .pdf)")
+    title: str = Field(..., min_length=1, max_length=200, description="Document title")
+    sections: List[DocxSection] = Field(..., min_length=1, max_length=50, description="Document sections")
+
+
+class RenderDocumentPageArgs(BaseModel):
+    source_path_or_id: str = Field(..., description="Path to PDF in workspace documents/ or knowledge source ID")
+    page_number: int = Field(default=1, ge=1, le=1000, description="1-indexed page number to render")
+    output_filename: str = Field(default="page_1.png", pattern=r"^[A-Za-z0-9_.\-]+\.(png|jpg|jpeg)$", description="Output image filename")
+    format: str = Field(default="png", pattern=r"^(png|jpg|jpeg)$", description="Target image format")
+
+
 # Tool Name -> Pydantic Schema mapping
 TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "check_pressure": CheckPressureArgs,
@@ -240,6 +254,8 @@ TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "generate_docx": GenerateDocxArgs,
     "generate_xlsx": GenerateXlsxArgs,
     "generate_pptx": GeneratePptxArgs,
+    "generate_pdf": GeneratePdfArgs,
+    "render_document_page": RenderDocumentPageArgs,
     "execute_code": ExecuteCodeArgs,
 }
 
@@ -250,17 +266,20 @@ TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
 HIGH_RISK_TOOLS = {
     "emergency_pressure_relief": "service_interrupting",
     "restart_component": "sensitive",
-    "restart_service": "service_interrupting"
+    "restart_service": "service_interrupting",
 }
 
 TOOL_RISK_LEVELS = {
     **HIGH_RISK_TOOLS,
     "execute_code": "sensitive",
+
     "file_write": "low_risk",
     "directory_create": "low_risk",
     "generate_docx": "low_risk",
     "generate_xlsx": "low_risk",
     "generate_pptx": "low_risk",
+    "generate_pdf": "low_risk",
+    "render_document_page": "low_risk",
     "run_diagnostic": "low_risk"
 }
 
@@ -597,14 +616,17 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                 pass
             return None
 
-    # Non-strict prose fallback: require meaningful prose (not code blocks, JSON, markup)
+    # Non-strict prose fallback: require meaningful prose (not code blocks, JSON, markup, or action tokens)
+    clean_stripped = clean_text.strip()
+    is_simulated = clean_stripped.startswith("[SIMULATED")
     if (
         not strict
-        and len(clean_text) >= 15
-        and not clean_text.startswith("<")
-        and not clean_text.startswith("{")
-        and not clean_text.startswith("`")
-        and '"action"' not in clean_text
+        and len(clean_stripped) >= 15
+        and not clean_stripped.startswith("<")
+        and not clean_stripped.startswith("{")
+        and (is_simulated or not clean_stripped.startswith("["))
+        and not re.search(r"['\"](?:action|step_observation|tool_call)['\"]\s*:", clean_stripped, re.IGNORECASE)
+        and not re.search(r":\s*['\"](?:step_observation|tool_call|final_answer)['\"]", clean_stripped, re.IGNORECASE)
     ):
         citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", clean_text)))
         return FinalAnswer(content=clean_text, citations=citations)

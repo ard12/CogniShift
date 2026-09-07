@@ -166,17 +166,22 @@ def check_docker_sandbox_readiness() -> PreflightComponentStatus:
 
 
 def check_frontend_external_assets() -> PreflightComponentStatus:
-    """Scans static index.html to guarantee 0 external CDN references."""
-    static_file = settings.static_dir / "index.html"
-    if not static_file.exists():
+    """Scans frontend index.html (Vite dist, template, or static) to guarantee 0 external CDN references."""
+    candidates = [
+        settings.PROJECT_ROOT / "frontend" / "dist" / "index.html",
+        settings.PROJECT_ROOT / "frontend" / "index.html",
+        settings.static_dir / "index.html",
+    ]
+    target_file = next((f for f in candidates if f.exists()), None)
+    if not target_file:
         return PreflightComponentStatus(
             name="Frontend Static Assets",
             status="MISSING",
-            details=f"{static_file} does not exist",
+            details="Neither frontend/dist/index.html nor frontend/index.html exists",
             is_ready=False
         )
     
-    text = static_file.read_text(encoding="utf-8")
+    text = target_file.read_text(encoding="utf-8")
     import re
     external_refs = [
         line.strip() for line in text.splitlines()
@@ -187,7 +192,7 @@ def check_frontend_external_assets() -> PreflightComponentStatus:
         return PreflightComponentStatus(
             name="Frontend Static Assets",
             status="READY",
-            details="Zero external CDN or font references in frontend",
+            details=f"Zero external CDN or font references in {target_file.name}",
             is_ready=True
         )
     return PreflightComponentStatus(

@@ -292,6 +292,30 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "trigger emergency trip on <equipment_id>",
         "stop equipment <equipment_id> now",
         "isolate component <equipment_id> now"
+    ],
+    SemanticIntent.UI_NAVIGATION: [
+        "take me to the portal where I can ingest documents",
+        "take me to the document ingestion portal",
+        "where can I ingest documents",
+        "where do I upload documents",
+        "how do I upload documents to the knowledge base",
+        "open the document upload page",
+        "navigate to the knowledge vault",
+        "go to knowledge",
+        "open knowledge",
+        "take me to approvals",
+        "show me pending approvals",
+        "go to approvals",
+        "take me to shift supervisor approvals",
+        "go to the dashboard",
+        "open dashboard",
+        "take me to agent settings",
+        "open agents studio",
+        "show all workspaces",
+        "open system telemetry monitor",
+        "navigate to artifact store",
+        "show run history",
+        "take me to operator chat"
     ]
 }
 
@@ -499,17 +523,24 @@ class SemanticIntentRouter:
                 }
             )
 
-        # 4.5. Deterministic Rule: Explicit Imperative Code Execution Request
-        # e.g. "run a simple python script of your choice that can generate us a report on the latest ingested document"
+        # 4.5. Deterministic Rule: Explicit Imperative Code Execution & Document Conversion Request
         is_question = any(text_lower.startswith(qo) for qo in [
             "can you", "could you", "would you", "how do you", "how can", "is it possible",
             "what can", "what is", "explain", "tell me"
         ])
         is_imperative_code = bool(re.search(
-            r'^\s*(?:please\s+)?(?:run|execute|write\s+and\s+run)\b.*?\b(?:python|code|script|program)\b',
+            r'^\s*(?:please\s+)?(?:run|execute|write|generate|make\s+(?:the\s+)?(?:ai|agent)\s+write)\b.*?\b(?:python|code|script|program)\b',
             text_lower
         ))
-        if is_imperative_code and not is_question:
+        is_document_conversion = bool(re.search(
+            r'\b(?:convert|transform|export|create|generate|render|review.*?and\s+(?:convert|create|generate|export|render))\b.*?\b(?:into|to|as|in)?\s*(?:docx|pdf|excel|xlsx|spreadsheet|jpg|jpeg|png|image)\b',
+            text_lower
+        ))
+        is_visualization_cmd = bool(re.search(
+            r'\b(?:visualize|plot|chart|graph)\b.*?\b(?:matplotlib|seaborn|telemetry|readings|sensor|data)\b',
+            text_lower
+        ))
+        if (is_imperative_code or is_document_conversion or is_visualization_cmd) and not is_question:
             return SemanticRoutingResult(
                 intent=SemanticIntent.CODE_EXECUTION,
                 decision_method=DecisionMethod.RULE,
@@ -540,7 +571,8 @@ class SemanticIntentRouter:
         question_openers = [
             "what is", "what are", "what does", "what do", "which",
             "how many", "where is", "where are", "who is", "cite the",
-            "is there a", "are there any", "do we have"
+            "is there a", "are there any", "do we have", "how do we",
+            "how can we", "why is", "why do", "why should", "when is", "when do"
         ]
         if any(text_lower.startswith(qo) for qo in question_openers):
             if SemanticIntent.CONTROL_ACTION in scores:
@@ -609,96 +641,169 @@ class SemanticIntentRouter:
 
     def _check_ui_navigation(self, text: str, refs: RoutingReferences) -> Optional[SemanticRoutingResult]:
         """Detect deterministic UI navigation commands."""
-        clean_text = text.strip().rstrip('.?!,;').strip()
+        clean_text = text.strip().rstrip('.?!,;').strip().lower()
         slash_commands = {
-            "/documents": "documents",
-            "/sandbox": "sandbox",
-            "/sovereignty": "sovereignty",
-            "/approvals": "approvals",
-            "/artifacts": "artifacts",
-            "/audit": "audit",
-            "/dashboard": "dashboard",
-            "/agents": "agents",
-            "/help": "help",
-            "/status": "status",
-            "/policy": "policy"
+            "/documents": ("documents", "/knowledge", "Knowledge Vault"),
+            "/knowledge": ("knowledge", "/knowledge", "Knowledge Vault"),
+            "/sandbox": ("sandbox", "/system", "Sandbox Environment"),
+            "/sovereignty": ("sovereignty", "/system", "System Sovereignty"),
+            "/approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "/artifacts": ("artifacts", "/artifacts", "Workspace Artifacts"),
+            "/audit": ("audit", "/system", "Audit Logs"),
+            "/dashboard": ("dashboard", "/dashboard", "Operational Dashboard"),
+            "/agents": ("agents", "/agents", "Agent Definitions"),
+            "/operator": ("operator", "/operator", "Operator Console"),
+            "/workspaces": ("workspaces", "/workspaces", "Workspace Management"),
+            "/runs": ("runs", "/runs", "Execution Run History"),
+            "/help": ("dashboard", "/dashboard", "Help & Documentation"),
+            "/status": ("system", "/system", "System Telemetry"),
+            "/policy": ("dashboard", "/dashboard", "Operational Policy")
         }
         if clean_text in slash_commands:
+            target, route, friendly = slash_commands[clean_text]
             return SemanticRoutingResult(
                 intent=SemanticIntent.UI_NAVIGATION,
                 decision_method=DecisionMethod.RULE,
                 confidence=None,
                 abstained=False,
                 references=refs,
-                details={"target": slash_commands[clean_text]}
+                details={"target": target, "target_route": route, "friendly_name": friendly}
             )
 
-        exact_nav_phrases = {
-            "open documents", "show documents", "list documents",
-            "open sandbox", "show sandbox",
-            "open sovereignty", "show sovereignty", "network monitor",
-            "open approvals", "show approvals", "show pending approvals",
-            "take me to approvals", "take me to approvals view", "go to approvals",
-            "open artifacts", "show artifacts", "list artifacts",
-            "open audit", "show audit", "show audit logs", "audit logs",
-            "open dashboard", "show dashboard", "go to dashboard"
-        }
-        if clean_text in exact_nav_phrases:
-            return SemanticRoutingResult(
-                intent=SemanticIntent.UI_NAVIGATION,
-                decision_method=DecisionMethod.RULE,
-                confidence=None,
-                abstained=False,
-                references=refs,
-                details={"phrase": clean_text}
-            )
-
-        # Regex matching for navigation commands (e.g. "take me to ... view", "go to ... page")
-        nav_match = re.match(r'^(?:take me to|go to|navigate to|switch to|open|show)\s+(?:the\s+)?([a-z0-9_\-\s]+?)(?:\s+view|\s+page|\s+tab)?$', clean_text)
-        if nav_match:
-            target_str = nav_match.group(1).strip()
-            nav_views = {
-                "document": "documents", "documents": "documents",
-                "sandbox": "sandbox", "sovereignty": "sovereignty",
-                "approval": "approvals", "approvals": "approvals",
-                "artifact": "artifacts", "artifacts": "artifacts",
-                "audit": "audit", "dashboard": "dashboard",
-                "agent": "agents", "agents": "agents",
-                "workspace": "workspaces", "workspaces": "workspaces"
-            }
-            if target_str in nav_views:
+        # 1. Document Ingestion / Knowledge Vault Navigation Patterns
+        knowledge_nav_patterns = [
+            r'^\s*(?:please\s+)?(?:how\s+to\s+)?(?:ingest|upload)\s+(?:documents?|files?|pdfs?|manuals?|data)\s*$',
+            r'.*\b(?:portal|page|view|tab|screen)\s+(?:where\s+i\s+can|to|for)\s+(?:ingest|upload)\b.*',
+            r'.*\b(?:where|how)\s+(?:can\s+i|do\s+i|to)\s+(?:ingest|upload)\b.*',
+            r'.*\b(?:take\s+me\s+to|go\s+to|open|navigate\s+to|show)\s+(?:the\s+)?(?:knowledge|knowledge\s+vault|knowledge\s+base|document\s+portal|upload\s+portal)\b.*',
+        ]
+        for pat in knowledge_nav_patterns:
+            if re.search(pat, clean_text):
                 return SemanticRoutingResult(
                     intent=SemanticIntent.UI_NAVIGATION,
                     decision_method=DecisionMethod.RULE,
                     confidence=None,
                     abstained=False,
                     references=refs,
-                    details={"target": nav_views[target_str]}
+                    details={"target": "knowledge", "target_route": "/knowledge", "friendly_name": "Knowledge Vault"}
+                )
+
+        # 2. General Exact Navigation Phrases
+        exact_nav_phrases = {
+            "open documents": ("knowledge", "/knowledge", "Knowledge Vault"),
+            "show documents": ("knowledge", "/knowledge", "Knowledge Vault"),
+            "list documents": ("knowledge", "/knowledge", "Knowledge Vault"),
+            "open knowledge": ("knowledge", "/knowledge", "Knowledge Vault"),
+            "show knowledge": ("knowledge", "/knowledge", "Knowledge Vault"),
+            "open sandbox": ("system", "/system", "Sandbox Environment"),
+            "show sandbox": ("system", "/system", "Sandbox Environment"),
+            "open sovereignty": ("system", "/system", "System Sovereignty"),
+            "show sovereignty": ("system", "/system", "System Sovereignty"),
+            "network monitor": ("system", "/system", "Network Telemetry"),
+            "open approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "show approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "show pending approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "take me to approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "take me to approvals view": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "go to approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+            "open artifacts": ("artifacts", "/artifacts", "Workspace Artifacts"),
+            "show artifacts": ("artifacts", "/artifacts", "Workspace Artifacts"),
+            "list artifacts": ("artifacts", "/artifacts", "Workspace Artifacts"),
+            "open audit": ("system", "/system", "Audit Logs"),
+            "show audit": ("system", "/system", "Audit Logs"),
+            "show audit logs": ("system", "/system", "Audit Logs"),
+            "audit logs": ("system", "/system", "Audit Logs"),
+            "open dashboard": ("dashboard", "/dashboard", "Operational Dashboard"),
+            "show dashboard": ("dashboard", "/dashboard", "Operational Dashboard"),
+            "go to dashboard": ("dashboard", "/dashboard", "Operational Dashboard"),
+            "open agents": ("agents", "/agents", "Agent Definitions"),
+            "go to agents": ("agents", "/agents", "Agent Definitions"),
+            "open workspaces": ("workspaces", "/workspaces", "Workspaces"),
+            "go to workspaces": ("workspaces", "/workspaces", "Workspaces"),
+            "open runs": ("runs", "/runs", "Execution Run History"),
+            "go to runs": ("runs", "/runs", "Execution Run History"),
+        }
+        if clean_text in exact_nav_phrases:
+            target, route, friendly = exact_nav_phrases[clean_text]
+            return SemanticRoutingResult(
+                intent=SemanticIntent.UI_NAVIGATION,
+                decision_method=DecisionMethod.RULE,
+                confidence=None,
+                abstained=False,
+                references=refs,
+                details={"target": target, "target_route": route, "friendly_name": friendly}
+            )
+
+        # 3. Regex matching for navigation commands (e.g. "take me to ... view", "go to ... page")
+        nav_match = re.match(r'^(?:take me to|go to|navigate to|switch to|open|show)\s+(?:the\s+)?([a-z0-9_\-\s]+?)(?:\s+view|\s+page|\s+tab|\s+portal|\s+screen)?$', clean_text)
+        if nav_match:
+            target_str = nav_match.group(1).strip()
+            nav_views = {
+                "document": ("knowledge", "/knowledge", "Knowledge Vault"),
+                "documents": ("knowledge", "/knowledge", "Knowledge Vault"),
+                "knowledge": ("knowledge", "/knowledge", "Knowledge Vault"),
+                "knowledge vault": ("knowledge", "/knowledge", "Knowledge Vault"),
+                "knowledge base": ("knowledge", "/knowledge", "Knowledge Vault"),
+                "sandbox": ("system", "/system", "Sandbox Environment"),
+                "sovereignty": ("system", "/system", "System Sovereignty"),
+                "approval": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+                "approvals": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+                "interlock": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+                "interlocks": ("approvals", "/approvals", "Shift Supervisor Approvals"),
+                "artifact": ("artifacts", "/artifacts", "Workspace Artifacts"),
+                "artifacts": ("artifacts", "/artifacts", "Workspace Artifacts"),
+                "audit": ("system", "/system", "Audit Logs"),
+                "dashboard": ("dashboard", "/dashboard", "Operational Dashboard"),
+                "agent": ("agents", "/agents", "Agent Definitions"),
+                "agents": ("agents", "/agents", "Agent Definitions"),
+                "operator": ("operator", "/operator", "Operator Console"),
+                "workspace": ("workspaces", "/workspaces", "Workspace Management"),
+                "workspaces": ("workspaces", "/workspaces", "Workspace Management"),
+                "run": ("runs", "/runs", "Execution Run History"),
+                "runs": ("runs", "/runs", "Execution Run History"),
+                "system": ("system", "/system", "System Telemetry"),
+            }
+            if target_str in nav_views:
+                target, route, friendly = nav_views[target_str]
+                return SemanticRoutingResult(
+                    intent=SemanticIntent.UI_NAVIGATION,
+                    decision_method=DecisionMethod.RULE,
+                    confidence=None,
+                    abstained=False,
+                    references=refs,
+                    details={"target": target, "target_route": route, "friendly_name": friendly}
                 )
 
         return None
 
     def _is_capability_inquiry_about_action(self, text: str) -> bool:
-        """Determines if a prompt is an educational or capability question ABOUT an action."""
+        """Determines if a prompt is an educational or capability question ABOUT an action/tool."""
+        action_indicators = ["restart", "relief", "depressuriz", "diagnostic", "shutdown", "trip", "vent", "reboot"] + list(SUPPORTED_CONTROL_CAPABILITIES.keys())
         inquiry_openers = [
             "are you able to", "how do you", "how does", "how to", "what happens if",
             "what happens during", "can you explain", "tell me about how", "is it possible to",
-            "explain how"
+            "explain how", "explain "
         ]
-        if any(text.startswith(io) for io in inquiry_openers):
-            return True
-        if text.startswith("explain "):
-            rem = text[len("explain "):].strip()
-            if any(tool in rem for tool in SUPPORTED_CONTROL_CAPABILITIES):
-                return True
-            if any(verb in rem for verb in ["restart", "relief", "depressuriz", "diagnostic", "shutdown", "trip"]):
-                return True
+        for io in inquiry_openers:
+            if text.startswith(io):
+                rem = text[len(io):].strip()
+                if (
+                    any(tool in rem for tool in SUPPORTED_CONTROL_CAPABILITIES)
+                    or any(alias in rem for aliases in SUPPORTED_CONTROL_CAPABILITIES.values() for alias in aliases)
+                    or any(verb in rem for verb in action_indicators)
+                ):
+                    return True
         return False
 
     def _is_negated_action(self, text: str) -> bool:
         """Detects explicit negations directing the agent NOT to take action."""
-        negation_openers = ["do not ", "don't ", "dont ", "never ", "nevermind", "cancel "]
-        return any(text.startswith(no) for no in negation_openers)
+        cleaned = re.sub(r"^(?:please\s+|hey\s+|operator(?:\s+directive)?[:\s]+)+", "", text.strip())
+        negation_openers = ["do not ", "don't ", "dont ", "don’t ", "never ", "nevermind", "cancel "]
+        if any(cleaned.startswith(no) for no in negation_openers):
+            return True
+        if re.search(r"\b(?:do\s+not|don['’]?t|never|cancel)\s+(?:restart|trip|relief|vent|depressurize|run\s+diagnostic|shutdown)", text):
+            return True
+        return False
 
     def _is_ambiguous_control_request(self, text: str, refs: RoutingReferences) -> bool:
         """Determines if a prompt is an ambiguous modal directive on an operational action."""
@@ -716,11 +821,15 @@ class SemanticIntentRouter:
 
         action_words = [
             "restart", "reboot", "shut down", "shutdown", "trip", "vent",
-            "relief", "depressurize", "diagnostic"
+            "relief", "depressurize", "diagnostic", "trigger"
         ]
         has_action_word = any(w in text for w in action_words)
         has_equipment = len(refs.equipment_ids) > 0
-        return has_action_word or has_equipment
+        target_indicators = [
+            "component", "pump", "valve", "sensor", "vessel", "reactor",
+            "pressure relief", "relief", "system", "service"
+        ]
+        return has_action_word and (has_equipment or any(w in text for w in target_indicators))
 
     def _is_supported_control_action(self, text: str, refs: RoutingReferences) -> bool:
         """Verifies if the requested operational action is supported by registered tools."""
@@ -733,14 +842,28 @@ class SemanticIntentRouter:
 
     def _is_artifact_inquiry(self, text: str, refs: RoutingReferences) -> bool:
         """Determines if a prompt is an explicit inquiry about a workspace file/artifact."""
-        if not refs.files:
-            return False
-
         is_code = bool(re.search(
             r'\b(?:run|write|execute|calculate|compute|eval|evaluate)\b.*?\b(?:python|code|script|program)\b|\bpython\b',
             text
         ))
         if is_code:
+            return False
+
+        if any(w in text for w in ["export", "convert", "generate two", "two deliverables", "two different files", "both docx", "both pdf", "and export", "and generate"]):
+            return False
+
+        # Conversational inquiry about generated artifacts or files
+        artifact_keywords = [
+            "file you generated", "files you generated", "artifact you generated", "artifacts you generated",
+            "document you generated", "name of the file", "what file", "which file", "where is the file",
+            "where is the artifact", "where is the document", "can't find it in artifacts", "cannot find it in artifacts",
+            "find the artifact", "in artifacts", "list artifacts", "show artifacts", "generated document",
+            "generated artifact", "the generated file", "the created file", "what is the file name"
+        ]
+        if any(kw in text for kw in artifact_keywords):
+            return True
+
+        if not refs.files:
             return False
 
         inquiry_triggers = [

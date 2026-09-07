@@ -2,7 +2,7 @@
 
 Technical architecture document for the on-premise agentic AI workbench.
 
-**Validated:** 2026-09-04 against the 219-test non-frontend regression suite and live Docker, RapidOCR, Ollama, and browser workflows. The complete local working tree has 226 passing checks.
+**Validated:** 2026-09-07 against the complete 401+ test suite (100% passing) and live Docker, RapidOCR, Ollama, and browser workflows.
 
 Authentication uses hashed long-lived bearer credentials plus optional loopback-only, process-memory demo sessions. Demo sessions require `COGNISHIFT_DEMO_MODE=true`, expire automatically, and never expose long-lived keys.
 
@@ -170,6 +170,47 @@ All web server responses include:
 
 ## 7. Operator Interfaces
 
-1. **Web Dashboard:** Browser-based interface at `http://127.0.0.1:8000/static/index.html`.
-2. **Terminal CLI:** Typer + Rich command-line application (`cli.py`) for headless edge servers and SSH sessions.
+1. **Production Web Console (SPA):** Modern Single Page Application built with React 19, TypeScript, and Tailwind CSS (located in `frontend/`). Features real-time run timelines, Four-Eyes approval cards, workspace switching, knowledge base ingestion, and inline deliverable preview/download. Served via Vite development server (`http://localhost:5173`) or production-compiled bundle via FastAPI at root (`http://127.0.0.1:8000/`).
+2. **Terminal CLI:** Typer + Rich command-line application (`cli.py`) for headless edge servers, air-gapped industrial consoles, and SSH sessions.
 3. **REST API:** OpenAPI / Swagger documentation at `http://127.0.0.1:8000/docs`.
+
+---
+
+## 8. Native FastEmbed Semantic Intent Router
+
+CogniShift integrates a zero-cloud, multi-domain intent classification router before model routing:
+* **7 Discrete Semantic Intents:**
+  1. `CONVERSATION`: Clarifications, greetings, capabilities, questions about what tools exist.
+  2. `KNOWLEDGE_QUERY`: Technical manual search, SOP lookups, standard operating tolerances.
+  3. `ARTIFACT_INSPECTION`: Inspection or review of generated reports, charts, and spreadsheets.
+  4. `CODE_EXECUTION`: Running python data science scripts or sandbox calculations.
+  5. `CONTROL_ACTION`: Actuating valves, reading live SCADA telemetry, tripping components.
+  6. `UI_NAVIGATION`: Direct interface navigation commands.
+  7. `COMPLEX_AGENT`: Multi-step diagnostic synthesis requiring iterative reasoning.
+* **Entity Decoupling & Normalization:** Identifies file extensions, equipment tags (`PT-101`, `P-101A`), and replaces them with normalized tokens (`<equipment_id>`, `<file>`) to ensure routing is invariant to specific equipment IDs.
+* **Cosine Distance & Confidence Margins:** Computes embeddings via local `BAAI/bge-small-en-v1.5` on CPU; requires minimum confidence and runner-up margin thresholds; safely abstains (`DecisionMethod.ABSTAIN`) when queries are ambiguous.
+
+---
+
+## 9. Multi-Turn Conversational Engine & CAS Pending Tasks
+
+CogniShift manages multi-turn conversational continuity and delayed human authorizations via an atomic state machine:
+* **Atomic Compare-And-Swap (CAS):** State transitions (`PENDING` → `CLAIMED` → `EXECUTING` → `COMPLETED`/`FAILED`) use atomic SQL updates (`UPDATE pending_tasks SET status = 'CLAIMED' WHERE id = ? AND status = 'PENDING'`) preventing race conditions or double execution.
+* **Affirmation Resumption:** When a high-risk proposal is paused, subsequent affirmations (e.g. *"yes do it"*, *"proceed"*, *"confirmed"*) automatically associate with the active task.
+* **Safe Cancellation:** Operators can abort pending operations (e.g. *"cancel that"*, *"stop"*, *"abort"*) without triggering side effects.
+* **15-Minute TTL Eviction:** Unclaimed or expired pending tasks fail closed and are marked `EXPIRED` to prevent stale actions from lingering.
+
+---
+
+## 10. Multi-Format Deliverable Generation Pipeline
+
+CogniShift features an industrial artifact generation pipeline that produces professional engineering deliverables:
+* **Supported Formats:**
+  - **Spreadsheets (`.xlsx`):** Multi-tab workbooks via `openpyxl` with financial audits, operational telemetry, and styled KPI summaries.
+  - **Documents (`.docx`):** Formal engineering memos and audit reports via `python-docx`.
+  - **Vector Reports (`.pdf`):** Publication-quality documents via `reportlab` with exact margins and tables.
+  - **Visualizations (`.png`):** High-resolution trend plots and multi-panel charts via `matplotlib` and `seaborn`.
+  - **Structured Datasets (`.json`):** Machine-readable telemetry and audit logs.
+* **Cryptographic Change Detection:** Computes SHA-256 digests for all generated artifacts; rejects tampered files at download time (HTTP 409 Conflict).
+* **Workspace Containment:** Artifacts are strictly quarantined within per-workspace subdirectories (`data/workspaces/{id}/generated/`).
+

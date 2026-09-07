@@ -104,13 +104,13 @@ DEFAULT_MODELS: Dict[str, ModelDefinition] = {
         ],
         context_window=32768,
         vram_requirement_mb=5500,
-        quality_score=0.95,
-        latency_score=0.75,
+        quality_score=0.96,
+        latency_score=0.90,
         supports_tools=True,
         supports_images=False,
         supports_json_schema=True,
         enabled=True,
-        priority=120
+        priority=130
     ),
     "deepseek-r1:14b": ModelDefinition(
         id="deepseek-r1:14b",

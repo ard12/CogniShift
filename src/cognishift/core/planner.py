@@ -75,6 +75,10 @@ def create_initial_plan(goal: str, task_type: str = "general_reasoning") -> Agen
             PlanStep(id=3, description="Cross-reference sensor readings against safe operating envelope"),
             PlanStep(id=4, description="Synthesize findings and generate engineering recommendation")
         ]
+    elif task_type == "conversational":
+        steps = [
+            PlanStep(id=1, description="Synthesize direct conversational answer addressing user query")
+        ]
     elif task_type == "document_analysis":
         steps = [
             PlanStep(id=1, description="Retrieve relevant SOP and OISD standards via RAG vector search"),

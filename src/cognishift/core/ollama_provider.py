@@ -54,6 +54,11 @@ class OllamaProvider(ModelProvider):
         try:
             async with get_sovereign_async_client(timeout=120.0, component="ollama_provider") as client:
                 response = await client.post(f"{self.base_url}/api/chat", json=payload)
+                if response.status_code == 404 and target_model != self.text_model:
+                    # Target model not installed in local Ollama; fallback to default text model
+                    payload["model"] = self.text_model
+                    response = await client.post(f"{self.base_url}/api/chat", json=payload)
+                    target_model = self.text_model
                 response.raise_for_status()
                 data = response.json()
                 text = data.get("message", {}).get("content", "")

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://127.0.0.1:11434"
     text_model: str = "qwen2.5:7b"
-    vision_model: str = "moondream"
+    vision_model: str = "moondream:latest"
     data_dir: Path = PROJECT_ROOT / "data"
     database_path: Path = PROJECT_ROOT / "data" / "cognishift.db"
     chroma_path: Path = PROJECT_ROOT / "data" / "chroma"

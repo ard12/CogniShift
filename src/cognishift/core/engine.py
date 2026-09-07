@@ -109,50 +109,52 @@ def populate_goal_contract_from_insights(contract: GoalContract, insights: Dict[
         contract.extracted_fields["revenue_current"] = r.get("latest")
         if "revenue_yoy_pct" in growth_map:
             contract.extracted_fields["revenue_yoy_pct"] = growth_map["revenue_yoy_pct"]
-        elif "revenue_cagr_pct" in growth_map:
-            contract.extracted_fields["revenue_yoy_pct"] = growth_map["revenue_cagr_pct"]
+        if "revenue_cagr_pct" in growth_map:
+            contract.extracted_fields["revenue_cagr_pct"] = growth_map["revenue_cagr_pct"]
     if "ebitda" in metrics_map:
         e = metrics_map["ebitda"]
         contract.extracted_fields["ebitda_previous"] = e.get("previous")
         contract.extracted_fields["ebitda_current"] = e.get("latest")
         if "ebitda_yoy_pct" in growth_map:
             contract.extracted_fields["ebitda_yoy_pct"] = growth_map["ebitda_yoy_pct"]
-        elif "ebitda_cagr_pct" in growth_map:
-            contract.extracted_fields["ebitda_yoy_pct"] = growth_map["ebitda_cagr_pct"]
+        if "ebitda_cagr_pct" in growth_map:
+            contract.extracted_fields["ebitda_cagr_pct"] = growth_map["ebitda_cagr_pct"]
     if "pat" in metrics_map:
         p = metrics_map["pat"]
         contract.extracted_fields["pat_previous"] = p.get("previous")
         contract.extracted_fields["pat_current"] = p.get("latest")
         if "pat_yoy_pct" in growth_map:
             contract.extracted_fields["pat_yoy_pct"] = growth_map["pat_yoy_pct"]
-        elif "pat_cagr_pct" in growth_map:
-            contract.extracted_fields["pat_yoy_pct"] = growth_map["pat_cagr_pct"]
+        if "pat_cagr_pct" in growth_map:
+            contract.extracted_fields["pat_cagr_pct"] = growth_map["pat_cagr_pct"]
 
 
-def extract_and_strip_thinking(text: str) -> Tuple[str, Optional[str]]:
+def extract_and_strip_thinking(text: str) -> Tuple[str, bool, int]:
     """
     Strips and sanitizes <think>...</think> blocks from model output.
     Handles case variants (<think>, <THINK>) and unclosed <think> tags through EOF.
-    Returns (cleaned_text, reasoning_summary).
-    Guarantees raw thinking tokens never leak to the operator UI or result_text.
+    Returns (cleaned_text, reasoning_detected, reasoning_character_count).
+    Guarantees raw thinking tokens are NEVER returned, logged, persisted, or passed downstream.
     """
     if not text:
-        return "", None
+        return "", False, 0
+    total_reasoning_chars = 0
     # 1. Strip closed tags (case-insensitive)
     closed_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL | re.IGNORECASE)
-    thinks = closed_pattern.findall(text)
+    for match in closed_pattern.finditer(text):
+        total_reasoning_chars += len(match.group(1))
     cleaned = closed_pattern.sub('', text)
 
     # 2. Strip unclosed tag through EOF (case-insensitive)
     unclosed_pattern = re.compile(r'<think>(.*)$', re.DOTALL | re.IGNORECASE)
     unclosed_match = unclosed_pattern.search(cleaned)
     if unclosed_match:
-        thinks.append(unclosed_match.group(1))
+        total_reasoning_chars += len(unclosed_match.group(1))
         cleaned = unclosed_pattern.sub('', cleaned)
 
     cleaned = cleaned.strip()
-    reasoning_summary = "\n".join(t.strip() for t in thinks if t.strip()) if thinks else None
-    return cleaned, reasoning_summary
+    reasoning_detected = (total_reasoning_chars > 0)
+    return cleaned, reasoning_detected, total_reasoning_chars
 
 
 def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[bool, str]:
@@ -1008,9 +1010,14 @@ async def execute_agent_run(
 
         # Pre-verify that selected_model_id is actually installed locally; if not, immediately use settings.text_model
         if installed_models:
-            installed_clean = set(m.strip().lower() for m in installed_models) | set(m.strip().lower().split(":")[0] for m in installed_models)
+            installed_clean = set(m.strip().lower() for m in installed_models)
             sel_clean = selected_model_id.strip().lower()
-            if sel_clean not in installed_clean and f"{sel_clean}:latest" not in installed_clean and sel_clean.split(":")[0] not in installed_clean:
+            matched = (
+                sel_clean in installed_clean
+                or (":" not in sel_clean and f"{sel_clean}:latest" in installed_clean)
+                or (sel_clean.endswith(":latest") and sel_clean[:-7] in installed_clean)
+            )
+            if not matched:
                 logger.warning(f"Selected model '{selected_model_id}' is not installed locally in Ollama ({installed_models}). Using '{settings.text_model}' to prevent 404.")
                 selected_model_id = settings.text_model
 
@@ -2064,17 +2071,17 @@ async def execute_agent_run(
                         return make_response(dict(await cursor.fetchone()))
 
                     raw_output = model_response.text or ""
-                    clean_output, think_summary = extract_and_strip_thinking(raw_output)
-                    if think_summary:
+                    clean_output, reasoning_detected, reasoning_chars = extract_and_strip_thinking(raw_output)
+                    if reasoning_detected:
                         await log_event(
                             db, run_id, "model_reasoning",
-                            f"Step #{current_step.id} internal reasoning detected and stripped ({len(think_summary)} chars)",
+                            f"Step #{current_step.id} internal reasoning detected and stripped ({reasoning_chars} chars)",
                             {
                                 "step_id": current_step.id,
                                 "reasoning_detected": True,
                                 "reasoning_stripped": True,
                                 "selected_model": selected_model_id,
-                                "reasoning_character_count": len(think_summary)
+                                "reasoning_character_count": reasoning_chars
                             }
                         )
 
@@ -3142,7 +3149,7 @@ print("Analysis script finished with returncode 0.")
                 if timing_block not in final_text:
                     final_text += timing_block
             # DeepSeek & LLM Output Hygiene: Ensure <think>...</think> blocks never leak to result_text
-            final_text, _ = extract_and_strip_thinking(final_text)
+            final_text, _, _ = extract_and_strip_thinking(final_text)
 
             # SCADA Anomaly Grounding Authority:
             # If an anomalous tabular event was detected, ensure model prose conforms to frozen facts.

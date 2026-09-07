@@ -49,12 +49,12 @@ def test_deepseek_thinking_hygiene():
         "</think>\n"
         "Pump P-101A is currently operating within nominal baseline parameters (Discharge Pressure: 142.5 PSI)."
     )
-    cleaned, think_summary = extract_and_strip_thinking(raw_output)
+    cleaned, reasoning_detected, reasoning_chars = extract_and_strip_thinking(raw_output)
     assert "<think>" not in cleaned
     assert "</think>" not in cleaned
     assert "Pump P-101A is currently operating" in cleaned
-    assert think_summary is not None
-    assert "evaluating" in think_summary.lower() or "operator is asking" in think_summary.lower()
+    assert reasoning_detected is True
+    assert reasoning_chars > 0
 
 
 def test_scada_anomaly_prose_validation_accepts_grounded_prose():

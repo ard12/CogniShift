@@ -117,8 +117,9 @@ def test_model_routing_vision():
     task = classify_task("Read the needle angle on this pressure gauge photo", has_image=True)
     decision = route_model(task, available_vram_mb=6000)
 
-    assert decision.selected_model == "moondream"
-    assert decision.candidate_evaluations["moondream"].eligible is True
+    assert decision.selected_model in ("moondream:latest", "moondream")
+    candidate_key = "moondream:latest" if "moondream:latest" in decision.candidate_evaluations else "moondream"
+    assert decision.candidate_evaluations[candidate_key].eligible is True
     # Text-only models should be excluded from vision tasks
     assert decision.candidate_evaluations["llama3.2:3b"].eligible is False
     assert "Excluded" in decision.candidate_evaluations["llama3.2:3b"].rationale

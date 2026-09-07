@@ -6,6 +6,7 @@ Verifies:
 3. Engine completion gate fails closed (status='failed', event='goal_contract_violation') if any required metric is absent.
 4. Engine completes successfully when all 9 deliverables are satisfied.
 """
+import json
 import pytest
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db, init_db
@@ -90,16 +91,20 @@ def test_populate_goal_contract_from_structured_insights():
     assert contract.extracted_fields["pat_yoy_pct"] == 40.0
 
 
-def test_populate_goal_contract_cagr_fallback():
-    """Verify fallback to cagr_pct if yoy_pct is keyed as cagr."""
+def test_cagr_cannot_satisfy_yoy_goal_contract():
+    """Regression test proving CAGR cannot satisfy a YoY GoalContract.
+    CAGR and YoY are different metrics. If YoY is requested and *_yoy_pct is unavailable,
+    the field must remain unsatisfied and fail closed."""
     contract = GoalContract(required_fields=["revenue_previous", "revenue_current", "revenue_yoy_pct"])
     mock_insights = {
         "metrics": {"revenue": {"previous": 1000.0, "latest": 2000.0}},
         "growth": {"revenue_cagr_pct": 100.0}
     }
     populate_goal_contract_from_insights(contract, mock_insights)
-    assert contract.is_satisfied() is True
-    assert contract.extracted_fields["revenue_yoy_pct"] == 100.0
+    # revenue_yoy_pct must NOT be populated by revenue_cagr_pct
+    assert contract.is_satisfied() is False
+    assert "revenue_yoy_pct" not in contract.extracted_fields
+    assert contract.extracted_fields.get("revenue_cagr_pct") == 100.0
 
 
 def test_goal_contract_incomplete_fails_closed():
@@ -145,7 +150,22 @@ async def test_engine_enforces_goal_contract_failure(setup_goal_test_env):
         user_id="operator"
     )
 
-    # In simulated/test mode without financial workbook, the run must fail closed or report unsatisfied
-    assert run_response.status in ("failed", "completed")
-    if run_response.status == "failed":
-        assert "Goal contract" in (run_response.error_message or "") or "goal_contract" in (run_response.result_text or "")
+    # Must fail closed with status == 'failed'
+    assert run_response.status == "failed"
+    assert "Goal contract" in (run_response.error_message or "") or "Goal contract" in (run_response.result_text or "")
+    assert "completed successfully" not in (run_response.result_text or "").lower()
+
+    # Verify event logged in run_events with missing fields recorded
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT event_type, message, structured_data FROM run_events WHERE run_id = ? AND event_type = 'goal_contract_violation'",
+            (run_response.id,)
+        )
+        event = await cursor.fetchone()
+        assert event is not None
+        assert event[0] == "goal_contract_violation"
+        meta = json.loads(event[2]) if event[2] else {}
+        assert "missing" in meta
+        assert len(meta["missing"]) > 0
+        for required_field in ["revenue_previous", "revenue_current", "revenue_yoy_pct"]:
+            assert required_field in meta["missing"]

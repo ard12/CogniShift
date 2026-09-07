@@ -179,12 +179,13 @@ def verify_evidence_sufficiency_and_thinking_hygiene() -> bool:
         "</think>\n"
         "Equipment P-101A is currently operating within nominal baseline parameters."
     )
-    cleaned, summary = extract_and_strip_thinking(model_response)
+    cleaned, reasoning_detected, reasoning_chars = extract_and_strip_thinking(model_response)
     assert "<think>" not in cleaned
     assert "</think>" not in cleaned
     assert "nominal baseline parameters" in cleaned
-    assert summary is not None
-    print(f"  -> Thinking tokens stripped. Reasoning summary extracted: '{summary[:60]}...'")
+    assert reasoning_detected is True
+    assert reasoning_chars > 0
+    print(f"  -> Thinking tokens stripped. Reasoning detected: {reasoning_chars} characters.")
 
     print("  [PASS] Test 3: Evidence Sufficiency & Thinking Hygiene 100% Verified.")
     return True

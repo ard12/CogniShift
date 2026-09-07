@@ -933,6 +933,7 @@ async def execute_agent_run(
 
                 matching_artifacts = []
                 lower_input = clean_input.lower()
+                target_doc = await resolve_target_document_for_query(workspace_id, clean_input)
 
                 target_files = []
                 if resolved_context and resolved_context.files:

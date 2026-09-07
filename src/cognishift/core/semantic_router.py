@@ -906,6 +906,14 @@ class SemanticIntentRouter:
         if any(kw in text for kw in artifact_keywords):
             return True
 
+        # Visual artifacts / inspection queries (photos, schematics, handwritten notes, gauge photos)
+        visual_keywords = [
+            "handwritten note", "handwritten operator", "inspection note", "shift handover note", "shift note",
+            "gauge photo", "inspection photo", "p&id diagram", "pid diagram", "p&id schematic", "pid schematic"
+        ]
+        if any(kw in text for kw in visual_keywords) and any(verb in text for verb in ["transcribe", "read", "check", "inspect", "explain", "look at", "what is on", "what does"]):
+            return True
+
         if not refs.files:
             return False
 

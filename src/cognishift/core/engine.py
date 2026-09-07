@@ -44,7 +44,8 @@ from cognishift.core.conversation_context import (
     ResolvedContext,
     get_latest_ingested_document,
     get_latest_ingested_document_async,
-    resolve_target_document_for_query
+    resolve_target_document_for_query,
+    extract_requested_page
 )
 from cognishift.core.pending_tasks import (
     create_pending_task,
@@ -110,11 +111,16 @@ async def log_event(
     await db.commit()
 
 
-def _extract_pdf_preview_sync(file_path: Path, max_pages: int = 10, max_chars_per_page: int = 1500, label: str = "") -> str:
+def _extract_pdf_preview_sync(file_path: Path, max_pages: int = 10, max_chars_per_page: int = 1500, label: str = "", target_page: Optional[int] = None) -> str:
     """Synchronous CPU worker to extract text preview from PDF pages (offloaded to thread)."""
     try:
         from pypdf import PdfReader
         reader = PdfReader(str(file_path))
+        if target_page and 1 <= target_page <= len(reader.pages):
+            page = reader.pages[target_page - 1]
+            ptxt = (page.extract_text() or "").strip()
+            if ptxt:
+                return f"[{label or file_path.name} | Page {target_page}]:\n{ptxt[:max_chars_per_page]}"
         pages_text = []
         for p_num, page in enumerate(reader.pages[:max_pages], start=1):
             ptxt = (page.extract_text() or "").strip()
@@ -281,6 +287,112 @@ def build_system_prompt(
     )
 
     return "\n".join(prompt_parts)
+
+
+async def _resolve_knowledge_and_page_context(
+    db: Any,
+    workspace_id: int,
+    agent: dict,
+    clean_input: str,
+    resolved_context: Any,
+    vision_analysis: Optional[str] = None
+) -> tuple[List[int], str, str]:
+    """
+    Authoritatively resolve allowed knowledge sources, dynamic document bindings,
+    and direct page-level extractions.
+    Returns: (allowed_source_ids, retrieval_query, page_direct_context)
+    """
+    raw_ks_ids = []
+    if agent.get("knowledge_source_ids"):
+        try:
+            loaded = json.loads(agent["knowledge_source_ids"])
+            if isinstance(loaded, list):
+                raw_ks_ids = [int(x) for x in loaded if str(x).isdigit()]
+        except Exception:
+            raw_ks_ids = []
+
+    allowed_source_ids = []
+    if raw_ks_ids:
+        placeholders = ",".join("?" for _ in raw_ks_ids)
+        c_sources = await db.execute(
+            f"SELECT id, name FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND id IN ({placeholders})",
+            (workspace_id, *raw_ks_ids)
+        )
+        rows_sources = await c_sources.fetchall()
+        allowed_source_ids = [r["id"] for r in rows_sources]
+
+        # Also include any updated/active versions with the same names in this workspace
+        known_names = [r["name"] for r in rows_sources]
+        if known_names:
+            n_ph = ",".join("?" for _ in known_names)
+            c_active = await db.execute(
+                f"SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND name IN ({n_ph})",
+                (workspace_id, *known_names)
+            )
+            for r_active in await c_active.fetchall():
+                if r_active["id"] not in allowed_source_ids:
+                    allowed_source_ids.append(r_active["id"])
+
+    # Authorize documents explicitly resolved from the query or conversation history
+    target_doc = await resolve_target_document_for_query(workspace_id, clean_input, db=db)
+    if target_doc and target_doc.get("id"):
+        td_id = int(target_doc["id"])
+        if td_id not in allowed_source_ids:
+            allowed_source_ids.append(td_id)
+
+    if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
+        ps_id = int(resolved_context.pinned_source["id"])
+        if ps_id not in allowed_source_ids:
+            allowed_source_ids.append(ps_id)
+
+    for rf in (resolved_context.files if resolved_context else []):
+        c_rf = await db.execute(
+            "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
+            (workspace_id, rf, rf)
+        )
+        for r_rf in await c_rf.fetchall():
+            if r_rf["id"] not in allowed_source_ids:
+                allowed_source_ids.append(r_rf["id"])
+
+    # Direct Page-Level Context Extraction
+    requested_page = getattr(resolved_context, "requested_page", None) if resolved_context else None
+    if not requested_page:
+        requested_page = extract_requested_page(clean_input)
+
+    page_direct_context = ""
+    active_doc_for_page = None
+    if resolved_context and resolved_context.pinned_source:
+        active_doc_for_page = resolved_context.pinned_source
+    elif target_doc:
+        active_doc_for_page = target_doc
+    elif resolved_context and resolved_context.files:
+        c_f = await db.execute(
+            "SELECT id, name, original_filename FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?) LIMIT 1",
+            (workspace_id, resolved_context.files[0], resolved_context.files[0])
+        )
+        r_f = await c_f.fetchone()
+        if r_f:
+            active_doc_for_page = dict(r_f)
+
+    if requested_page and active_doc_for_page:
+        doc_sid = active_doc_for_page["id"]
+        doc_name = active_doc_for_page["name"]
+        c_page = await db.execute(
+            "SELECT text_content, extraction_method FROM document_pages WHERE source_id = ? AND page_number = ?",
+            (doc_sid, requested_page)
+        )
+        p_row = await c_page.fetchone()
+        if p_row and p_row["text_content"]:
+            p_method = (p_row["extraction_method"] or "native").upper()
+            page_direct_context = (
+                f"[{doc_name} | Page {requested_page} | {p_method}]\n"
+                f'<document_context source="{doc_name}" page="{requested_page}" method="{p_row["extraction_method"] or "native"}">\n'
+                f"{p_row['text_content']}\n"
+                f"</document_context>"
+            )
+
+    retrieval_query = f"{clean_input} {vision_analysis}".strip() if vision_analysis else clean_input
+    return allowed_source_ids, retrieval_query, page_direct_context
 
 
 async def execute_agent_run(
@@ -927,6 +1039,15 @@ async def execute_agent_run(
                         cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
                         return make_response(dict(await cursor.fetchone()))
 
+                seen_fns = set()
+                unique_matching_artifacts = []
+                for art in matching_artifacts:
+                    fn = art["filename"].lower()
+                    if fn not in seen_fns:
+                        seen_fns.add(fn)
+                        unique_matching_artifacts.append(art)
+                matching_artifacts = unique_matching_artifacts
+
                 for art in matching_artifacts[:2]:
                     try:
                         raw_rel = art["relative_path"]
@@ -969,7 +1090,30 @@ async def execute_agent_run(
                                     logger.warning(f"Error reading docx {art['filename']}: {docx_err}")
                                     content = f"[DOCX document: {art['filename']}]"
                             elif ext == ".pdf":
-                                content = await asyncio.to_thread(_extract_pdf_preview_sync, art_path, 10, 1500, art["filename"])
+                                requested_p = getattr(resolved_context, "requested_page", None) if resolved_context else None
+                                if not requested_p:
+                                    requested_p = extract_requested_page(clean_input)
+
+                                if requested_p:
+                                    c_dp = await db.execute(
+                                        """SELECT dp.text_content, dp.extraction_method 
+                                           FROM document_pages dp 
+                                           JOIN knowledge_sources ks ON dp.source_id = ks.id 
+                                           WHERE ks.workspace_id = ? AND (ks.name = ? OR ks.original_filename = ?) AND dp.page_number = ?
+                                           ORDER BY ks.id DESC LIMIT 1""",
+                                        (workspace_id, art["filename"], art["filename"], requested_p)
+                                    )
+                                    row_dp = await c_dp.fetchone()
+                                    if row_dp and row_dp["text_content"]:
+                                        method_label = (row_dp["extraction_method"] or "native").upper()
+                                        content = f"[{art['filename']} | Page {requested_p} | {method_label}]:\n{row_dp['text_content']}"
+                                        artifact_citations.append(f"{art['filename']} | Page {requested_p} | {method_label}")
+                                    else:
+                                        content = await asyncio.to_thread(_extract_pdf_preview_sync, art_path, requested_p, 3000, art["filename"], requested_p)
+                                        artifact_citations.append(f"{art['filename']} | Page {requested_p}")
+                                else:
+                                    content = await asyncio.to_thread(_extract_pdf_preview_sync, art_path, 10, 1500, art["filename"])
+                                    artifact_citations.append(f"Workspace Artifact | {art['filename']}")
 
                             if content:
                                 preview = content[:4000]
@@ -980,7 +1124,8 @@ async def execute_agent_run(
                                     f"Path: {art['relative_path']}\n"
                                     f"Content:\n{preview}"
                                 )
-                                artifact_citations.append(f"Workspace Artifact | {art['filename']}")
+                                if not any(art["filename"] in c for c in artifact_citations):
+                                    artifact_citations.append(f"Workspace Artifact | {art['filename']}")
                     except Exception as ex:
                         logger.warning(f"Could not load artifact {art.get('relative_path')}: {ex}")
 
@@ -999,26 +1144,15 @@ async def execute_agent_run(
                 )
 
             elif routing_res.intent == SemanticIntent.KNOWLEDGE_QUERY:
-                raw_ks_ids = []
-                if agent.get("knowledge_source_ids"):
-                    try:
-                        loaded = json.loads(agent["knowledge_source_ids"])
-                        if isinstance(loaded, list):
-                            raw_ks_ids = [int(x) for x in loaded if str(x).isdigit()]
-                    except Exception:
-                        raw_ks_ids = []
+                allowed_source_ids, retrieval_query, page_direct_context = await _resolve_knowledge_and_page_context(
+                    db=db,
+                    workspace_id=workspace_id,
+                    agent=agent,
+                    clean_input=clean_input,
+                    resolved_context=resolved_context,
+                    vision_analysis=vision_analysis
+                )
 
-                allowed_source_ids = []
-                if raw_ks_ids:
-                    placeholders = ",".join("?" for _ in raw_ks_ids)
-                    c_sources = await db.execute(
-                        f"SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND id IN ({placeholders})",
-                        (workspace_id, *raw_ks_ids)
-                    )
-                    rows = await c_sources.fetchall()
-                    allowed_source_ids = [r["id"] for r in rows]
-
-                retrieval_query = f"{clean_input} {vision_analysis}".strip() if vision_analysis else clean_input
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids})...")
                 if allowed_source_ids:
                     context_str = await retrieve_context(
@@ -1027,11 +1161,14 @@ async def execute_agent_run(
                         top_k=3,
                         allowed_source_ids=allowed_source_ids
                     )
+                if page_direct_context:
+                    context_str = f"{page_direct_context}\n\n{context_str}".strip() if context_str else page_direct_context
+
                 has_tag = any(p in retrieval_query.upper() for p in ["P-", "V-", "T-", "HEX-", "MOV-", "PT-", "TT-"])
                 if has_tag:
                     graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
-                citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", context_str))) if context_str else []
+                citations = list(dict.fromkeys(re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", context_str))) if context_str else []
                 sources_used = ", ".join(citations) if citations else "None (No matching manual found)"
                 if graph_context:
                     sources_used += " + Plant Topology Graph"
@@ -1214,26 +1351,15 @@ async def execute_agent_run(
 
             else:
                 # CONTROL_ACTION / COMPLEX_AGENT / Default: Full retrieval
-                raw_ks_ids = []
-                if agent.get("knowledge_source_ids"):
-                    try:
-                        loaded = json.loads(agent["knowledge_source_ids"])
-                        if isinstance(loaded, list):
-                            raw_ks_ids = [int(x) for x in loaded if str(x).isdigit()]
-                    except Exception:
-                        raw_ks_ids = []
+                allowed_source_ids, retrieval_query, page_direct_context = await _resolve_knowledge_and_page_context(
+                    db=db,
+                    workspace_id=workspace_id,
+                    agent=agent,
+                    clean_input=clean_input,
+                    resolved_context=resolved_context,
+                    vision_analysis=vision_analysis
+                )
 
-                allowed_source_ids = []
-                if raw_ks_ids:
-                    placeholders = ",".join("?" for _ in raw_ks_ids)
-                    c_sources = await db.execute(
-                        f"SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND id IN ({placeholders})",
-                        (workspace_id, *raw_ks_ids)
-                    )
-                    rows = await c_sources.fetchall()
-                    allowed_source_ids = [r["id"] for r in rows]
-
-                retrieval_query = f"{clean_input} {vision_analysis}".strip() if vision_analysis else clean_input
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids}) and plant topology graph...")
                 if allowed_source_ids:
                     context_str = await retrieve_context(
@@ -1242,6 +1368,9 @@ async def execute_agent_run(
                         top_k=3,
                         allowed_source_ids=allowed_source_ids
                     )
+                if page_direct_context:
+                    context_str = f"{page_direct_context}\n\n{context_str}".strip() if context_str else page_direct_context
+
                 graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
                 lower_clean = clean_input.lower()
@@ -1326,7 +1455,7 @@ async def execute_agent_run(
                     except Exception as ex:
                         pass
 
-                citations = list(set(re.findall(r"\[(.*?\|\s*Page\s*\d+)\]", context_str))) if context_str else []
+                citations = list(dict.fromkeys(re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", context_str))) if context_str else []
                 sources_used = ", ".join(citations) if citations else "None (No matching manual found)"
                 if graph_context:
                     sources_used += " + Plant Topology Graph"

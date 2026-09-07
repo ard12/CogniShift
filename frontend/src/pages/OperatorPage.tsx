@@ -262,9 +262,12 @@ export function OperatorPage() {
     try {
       let inputImagePath: string | null = null;
       if (imageFile) {
-        setDispatchStage("Ingesting attached image through the knowledge pipeline…");
+        setDispatchStage("Ingesting attached file through the knowledge pipeline…");
         const source = await knowledgeApi.upload(imageFile, selectedWorkspaceId);
-        inputImagePath = source.local_path ?? null;
+        const isImage = imageFile.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(imageFile.name);
+        if (isImage) {
+          inputImagePath = source.local_path ?? null;
+        }
       }
 
       // Auto-clear image attachment immediately so subsequent prompts do not re-upload it
@@ -436,7 +439,7 @@ export function OperatorPage() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/png,image/jpeg"
+                      accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg"
                       className="hidden"
                       onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
                     />
@@ -444,9 +447,9 @@ export function OperatorPage() {
                       variant="secondary"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
-                      title="Attach an inspection photo (gauge dial, nameplate, etc.)"
+                      title="Attach file (Excel spreadsheet, PDF manual, CSV, or inspection photo)"
                     >
-                      <IconImage className="h-3.5 w-3.5" /> Attach image
+                      <IconImage className="h-3.5 w-3.5" /> Attach file / image
                     </Button>
                     <Button
                       variant="primary"
@@ -461,8 +464,7 @@ export function OperatorPage() {
 
                 {imageFile && (
                   <p className="text-[11px] leading-relaxed text-ink-3">
-                    The attached image is first ingested through the Knowledge Vault to obtain a
-                    server-side path, then referenced as visual input for this run.
+                    The attached file ({imageFile.name}) is ingested through the Knowledge Vault into the workspace for immediate agent retrieval and analysis.
                   </p>
                 )}
 

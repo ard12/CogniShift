@@ -91,7 +91,7 @@ export function KnowledgePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg"
                 className="hidden"
                 onChange={(e) => void handleFileSelected(e.target.files?.[0])}
               />
@@ -100,7 +100,7 @@ export function KnowledgePage() {
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 loading={uploading}
-                title="Upload PDF manual, Excel spreadsheet (.xlsx/.xls), CSV, or inspection photo"
+                title="Upload Excel spreadsheet (.xlsx/.xls), CSV, PDF manual, or inspection photo"
               >
                 <IconUpload className="h-3.5 w-3.5" /> Upload document / spreadsheet
               </Button>
@@ -114,12 +114,33 @@ export function KnowledgePage() {
       {!selectedWorkspaceId ? (
         <EmptyState title="Select a workspace" description="Choose a workspace from the top bar to view its knowledge vault." />
       ) : (
-        <Panel>
-          <PanelHeader
-            icon={<IconBook className="h-3.5 w-3.5" />}
-            title="Ingested Sources"
-            meta={<span className="font-mono text-[10px] text-ink-3">{sources.length}</span>}
-          />
+        <div
+          onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const f = e.dataTransfer.files?.[0];
+            if (f) void handleFileSelected(f);
+          }}
+        >
+          <Panel>
+            <PanelHeader
+              icon={<IconBook className="h-3.5 w-3.5" />}
+              title="Ingested Sources"
+              meta={<span className="font-mono text-[10px] text-ink-3">{sources.length}</span>}
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-border bg-surface-2/60 px-4 py-2 text-xs text-ink-3">
+              <span>Drag and drop any file here or use the upload button above.</span>
+              <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-brand font-medium">Excel (.xlsx, .xls)</span>
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-ink-2">CSV (.csv)</span>
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-ink-2">PDF (.pdf)</span>
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-ink-2">Images (.png, .jpg)</span>
+              </div>
+            </div>
           <PanelBody className="p-0">
             {loading ? (
               <LoadingState />
@@ -129,7 +150,7 @@ export function KnowledgePage() {
               <EmptyState
                 icon={<IconBook className="h-6 w-6" />}
                 title="No documents ingested"
-                description="Upload an operational spreadsheet (XLSX/CSV), PDF manual, or inspection photo (PNG/JPEG) to begin."
+                description="Upload an operational spreadsheet (XLSX/XLS/CSV), PDF manual, or inspection photo (PNG/JPEG) to begin."
               />
             ) : (
               <ul className="divide-y divide-surface-border">
@@ -156,7 +177,8 @@ export function KnowledgePage() {
               </ul>
             )}
           </PanelBody>
-        </Panel>
+          </Panel>
+        </div>
       )}
 
       <ConfirmDialog

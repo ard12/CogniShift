@@ -1,4 +1,5 @@
 import os
+import json
 import hashlib
 import uuid
 from pathlib import Path
@@ -94,7 +95,7 @@ async def upload_document(
             metadatas = []
             ids = []
 
-            if ext in [".xlsx", ".xls"]:
+            if ext == ".xlsx":
                 wb = openpyxl.load_workbook(file_path, data_only=True)
                 for sheet_idx, sname in enumerate(wb.sheetnames):
                     ws = wb[sname]
@@ -112,10 +113,34 @@ async def upload_document(
                     chunks.append(sheet_text)
                     metadatas.append({
                         "source_id": int(source_id),
+                        "filename": safe_basename,
                         "document_name": safe_basename,
+                        "page": sheet_idx + 1,
                         "page_number": sheet_idx + 1,
                         "sheet_name": sname,
-                        "workspace_id": int(workspace_id)
+                        "workspace_id": int(workspace_id),
+                        "extraction_method": "spreadsheet"
+                    })
+                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}")
+            elif ext == ".xls":
+                xl = pd.ExcelFile(file_path)
+                for sheet_idx, sname in enumerate(xl.sheet_names):
+                    df_sheet = pd.read_excel(xl, sheet_name=sname)
+                    sheet_lines = [f"=== SPREADSHEET: {safe_basename} | SHEET: {sname} ==="]
+                    sheet_lines.append("Columns: " + ", ".join(str(c) for c in df_sheet.columns))
+                    for _, r in df_sheet.head(150).iterrows():
+                        sheet_lines.append(" | ".join(str(c) for c in r.values if pd.notna(c)))
+                    sheet_text = "\n".join(sheet_lines)
+                    chunks.append(sheet_text)
+                    metadatas.append({
+                        "source_id": int(source_id),
+                        "filename": safe_basename,
+                        "document_name": safe_basename,
+                        "page": sheet_idx + 1,
+                        "page_number": sheet_idx + 1,
+                        "sheet_name": sname,
+                        "workspace_id": int(workspace_id),
+                        "extraction_method": "spreadsheet"
                     })
                     ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}")
             else:
@@ -124,10 +149,13 @@ async def upload_document(
                 chunks.append(csv_text)
                 metadatas.append({
                     "source_id": int(source_id),
+                    "filename": safe_basename,
                     "document_name": safe_basename,
+                    "page": 1,
                     "page_number": 1,
                     "sheet_name": "CSV_Data",
-                    "workspace_id": int(workspace_id)
+                    "workspace_id": int(workspace_id),
+                    "extraction_method": "spreadsheet"
                 })
                 ids.append(f"src_{source_id}_csv_1")
 
@@ -141,10 +169,32 @@ async def upload_document(
             await asyncio.to_thread(_embed_and_upsert)
 
             async with get_db() as db:
+                # Save page/sheet records in document_pages table for direct page retrieval
+                for idx, chunk_text in enumerate(chunks, start=1):
+                    await db.execute(
+                        """INSERT INTO document_pages (source_id, page_number, text_content, extraction_method)
+                           VALUES (?, ?, ?, 'spreadsheet')""",
+                        (source_id, idx, chunk_text)
+                    )
                 await db.execute(
                     "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ? WHERE id = ?",
                     (len(chunks), source_id)
                 )
+                # Auto-append source_id to agents in this workspace so newly ingested knowledge is immediately accessible
+                c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+                for ag in await c_agents.fetchall():
+                    try:
+                        curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                        if not isinstance(curr_ids, list):
+                            curr_ids = []
+                    except Exception:
+                        curr_ids = []
+                    if source_id not in curr_ids:
+                        curr_ids.append(source_id)
+                        await db.execute(
+                            "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                            (json.dumps(curr_ids), ag["id"])
+                        )
                 await db.commit()
                 cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
                 updated_row = await cursor.fetchone()
@@ -167,6 +217,22 @@ async def upload_document(
         )
         
         async with get_db() as db:
+            # Auto-append source_id to agents in this workspace so newly ingested knowledge is immediately accessible
+            c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+            for ag in await c_agents.fetchall():
+                try:
+                    curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                    if not isinstance(curr_ids, list):
+                        curr_ids = []
+                except Exception:
+                    curr_ids = []
+                if source_id not in curr_ids:
+                    curr_ids.append(source_id)
+                    await db.execute(
+                        "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                        (json.dumps(curr_ids), ag["id"])
+                    )
+            await db.commit()
             cursor = await db.execute(
                 "SELECT * FROM knowledge_sources WHERE id = ?",
                 (source_id,)

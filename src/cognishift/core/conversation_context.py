@@ -242,12 +242,122 @@ async def resolve_target_document_for_query(
 
     scored_candidates.sort(key=lambda x: x[0], reverse=True)
 
+def extract_requested_page(text: str) -> Optional[int]:
+    """Extract 1-indexed target page number from natural language queries."""
+    if not text:
+        return None
+    t = text.lower()
+    if re.search(r'\b(?:first|1st)\s*page\b|\bpage\s*1\b', t):
+        return 1
+    if re.search(r'\b(?:second|2nd)\s*page\b|\bpage\s*2\b', t):
+        return 2
+    if re.search(r'\b(?:third|3rd)\s*page\b|\bpage\s*3\b', t):
+        return 3
+    if re.search(r'\b(?:fourth|4th)\s*page\b|\bpage\s*4\b', t):
+        return 4
+    if re.search(r'\b(?:fifth|5th)\s*page\b|\bpage\s*5\b', t):
+        return 5
+    m = re.search(r'\bpage\s*(\d+)\b|\b(\d+)(?:st|nd|rd|th)\s*page\b', t)
+    if m:
+        val = m.group(1) or m.group(2)
+        try:
+            return int(val)
+        except ValueError:
+            return None
+    return None
+
+
+def resolve_target_document_for_query_sync(
+    workspace_id: int,
+    query: str
+) -> Optional[Dict[str, Any]]:
+    """Synchronous read-only resolver for target knowledge source document referenced in text."""
+    db_path = settings.database_path
+    if not db_path.exists():
+        return None
+
+    try:
+        uri_path = f"file:{db_path.resolve().as_posix()}?mode=ro"
+        conn = sqlite3.connect(uri_path, uri=True, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT id, workspace_id, name, original_filename, local_path, 
+                      source_type, checksum, chunk_count, created_at, active_processing_version
+               FROM knowledge_sources 
+               WHERE workspace_id = ? AND processing_status = 'completed'
+               ORDER BY created_at DESC, id DESC""",
+            (workspace_id,)
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Error fetching knowledge sources for sync resolution: {e}")
+        return None
+
+    if not rows:
+        return None
+
+    q_lower = (query or "").lower().strip()
+
+    # 1. Exact filename or stem match in query
+    for r in rows:
+        name = (r.get("name") or "").lower()
+        orig_name = (r.get("original_filename") or "").lower()
+        stem = Path(name).stem.lower()
+        if (name and name in q_lower) or (orig_name and orig_name in q_lower):
+            return r
+        if stem and len(stem) > 5 and stem in q_lower:
+            return r
+
+    wants_spreadsheet = any(w in q_lower for w in ["excel", "xlsx", "xls", "csv", "spreadsheet", "spreadsheets", "sheets", "workbook"])
+    wants_image = any(w in q_lower for w in ["image", "photo", "png", "jpg", "jpeg", "schematic", "p&id", "pid", "diagram", "gauge", "meter", "dial"])
+    wants_pdf = any(w in q_lower for w in ["pdf", "manual", "sop", "standard", "policy"])
+
+    domain_keywords = [
+        "financial", "history", "audit", "revenue", "ebitda", "pat", "cagr", "p&l", "profit",
+        "pid", "schematic", "cdu", "hydrocracker", "manifold",
+        "pump", "p-101", "p-101a", "sop", "maintenance", "inspection", "report",
+        "gauge", "meter", "dial", "photo",
+        "handwritten", "note",
+        "oisd", "prv", "relief", "pressure"
+    ]
+
+    scored_candidates = []
+    for r in rows:
+        name = (r.get("name") or "").lower()
+        stype = (r.get("source_type") or "").lower()
+        ext = Path(name).suffix.lower()
+        score = 0
+
+        # Modality alignment
+        if wants_spreadsheet:
+            if stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
+                score += 50
+            elif stype == "image" or ext in (".png", ".jpg", ".jpeg"):
+                score -= 60
+        elif wants_image:
+            if stype == "image" or ext in (".png", ".jpg", ".jpeg"):
+                score += 50
+            elif stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
+                score -= 40
+        elif wants_pdf:
+            if stype == "pdf" or ext == ".pdf":
+                score += 30
+
+        # Domain keyword matching
+        for kw in domain_keywords:
+            if kw in q_lower and kw in name:
+                score += 35
+
+        scored_candidates.append((score, r))
+
+    scored_candidates.sort(key=lambda x: x[0], reverse=True)
+
     if scored_candidates and scored_candidates[0][0] > 0:
         return scored_candidates[0][1]
 
-    # Fallback to latest document
-    return rows[0]
-
+    return None
 
 
 @dataclass
@@ -263,6 +373,7 @@ class ResolvedContext:
     is_affirmation: bool = False
     is_cancellation: bool = False
     pending_task_id: Optional[str] = None
+    requested_page: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -275,7 +386,8 @@ class ResolvedContext:
             "pinned_source": self.pinned_source,
             "is_affirmation": self.is_affirmation,
             "is_cancellation": self.is_cancellation,
-            "pending_task_id": self.pending_task_id
+            "pending_task_id": self.pending_task_id,
+            "requested_page": self.requested_page
         }
 
 
@@ -329,6 +441,7 @@ class ConversationContextResolver:
             conversation_history = self.parse_raw_history(text)
 
         is_affirmation, is_cancellation = detect_affirmation_or_cancellation(text)
+        requested_page = extract_requested_page(text)
 
         # Check for presence of anaphora in current turn
         has_anaphora = bool(ANAPHORA_PATTERN.search(text)) or is_affirmation or is_cancellation
@@ -355,7 +468,8 @@ class ConversationContextResolver:
                 has_anaphora=has_anaphora,
                 pinned_source=pinned_source,
                 is_affirmation=is_affirmation,
-                is_cancellation=is_cancellation
+                is_cancellation=is_cancellation,
+                requested_page=requested_page
             )
 
         if not text or not conversation_history:
@@ -365,7 +479,8 @@ class ConversationContextResolver:
                 has_anaphora=has_anaphora,
                 pinned_source=pinned_source,
                 is_affirmation=is_affirmation,
-                is_cancellation=is_cancellation
+                is_cancellation=is_cancellation,
+                requested_page=requested_page
             )
 
         # If no anaphora, no affirmation, and no reference triggers, do not inherit stale context
@@ -376,7 +491,8 @@ class ConversationContextResolver:
                 has_anaphora=False,
                 pinned_source=pinned_source,
                 is_affirmation=False,
-                is_cancellation=False
+                is_cancellation=False,
+                requested_page=requested_page
             )
 
         # Bounded scan backwards through history (up to max_history_turns)
@@ -412,10 +528,20 @@ class ConversationContextResolver:
 
             # Look for referenced files in historical turn
             found_files = FILE_REGEX.findall(content)
+            if not found_files and workspace_id:
+                # Also resolve domain document references (e.g. "inspection report", "financial sheet")
+                matched_doc = resolve_target_document_for_query_sync(workspace_id, content)
+                if matched_doc and matched_doc.get("name"):
+                    found_files = [matched_doc["name"]]
+                    if pinned_source is None:
+                        pinned_source = matched_doc
+
             if found_files and not resolved_files:
                 resolved_files = list(dict.fromkeys(found_files))
                 source_turn = turn_idx
                 topic = f"Artifact inquiry: {resolved_files[0]}"
+                if pinned_source is None and workspace_id:
+                    pinned_source = resolve_target_document_for_query_sync(workspace_id, resolved_files[0])
 
             # Look for equipment tags if equipment was not resolved
             found_equipment = EQUIPMENT_REGEX.findall(content)
@@ -443,5 +569,6 @@ class ConversationContextResolver:
             prior_citations=prior_citations,
             pinned_source=pinned_source,
             is_affirmation=is_affirmation,
-            is_cancellation=is_cancellation
+            is_cancellation=is_cancellation,
+            requested_page=requested_page
         )

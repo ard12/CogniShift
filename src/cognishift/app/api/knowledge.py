@@ -313,7 +313,21 @@ async def delete_knowledge_source(
             except OSError:
                 pass
 
-        # 5. Delete database record
+        # 5. Clean agent_definitions knowledge_source_ids
+        c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+        for ag in await c_agents.fetchall():
+            try:
+                curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                if isinstance(curr_ids, list) and source_id in curr_ids:
+                    curr_ids.remove(source_id)
+                    await db.execute(
+                        "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                        (json.dumps(curr_ids), ag["id"])
+                    )
+            except Exception:
+                pass
+
+        # 6. Delete database record
         await db.execute("DELETE FROM knowledge_sources WHERE id = ?", (source_id,))
         await db.commit()
 

@@ -112,14 +112,48 @@ async def execute_tool(
         return f"Thermocouple {sensor_id} reports bearing temperature is 68.4 C (Normal Operating Range: 60.0 - 80.0 C). Status: NORMAL."
 
     elif tool_name == "run_diagnostic":
-        subsystem = parameters.get("equipment_id") or parameters.get("subsystem", "P-101A Crude Feed Booster Pump")
+        subsystem = str(parameters.get("component_id") or parameters.get("equipment_id") or parameters.get("subsystem", "P-101A Crude Feed Booster Pump")).strip()
+        tag_upper = subsystem.upper()
+
+        if any(tag_upper.startswith(p) for p in ["K-", "COMP"]) or "COMPRESSOR" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Stage 1 suction pressure: 2.8 bar, discharge pressure: 9.4 bar (Compression Ratio: 3.35). "
+                f"Lube oil header pressure: 2.4 bar (Normal: > 1.8 bar). Axial shaft displacement: +0.03 mm (Tolerance: ±0.08 mm). "
+                f"Vibration: 1.8 mm/s RMS (ISO 10816 Zone A - Good). Surge margin: 18.5% above minimum control line. Overall asset health: NOMINAL / OPERATIONAL."
+            )
+        elif any(tag_upper.startswith(p) for p in ["SV-", "PSV-", "MOV-", "PV-", "FV-"]) or "VALVE" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Actuator stroke time: 2.8s (Specification: < 4.0s). "
+                f"Seat tightness leakage rate: 0.0 sccm (Bubble-tight, API 527 Class VI). Pilot pop pressure verified at calibrated setpoint. "
+                f"Limit switch feedback: Verified. Overall asset health: VERIFIED / STANDBY."
+            )
+        elif any(tag_upper.startswith(p) for p in ["TK-", "VESSEL", "DRUM", "REACTOR"]) or (tag_upper.startswith("V-") and not tag_upper.startswith("VALVE")):
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Ultrasonic shell wall thickness: 18.4 mm (Nominal: 18.5 mm, Corrosion Allowance Remaining: 3.8 mm). "
+                f"Cathodic protection potential: -920 mV vs CSE (NACE SP0169 Compliant). Relief nozzle visual inspection: Clear of deposits. "
+                f"Hydrostatic test certification valid through 2027. Overall asset health: SOUND / IN SERVICE."
+            )
+        elif any(tag_upper.startswith(p) for p in ["MOTOR-", "M-"]) or "MOTOR" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Stator winding temperature: 68.2 °C (Class F insulation, limit 105 °C). "
+                f"Insulation resistance (Megger 1000V): 185 MΩ (IEEE 43 threshold: > 5 MΩ). 3-Phase current balance: U=42.1A, V=41.8A, W=42.4A (Unbalance: 0.7%). "
+                f"Bearing DE/NDE vibration: 1.2 mm/s RMS. Overall asset health: NOMINAL / OPERATIONAL."
+            )
+        elif any(tag_upper.startswith(p) for p in ["PT-", "TT-", "FT-", "LT-"]) or "TRANSMITTER" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: 4-20mA current loop output: 12.84 mA (Zero error: +0.05%, Span error: -0.08%). "
+                f"Hart diagnostics: Healthy, no loop noise or damping faults. Process connection impulse line: Cleared of obstruction. "
+                f"Calibration validity: Current (Calibrated per ISA-RP55.1). Overall asset health: CALIBRATED / ONLINE."
+            )
+
+        # Default pump / rotary equipment diagnostic
         maint_data = _load_json(MAINTENANCE_PATH)
         past_order = ""
         if maint_data and "orders" in maint_data:
-            match = next((o for o in maint_data["orders"] if "101" in o.get("equipment_tag", "")), None)
+            match = next((o for o in maint_data["orders"] if any(t in o.get("equipment_tag", "") for t in [subsystem, "101"])), None)
             if match:
                 past_order = f" Past SAP PM Order {match['order_number']}: {match['damage_code']} resolved via {match['corrective_actions_taken'][0]}."
-        
+
         return (
             f"Telemetry diagnostic completed for {subsystem}: Dual cartridge mechanical seal (API 682 Plan 53A) "
             f"barrier pressure differential is +20 PSI. Vibration FFT spectrum shows 2.4 mm/s RMS (ISO 10816 Zone B - Acceptable)."

@@ -134,18 +134,19 @@ def test_generate_pdf_casing_and_extension_repair():
 
 
 def test_execute_code_casing_and_extension_repair():
-    """Verify that ExecuteCodeArgs handles uppercase .PY and missing extensions."""
+    """Verify that ExecuteCodeArgs handles uppercase .PY and bounded repair handles missing extensions."""
     args1 = ExecuteCodeArgs(
         code="print('Hello')",
         entrypoint="SCRIPT.PY"
     )
     assert args1.entrypoint == "SCRIPT.py"
 
-    args2 = ExecuteCodeArgs(
-        code="print('Hello')",
-        entrypoint="runner"
+    repaired, _ = bounded_repair_tool_parameters(
+        "execute_code",
+        {"code": "print('Hello')", "entrypoint": "runner"}
     )
-    assert args2.entrypoint == "runner.py"
+    assert repaired["entrypoint"] == "runner.py"
+
 
 
 def test_bounded_repair_universal_hygiene():

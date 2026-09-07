@@ -243,7 +243,12 @@ INTENT_ANCHORS: Dict[SemanticIntent, List[str]] = {
         "what is MRPL's gross refining margin GRM",
         "what was our gross refining margin over the past three years",
         "break down the gross refining margin trend simply",
-        "what were the gross refining margins and trends"
+        "what were the gross refining margins and trends",
+        "according to the documents currently available in my knowledge vault",
+        "according to the documents in knowledge vault",
+        "what is the remaining corrosion life from its inspection report",
+        "what is the remaining corrosion life of <equipment_id>",
+        "cite the source from the inspection report"
     ],
     SemanticIntent.ARTIFACT_INSPECTION: [
         "explain <file>",
@@ -612,6 +617,28 @@ class SemanticIntentRouter:
                 details={"rule": "explicit_code_execution_command"}
             )
 
+        # 4.6. Deterministic Rule: Explicit Knowledge Query / Document Citation
+        is_knowledge_inquiry = (
+            bool(re.search(r'\b(?:according to|based on)\s+(?:the\s+|our\s+|my\s+)?(?:documents?|knowledge(?:\s+vault|\s+base)?|manuals?|sops?|reports?|standards?)\b', text_lower))
+            or bool(re.search(r'\b(?:in|from)\s+(?:my\s+|the\s+|our\s+)?(?:knowledge\s+vault|knowledge\s+base|inspection\s+report)\b', text_lower))
+            or bool(re.search(r'\bcite\s+(?:the\s+)?(?:source|sources|manual|sop|procedure|standard)\b', text_lower))
+            or bool(re.search(r'\bwhat\s+does\s+(?:the|our)\s+(?:sop|procedure|standard|manual|policy)\s+(?:say|state|require)\b', text_lower))
+            or "corrosion life" in text_lower
+        ) and not bool(re.search(r'\b(?:run|execute|write|generate)\b.*?\b(?:python|code|script|program)\b', text_lower)) \
+          and not bool(re.search(r'\b(?:restart|trip|depressurize|reboot)\b', text_lower))
+
+        if is_knowledge_inquiry:
+            return SemanticRoutingResult(
+                intent=SemanticIntent.KNOWLEDGE_QUERY,
+                decision_method=DecisionMethod.RULE,
+                confidence=1.0,
+                runner_up=None,
+                margin=None,
+                abstained=False,
+                references=refs,
+                details={"rule": "explicit_knowledge_inquiry"}
+            )
+
         # 5. FastEmbed Vector Similarity Matching (Normalized Text)
         norm_text = normalize_for_routing(raw_text, refs)
         query_embs = list(embedding_model.embed([norm_text]))
@@ -641,7 +668,11 @@ class SemanticIntentRouter:
                 "is there", "are there", "do we", "can you explain", "can you tell",
                 "explain ", "describe ", "cite ", "summarize ", "list "
             ])
-            or text_lower.endswith("?")
+            or any(w in text_lower for w in [
+                "according to", "based on", "cite the", "what is", "what are", "what does",
+                "which procedure", "which manual", "corrosion life", "inspection report"
+            ])
+            or "?" in text_lower
         )
         # Ensure that active imperative control actions (restart, trip, override, open valve) are not suppressed
         is_explicit_control_imperative = any(text_lower.startswith(w) for w in ["restart ", "trip ", "override ", "depressurize ", "reboot "])

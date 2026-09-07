@@ -275,74 +275,114 @@ class SimulatedSandboxBackend(SandboxBackend):
                 error_message="Process exited with return code 1."
             )
 
-        # Default Success Simulation:
+        # Default Success Simulation (Dynamic, Data-Grounded):
         if request.promote_outputs or "GENERATE_OUTPUT" in code_str:
-            # Create a safe simulated output file in output directory
-            sim_file = output_dir / "telemetry_summary.csv"
-            sim_file.write_text("Sensor,Value,Unit\nPT-101,102.5,PSI\nTT-101,68.4,C\n", encoding="utf-8")
+            from cognishift.core.document_insights import extract_document_insights, clean_numeric_value
+            input_dir = staging_dir / "input"
+            staged_files = [f for f in input_dir.iterdir() if f.is_file()] if input_dir.exists() else []
 
-            if "telemetry_chart.png" in code_str or "matplotlib" in code_str:
-                chart_file = output_dir / "telemetry_chart.png"
+            is_financial = any(w in code_str.lower() for w in ["financial", "revenue", "ebitda", "pat", "cagr", "grm", "profit", "balance", "p&l"])
+            wants_chart = any(w in code_str.lower() for w in ["chart", "plot", "matplotlib", "seaborn", "savefig", ".png"])
+            wants_telemetry_csv = "telemetry_summary.csv" in code_str or ("telemetry" in code_str.lower() and not is_financial)
+
+            # 1. Inspect real staged input file if available
+            doc_insights = None
+            if staged_files:
+                target_input = staged_files[0]
+                try:
+                    doc_insights = extract_document_insights(target_input, query_hint=code_str)
+                except Exception as ex:
+                    logger.warning(f"Error extracting insights in simulated sandbox: {ex}")
+
+            # 2. Emit telemetry_summary.csv strictly when appropriate (never in financial runs!)
+            if wants_telemetry_csv and not is_financial:
+                sim_file = output_dir / "telemetry_summary.csv"
+                if doc_insights and doc_insights.get("table_rows"):
+                    headers = doc_insights.get("table_headers", ["Sensor", "Value", "Unit"])
+                    lines = [",".join(headers)]
+                    for r in doc_insights["table_rows"][:20]:
+                        lines.append(",".join(str(c) for c in r))
+                    sim_file.write_text("\n".join(lines), encoding="utf-8")
+                else:
+                    sim_file.write_text("Sensor,Value,Unit\nPT-101,102.5,PSI\nTT-101,68.4,C\n", encoding="utf-8")
+
+            # 3. Dynamic Chart Generation
+            if wants_chart:
+                chart_filename = "financial_chart.png" if (is_financial and "telemetry_chart.png" not in code_str) else "telemetry_chart.png"
+                if "financial_chart.png" in code_str:
+                    chart_filename = "financial_chart.png"
+                chart_file = output_dir / chart_filename
+
                 try:
                     import matplotlib
                     matplotlib.use('Agg')
                     import matplotlib.pyplot as plt
                     import numpy as np
 
-                    is_financial = any(w in code_str.lower() for w in ["financial", "revenue", "ebitda", "pat", "cagr", "grm", "profit"])
-                    if is_financial:
-                        years = ['FY 2023-24', 'FY 2024-25', 'FY 2025-26']
-                        revenue = [105220, 112450, 121800]
-                        ebitda = [9830, 12500, 15100]
-                        pat = [5560, 7573, 9533]
-                        grm = [8.45, 10.15, 11.80]
+                    if doc_insights and doc_insights.get("chart_data"):
+                        cdata = doc_insights["chart_data"]
+                        if cdata.get("type") == "financial_multi_panel" and is_financial:
+                            x_labels = cdata["x_labels"]
+                            series = cdata["series"]
+                            grm = cdata.get("grm")
 
-                        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
-                        x = np.arange(len(years))
-                        width = 0.25
-                        ax1.bar(x - width, [r / 1000 for r in revenue], width, label='Gross Revenue (k Cr)', color='#1F4E79')
-                        ax1.bar(x, [e / 1000 for e in ebitda], width, label='EBITDA (k Cr)', color='#2CA02C')
-                        ax1.bar(x + width, [p / 1000 for p in pat], width, label='PAT (k Cr)', color='#FF7F0E')
-                        ax1.set_xticks(x)
-                        ax1.set_xticklabels(years, fontweight='bold')
-                        ax1.set_ylabel('Amount (₹ Thousand Crores)', fontweight='bold')
-                        ax1.set_title('MRPL 3-Year P&L Trajectory', fontweight='bold', pad=10)
-                        ax1.legend(frameon=True)
-                        ax1.grid(axis='y', linestyle=':', alpha=0.6)
+                            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+                            x = np.arange(len(x_labels))
+                            width = 0.25
 
-                        ax2_twin = ax2.twinx()
-                        ebitda_margins = [round((e / r) * 100, 2) for e, r in zip(ebitda, revenue)]
-                        line1 = ax2.plot(years, ebitda_margins, color='#2CA02C', marker='s', linewidth=2.5, label='EBITDA Margin (%)')
-                        line2 = ax2_twin.plot(years, grm, color='#9467BD', marker='o', linewidth=2.5, linestyle='--', label='GRM ($/bbl)')
-                        ax2.set_ylabel('EBITDA Margin (%)', color='#2CA02C', fontweight='bold')
-                        ax2_twin.set_ylabel('Gross Refining Margin ($/bbl)', color='#9467BD', fontweight='bold')
-                        ax2.set_title('Margin Expansion & GRM Performance', fontweight='bold', pad=10)
-                        lines = line1 + line2
-                        labels = [l.get_label() for l in lines]
-                        ax2.legend(lines, labels, loc='upper left')
-                        ax2.grid(True, linestyle=':', alpha=0.5)
+                            colors = ['#1F4E79', '#2CA02C', '#FF7F0E']
+                            for s_idx, (s_name, s_vals) in enumerate(series.items()):
+                                pos = x + (s_idx - 1) * width
+                                ax1.bar(pos, [v / 1000 if max(s_vals, default=0) > 1000 else v for v in s_vals],
+                                        width, label=s_name, color=colors[s_idx % len(colors)])
 
-                        plt.tight_layout()
-                        plt.savefig(str(chart_file))
-                        plt.close()
+                            ax1.set_xticks(x)
+                            ax1.set_xticklabels(x_labels, fontweight='bold')
+                            ax1.set_ylabel('Amount (k Cr)' if any(max(v, default=0) > 1000 for v in series.values()) else 'Value', fontweight='bold')
+                            ax1.set_title(f"{doc_insights['filename']} Performance", fontweight='bold', pad=10)
+                            ax1.legend(frameon=True)
+                            ax1.grid(axis='y', linestyle=':', alpha=0.6)
 
-                        metrics_data = {
-                            "analysis_status": "SUCCESS",
-                            "revenue_cagr_pct": 7.60,
-                            "ebitda_cagr_pct": 23.94,
-                            "pat_cagr_pct": 30.93,
-                            "fy26_revenue_cr": 121800,
-                            "fy26_ebitda_cr": 15100,
-                            "fy26_pat_cr": 9533,
-                            "fy26_grm_usd_per_bbl": 11.80,
-                            "fy26_de_ratio": 0.48,
-                            "summary": "3-Year Quantitative Financial Audit completed with CAGR metrics and dual-panel chart."
-                        }
-                        (output_dir / "metrics.json").write_text(json.dumps(metrics_data, indent=2), encoding="utf-8")
+                            if grm and any(grm):
+                                ax2.plot(x_labels, grm, color='#9467BD', marker='o', linewidth=2.5, label='GRM ($/bbl)')
+                                ax2.set_ylabel('GRM ($/bbl)', color='#9467BD', fontweight='bold')
+                                ax2.set_title('Margin & Performance Metrics', fontweight='bold', pad=10)
+                                ax2.legend(loc='upper left')
+                                ax2.grid(True, linestyle=':', alpha=0.5)
+                            else:
+                                ax2.set_title('Summary Metrics', fontweight='bold')
+
+                            plt.tight_layout()
+                            plt.savefig(str(chart_file))
+                            plt.close()
+
+                        elif cdata.get("series"):
+                            # General numeric bar chart
+                            fig, ax = plt.subplots(figsize=(8, 4.5), dpi=120)
+                            x_labels = cdata.get("x_labels", [])
+                            series = cdata["series"]
+                            for s_name, s_vals in list(series.items())[:3]:
+                                ax.plot(x_labels[:len(s_vals)], s_vals, marker='o', label=s_name)
+                            ax.set_title(f"Data Series - {doc_insights['filename']}", fontweight='bold')
+                            ax.legend()
+                            ax.grid(True, linestyle=':', alpha=0.5)
+                            plt.tight_layout()
+                            plt.savefig(str(chart_file))
+                            plt.close()
+                        else:
+                            # Fallback clean chart
+                            fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+                            ax.plot([1, 2, 3], [10, 20, 15], color="#1F4E79", label="Execution Telemetry")
+                            ax.set_title("Analysis Trend", fontsize=10)
+                            ax.legend()
+                            fig.tight_layout()
+                            fig.savefig(chart_file)
+                            plt.close(fig)
                     else:
+                        # Fallback clean chart without hardcoded numbers
                         fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
-                        ax.plot([1, 2, 3, 4], [100, 105, 102, 108], color="#1F4E79", label="PT-101 (PSI)")
-                        ax.set_title("Sensor Telemetry Trend", fontsize=10)
+                        ax.plot([1, 2, 3], [10, 20, 15], color="#1F4E79", label="Execution Telemetry")
+                        ax.set_title("Operational Analysis", fontsize=10)
                         ax.legend()
                         fig.tight_layout()
                         fig.savefig(chart_file)
@@ -350,16 +390,34 @@ class SimulatedSandboxBackend(SandboxBackend):
                 except Exception as e:
                     logger.warning(f"Error generating simulated chart: {e}")
 
+                # 4. Generate metrics.json from actual extracted metrics
+                metrics_data: Dict[str, Any] = {
+                    "analysis_status": "SUCCESS",
+                    "source_file": doc_insights["filename"] if doc_insights else "simulated_run"
+                }
+                if doc_insights and doc_insights.get("metrics"):
+                    for m_name, m_val in doc_insights["metrics"].items():
+                        metrics_data[f"{m_name}_latest"] = m_val.get("latest")
+                if doc_insights and doc_insights.get("growth"):
+                    metrics_data.update(doc_insights["growth"])
+                metrics_data["summary"] = "Quantitative document analysis completed in isolated sandbox."
+                (output_dir / "metrics.json").write_text(json.dumps(metrics_data, indent=2), encoding="utf-8")
+
             if "telemetry_data.xlsx" in code_str or "openpyxl" in code_str:
                 excel_file = output_dir / "telemetry_data.xlsx"
                 try:
                     import openpyxl
                     wb = openpyxl.Workbook()
                     ws = wb.active
-                    ws.title = "Telemetry"
-                    ws.append(["Sensor", "Value", "Unit"])
-                    ws.append(["PT-101", 102.5, "PSI"])
-                    ws.append(["TT-204", 74.2, "C"])
+                    ws.title = "Data_Export"
+                    if doc_insights and doc_insights.get("table_headers"):
+                        ws.append(doc_insights["table_headers"])
+                        for r in doc_insights.get("table_rows", [])[:50]:
+                            ws.append(r)
+                    else:
+                        ws.append(["Item", "Value", "Status"])
+                        ws.append(["Reading_A", 100.0, "NORMAL"])
+                        ws.append(["Reading_B", 200.0, "NORMAL"])
                     wb.save(excel_file)
                 except Exception:
                     pass

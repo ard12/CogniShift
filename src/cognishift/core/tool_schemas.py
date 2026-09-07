@@ -280,15 +280,13 @@ class ExecuteCodeArgs(BaseModel):
     @classmethod
     def normalize_entrypoint(cls, v: Any) -> str:
         if isinstance(v, str):
-            clean = v.strip().replace("\\", "/").split("/")[-1]
-            if not clean:
-                return "main.py"
-            if clean.lower().endswith(".py"):
-                clean = clean[:-3] + ".py"
-            else:
-                clean = f"{clean}.py"
-            return clean
+            if "\0" in v or "/" in v or "\\" in v:
+                raise ValueError("Entrypoint cannot contain directory separators or null bytes")
+            if not v.lower().endswith(".py"):
+                raise ValueError("Entrypoint must end with .py")
+            return v[:-3] + ".py"
         return "main.py"
+
 
 
 class GeneratePdfArgs(BaseModel):

@@ -28,7 +28,7 @@ from cognishift.core.security import (
     get_workspace_root,
     SecurityError
 )
-from cognishift.core.retriever import chroma_client, retrieve_context
+from cognishift.core.retriever import chroma_client, retrieve_context, embedding_model
 from cognishift.core.artifact_generators import create_and_register_artifact, generate_docx_document
 from cognishift.app.db.database import get_db, init_db
 import docx
@@ -246,12 +246,14 @@ async def test_remediation_end_to_end_knowledge_boundary_confidentiality():
         col.delete(where={"workspace_id": 1})
     except Exception:
         pass
+    docs = [
+        "Source A: AUTHORIZED_INFO_123 - Standard operating plant safety code and procedure.",
+        "Source B: CONFIDENTIAL_INFO_987 - Secret plant safety code."
+    ]
+    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in embedding_model.embed(docs)]
     col.add(
-        documents=[
-            "Source A: AUTHORIZED_INFO_123 - Standard operating procedure.",
-            "Source B: CONFIDENTIAL_INFO_987 - Secret plant safety code."
-        ],
-        embeddings=[[0.1] * 384, [0.9] * 384],
+        documents=docs,
+        embeddings=embs,
         metadatas=[
             {"source_id": 1, "workspace_id": 1, "filename": "SourceA.pdf"},
             {"source_id": 2, "workspace_id": 1, "filename": "SourceB.pdf"}

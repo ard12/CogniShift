@@ -16,7 +16,12 @@ from cognishift.core.network.client import get_sovereign_async_client, get_sover
 from cognishift.core.network.schemas import NetworkPolicyViolation
 from cognishift.core.ollama_provider import OllamaProvider
 from cognishift.core.providers import ProviderError
-from cognishift.app.db.database import get_db
+from cognishift.app.db.database import get_db, init_db
+
+
+@pytest.fixture(autouse=True)
+async def setup_enforcement_db():
+    await init_db()
 
 
 @pytest.mark.asyncio

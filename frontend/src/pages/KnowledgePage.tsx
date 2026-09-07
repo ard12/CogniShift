@@ -82,8 +82,8 @@ export function KnowledgePage() {
         title="Sovereign Knowledge Vault"
         description={
           selectedWorkspace
-            ? `Documents and images ingested for ${selectedWorkspace.name}. Retrieval happens internally during agent runs — there is no standalone search endpoint.`
-            : "Documents and images ingested for retrieval during agent runs."
+            ? `Documents (PDF), operational spreadsheets (XLSX, XLS, CSV), and inspection photos (PNG, JPEG) ingested for ${selectedWorkspace.name}. Ingested materials are semantically indexed into local ChromaDB for agent RAG and sandboxed data analysis.`
+            : "Documents, operational spreadsheets, and inspection photos ingested for retrieval and sandboxed analysis during agent runs."
         }
         actions={
           selectedWorkspaceId ? (
@@ -91,12 +91,18 @@ export function KnowledgePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
+                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                 className="hidden"
                 onChange={(e) => void handleFileSelected(e.target.files?.[0])}
               />
-              <Button variant="primary" size="sm" onClick={() => fileInputRef.current?.click()} loading={uploading}>
-                <IconUpload className="h-3.5 w-3.5" /> Upload document
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                loading={uploading}
+                title="Upload PDF manual, Excel spreadsheet (.xlsx/.xls), CSV, or inspection photo"
+              >
+                <IconUpload className="h-3.5 w-3.5" /> Upload document / spreadsheet
               </Button>
             </>
           ) : undefined
@@ -123,7 +129,7 @@ export function KnowledgePage() {
               <EmptyState
                 icon={<IconBook className="h-6 w-6" />}
                 title="No documents ingested"
-                description="Upload a PDF manual or an inspection photo (PNG/JPEG) to begin."
+                description="Upload an operational spreadsheet (XLSX/CSV), PDF manual, or inspection photo (PNG/JPEG) to begin."
               />
             ) : (
               <ul className="divide-y divide-surface-border">

@@ -1,7 +1,9 @@
 __pycache__/
 *.pyc
 .env
-data/
+data/*
+!data/demo/
+!data/demo/**
 *.db
 .venv/
 venv/
@@ -10,7 +12,6 @@ dist/
 build/
 .pytest_cache/
 .ruff_cache/
-data/
 data/private/
 *.auth.json
 auth_store.json

@@ -1,0 +1,97 @@
+========================================================================================
+MANGALORE REFINERY AND PETROCHEMICALS LIMITED (MRPL)
+A Subsidiary of Oil and Natural Gas Corporation (ONGC)
+Kuthethoor P.O., Via Katipalla, Mangalore - 575030, Karnataka, India
+DEPARTMENT OF RELIABILITY ENGINEERING & NON-DESTRUCTIVE TESTING (NDT)
+========================================================================================
+ASSET INTEGRITY & VIBRATION DIAGNOSTIC FIELD REPORT
+DOCUMENT REF : MRPL-NDT-2026-0982
+EQUIPMENT TAG: P-101A (Heavy Gasoil Booster Pump - Primary)
+EQUIPMENT S/N: SZ-MSD-150-380-2018-912
+PROCESS UNIT : Unit 01 — Heavy Gasoil Hydrotreater (HCU-01), Block 3
+P&ID DRAWING : DWG-HCU-401-R3 / ISO-12-CDU-401-HC
+DATE OF AUDIT: 2026-09-04 08:30 IST | SHIFT: Morning A-Shift
+INSPECTORS   : P. K. Verma (ASNT Level III UT/PT/VT) / M. Ananthakrishnan (Sr. Reliability Eng.)
+ASSET STATUS : FIT FOR PURPOSE (FFP) / DUAL SUPERVISOR RE-START CLEARANCE REQUIRED
+========================================================================================
+
+1.0 ASSET OPERATING ENVELOPE & BOUNDARIES (API 610 12th EDITION)
+----------------------------------------------------------------------------------------
+- Pump Classification        : Centrifugal Between-Bearing Radially Split (BB2)
+- Driven Fluid               : Heavy Atmospheric Gasoil (HAGO, SG: 0.884 @ 60 deg C)
+- Rated Volumetric Capacity  : 380.0 m3/h (1,673 US GPM) @ 2,980 RPM
+- Rated Differential Head    : 142.0 meters (Shut-off Head: 178.0 meters)
+- Normal Suction Pressure    : 15.0 - 25.0 PSI (PT-102)
+- Normal Discharge Pressure  : 80.0 - 120.0 PSI (PT-101)
+- Maximum Allowable Working P: 500.0 PSI (MAWP, Casing Hydrotest: 750 PSI)
+- Automatic Emergency Trip P : 450.0 PSI (Interlock I-101 via 2oo3 PT-101 voting)
+- Electric Prime Mover       : 450 kW (600 HP) Induction Motor, 6.6 kV, Zone 1 Ex-d IIC T4
+- Mechanical Seal Type       : Dual Pressurized Cartridge Seal with Plan 53B Accumulator Loop
+
+2.0 RECENT PROCESS DISTURBANCE & EMERGENCY INTERVENTION SUMMARY
+----------------------------------------------------------------------------------------
+At 18:05 IST during routine gasoil charging, a sudden downstream control valve stiction
+event induced rapid hydraulic pressure accumulation in discharge spool 12-CDU-401-HC.
+- Discharge Pressure Surge   : Peaked at 492.5 PSI (exceeded 450.0 PSI trip set-point).
+- Safety Action 1            : Interlock I-101 tripped 6.6 kV breaker VCB-101A within 42 ms.
+- Safety Action 2            : Emergency Relief Valve SV-402 actuated open to Flare Header.
+- Inboard Bearing Temp (TT)  : Spiked to 96.2 deg C (Trip threshold: 95.0 deg C).
+- Post-Trip Hydraulic Status : System safely depressurized to 94.0 PSI within 35 minutes.
+- Containment Verification   : Zero hydrocarbon leakage detected at casing joints or seal pot.
+
+3.0 ULTRASONIC THICKNESS (UT) GAUGING & CORROSION RATE SURVEY
+----------------------------------------------------------------------------------------
+Instrument: Olympus 38DL Plus Thickness Gauge (Dual-element transducer calibrated on A106-B)
+Acceptance Standard: API 570 / ASME Section VIII Division 1
+
+Tag Location           Component Description         Nom (mm)  Min (mm)  Act (mm)  Status
+----------------------------------------------------------------------------------------
+P101A-C1               Suction Nozzle Neck           14.20     9.50      13.45     ACCEPTABLE
+P101A-C2               Impeller Volute Casing Top    18.50     12.20     17.80     ACCEPTABLE
+P101A-C3               Discharge Nozzle Flange       16.00     10.80     15.10     ACCEPTABLE
+SPOOL-401-E1           Discharge Elbow 90-Deg Bend   12.70     8.40      11.15     MONITOR (Erosion)
+SPOOL-401-T1           Upstream Check Valve Tee      12.70     8.40      11.85     ACCEPTABLE
+PRV-402-IN             Safety Valve Inlet Nozzle     11.10     7.20      10.60     ACCEPTABLE
+----------------------------------------------------------------------------------------
+Calculated Maximum Corrosion Rate : 0.16 mm/year (localized at 90-deg discharge elbow).
+Remaining Useful Mechanical Life  : 9.4 years under standard service factors.
+
+4.0 TRI-AXIAL VIBRATION SPECTRAL ANALYSIS (CSI 2140 ANALYZER)
+----------------------------------------------------------------------------------------
+Operating Condition: Post-cooldown rotation check @ 2,980 RPM / ISO 10816-3 Zone A/B
+
+Position / Orientation       1X Peak (49.7 Hz)  2X Peak (99.4 Hz)  Overall RMS  ISO Zone
+----------------------------------------------------------------------------------------
+Pump Drive End (DE) Horiz    1.42 mm/s          0.48 mm/s          2.35 mm/s    Zone A (Good)
+Pump Drive End (DE) Vert     1.10 mm/s          0.35 mm/s          1.82 mm/s    Zone A (Good)
+Pump Non-Drive End Axial     1.65 mm/s          0.72 mm/s          2.60 mm/s    Zone B (Acceptable)
+Motor Drive End Horiz        1.25 mm/s          0.30 mm/s          1.65 mm/s    Zone A (Good)
+----------------------------------------------------------------------------------------
+Spectral Evaluation: Dominant 1X running frequency. Absence of 0.43X oil whirl sub-harmonics
+or high-frequency demodulation peaks indicates healthy bearing races and zero cage faults.
+
+5.0 PLAN 53B SEAL BARRIER SYSTEM AUDIT
+----------------------------------------------------------------------------------------
+- Barrier Fluid Medium       : Mobil SHC 524 Synthetic PAO
+- Accumulator Bladder N2     : 18.2 bar gauge (Nominal set-point: 18.0 bar)
+- Barrier Loop Pressure      : 22.5 bar gauge (Maintains +2.1 bar over stuffing box)
+- 24-Hour Barrier Consumption: 45 ml / 24 hours (Within API 682 limit < 120 ml/24h)
+- Return Temperature         : 48.5 deg C (Well below 65.0 deg C cooling threshold)
+
+6.0 CORRECTIVE PUNCH LIST & RE-COMMISSIONING MANDATE
+----------------------------------------------------------------------------------------
+1. [WO-889021]: Re-gauge discharge elbow SPOOL-401-E1 during Q4 turnaround (90 days).
+2. [WO-889045]: Replace acrylic sight glass on bearing oil reservoir with borosilicate Pyrex.
+3. [WO-889088]: Polish and re-torque copper earth grounding bond strap (< 0.2 ohms).
+4. MANDATORY SAFETY GATE: In compliance with MRPL Safety Rulebook Part IV (Four-Eyes Principle),
+   re-starting Pump P-101A requires dual-level cryptographically validated supervisory sign-off:
+   - Stage 1: Shift In-Charge Supervisor Review (Verification of discharge pressure < 200 PSI)
+   - Stage 2: Plant Authorizer / VP Operations Approval (Execution of restart_component)
+
+7.0 AUTHORIZATION & ENGINEERING SIGN-OFFS
+----------------------------------------------------------------------------------------
+Lead NDT Inspector     : P. K. Verma, ASNT Level III (Cert #UT-2014-8841)
+Senior Reliability Eng : M. Ananthakrishnan, B.Tech Mech, MRPL Reliability Group
+Chief General Manager  : Dr. S. K. Roy, Head of Refinery Operations & Maintenance
+Endorsement Timestamp  : 2026-09-04T12:45:00+05:30
+========================================================================================

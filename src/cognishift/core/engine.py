@@ -1295,6 +1295,9 @@ async def execute_agent_run(
                 GENERIC_STEMS = {"report", "reading", "readings", "file", "document", "artifact", "data", "sheet", "table", "summary", "test", "plan", "output", "input", "result", "results", "status", "logs", "log", "pdf"}
                 ref_files = [f.lower() for f in target_files]
 
+                is_strict_scope = any(w in lower_input for w in ["using only", "strictly from", "only use", "do not use other", "using that workbook only", "using that file only"])
+                seen_artifact_ids = set()
+
                 # 1. Authoritative resolved document from Knowledge Vault takes top precedence
                 if target_doc and target_doc.get("local_path"):
                     raw_lp = target_doc.get("local_path", "")
@@ -1314,31 +1317,36 @@ async def execute_agent_run(
                         "title": target_doc.get("name"),
                         "is_knowledge_source": True
                     })
+                    seen_artifact_ids.add(target_doc.get("id"))
 
-                # 2. Match Knowledge Sources before Workspace Artifacts
-                for src in source_rows:
-                    s_fname = (src["original_filename"] or src["name"]).lower()
-                    s_stem = Path(s_fname).stem.lower()
-                    raw_lp = src["local_path"]
-                    rel_p = raw_lp
-                    if raw_lp:
-                        try:
-                            p = Path(raw_lp)
-                            if p.is_absolute():
-                                rel_p = str(p.resolve().relative_to(ws_root)).replace("\\", "/")
-                        except Exception:
-                            rel_p = Path(raw_lp).name
-                    if s_fname in lower_input or s_fname in ref_files:
-                        matching_artifacts.append({
-                            "id": src["id"],
-                            "filename": src["original_filename"] or src["name"],
-                            "relative_path": rel_p,
-                            "artifact_type": src["source_type"] or "pdf",
-                            "title": src["name"],
-                            "is_knowledge_source": True
-                        })
-                    elif s_stem not in GENERIC_STEMS and len(s_stem) > 4:
-                        if s_stem in lower_input or s_stem in [Path(rf).stem.lower() for rf in ref_files]:
+                # 2. Match Knowledge Sources before Workspace Artifacts (suppressed if strict single-source scope is active)
+                if not (is_strict_scope and target_doc):
+                    for src in source_rows:
+                        if src["id"] in seen_artifact_ids:
+                            continue
+                        s_fname = (src["original_filename"] or src["name"]).lower()
+                        s_stem = Path(s_fname).stem.lower()
+                        raw_lp = src["local_path"]
+                        rel_p = raw_lp
+                        if raw_lp:
+                            try:
+                                p = Path(raw_lp)
+                                if p.is_absolute():
+                                    rel_p = str(p.resolve().relative_to(ws_root)).replace("\\", "/")
+                            except Exception:
+                                rel_p = Path(raw_lp).name
+                        if explicit_files:
+                            if any(s_fname == ef.lower() for ef in explicit_files):
+                                matching_artifacts.append({
+                                    "id": src["id"],
+                                    "filename": src["original_filename"] or src["name"],
+                                    "relative_path": rel_p,
+                                    "artifact_type": src["source_type"] or "pdf",
+                                    "title": src["name"],
+                                    "is_knowledge_source": True
+                                })
+                                seen_artifact_ids.add(src["id"])
+                        elif s_fname in lower_input or s_fname in ref_files:
                             matching_artifacts.append({
                                 "id": src["id"],
                                 "filename": src["original_filename"] or src["name"],
@@ -1347,20 +1355,37 @@ async def execute_agent_run(
                                 "title": src["name"],
                                 "is_knowledge_source": True
                             })
+                            seen_artifact_ids.add(src["id"])
+                        elif s_stem not in GENERIC_STEMS and len(s_stem) > 4:
+                            if s_stem in lower_input or s_stem in [Path(rf).stem.lower() for rf in ref_files]:
+                                matching_artifacts.append({
+                                    "id": src["id"],
+                                    "filename": src["original_filename"] or src["name"],
+                                    "relative_path": rel_p,
+                                    "artifact_type": src["source_type"] or "pdf",
+                                    "title": src["name"],
+                                    "is_knowledge_source": True
+                                })
+                                seen_artifact_ids.add(src["id"])
 
                 # 3. Match Workspace Artifacts second
-                for art in art_rows:
-                    fname = art["filename"].lower()
-                    stem = Path(art["filename"]).stem.lower()
-                    if fname in lower_input or fname in ref_files:
-                        art_dict = dict(art)
-                        art_dict["is_knowledge_source"] = False
-                        matching_artifacts.append(art_dict)
-                    elif stem not in GENERIC_STEMS and len(stem) > 4:
-                        if stem in lower_input or stem in [Path(rf).stem.lower() for rf in ref_files]:
-                            art_dict = dict(art)
-                            art_dict["is_knowledge_source"] = False
-                            matching_artifacts.append(art_dict)
+                if not (is_strict_scope and target_doc):
+                    for art in art_rows:
+                        if art["id"] in seen_artifact_ids:
+                            continue
+                        fname = art["filename"].lower()
+                        stem = Path(art["filename"]).stem.lower()
+                        if explicit_files:
+                            if any(fname == ef.lower() for ef in explicit_files):
+                                matching_artifacts.append(dict(art))
+                                seen_artifact_ids.add(art["id"])
+                        elif fname in lower_input or fname in ref_files:
+                            matching_artifacts.append(dict(art))
+                            seen_artifact_ids.add(art["id"])
+                        elif stem not in GENERIC_STEMS and len(stem) > 4:
+                            if stem in lower_input or stem in [Path(rf).stem.lower() for rf in ref_files]:
+                                matching_artifacts.append(dict(art))
+                                seen_artifact_ids.add(art["id"])
 
                 # Check physical disk if not found in tables
                 if not matching_artifacts and target_files:
@@ -2867,8 +2892,8 @@ print("Analysis script finished with returncode 0.")
                         f"You must reformat your response immediately into ONE valid JSON object conforming to one of these schemas:\n\n"
                         f'Option 1 (Tool Call):\n'
                         f'{{"thought": "<brief reasoning>", "action": "tool_call", "tool_name": "<tool_name>", "parameters": {{...}}}}\n\n'
-                        f'Option 2 (Final Response):\n'
-                        f'{{"thought": "<brief reasoning>", "action": "final_response", "answer": "<your complete final answer>"}}\n\n'
+                        f'Option 2 (Final Answer):\n'
+                        f'{{"thought": "<brief reasoning>", "action": "final_answer", "content": "<your complete final answer>", "citations": []}}\n\n'
                         f"Available tools: {json.dumps(allowed_tool_names)}\n"
                         f"Respond ONLY with the JSON object. Do not include markdown formatting or commentary outside the JSON."
                     )

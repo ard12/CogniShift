@@ -590,7 +590,7 @@ def detect_dataframe_anomalies(file_path: Path, max_rows: Optional[int] = None) 
     # Severity tier definitions
     tier_scores = {
         "TRIP": 1000.0,
-        "CRITICAL": 750.0,
+        "CRITICAL": 1000.0,
         "ALARM": 500.0,
         "ABNORMAL": 250.0,
         "SPIKE": 250.0,
@@ -641,9 +641,9 @@ def detect_dataframe_anomalies(file_path: Path, max_rows: Optional[int] = None) 
             curr_v = clean_numeric_value(rec.get(h))
             if curr_v is not None:
                 if mad > 1e-6:
-                    rz = min(abs(curr_v - med) / (1.4826 * mad), 50.0)
+                    rz = min(abs(curr_v - med) / (1.4826 * mad), 500.0)
                 elif std_v > 1e-6:
-                    rz = min(abs(curr_v - med) / std_v, 50.0)
+                    rz = min(abs(curr_v - med) / std_v, 500.0)
                 else:
                     rz = 0.0
                 if rz > max_robust_z:

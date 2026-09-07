@@ -183,6 +183,21 @@ async def resolve_target_document_for_query(
     # If query explicitly specifies 'latest document' or 'newest', return the most recent doc
     is_explicit_latest = bool(LATEST_DOC_REGEX.search(q_lower))
 
+    # 0. Strict Explicit Filename Matching
+    # If query mentions an explicit filename (e.g. foo.xlsx), require exact equality.
+    # Never allow a non-revision file (e.g. ..._48H.xlsx) to satisfy a request for ..._48H_REV_B.xlsx via stem matching.
+    explicit_files = [f.lower().strip() for f in FILE_REGEX.findall(query or "")]
+    if explicit_files:
+        for ef in explicit_files:
+            for r in rows:
+                name = (r.get("name") or "").lower().strip()
+                orig_name = (r.get("original_filename") or "").lower().strip()
+                if ef in (name, orig_name):
+                    return r
+        # Explicit filename specified in query, but not found among completed knowledge sources.
+        # Fail closed: Do NOT allow fuzzy / stem matching of a different file!
+        return None
+
     # 1. Exact filename or stem match in query
     for r in rows:
         name = (r.get("name") or "").lower()
@@ -318,6 +333,21 @@ def resolve_target_document_for_query_sync(
         return None
 
     q_lower = (query or "").lower().strip()
+
+    # 0. Strict Explicit Filename Matching
+    # If query mentions an explicit filename (e.g. foo.xlsx), require exact equality.
+    # Never allow a non-revision file (e.g. ..._48H.xlsx) to satisfy a request for ..._48H_REV_B.xlsx via stem matching.
+    explicit_files = [f.lower().strip() for f in FILE_REGEX.findall(query or "")]
+    if explicit_files:
+        for ef in explicit_files:
+            for r in rows:
+                name = (r.get("name") or "").lower().strip()
+                orig_name = (r.get("original_filename") or "").lower().strip()
+                if ef in (name, orig_name):
+                    return r
+        # Explicit filename specified in query, but not found among completed knowledge sources.
+        # Fail closed: Do NOT allow fuzzy / stem matching of a different file!
+        return None
 
     # 1. Exact filename or stem match in query
     for r in rows:
@@ -465,15 +495,25 @@ async def resolve_authoritative_source(
         matched = False
         selected_by = "exact_filename"
 
-        if fn_cand and (fn_cand.lower() == s_name or fn_cand.lower() == s_orig):
-            matched = True
-            selected_by = "exact_filename"
-        elif fn_cand and (Path(fn_cand).stem.lower() == Path(s_name).stem or Path(fn_cand).stem.lower() == Path(s_orig).stem):
-            matched = True
-            selected_by = "stem_match"
-        elif not fn_cand and (s_name in q_lower or s_orig in q_lower):
-            matched = True
-            selected_by = "query_mention"
+        if fn_cand:
+            if fn_cand.lower() == s_name or fn_cand.lower() == s_orig:
+                matched = True
+                selected_by = "exact_filename"
+            elif Path(fn_cand).suffix and Path(fn_cand).suffix.lower() in [".xlsx", ".xls", ".csv", ".pdf", ".docx", ".png", ".jpg"]:
+                cand_stem = Path(fn_cand).stem.lower()
+                s_stem = Path(s_name).stem.lower()
+                if cand_stem == s_stem and ("_rev" not in cand_stem and "_rev" not in s_stem):
+                    matched = True
+                    selected_by = "stem_match"
+            elif Path(fn_cand).stem.lower() == Path(s_name).stem or Path(fn_cand).stem.lower() == Path(s_orig).stem:
+                matched = True
+                selected_by = "stem_match"
+        elif (s_name in q_lower or s_orig in q_lower):
+            # Do not allow general query mention if query explicitly names another specific file
+            all_q_files = [ef.lower() for ef in FILE_REGEX.findall(q_lower)]
+            if not all_q_files or s_name in all_q_files or s_orig in all_q_files:
+                matched = True
+                selected_by = "query_mention"
 
         if matched:
             raw_lp = src.get("local_path", "")

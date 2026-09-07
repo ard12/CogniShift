@@ -94,7 +94,10 @@ export function OperatorPage() {
       .then((list) => {
         if (cancelled) return;
         setAgents(list);
+        const savedAgentId = sessionStorage.getItem(`cognishift_operator_agent_${selectedWorkspaceId}`);
+        const parsedSavedAgent = savedAgentId ? Number(savedAgentId) : null;
         setSelectedAgentId((current) => {
+          if (parsedSavedAgent && list.some((a) => a.id === parsedSavedAgent)) return parsedSavedAgent;
           if (current && list.some((a) => a.id === current)) return current;
           return list[0]?.id ?? null;
         });
@@ -358,7 +361,13 @@ export function OperatorPage() {
                       className="w-56"
                       value={selectedAgentId ?? ""}
                       disabled={agentsLoading || agents.length === 0}
-                      onChange={(e) => setSelectedAgentId(Number(e.target.value))}
+                      onChange={(e) => {
+                        const newId = Number(e.target.value);
+                        setSelectedAgentId(newId);
+                        if (selectedWorkspaceId) {
+                          sessionStorage.setItem(`cognishift_operator_agent_${selectedWorkspaceId}`, String(newId));
+                        }
+                      }}
                       aria-label="Select agent"
                     >
                       {agentsLoading && <option>Loading…</option>}
@@ -401,7 +410,12 @@ export function OperatorPage() {
                     className="textarea flex-1 font-mono"
                     placeholder="Enter operational command, telemetry query, or safety intervention…"
                     value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
+                    onChange={(e) => {
+                      setPrompt(e.target.value);
+                      if (selectedWorkspaceId) {
+                        sessionStorage.setItem(`cognishift_operator_prompt_${selectedWorkspaceId}`, e.target.value);
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.ctrlKey && e.key === "Enter") {
                         e.preventDefault();

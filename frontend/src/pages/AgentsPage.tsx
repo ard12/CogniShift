@@ -1,9 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { agentsApi } from "@/api/agents";
 import { ApiError } from "@/api/clients";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { IconBot, IconPlus, IconX } from "@/components/ui/Icon";
+import {
+  IconBot,
+  IconCheck,
+  IconCopy,
+  IconPlay,
+  IconPlayCircle,
+  IconPlus,
+  IconX,
+} from "@/components/ui/Icon";
 import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
 import { EmptyState, ErrorState, InlineError, LoadingState } from "@/components/ui/States";
 import { useWorkspaces } from "@/context/useWorkspaces";
@@ -17,6 +26,194 @@ function parseIdList(value: string): number[] {
     .filter(Boolean)
     .map(Number)
     .filter((n) => Number.isInteger(n) && n > 0);
+}
+
+interface SuggestedPrompt {
+  id: string;
+  title: string;
+  badge: string;
+  badgeTone: "neutral" | "info" | "warning" | "danger" | "success";
+  text: string;
+}
+
+function getSuggestedPromptsForAgent(agent: Agent): SuggestedPrompt[] {
+  const prompts: SuggestedPrompt[] = [];
+  const model = (agent.model_name || "").toLowerCase();
+  const name = (agent.name || "").toLowerCase();
+  const desc = (agent.description || "").toLowerCase();
+  const instructions = (agent.system_instructions || "").toLowerCase();
+  const tools = agent.allowed_tool_ids || [];
+
+  const isCoder =
+    model.includes("coder") ||
+    name.includes("coder") ||
+    name.includes("code") ||
+    name.includes("developer") ||
+    name.includes("python") ||
+    desc.includes("code") ||
+    desc.includes("python") ||
+    tools.includes(15);
+
+  const isVision =
+    model.includes("moondream") ||
+    model.includes("vision") ||
+    name.includes("vision") ||
+    name.includes("gauge") ||
+    name.includes("inspection") ||
+    desc.includes("vision") ||
+    desc.includes("camera");
+
+  const isFinancial =
+    name.includes("finance") ||
+    name.includes("financial") ||
+    name.includes("cagr") ||
+    name.includes("yoy") ||
+    name.includes("revenue") ||
+    name.includes("ebitda") ||
+    desc.includes("financial") ||
+    instructions.includes("yoy");
+
+  const isIT =
+    name.includes("it") ||
+    name.includes("helpdesk") ||
+    name.includes("network") ||
+    tools.includes(6) ||
+    tools.includes(7);
+
+  if (isCoder) {
+    prompts.push(
+      {
+        id: "coder-threshold-filter",
+        title: "Telemetry Outlier Filtering (Docker Sandbox)",
+        badge: "DOCKER SANDBOX",
+        badgeTone: "info",
+        text: "Write a Python script to filter sensor readings from a list of values [102.1, 495.3, 98.4, 510.2, 101.0] that exceed the safe operating threshold of 450 PSI, and execute it in the sandbox.",
+      },
+      {
+        id: "coder-vibration-stats",
+        title: "Vibration Standard Deviation Analysis",
+        badge: "DOCKER SANDBOX",
+        badgeTone: "info",
+        text: "Generate and execute a Python script to calculate the mean and standard deviation for the last 10 hourly vibration readings on Pump-101A.",
+      },
+      {
+        id: "coder-data-validation",
+        title: "Dataset Sanitization & NaN Assertion",
+        badge: "DATA VALIDATION",
+        badgeTone: "neutral",
+        text: "Write and execute a Python script to inspect telemetry records and verify that all pressure transmitter readings are strictly non-negative and finite.",
+      }
+    );
+  } else if (isVision) {
+    prompts.push(
+      {
+        id: "vision-analog-dial",
+        title: "Analog Gauge Dial Reading (PT-101)",
+        badge: "VISION OCR",
+        badgeTone: "warning",
+        text: "Inspect the attached analog pressure gauge dial image for sensor PT-101. Report the pointer needle angle, reading in PSI, and confirm if it breaches the 450 PSI threshold.",
+      },
+      {
+        id: "vision-faceplate-scale",
+        title: "Faceplate Calibration & Unit Verification",
+        badge: "INSPECTION",
+        badgeTone: "neutral",
+        text: "Examine the meter faceplate for instrument tag markings and verify whether the primary dial scale is calibrated in PSI or bar.",
+      },
+      {
+        id: "vision-negative-abstention",
+        title: "Non-Instrument Imagery Safety Abstention",
+        badge: "SAFETY REFUSAL",
+        badgeTone: "neutral",
+        text: "Analyze this image. If it does not contain an industrial dial, meter, or process instrument, state that clearly and refuse measurement.",
+      }
+    );
+  } else if (isFinancial) {
+    prompts.push(
+      {
+        id: "fin-strict-yoy",
+        title: "Strict YoY Financial Verification (GoalContract)",
+        badge: "GOAL CONTRACT",
+        badgeTone: "neutral",
+        text: "Calculate the Year-over-Year (YoY) revenue and EBITDA growth percentages from the Q4 financials. Do not substitute CAGR values.",
+      },
+      {
+        id: "fin-ebitda-variance",
+        title: "EBITDA Margin & Variance Evaluation",
+        badge: "ANALYTICS",
+        badgeTone: "neutral",
+        text: "Extract operating revenues and EBITDA for FY2023 vs FY2024 and evaluate the percentage margin variance.",
+      },
+      {
+        id: "fin-capex-depreciation",
+        title: "CapEx & Asset Depreciation Summary",
+        badge: "REPORT",
+        badgeTone: "info",
+        text: "Review capital expenditure allocations and summarize depreciation schedules for newly commissioned refinery units.",
+      }
+    );
+  } else if (isIT) {
+    prompts.push(
+      {
+        id: "it-gateway-ping",
+        title: "SCADA Gateway Connectivity Check",
+        badge: "READ-ONLY",
+        badgeTone: "neutral",
+        text: "Check network connectivity to SCADA gateway 192.168.40.10 and report packet latency.",
+      },
+      {
+        id: "it-restart-bridge",
+        title: "Restart Telemetry Bridge Service",
+        badge: "SUPERVISOR PERMIT",
+        badgeTone: "warning",
+        text: "The Modbus collector service telemetry-bridge is unresponsive. Initiate restart for service telemetry-bridge.",
+      },
+      {
+        id: "it-vlan-audit",
+        title: "VLAN 40 Telemetry Port Audit",
+        badge: "DIAGNOSTIC",
+        badgeTone: "neutral",
+        text: "Verify open telemetry ports on VLAN 40 and check that port 502 Modbus/TCP is actively listening.",
+      }
+    );
+  } else {
+    // Standard refinery / operations / multi-step diagnostic specialist
+    prompts.push(
+      {
+        id: "ops-pt101-sop",
+        title: "PT-101 Nominal Operating Window & Telemetry",
+        badge: "READ-ONLY",
+        badgeTone: "neutral",
+        text: "What is the normal operating pressure for sensor PT-101 according to our SOP? Please check current pressure telemetry.",
+      },
+      {
+        id: "ops-emergency-relief",
+        title: "Overpressure Excursion & Four-Eyes Relief",
+        badge: "FOUR-EYES REQUIRED",
+        badgeTone: "danger",
+        text: "Pressure transmitter PT-101 is reading 495 PSI! This exceeds 450 PSI! Actuate emergency pressure relief on chamber Reactor-B!",
+      },
+      {
+        id: "ops-tt204-diagnostic",
+        title: "Thermocouple TT-204 & Bearing Diagnostics",
+        badge: "DIAGNOSTIC",
+        badgeTone: "neutral",
+        text: "Please check temperature telemetry on thermocouple TT-204 and run equipment diagnostic on Pump-101A.",
+      }
+    );
+
+    if (tools.includes(5) || instructions.includes("restart")) {
+      prompts.push({
+        id: "ops-restart-pump",
+        title: "Post-Trip Controlled Restart (P-101A)",
+        badge: "FOUR-EYES REQUIRED",
+        badgeTone: "warning",
+        text: "Bearing temperatures have stabilized below 70°C. Initiate controlled component restart on pump P-101A following SOP section 2.0.",
+      });
+    }
+  }
+
+  return prompts;
 }
 
 function CreateAgentForm({
@@ -156,12 +353,30 @@ function CreateAgentForm({
 }
 
 function AgentDetail({ agent, onUpdated }: { agent: Agent; onUpdated: (a: Agent) => void }) {
+  const navigate = useNavigate();
   const [status, setStatus] = useState(agent.status);
   const [approvalRequired, setApprovalRequired] = useState(agent.approval_required);
   const [modelName, setModelName] = useState(agent.model_name || "qwen2.5:7b");
   const [systemInstructions, setSystemInstructions] = useState(agent.system_instructions || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedPromptId, setCopiedPromptId] = useState<string | null>(null);
+
+  const suggestedPrompts = getSuggestedPromptsForAgent(agent);
+
+  function handleCopyPrompt(prompt: SuggestedPrompt) {
+    void navigator.clipboard.writeText(prompt.text);
+    setCopiedPromptId(prompt.id);
+    setTimeout(() => setCopiedPromptId(null), 2000);
+  }
+
+  function handleRunInConsole(prompt: SuggestedPrompt) {
+    if (agent.workspace_id) {
+      sessionStorage.setItem(`cognishift_operator_prompt_${agent.workspace_id}`, prompt.text);
+      sessionStorage.setItem(`cognishift_operator_agent_${agent.workspace_id}`, String(agent.id));
+    }
+    navigate("/operator");
+  }
 
   useEffect(() => {
     setStatus(agent.status);
@@ -249,6 +464,70 @@ function AgentDetail({ agent, onUpdated }: { agent: Agent; onUpdated: (a: Agent)
           </dd>
         </div>
       </dl>
+
+      {/* Suggested Operational Prompts */}
+      <div className="space-y-3 rounded border border-surface-border bg-surface-1/60 p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconPlayCircle className="h-4 w-4 text-brand" />
+            <p className="label font-semibold text-ink-1">Operational Prompts &amp; Test Triggers</p>
+          </div>
+          <span className="font-mono text-[10px] text-ink-3">
+            {suggestedPrompts.length} templates
+          </span>
+        </div>
+        <p className="text-xs text-ink-3">
+          Pre-validated operational prompts tailored to this agent&apos;s capabilities. Test them in the Console with 1-click execution.
+        </p>
+
+        <div className="space-y-2">
+          {suggestedPrompts.map((p) => (
+            <div
+              key={p.id}
+              className="rounded border border-surface-border/80 bg-surface-2/70 p-3 transition-colors hover:border-surface-border"
+            >
+              <div className="mb-1.5 flex items-start justify-between gap-2">
+                <span className="text-xs font-semibold text-ink-1">{p.title}</span>
+                <Badge tone={p.badgeTone}>{p.badge}</Badge>
+              </div>
+              <p className="select-all break-words rounded border border-surface-border/50 bg-surface-1/90 p-2 font-mono text-xs text-ink-2">
+                {p.text}
+              </p>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopyPrompt(p)}
+                  className="text-xs"
+                >
+                  {copiedPromptId === p.id ? (
+                    <>
+                      <IconCheck className="h-3.5 w-3.5 text-status-success" />
+                      <span className="text-status-success">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconCopy className="h-3.5 w-3.5" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleRunInConsole(p)}
+                  className="text-xs"
+                >
+                  <IconPlay className="h-3.5 w-3.5 text-brand" />
+                  ▶ Run in Console
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="space-y-3 rounded border border-surface-border bg-surface-1/40 p-3">
         <div className="flex items-center justify-between">

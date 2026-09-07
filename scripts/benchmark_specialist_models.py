@@ -223,17 +223,30 @@ if __name__ == '__main__':
             }
         )
 
+    from cognishift.app.db.database import get_db, init_db
+    await init_db()
+    bench_run_id = 1
+    try:
+        async with get_db() as db:
+            await db.execute("INSERT OR IGNORE INTO workspaces (id, name) VALUES (1, 'Sandbox-Bench')")
+            await db.execute("INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name, model_name) VALUES (1, 1, 'Coder-Agent', 'qwen2.5-coder:7b')")
+            cursor = await db.execute("INSERT INTO agent_runs (workspace_id, agent_id, status) VALUES (1, 1, 'running')")
+            bench_run_id = cursor.lastrowid
+            await db.commit()
+    except Exception:
+        bench_run_id = 1
+
     req = CodeExecutionRequest(
+        code=test_harness,
         entrypoint="main.py",
-        files={"main.py": test_harness},
         timeout_seconds=15,
         memory_mb=256,
         cpu_count=1.0
     )
 
     try:
-        res = await execute_sandbox_code(workspace_id=1, run_id=1, request=req)
-        if res.status != SandboxStatus.COMPLETED:
+        res = await execute_sandbox_code(workspace_id=1, run_id=bench_run_id, request=req)
+        if res.status != SandboxStatus.SUCCESS:
             notes = f"Sandbox execution non-zero exit: status={res.status}, stderr={res.stderr}"
             return (
                 "FAILED",

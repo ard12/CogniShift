@@ -89,21 +89,27 @@ async def begin_challenge(
             "SELECT * FROM trusted_devices WHERE device_id = ? AND user_id = ?",
             (device_id, user_id),
         )).fetchone()
-        approved_count = (await (await db.execute(
-            "SELECT count(*) AS n FROM trusted_devices WHERE status = 'approved'"
-        )).fetchone())["n"]
-
-        # Loopback-only bootstrap for the very first administrator
-        if not row and role == "administrator" and approved_count == 0 and is_loopback:
-            await db.execute(
-                "INSERT INTO trusted_devices (device_id, user_id, display_name, public_key_jwk, key_fingerprint, status, approved_by, approved_at, last_ip) "
-                "VALUES (?, ?, ?, ?, ?, 'approved', ?, CURRENT_TIMESTAMP, ?)",
-                (device_id, user_id, display_name[:100], canonical, fingerprint, user_id, client_ip),
-            )
+        # Loopback-only bootstrap for the administrator:
+        # Permitted only if caller holds administrator role AND connects from loopback.
+        # Allows host administrator to bootstrap if new or promote their pending console session.
+        is_pending_or_new = (not row) or (row["status"] == "pending")
+        if is_pending_or_new and role == "administrator" and is_loopback:
+            if not row:
+                await db.execute(
+                    "INSERT INTO trusted_devices (device_id, user_id, display_name, public_key_jwk, key_fingerprint, status, approved_by, approved_at, last_ip) "
+                    "VALUES (?, ?, ?, ?, ?, 'approved', ?, CURRENT_TIMESTAMP, ?)",
+                    (device_id, user_id, display_name[:100], canonical, fingerprint, user_id, client_ip),
+                )
+            else:
+                await db.execute(
+                    "UPDATE trusted_devices SET status = 'approved', approved_by = ?, approved_at = CURRENT_TIMESTAMP, public_key_jwk = ?, key_fingerprint = ?, last_ip = ? "
+                    "WHERE device_id = ? AND user_id = ?",
+                    (user_id, canonical, fingerprint, client_ip, device_id, user_id),
+                )
             await db.execute(
                 "INSERT INTO audit_events (actor_id, action, resource_type, details, result) "
                 "VALUES (?, 'trusted_device_bootstrap', 'trusted_device', ?, 'success')",
-                (user_id, f"First trusted administrator device bootstrapped via loopback; device_id={device_id}; fingerprint={fingerprint}; ip={client_ip}"),
+                (user_id, f"Administrator device bootstrapped via loopback; device_id={device_id}; fingerprint={fingerprint}; ip={client_ip}"),
             )
             await db.commit()
             row = await (await db.execute(
@@ -112,7 +118,7 @@ async def begin_challenge(
             )).fetchone()
         elif not row:
             # New device - requires administrator approval
-            bootstrap_denied = (role == "administrator" and approved_count == 0 and not is_loopback)
+            bootstrap_denied = (role == "administrator" and not is_loopback)
             detail_msg = (
                 f"Remote administrator bootstrap denied without loopback; device_id={device_id}; ip={client_ip}"
                 if bootstrap_denied

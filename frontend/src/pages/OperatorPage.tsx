@@ -276,12 +276,15 @@ export function OperatorPage() {
 
     try {
       let inputImagePath: string | null = null;
+      let attachedSourceName: string | null = null;
       if (imageFile) {
         setDispatchStage("Ingesting attached file through the knowledge pipeline…");
         const source = await knowledgeApi.upload(imageFile, selectedWorkspaceId);
         const isImage = imageFile.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(imageFile.name);
         if (isImage) {
           inputImagePath = source.local_path ?? null;
+        } else {
+          attachedSourceName = source.original_filename ?? source.name ?? imageFile.name;
         }
       }
 
@@ -298,7 +301,9 @@ export function OperatorPage() {
       const created = await runsApi.create({
         workspace_id: selectedWorkspaceId,
         agent_id: selectedAgentId,
-        input_text: prompt.trim(),
+        input_text: attachedSourceName
+          ? `${prompt.trim()}\n\nAttached source file: ${attachedSourceName}`
+          : prompt.trim(),
         input_image_path: inputImagePath,
         conversation_history: history,
       });
@@ -452,7 +457,7 @@ export function OperatorPage() {
                       type="button"
                       onClick={clearImage}
                       className="ml-auto shrink-0 text-ink-3 hover:text-ink-1"
-                      aria-label="Remove attached image"
+                      aria-label="Remove attached file"
                     >
                       <IconX className="h-3.5 w-3.5" />
                     </button>

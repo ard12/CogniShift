@@ -14,6 +14,7 @@ async def test_root_and_frontend_serving():
         assert root_res.status_code == 200
         assert "Content-Security-Policy" in root_res.headers
         assert "script-src 'self'" in root_res.headers["Content-Security-Policy"]
+        assert "img-src 'self' data: blob:" in root_res.headers["Content-Security-Policy"]
 
         vite_dist = PROJECT_ROOT / "frontend" / "dist" / "index.html"
 

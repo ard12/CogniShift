@@ -1,4 +1,14 @@
-import { apiFetch } from "./clients";
+import { apiFetch, apiUpload, ApiError } from "./clients";
+import { getStoredToken } from "@/lib/token-storage";
+import { getDeviceSession } from "@/lib/device-identity";
+
+export interface MailAttachment {
+  id: number;
+  filename: string;
+  content_type: string;
+  file_size: number;
+  sha256_hash: string;
+}
 
 export interface MailMessageMetadata {
   id: number;
@@ -25,14 +35,21 @@ export interface MailCitation {
   source_id: string;
   page_number?: number;
   validated: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
+}
+
+export interface MailEvidencePack {
+  permit_code?: string;
+  tool_name?: string;
+  [key: string]: unknown;
 }
 
 export interface MailMessageDetail extends MailMessageMetadata {
   body_text: string;
   body_html?: string;
-  evidence_pack: Record<string, any>;
+  evidence_pack: MailEvidencePack;
   citations: MailCitation[];
+  attachments?: MailAttachment[];
   eml_path?: string;
   artifact?: {
     id: number;
@@ -60,6 +77,29 @@ export interface SmtpHealthStatus {
   loopback_only: boolean;
 }
 
+export interface MailRecipient {
+  user_id: string;
+  display_name: string;
+  role: string;
+  internal_email: string;
+}
+
+export interface SendMailPayload {
+  recipients: string[];
+  subject: string;
+  body_text: string;
+  body_html?: string;
+  attachment_ids?: number[];
+}
+
+export interface DraftAssistResponse {
+  subject: string;
+  body: string;
+  model: string;
+  latency_ms: number;
+  fallback: boolean;
+}
+
 export const mailApi = {
   list: (folder?: string, limit?: number, offset?: number) =>
     apiFetch<MailboxResponse>("/api/v1/mail", {
@@ -72,6 +112,56 @@ export const mailApi = {
       `/api/v1/mail/${alertId}/read`,
       { method: "POST" }
     ),
+  recipients: () =>
+    apiFetch<MailRecipient[]>("/api/v1/mail/recipients"),
+  send: (payload: SendMailPayload) =>
+    apiFetch<{ status: string; alert_id: number; recipients: string[]; created_at: string }>(
+      "/api/v1/mail/send",
+      { method: "POST", body: payload }
+    ),
+  uploadAttachment: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiUpload<{ id: number; filename: string; file_size: number; content_type: string; sha256: string }>(
+      "/api/v1/mail/attachments/upload",
+      formData
+    );
+  },
+  downloadAttachmentUrl: (alertId: number, attachmentId: number) =>
+    `/api/v1/mail/${alertId}/attachments/${attachmentId}`,
+  async downloadAttachment(alertId: number, attachmentId: number, filename: string): Promise<void> {
+    const token = getStoredToken();
+    const deviceSession = getDeviceSession();
+    const res = await fetch(`/api/v1/mail/${alertId}/attachments/${attachmentId}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+      },
+    });
+    if (!res.ok) {
+      let detail: unknown;
+      try {
+        detail = await res.json();
+      } catch {
+        detail = undefined;
+      }
+      throw new ApiError(`Attachment download failed (${res.status})`, res.status, detail);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  },
+  draftAssist: (intent: string, context?: string, tone?: string) =>
+    apiFetch<DraftAssistResponse>("/api/v1/mail/draft/assist", {
+      method: "POST",
+      body: { intent, context, tone },
+    }),
   dispatchTest: () =>
     apiFetch<{ status: string; alert_id: number; subject: string; delivered: boolean }>(
       "/api/v1/mail/dispatch-test",

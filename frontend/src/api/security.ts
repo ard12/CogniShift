@@ -50,13 +50,13 @@ export interface SecurityAlertCitation {
   source_id: string;
   page_number?: number;
   validated: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface SecurityAlertDetail extends SecurityAlert {
   body_text: string;
   body_html?: string;
-  evidence_pack: Record<string, any>;
+  evidence_pack: Record<string, unknown>;
   citations: SecurityAlertCitation[];
 }
 

@@ -31,6 +31,20 @@ LATEST_DOC_REGEX = re.compile(
     re.IGNORECASE
 )
 
+
+def _explicit_filename_matches_source(reference: str, candidate: str) -> bool:
+    """Match exact names, allowing only an XLS/XLSX suffix correction."""
+    reference_path = Path((reference or "").lower().strip())
+    candidate_path = Path((candidate or "").lower().strip())
+    if reference_path.name == candidate_path.name:
+        return True
+    spreadsheet_suffixes = {".xls", ".xlsx"}
+    return (
+        reference_path.stem == candidate_path.stem
+        and reference_path.suffix in spreadsheet_suffixes
+        and candidate_path.suffix in spreadsheet_suffixes
+    )
+
 # Pronouns and anaphoric trigger phrases
 ANAPHORA_TRIGGERS = [
     r'\bthat\b',
@@ -199,7 +213,7 @@ async def resolve_target_document_for_query(
             for r in rows:
                 name = (r.get("name") or "").lower().strip()
                 orig_name = (r.get("original_filename") or "").lower().strip()
-                if ef in (name, orig_name):
+                if _explicit_filename_matches_source(ef, name) or _explicit_filename_matches_source(ef, orig_name):
                     return r
         # Explicit filename specified in query, but not found among completed knowledge sources.
         # Fail closed: Do NOT allow fuzzy / stem matching of a different file!
@@ -350,7 +364,7 @@ def resolve_target_document_for_query_sync(
             for r in rows:
                 name = (r.get("name") or "").lower().strip()
                 orig_name = (r.get("original_filename") or "").lower().strip()
-                if ef in (name, orig_name):
+                if _explicit_filename_matches_source(ef, name) or _explicit_filename_matches_source(ef, orig_name):
                     return r
         # Explicit filename specified in query, but not found among completed knowledge sources.
         # Fail closed: Do NOT allow fuzzy / stem matching of a different file!

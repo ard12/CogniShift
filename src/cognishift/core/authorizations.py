@@ -466,12 +466,13 @@ async def execute_authorized_action_atomic(
                     WHEN uses + 1 >= max_uses THEN ?
                     ELSE consumed_at
                 END
-            WHERE permit_code = ?
+            WHERE (permit_code = ? OR CAST(id AS TEXT) = ?)
               AND status = 'ACTIVE'
               AND user_id = ?
               AND action = ?
               AND resource = ?
               AND uses < max_uses
+              AND valid_from <= ?
               AND expires_at > ?
               AND (
                   trusted_device_id IS NULL
@@ -482,9 +483,11 @@ async def execute_authorized_action_atomic(
             (
                 now_str,
                 permit_code,
+                str(permit_code),
                 caller_user_id,
                 action,
                 resource,
+                now_str,
                 now_str,
                 caller_device_id,
             ),
@@ -513,7 +516,7 @@ async def execute_authorized_action_atomic(
                     caller_user_id,
                     permit_id,
                     json.dumps({
-                        "permit_code": permit_code,
+                        "permit_code": permit["permit_code"],
                         "resource": resource,
                         "action": action,
                         "tool_result": sim_result,
@@ -533,11 +536,11 @@ async def execute_authorized_action_atomic(
                     target_user=caller_user_id,
                     workspace_id=workspace_id,
                     tool_name=f"{action} [{resource}]",
-                    permit_code=permit_code,
+                    permit_code=permit["permit_code"],
                     uses_remaining=0,
                     correlation_id=corr_id,
                     summary=(
-                        f"Operational permit '{permit_code}' successfully executed by operator '{caller_user_id}'. "
+                        f"Operational permit '{permit['permit_code']}' successfully executed by operator '{caller_user_id}'. "
                         f"Target asset: {resource}. Remaining permitted uses: 0. "
                         f"Permit is now permanently CONSUMED. Execution result: {sim_result}"
                     ),
@@ -545,8 +548,8 @@ async def execute_authorized_action_atomic(
                         NotificationCitation(
                             citation_index=1,
                             citation_type=CitationClass.AUTHORIZATION,
-                            display_label=f"Permit {permit_code} (CONSUMED)",
-                            source_id=permit_code,
+                            display_label=f"Permit {permit['permit_code']} (CONSUMED)",
+                            source_id=permit["permit_code"],
                             validated=True,
                         ),
                         NotificationCitation(
@@ -565,7 +568,7 @@ async def execute_authorized_action_atomic(
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
             return {
                 "status": "CONSUMED",
-                "permit_code": permit_code,
+                "permit_code": permit["permit_code"],
                 "user_id": caller_user_id,
                 "resource": resource,
                 "action": action,
@@ -579,23 +582,59 @@ async def execute_authorized_action_atomic(
             }
 
         inspect_row = await (await db.execute(
-            "SELECT * FROM temporary_authorizations WHERE permit_code = ?",
-            (permit_code,),
+            "SELECT * FROM temporary_authorizations WHERE permit_code = ? OR CAST(id AS TEXT) = ?",
+            (permit_code, str(permit_code)),
         )).fetchone()
 
         if not inspect_row:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Authorization permit '{permit_code}' does not exist.",
+                detail=f"AUTHORIZATION_NOT_FOUND: Authorization permit '{permit_code}' does not exist.",
             )
 
         p = dict(inspect_row)
+        # Validation checks in priority order:
+        if p["user_id"].strip().lower() != caller_user_id.strip().lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"AUTHORIZATION_NOT_OWNED: Permit belongs to user '{p['user_id']}', not caller '{caller_user_id}'.",
+            )
+        if p["action"].strip().lower() != action.strip().lower() or p["resource"].strip().lower() != resource.strip().lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"AUTHORIZATION_SCOPE_MISMATCH: Permit authorizes '{p['action']}' on '{p['resource']}', requested '{action}' on '{resource}'.",
+            )
+        if p.get("trusted_device_id") and (not caller_device_id or p["trusted_device_id"] != caller_device_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="AUTHORIZATION_DEVICE_MISMATCH: Calling hardware key does not match the device bound to this permit.",
+            )
+        if p["status"] == "REVOKED":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="AUTHORIZATION_REVOKED: This permit has been revoked by a supervisor.",
+            )
         if p["status"] == "CONSUMED" or p["uses"] >= p["max_uses"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="AUTHORIZATION_CONSUMED: This one-time operational permit has already been consumed.",
             )
-        if p["expires_at"] <= now_str:
+        if p["status"] != "ACTIVE":
+            if p["status"] == "PENDING_APPROVAL":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="AUTHORIZATION_NOT_ACTIVE: Dual supervisor Four-Eyes approvals are still pending.",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"AUTHORIZATION_NOT_ACTIVE: Permit is not in ACTIVE status (current status: {p['status']}).",
+            )
+        if p.get("valid_from") and p["valid_from"] > now_str:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"AUTHORIZATION_NOT_YET_VALID: Permit validity begins at {p['valid_from']}.",
+            )
+        if p["expires_at"] <= now_str or p["status"] == "EXPIRED":
             await db.execute(
                 "UPDATE temporary_authorizations SET status = 'EXPIRED' WHERE id = ?",
                 (p["id"],),
@@ -604,31 +643,6 @@ async def execute_authorized_action_atomic(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"AUTHORIZATION_EXPIRED: Permit expired at {p['expires_at']}.",
-            )
-        if p["user_id"].strip().lower() != caller_user_id.strip().lower():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"AUTHORIZATION_NOT_OWNED: Permit belongs to user '{p['user_id']}', not caller '{caller_user_id}'.",
-            )
-        if p.get("trusted_device_id") and caller_device_id and p["trusted_device_id"] != caller_device_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="AUTHORIZATION_DEVICE_MISMATCH: Calling hardware key does not match the device bound to this permit.",
-            )
-        if p["action"].strip().lower() != action.strip().lower() or p["resource"].strip().lower() != resource.strip().lower():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"AUTHORIZATION_SCOPE_MISMATCH: Permit authorizes '{p['action']}' on '{p['resource']}', requested '{action}' on '{resource}'.",
-            )
-        if p["status"] == "REVOKED":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="AUTHORIZATION_REVOKED: This permit has been revoked by a supervisor.",
-            )
-        if p["status"] == "PENDING_APPROVAL":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="AUTHORIZATION_PENDING_APPROVAL: Dual supervisor Four-Eyes approvals are still pending.",
             )
 
         raise HTTPException(
@@ -801,6 +815,35 @@ async def process_pending_post_approval_jobs() -> int:
                 )
 
                 alert_id, composed, delivered = await dispatch_notification_for_event(ev)
+
+                if alert_id and artifact_id:
+                    try:
+                        from cognishift.core.security import resolve_workspace_path
+                        art_file_path = resolve_workspace_path(workspace_id, artifact_path, purpose="read")
+                        f_size = art_file_path.stat().st_size if art_file_path.exists() else 0
+                        async with get_db() as db:
+                            await db.execute(
+                                """
+                                INSERT INTO mail_attachments (
+                                    alert_id, uploader_user_id, filename, content_type, file_size, storage_path,
+                                    sha256_hash, artifact_id, created_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    alert_id,
+                                    permit.get("second_approver") or "system",
+                                    artifact_filename,
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    f_size,
+                                    str(art_file_path),
+                                    artifact_record.get("sha256_hash", ""),
+                                    artifact_id,
+                                    now_iso_utc(),
+                                ),
+                            )
+                            await db.commit()
+                    except Exception as att_err:
+                        logger.warning(f"Could not link artifact attachment for alert {alert_id}: {att_err}")
 
                 async with get_db() as db:
                     await db.execute(

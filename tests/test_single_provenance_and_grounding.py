@@ -40,6 +40,23 @@ def test_evidence_sufficiency_accepts_authentic_corrosion_evidence():
     assert is_suff is True
 
 
+def test_evidence_sufficiency_rejects_other_equipment_as_support():
+    query = "According to the documents, what is the maintenance procedure for P-9999?"
+    distractor_context = (
+        "[Pump Manual | Page 30]\nP-101A and P-101B use the redundant pump auto-transfer protocol."
+    )
+    is_suff, reason = validate_evidence_sufficiency(query, distractor_context)
+    assert is_suff is False
+    assert "P-9999" in reason
+
+
+def test_evidence_sufficiency_accepts_exact_requested_equipment():
+    query = "According to the documents, what is the maintenance procedure for P-101A?"
+    context = "[Pump Manual | Page 12]\nP-101A maintenance requires the documented isolation sequence."
+    is_suff, _ = validate_evidence_sufficiency(query, context)
+    assert is_suff is True
+
+
 def test_deepseek_thinking_hygiene():
     """Verify that <think>...</think> blocks are stripped from model output."""
     raw_output = (

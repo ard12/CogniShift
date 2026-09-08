@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import { mailApi, type MailMessageMetadata, type MailMessageDetail, type SmtpHealthStatus } from "@/api/mail";
+import { useCallback, useEffect, useState, useRef } from "react";
+import {
+  mailApi,
+  type MailMessageMetadata,
+  type MailMessageDetail,
+  type SmtpHealthStatus,
+  type MailRecipient,
+  type MailAttachment,
+} from "@/api/mail";
 import { securityApi } from "@/api/security";
 import { authorizationsApi, type ExecutionResult } from "@/api/authorizations";
 import { useAuth } from "@/auth/useAuth";
@@ -19,8 +26,10 @@ import {
   IconTrash,
 } from "@/components/ui/Icon";
 import { formatRelativeTime, formatFullDateTime, formatIstTime } from "@/lib/format";
+import { getStoredToken } from "@/lib/token-storage";
+import { getDeviceSession } from "@/lib/device-identity";
 
-type FolderType = "all" | "permits" | "security" | "governance";
+type FolderType = "all" | "sent" | "permits" | "security" | "governance";
 
 export function MailPage() {
   const { role } = useAuth();
@@ -28,6 +37,7 @@ export function MailPage() {
   const [messages, setMessages] = useState<MailMessageMetadata[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [selectedFolder, setSelectedFolder] = useState<FolderType>("all");
   const [filterUnreadOnly, setFilterUnreadOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -55,6 +65,27 @@ export function MailPage() {
   const [requestReason, setRequestReason] = useState<string>("Scheduled operational run under supervisor authorization");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState<boolean>(false);
 
+  // User-to-User Compose Modal State
+  const [showComposeModal, setShowComposeModal] = useState<boolean>(false);
+  const [availableRecipients, setAvailableRecipients] = useState<MailRecipient[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
+  const [recipientFilter, setRecipientFilter] = useState<string>("");
+  const [composeSubject, setComposeSubject] = useState<string>("");
+  const [composeBody, setComposeBody] = useState<string>("");
+  const [composeAttachments, setComposeAttachments] = useState<MailAttachment[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isSendingMail, setIsSendingMail] = useState<boolean>(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  // Local AI Draft Assist State
+  const [showAiAssist, setShowAiAssist] = useState<boolean>(false);
+  const [aiIntent, setAiIntent] = useState<string>("");
+  const [isGeneratingAiDraft, setIsGeneratingAiDraft] = useState<boolean>(false);
+  const [aiDraftStatus, setAiDraftStatus] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const fetchMail = useCallback(async () => {
     try {
       const folderParam = selectedFolder === "all" ? undefined : selectedFolder;
@@ -63,11 +94,12 @@ export function MailPage() {
         setMessages(res.messages);
         setUnreadCount(res.unread_count);
         setTotalCount(res.total_count);
+        setCurrentUserId(res.user_id);
         setFetchError(null);
       } catch (err) {
         console.warn("mailApi.list failed, falling back to securityApi.mailbox:", err);
         const mb = await securityApi.mailbox(100, 0);
-        setMessages(mb.alerts as any);
+        setMessages(mb.alerts as unknown as MailMessageMetadata[]);
         setUnreadCount(mb.unread_count);
         setTotalCount(mb.total_count);
         setFetchError(null);
@@ -97,6 +129,183 @@ export function MailPage() {
     return () => clearInterval(interval);
   }, [fetchMail]);
 
+  // Real-Time Server-Sent Events (SSE) Stream with Disconnect Safety
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    async function streamEvents() {
+      try {
+        const token = getStoredToken();
+        const deviceSession = getDeviceSession();
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        if (deviceSession) headers["X-Device-Session"] = deviceSession;
+
+        const response = await fetch("/api/v1/mail/events", {
+          headers,
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) return;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (active) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() ?? "";
+          for (const part of parts) {
+            if (part.includes("event: new_mail")) {
+              void fetchMail();
+            }
+          }
+        }
+      } catch (err: unknown) {
+        if (active && (!(err instanceof Error) || err.name !== "AbortError")) {
+          // Short polling fallback handles connection retries
+        }
+      }
+    }
+
+    void streamEvents();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [fetchMail]);
+
+  const openComposeModal = async () => {
+    setShowComposeModal(true);
+    setSendError(null);
+    setAttachmentError(null);
+    try {
+      const recs = await mailApi.recipients();
+      setAvailableRecipients(recs);
+    } catch (err) {
+      console.error("Failed to load recipients:", err);
+    }
+  };
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    const allowed = [".pdf", ".docx", ".xlsx", ".csv", ".txt", ".png", ".jpg", ".jpeg"];
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (!allowed.includes(ext)) {
+      setAttachmentError(`File extension '${ext}' is not permitted. Allowed: ${allowed.join(", ")}`);
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setAttachmentError("File size exceeds 10 MB limit.");
+      return;
+    }
+
+    setIsUploadingAttachment(true);
+    setAttachmentError(null);
+
+    try {
+      const uploaded = await mailApi.uploadAttachment(file);
+      setComposeAttachments((prev) => [
+        ...prev,
+        {
+          id: uploaded.id,
+          filename: uploaded.filename,
+          file_size: uploaded.file_size,
+          content_type: uploaded.content_type,
+          sha256_hash: uploaded.sha256,
+        },
+      ]);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err: unknown) {
+      setAttachmentError(err instanceof Error ? err.message : "Failed to upload attachment.");
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
+  const removeAttachment = (attId: number) => {
+    setComposeAttachments((prev) => prev.filter((a) => a.id !== attId));
+  };
+
+  const handleGenerateAiDraft = async () => {
+    if (!aiIntent.trim()) return;
+    setIsGeneratingAiDraft(true);
+    setAiDraftStatus(null);
+    try {
+      const draft = await mailApi.draftAssist(aiIntent.trim());
+      setComposeSubject(draft.subject);
+      setComposeBody(draft.body);
+      setAiDraftStatus(
+        draft.fallback
+          ? `Local model unavailable; deterministic fallback used in ${draft.latency_ms}ms`
+          : `Draft generated via local ${draft.model} in ${draft.latency_ms}ms`
+      );
+      setShowAiAssist(false);
+    } catch (err: unknown) {
+      setAiDraftStatus(err instanceof Error ? err.message : "AI drafting failed.");
+    } finally {
+      setIsGeneratingAiDraft(false);
+    }
+  };
+
+  const handleSendMail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedRecipients.length === 0) {
+      setSendError("Please select at least one recipient.");
+      return;
+    }
+    if (!composeSubject.trim()) {
+      setSendError("Please enter a subject.");
+      return;
+    }
+    if (!composeBody.trim()) {
+      setSendError("Please enter a message body.");
+      return;
+    }
+
+    setIsSendingMail(true);
+    setSendError(null);
+
+    try {
+      const res = await mailApi.send({
+        recipients: selectedRecipients,
+        subject: composeSubject.trim(),
+        body_text: composeBody.trim(),
+        attachment_ids: composeAttachments.map((a) => a.id),
+      });
+
+      setShowComposeModal(false);
+      setSelectedRecipients([]);
+      setComposeSubject("");
+      setComposeBody("");
+      setComposeAttachments([]);
+
+      setSelectedFolder("sent");
+      await fetchMail();
+      if (res.alert_id) {
+        await handleSelectMessage(res.alert_id);
+      }
+    } catch (err: unknown) {
+      setSendError(err instanceof Error ? err.message : "Failed to send message.");
+    } finally {
+      setIsSendingMail(false);
+    }
+  };
+
+  const toggleRecipient = (userId: string) => {
+    setSelectedRecipients((prev) =>
+      prev.includes(userId) ? prev.filter((u) => u !== userId) : [...prev, userId]
+    );
+  };
+
   const handleSelectMessage = async (msgId: number) => {
     setSelectedMessageId(msgId);
     setExecutionResult(null);
@@ -107,7 +316,7 @@ export function MailPage() {
         detail = await mailApi.get(msgId);
       } catch {
         const secDetail = await securityApi.alertDetail(msgId);
-        detail = secDetail as any;
+        detail = secDetail as unknown as MailMessageDetail;
       }
       setSelectedDetail(detail);
       if (!detail.is_read) {
@@ -200,9 +409,8 @@ export function MailPage() {
       // Reload detail to update state
       await handleSelectMessage(selectedDetail.id);
       await fetchMail();
-    } catch (err: any) {
-      const msg = err?.message || err?.detail || "Execution denied.";
-      setExecutionError(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } catch (err: unknown) {
+      setExecutionError(err instanceof Error ? err.message : "Execution denied.");
     } finally {
       setIsExecutingPermit(false);
     }
@@ -243,7 +451,7 @@ export function MailPage() {
       <div className="flex items-center justify-between">
         <PageHeader
           title="Sovereign Industrial Mailbox"
-          description={`Air-Gapped Loopback Internal Messaging · Role: ${role ?? "operator"}`}
+          description={`Internal Messaging · Role: ${role ?? "operator"}`}
         />
         <div className="flex items-center gap-2">
           {smtpHealth && (
@@ -260,15 +468,24 @@ export function MailPage() {
                   smtpHealth.status === "ACTIVE" ? "bg-emerald-400 animate-pulse" : "bg-status-error"
                 }`}
               />
-              <span>SMTP {smtpHealth.host}:{smtpHealth.port} ({smtpHealth.status})</span>
+              <span>SMTP {smtpHealth.host}:{smtpHealth.port}</span>
             </div>
           )}
           <Button
             size="sm"
             variant="primary"
+            onClick={openComposeModal}
+            className="bg-brand text-black font-semibold hover:bg-brand/90"
+          >
+            <IconMail className="h-3.5 w-3.5 mr-1" />
+            Compose
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
             onClick={() => setShowRequestModal(true)}
           >
-            + Request Work Permit
+            + Request Permit
           </Button>
           {(role === "supervisor" || role === "administrator") && (
             <Button
@@ -276,19 +493,20 @@ export function MailPage() {
               variant="secondary"
               disabled={isDispatching}
               onClick={handleDispatchTest}
+              className="hidden sm:inline-flex"
             >
-              {isDispatching ? "Dispatching..." : "Dispatch Test Alert"}
+              {isDispatching ? "Dispatching..." : "Test Alert"}
             </Button>
           )}
           {role === "administrator" && messages.length > 0 && (
             <Button
               size="sm"
               variant="secondary"
-              className="border-status-error/40 text-status-error hover:bg-status-error/10"
+              className="border-status-error/40 text-status-error hover:bg-status-error/10 hidden sm:inline-flex"
               onClick={handleClearMailbox}
             >
               <IconTrash className="h-3.5 w-3.5 mr-1" />
-              Clear Mailbox
+              Clear
             </Button>
           )}
           <Button size="sm" variant="secondary" onClick={() => void fetchMail()}>
@@ -297,10 +515,36 @@ export function MailPage() {
         </div>
       </div>
 
+      {/* Mobile folder pills (visible only on mobile) */}
+      <div className="flex md:hidden items-center gap-1 overflow-x-auto pb-1 text-xs shrink-0">
+        {[
+          { key: "all", label: "Inbound" },
+          { key: "sent", label: "Sent" },
+          { key: "permits", label: "Permits" },
+          { key: "security", label: "Security" },
+          { key: "governance", label: "Governance" },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => {
+              setSelectedFolder(f.key as FolderType);
+              setSelectedMessageId(null);
+            }}
+            className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              selectedFolder === f.key
+                ? "bg-brand text-black border-brand font-bold"
+                : "bg-surface-2 text-ink-2 border-surface-border"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* 3-PANE EMAIL CLIENT LAYOUT */}
       <div className="flex flex-1 min-h-0 rounded-xl border border-surface-border bg-surface-1 overflow-hidden shadow-2xl">
         {/* PANE 1: FOLDERS & CATEGORIES */}
-        <div className="w-56 border-r border-surface-border bg-surface-2/40 flex flex-col justify-between p-3 shrink-0">
+        <div className="hidden md:flex w-52 lg:w-56 border-r border-surface-border bg-surface-2/40 flex-col justify-between p-3 shrink-0">
           <div className="space-y-4">
             <div>
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink-3 px-2">
@@ -309,16 +553,20 @@ export function MailPage() {
               <div className="mt-2 space-y-1">
                 {[
                   { key: "all", label: "All Inbound", count: totalCount, icon: IconInbox },
+                  { key: "sent", label: "Sent Messages", icon: IconMail },
                   { key: "permits", label: "Work Permits", icon: IconShieldCheck },
                   { key: "security", label: "Security Events", icon: IconAlertTriangle },
-                  { key: "governance", label: "Four-Eyes / Governance", icon: IconMail },
+                  { key: "governance", label: "Four-Eyes / Gov", icon: IconCheck },
                 ].map((f) => {
                   const IconComponent = f.icon;
                   const isActive = selectedFolder === f.key;
                   return (
                     <button
                       key={f.key}
-                      onClick={() => setSelectedFolder(f.key as FolderType)}
+                      onClick={() => {
+                        setSelectedFolder(f.key as FolderType);
+                        setSelectedMessageId(null);
+                      }}
                       className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
                         isActive
                           ? "bg-brand/15 text-brand font-semibold"
@@ -360,25 +608,29 @@ export function MailPage() {
             </div>
           </div>
 
-          {/* Air gap telemetry status */}
+          {/* Transport status. Only assert what the health endpoint verified. */}
           <div className="rounded-lg border border-surface-border bg-surface-2 p-2.5 text-[11px] font-mono text-ink-3 space-y-1">
             <div className="flex items-center justify-between">
-              <span>Sovereignty:</span>
-              <span className="text-emerald-400 font-bold">100% OFFLINE</span>
+              <span>Transport scope:</span>
+              <span className={smtpHealth?.loopback_only ? "text-emerald-400 font-bold" : "text-status-warning font-bold"}>
+                {smtpHealth ? (smtpHealth.loopback_only ? "LOCAL ONLY" : "NOT VERIFIED") : "UNAVAILABLE"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span>Transport:</span>
-              <span className="text-ink-2">Loopback SMTP</span>
+              <span className="text-ink-2">
+                {smtpHealth ? `${smtpHealth.host}:${smtpHealth.port}` : "Unavailable"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Egress:</span>
-              <span className="text-emerald-400 font-bold">ZERO CLOUD</span>
+              <span>Internet status:</span>
+              <span className="text-status-warning font-bold">NOT VERIFIED</span>
             </div>
           </div>
         </div>
 
         {/* PANE 2: SEARCHABLE MESSAGE LIST */}
-        <div className="w-80 md:w-96 border-r border-surface-border flex flex-col bg-surface-1 shrink-0">
+        <div className={`${selectedMessageId !== null ? "hidden md:flex" : "flex"} w-full md:w-80 lg:w-96 border-r border-surface-border flex-col bg-surface-1 shrink-0`}>
           <div className="p-2.5 border-b border-surface-border">
             <input
               type="text"
@@ -460,14 +712,32 @@ export function MailPage() {
         </div>
 
         {/* PANE 3: DETAILED PREVIEW & EXECUTION PANE */}
-        <div className="flex-1 flex flex-col min-w-0 bg-surface-2/20 overflow-y-auto">
+        <div className={`${selectedMessageId === null ? "hidden md:flex" : "flex"} flex-1 flex-col min-w-0 bg-surface-2/20 overflow-y-auto`}>
           {!selectedDetail ? (
-            <div className="flex h-full items-center justify-center flex-col text-xs text-ink-3 gap-2">
+            <div className="flex h-full items-center justify-center flex-col text-xs text-ink-3 gap-2 p-6">
               <IconInbox className="h-8 w-8 text-ink-3/40" />
               <span>Select an email or work permit from the list to preview details.</span>
             </div>
           ) : (
-            <div className="p-6 space-y-5 max-w-4xl">
+            <div className="p-4 md:p-6 space-y-5 max-w-4xl">
+              {/* Mobile Back Button */}
+              <div className="md:hidden pb-2 border-b border-surface-border flex items-center justify-between">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setSelectedMessageId(null);
+                    setSelectedDetail(null);
+                  }}
+                  className="text-xs"
+                >
+                  ← Back to Messages
+                </Button>
+                <span className="font-mono text-[10px] text-ink-3">
+                  ID: #{selectedDetail.id}
+                </span>
+              </div>
+
               {/* Header */}
               <div className="border-b border-surface-border pb-4 space-y-2">
                 <div className="flex items-center justify-between">
@@ -617,17 +887,59 @@ export function MailPage() {
 
               {/* Body Content Render */}
               {bodyViewMode === "html" && selectedDetail.body_html ? (
-                <div className="rounded-lg border border-surface-border bg-black/40 overflow-hidden">
+                <div className="rounded-lg border border-surface-border bg-white overflow-hidden text-black">
                   <iframe
                     title="Email Preview"
                     srcDoc={selectedDetail.body_html}
-                    className="w-full h-96 border-0"
+                    className="w-full h-80 border-0"
                     sandbox="allow-same-origin"
                   />
                 </div>
               ) : (
                 <div className="rounded-lg border border-surface-border bg-surface-1 p-4 font-mono text-xs leading-relaxed text-ink-1 whitespace-pre-wrap">
                   {selectedDetail.body_text}
+                </div>
+              )}
+
+              {/* ATTACHMENTS SECTION */}
+              {selectedDetail.attachments && selectedDetail.attachments.length > 0 && (
+                <div className="rounded-lg border border-surface-border bg-surface-2/60 p-3 space-y-2">
+                  <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-ink-2 uppercase tracking-wider">
+                    <IconDownload className="h-3.5 w-3.5 text-brand" />
+                    <span>Attached Files ({selectedDetail.attachments.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedDetail.attachments.map((att) => (
+                      <button
+                        type="button"
+                        key={att.id}
+                        onClick={async () => {
+                          try {
+                            setFetchError(null);
+                            await mailApi.downloadAttachment(selectedDetail.id, att.id, att.filename);
+                          } catch (err) {
+                            setFetchError(err instanceof Error ? err.message : "Attachment download failed");
+                          }
+                        }}
+                        className="flex items-center justify-between rounded-lg border border-surface-border bg-surface-1 p-2.5 hover:border-brand/40 transition-colors group"
+                      >
+                        <div className="min-w-0 flex items-center gap-2">
+                          <span className="font-mono text-base">📎</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-ink-1 truncate group-hover:text-brand transition-colors">
+                              {att.filename}
+                            </p>
+                            <p className="font-mono text-[10px] text-ink-3">
+                              {(att.file_size / 1024).toFixed(1)} KB · {att.content_type.split("/")[1] || "file"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
+                          <IconDownload className="h-3.5 w-3.5 text-ink-2 group-hover:text-brand" />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -825,6 +1137,259 @@ export function MailPage() {
               >
                 {isSubmittingRequest ? "Submitting..." : "Submit Permit Request"}
               </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* GENUINE USER-TO-USER MAIL COMPOSE MODAL */}
+      {showComposeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 md:p-4 backdrop-blur-sm">
+          <form
+            onSubmit={handleSendMail}
+            className="w-full max-w-2xl rounded-xl border border-surface-border bg-surface-1 p-5 space-y-4 shadow-2xl max-h-[92vh] flex flex-col"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-surface-border pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <IconMail className="h-4 w-4 text-brand" />
+                <h3 className="font-bold text-base text-ink-1">Compose Internal Message</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowComposeModal(false)}
+                className="text-ink-3 hover:text-ink-1 text-sm font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs overflow-y-auto pr-1 flex-1">
+              {/* Recipients Selection */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-ink-3 font-mono font-medium">
+                    Recipients (Select team members)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Filter names..."
+                    value={recipientFilter}
+                    onChange={(e) => setRecipientFilter(e.target.value)}
+                    className="rounded border border-surface-border bg-surface-2 px-2 py-0.5 text-[11px] text-ink-1 focus:border-brand focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5 p-2 rounded border border-surface-border bg-surface-2 min-h-[38px] max-h-28 overflow-y-auto">
+                  {availableRecipients.length === 0 ? (
+                    <span className="text-ink-3 text-xs">Loading team directory...</span>
+                  ) : (
+                    availableRecipients
+                      .filter((r) =>
+                        !recipientFilter.trim() ||
+                        r.display_name.toLowerCase().includes(recipientFilter.toLowerCase()) ||
+                        r.role.toLowerCase().includes(recipientFilter.toLowerCase()) ||
+                        r.user_id.toLowerCase().includes(recipientFilter.toLowerCase())
+                      )
+                      .map((rec) => {
+                        const isSelected = selectedRecipients.includes(rec.user_id);
+                        return (
+                          <button
+                            key={rec.user_id}
+                            type="button"
+                            onClick={() => toggleRecipient(rec.user_id)}
+                            className={`rounded-full px-2.5 py-1 text-xs font-mono transition-colors flex items-center gap-1.5 border ${
+                              isSelected
+                                ? "bg-brand text-black border-brand font-bold shadow-sm"
+                                : "bg-surface-1 text-ink-2 border-surface-border hover:border-ink-3"
+                            }`}
+                          >
+                            <span>{rec.display_name}</span>
+                            <span className={`text-[10px] opacity-75 ${isSelected ? "text-black" : "text-ink-3"}`}>
+                              ({rec.role})
+                            </span>
+                          </button>
+                        );
+                      })
+                  )}
+                </div>
+                {selectedRecipients.length > 0 && (
+                  <p className="font-mono text-[10px] text-ink-3 mt-1">
+                    Selected ({selectedRecipients.length}): {selectedRecipients.join(", ")}
+                  </p>
+                )}
+              </div>
+
+              {/* Subject + AI Assist Trigger */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-ink-3 font-mono font-medium">Subject</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAiAssist((v) => !v)}
+                    className="text-brand hover:underline font-mono text-[11px] flex items-center gap-1 font-semibold"
+                  >
+                    <span>✨ Improve with Local AI</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={composeSubject}
+                  onChange={(e) => setComposeSubject(e.target.value)}
+                  placeholder="e.g. Unit 4 Scheduled Inspection & Maintenance Handoff"
+                  className="w-full rounded border border-surface-border bg-surface-2 px-3 py-1.5 text-xs text-ink-1 font-medium focus:border-brand focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Local AI Assistant Box */}
+              {showAiAssist && (
+                <div className="rounded-lg border border-brand/40 bg-brand/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-brand">
+                    <span>Local Operational Draft Assistant</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAiAssist(false)}
+                      className="text-ink-3 hover:text-ink-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-ink-3">
+                    Describe your operational goal. The configured local model will generate a structured subject and email body.
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={aiIntent}
+                      onChange={(e) => setAiIntent(e.target.value)}
+                      placeholder="e.g. Request Zara to approve urgent seal repair on pump P-101A"
+                      className="flex-1 rounded border border-surface-border bg-surface-1 px-3 py-1.5 text-xs text-ink-1 focus:border-brand focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleGenerateAiDraft();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="primary"
+                      disabled={isGeneratingAiDraft || !aiIntent.trim()}
+                      onClick={handleGenerateAiDraft}
+                    >
+                      {isGeneratingAiDraft ? "Drafting..." : "Generate"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {aiDraftStatus && (
+                <p
+                  className={`font-mono text-[10px] ${
+                    aiDraftStatus.includes("fallback") ? "text-status-warning" : "text-emerald-400"
+                  }`}
+                >
+                  {aiDraftStatus}
+                </p>
+              )}
+
+              {/* Message Body */}
+              <div>
+                <label className="block text-ink-3 font-mono mb-1 font-medium">Message Body</label>
+                <textarea
+                  rows={6}
+                  value={composeBody}
+                  onChange={(e) => setComposeBody(e.target.value)}
+                  placeholder="Enter clear, professional operational communications..."
+                  className="w-full rounded border border-surface-border bg-surface-2 px-3 py-2 text-xs text-ink-1 font-sans leading-relaxed focus:border-brand focus:outline-none resize-none"
+                  required
+                />
+              </div>
+
+              {/* Attachments Upload & Chips */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-ink-3 font-mono font-medium">
+                    Attachments (Max 10MB: .pdf, .docx, .xlsx, .csv, .txt, .png, .jpg)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAttachment}
+                    className="text-brand hover:underline font-mono text-[11px] font-semibold"
+                  >
+                    {isUploadingAttachment ? "Uploading..." : "+ Add File"}
+                  </button>
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleAttachmentUpload}
+                  className="hidden"
+                  accept=".pdf,.docx,.xlsx,.csv,.txt,.png,.jpg,.jpeg"
+                />
+
+                {composeAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {composeAttachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-2 px-2.5 py-1 text-xs font-mono"
+                      >
+                        <span className="text-ink-1 font-medium truncate max-w-[180px]">
+                          {att.filename}
+                        </span>
+                        <span className="text-ink-3 text-[10px]">
+                          ({(att.file_size / 1024).toFixed(1)} KB)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(att.id)}
+                          className="text-status-error hover:text-status-error/80 font-bold ml-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {attachmentError && (
+                  <p className="font-mono text-[10px] text-status-error mt-1">{attachmentError}</p>
+                )}
+              </div>
+
+              {sendError && (
+                <div className="rounded border border-status-error/40 bg-status-error/10 p-2 text-xs font-mono text-status-error">
+                  {sendError}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-surface-border shrink-0">
+              <span className="font-mono text-[10px] text-ink-3">
+                Sender: <strong>{currentUserId || "not-verified"}@secure.internal</strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowComposeModal(false)}
+                  disabled={isSendingMail}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={isSendingMail || selectedRecipients.length === 0}
+                  className="bg-brand text-black font-semibold"
+                >
+                  {isSendingMail ? "Sending..." : "Send Message"}
+                </Button>
+              </div>
             </div>
           </form>
         </div>

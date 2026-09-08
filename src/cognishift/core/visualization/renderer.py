@@ -29,6 +29,13 @@ PALETTE = [
 ]
 
 
+def _tick_positions(value_count: int, max_ticks: int = 12) -> list[int]:
+    """Return representative tick positions while always retaining both ends."""
+    if value_count <= max_ticks:
+        return list(range(value_count))
+    return sorted(set(np.linspace(0, value_count - 1, max_ticks, dtype=int).tolist()))
+
+
 def render_visualization(spec: VisualizationSpec, output_path: Path) -> Path:
     """
     Renders a VisualizationSpec into an authoritative PNG artifact.
@@ -85,19 +92,21 @@ def render_visualization(spec: VisualizationSpec, output_path: Path) -> Path:
         for s_idx, (s_name, s_values) in enumerate(series_dict.items()):
             color = PALETTE[s_idx % len(PALETTE)]
             vals_to_plot = s_values[:len(x_vals)]
+            point_count = len(vals_to_plot)
             ax.plot(
-                range(len(vals_to_plot)),
+                range(point_count),
                 vals_to_plot,
                 label=s_name,
                 color=color,
                 marker="o",
-                markersize=5,
-                linewidth=2.2,
+                markersize=2.5 if point_count > 100 else 5,
+                linewidth=1.8 if point_count > 100 else 2.2,
                 alpha=0.95
             )
 
-        ax.set_xticks(range(len(x_vals)))
-        x_labels = [str(x) for x in x_vals]
+        tick_positions = _tick_positions(len(x_vals))
+        ax.set_xticks(tick_positions)
+        x_labels = [str(x_vals[index]) for index in tick_positions]
         rotation = 28 if (len(x_labels) > 6 or any(len(str(lbl)) > 8 for lbl in x_labels)) else 0
         ax.set_xticklabels(x_labels, rotation=rotation, ha="right" if rotation else "center", fontsize=9, fontweight="medium")
         ax.grid(True, linestyle=":", alpha=0.6, color="#BBBBBB")
@@ -116,8 +125,9 @@ def render_visualization(spec: VisualizationSpec, output_path: Path) -> Path:
                 edgecolor="#222222",
                 linewidth=0.8
             )
-        ax.set_xticks(range(len(x_vals)))
-        x_labels = [str(x) for x in x_vals]
+        tick_positions = _tick_positions(len(x_vals))
+        ax.set_xticks(tick_positions)
+        x_labels = [str(x_vals[index]) for index in tick_positions]
         rotation = 28 if len(x_labels) > 6 else 0
         ax.set_xticklabels(x_labels, rotation=rotation, ha="right" if rotation else "center", fontsize=9)
         ax.grid(True, linestyle=":", alpha=0.6, color="#BBBBBB")

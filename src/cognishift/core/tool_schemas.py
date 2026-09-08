@@ -289,6 +289,27 @@ class ExecuteCodeArgs(BaseModel):
 
 
 
+class GenerateCsvArgs(BaseModel):
+    filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.(?i:csv)$", description="Target filename (must end in .csv)")
+    title: str = Field(..., min_length=1, max_length=200, description="CSV export title")
+    headers: List[str] = Field(default_factory=list, max_length=50, description="CSV column headers")
+    rows: List[List[Union[str, int, float, bool, None]]] = Field(default_factory=list, max_length=5000, description="CSV data rows")
+
+    @field_validator("filename", mode="before")
+    @classmethod
+    def normalize_filename(cls, v: Any) -> str:
+        if isinstance(v, str):
+            clean = v.strip().replace("\\", "/").split("/")[-1]
+            if not clean:
+                return "data.csv"
+            if clean.lower().endswith(".csv"):
+                clean = clean[:-4] + ".csv"
+            else:
+                clean = f"{clean}.csv"
+            return clean
+        return "data.csv"
+
+
 class GeneratePdfArgs(BaseModel):
     filename: str = Field(..., pattern=r"^[A-Za-z0-9_.\-]+\.(?i:pdf)$", description="Target filename (must end in .pdf)")
     title: str = Field(..., min_length=1, max_length=200, description="Document title")
@@ -363,6 +384,7 @@ TOOL_SCHEMAS: Dict[str, Type[BaseModel]] = {
     "generate_xlsx": GenerateXlsxArgs,
     "generate_pptx": GeneratePptxArgs,
     "generate_pdf": GeneratePdfArgs,
+    "generate_csv": GenerateCsvArgs,
     "render_document_page": RenderDocumentPageArgs,
     "execute_code": ExecuteCodeArgs,
 }
@@ -387,6 +409,7 @@ TOOL_RISK_LEVELS = {
     "generate_xlsx": "low_risk",
     "generate_pptx": "low_risk",
     "generate_pdf": "low_risk",
+    "generate_csv": "low_risk",
     "render_document_page": "low_risk",
     "run_diagnostic": "low_risk",
     "check_interlock_status": "low_risk"
@@ -523,12 +546,13 @@ def bounded_repair_tool_parameters(
             except (ValueError, TypeError):
                 params["page_number"] = 1
 
-    elif tool_name in ("generate_docx", "generate_xlsx", "generate_pptx", "generate_pdf"):
+    elif tool_name in ("generate_docx", "generate_xlsx", "generate_pptx", "generate_pdf", "generate_csv"):
         ext_map = {
             "generate_docx": ".docx",
             "generate_xlsx": ".xlsx",
             "generate_pptx": ".pptx",
             "generate_pdf": ".pdf",
+            "generate_csv": ".csv",
         }
         expected_ext = ext_map[tool_name]
         if "filename" in params and isinstance(params["filename"], str):

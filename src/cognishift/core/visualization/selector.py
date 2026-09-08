@@ -47,6 +47,17 @@ def parse_artifact_request_contract(query: str) -> ArtifactRequestContract:
     # 3. Excel requirement
     xlsx_required = any(w in clean_q for w in ["convert to excel", "export to excel", "into excel", "as excel", "as xlsx", "as spreadsheet"])
 
+    # CSV output requirement. Do not treat an input phrase such as
+    # "create a chart from the attached CSV" as a request for a second CSV.
+    csv_required = bool(
+        re.search(
+            r"\b(?:create|generate|produce|make)\s+(?:an?\s+)?(?:csv|comma-separated)(?:\s+(?:file|export))?\b",
+            clean_q,
+        )
+        or re.search(r"\b(?:export|save)\b.*\bas\s+(?:an?\s+)?csv\b", clean_q)
+        or re.search(r"\bgive\s+me\s+(?:an?\s+)?csv\b", clean_q)
+    )
+
     # 4. PNG / Visualization requirement
     viz_keywords = [
         "visualization", "visualizations", "visualisation", "visualisations",
@@ -57,7 +68,8 @@ def parse_artifact_request_contract(query: str) -> ArtifactRequestContract:
         "trend graph", "trend graphs", "trend chart", "trend charts",
         "scatter plot", "scatter plots", "scatter",
         "pie chart", "pie charts", "pie",
-        "png", "pngs", "image", "images", "dashboard chart", "dashboard charts"
+        "png", "pngs", "image", "images", "dashboard chart", "dashboard charts",
+        "graphical representation", "graphical representations"
     ]
     png_required = any(re.search(rf"\b{re.escape(kw)}\b", clean_q) for kw in viz_keywords)
 
@@ -94,12 +106,13 @@ def parse_artifact_request_contract(query: str) -> ArtifactRequestContract:
     if sheet_matches:
         explicit_sheet = sheet_matches[0].strip()
 
-    is_deliv = pdf_required or docx_required or xlsx_required or png_required
+    is_deliv = pdf_required or docx_required or xlsx_required or csv_required or png_required
 
     return ArtifactRequestContract(
         pdf_required=pdf_required,
         docx_required=docx_required,
         xlsx_required=xlsx_required,
+        csv_required=csv_required,
         png_required=png_required,
         png_count=png_count,
         requested_chart_type=requested_chart_type,
@@ -281,6 +294,98 @@ def _generate_single_spec(
     q_lower = query.lower()
     stem = file_path.stem
 
+    # Strategy 0: honor an explicitly requested numeric metric/time axis before
+    # considering generic categorical distributions. This is intentionally
+    # deterministic: only real columns and exact values from the source are used.
+    def _column_words(value: Any) -> List[str]:
+        return re.findall(r"[a-z0-9]+", str(value).lower())
+
+    numeric_cols = [c for c in clean_cols if pd.api.types.is_numeric_dtype(df[c])]
+    query_words = set(_column_words(q_lower))
+    generic_words = {
+        "a", "an", "and", "attached", "chart", "create", "csv", "file",
+        "from", "graph", "graphical", "line", "of", "over", "plot", "showing",
+        "spreadsheet", "the", "time", "visualization",
+    }
+
+    def _metric_score(column: Any) -> Tuple[int, int]:
+        words = [word for word in _column_words(column) if word not in {"value", "reading"}]
+        overlap = sum(1 for word in words if word in query_words and word not in generic_words)
+        # Requiring two matching semantic tokens prevents a generic word such as
+        # "pressure" from silently selecting the wrong pressure measurement.
+        return overlap, len(words)
+
+    scored_metrics = sorted(
+        ((_metric_score(column), column) for column in numeric_cols),
+        key=lambda item: (item[0][0], -item[0][1]),
+        reverse=True,
+    )
+    explicit_metric_col = (
+        scored_metrics[0][1]
+        if scored_metrics and scored_metrics[0][0][0] >= 2
+        else None
+    )
+    time_cols = [
+        c for c in clean_cols
+        if any(token in _column_words(c) for token in ("timestamp", "datetime", "date", "time"))
+    ]
+    time_series_requested = bool(
+        contract.requested_chart_type == ChartType.LINE
+        or re.search(r"\b(?:over\s+time|time\s+series|trend)\b", q_lower)
+    )
+
+    if explicit_metric_col is not None and time_series_requested and time_cols:
+        selected_df = df.copy()
+        filter_description = None
+        equipment_cols = [
+            c for c in clean_cols
+            if any(token in _column_words(c) for token in ("component", "equipment", "asset", "tag"))
+        ]
+        for equipment_col in equipment_cols:
+            values = selected_df[equipment_col].dropna().astype(str).unique().tolist()
+            requested_value = next(
+                (value for value in values if re.search(rf"(?<![A-Za-z0-9]){re.escape(value)}(?![A-Za-z0-9])", query, re.IGNORECASE)),
+                None,
+            )
+            if requested_value is not None:
+                selected_df = selected_df[selected_df[equipment_col].astype(str) == requested_value]
+                filter_description = f"{equipment_col} = {requested_value}"
+                break
+
+        time_col = time_cols[0]
+        selected_df = selected_df[[time_col, explicit_metric_col]].dropna()
+        if not selected_df.empty:
+            x_values = [str(value) for value in selected_df[time_col].tolist()]
+            y_values = [float(value) for value in selected_df[explicit_metric_col].tolist()]
+            metric_label = str(explicit_metric_col).replace("_", " ").title()
+            equipment_suffix = f" for {filter_description.split(' = ', 1)[1]}" if filter_description else ""
+            transformation = f"SELECT({time_col}, {explicit_metric_col})"
+            if filter_description:
+                transformation += f" WHERE {filter_description}"
+            return VisualizationSpec(
+                title=f"{metric_label}{equipment_suffix} Over Time",
+                source_file=file_path.name,
+                source_sheet=sheet_name,
+                chart_type=ChartType.LINE,
+                x_column=str(time_col),
+                y_columns=[str(explicit_metric_col)],
+                x_values=x_values,
+                series={str(explicit_metric_col): y_values},
+                x_label=str(time_col).replace("_", " ").title(),
+                y_label=metric_label,
+                output_filename=f"{stem}_{str(explicit_metric_col).lower()}_trend.png",
+                provenance={
+                    "source_file": file_path.name,
+                    "source_sheet": sheet_name,
+                    "x_column": str(time_col),
+                    "y_columns": [str(explicit_metric_col)],
+                    "filter": filter_description,
+                    "transformation": transformation,
+                    "chart_type": ChartType.LINE.value,
+                    "row_count": len(x_values),
+                },
+            )
+
     # Strategy 1: Horizontal Metric Row in Financial Matrix (e.g. Operating EBITDA across FY columns)
     first_col = clean_cols[0] if clean_cols else df.columns[0]
     metric_rows = df[first_col].dropna().astype(str).tolist()
@@ -431,7 +536,6 @@ def _generate_single_spec(
         )
 
     # Strategy 3: General numeric fallback from first 2 numeric columns
-    numeric_cols = [c for c in clean_cols if pd.api.types.is_numeric_dtype(df[c])]
     if numeric_cols:
         num_col = numeric_cols[0]
         label_col = clean_cols[0] if clean_cols[0] != num_col else "Index"

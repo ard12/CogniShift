@@ -53,7 +53,7 @@ export interface ExecutePermitPayload {
   permit_code: string;
   action?: string;
   resource?: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }
 
 export interface ExecutionResult {

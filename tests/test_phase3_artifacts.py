@@ -57,6 +57,9 @@ async def setup_artifacts_db():
         await db.execute(
             "INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (20, 2, 1, 'completed', 'operator_t2')"
         )
+        await db.execute("DELETE FROM mail_attachments WHERE artifact_id IN (SELECT id FROM workspace_artifacts WHERE workspace_id IN (1, 2))")
+        await db.execute("DELETE FROM post_approval_jobs WHERE artifact_id IN (SELECT id FROM workspace_artifacts WHERE workspace_id IN (1, 2))")
+        await db.execute("DELETE FROM temporary_authorizations WHERE artifact_id IN (SELECT id FROM workspace_artifacts WHERE workspace_id IN (1, 2))")
         await db.execute("DELETE FROM workspace_artifacts WHERE workspace_id IN (1, 2)")
         await db.commit()
 
@@ -236,6 +239,28 @@ async def test_generate_and_validate_xlsx_with_formula_sanitization():
     val_row7 = ws.cell(row=7, column=3).value
     assert val_row6.startswith("'"), "Formula '=' was not escaped!"
     assert val_row7.startswith("'"), "Formula '@' was not escaped!"
+
+
+@pytest.mark.asyncio
+async def test_generate_and_validate_csv():
+    res = await execute_tool(
+        "generate_csv",
+        {
+            "filename": "pressure_export.csv",
+            "title": "P-101A Pressure Export",
+            "headers": ["timestamp", "discharge_pressure_psi"],
+            "rows": [["2026-09-08 10:00:00", 143.2], ["2026-09-08 10:05:00", 144.1]],
+        },
+        workspace_id=1,
+        run_id=10,
+    )
+    assert "Successfully generated and registered CSV artifact" in res
+    csv_path = resolve_workspace_path(1, "generated/run_10/pressure_export.csv", purpose="read")
+    assert csv_path.read_text(encoding="utf-8").splitlines() == [
+        "timestamp,discharge_pressure_psi",
+        "2026-09-08 10:00:00,143.2",
+        "2026-09-08 10:05:00,144.1",
+    ]
 
 
 @pytest.mark.asyncio

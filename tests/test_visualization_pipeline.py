@@ -12,9 +12,10 @@ from cognishift.core.visualization.selector import (
     select_target_sheet,
     build_visualization_specs,
 )
-from cognishift.core.visualization.renderer import render_visualization
+from cognishift.core.visualization.renderer import _tick_positions, render_visualization
 from cognishift.core.visualization.validator import validate_png_artifact
-from cognishift.core.engine import GoalContract
+from cognishift.core.engine import GoalContract, _is_presentation_request
+from cognishift.core.conversation_context import _explicit_filename_matches_source
 
 
 def test_parse_artifact_request_contract():
@@ -56,6 +57,35 @@ def test_parse_artifact_request_contract():
     assert c6.png_count == 2
     assert c6.is_deliverable_request is True
 
+    q7 = "Create a CSV file containing the timestamp and discharge pressure."
+    c7 = parse_artifact_request_contract(q7)
+    assert c7.csv_required is True
+    assert c7.is_deliverable_request is True
+
+    c7_input = parse_artifact_request_contract(
+        "Create a line chart showing discharge pressure over time from the attached CSV."
+    )
+    assert c7_input.csv_required is False
+    assert c7_input.png_required is True
+
+    q8 = "Create a graphical representation of the attached spreadsheet."
+    c8 = parse_artifact_request_contract(q8)
+    assert c8.png_required is True
+    assert c8.is_deliverable_request is True
+
+
+def test_graphical_representation_does_not_request_powerpoint():
+    assert _is_presentation_request("create a graphical representation and a PDF") is False
+    assert _is_presentation_request("create a PowerPoint presentation") is True
+
+
+def test_explicit_xls_reference_can_resolve_same_stem_xlsx_source_only():
+    requested = "MRPL_Enterprise_Financial_and_Operational_History_10Y.xls"
+    stored = "MRPL_Enterprise_Financial_and_Operational_History_10Y.xlsx"
+    assert _explicit_filename_matches_source(requested, stored) is True
+    assert _explicit_filename_matches_source(requested, "MRPL_Enterprise_Financial_and_Operational_History_3Y.xlsx") is False
+    assert _explicit_filename_matches_source("inspection.pdf", "inspection.docx") is False
+
 
 def test_build_visualization_specs_csv():
     """Verify truthful extraction from real maintenance log CSV without LLM fabrication."""
@@ -74,6 +104,26 @@ def test_build_visualization_specs_csv():
     assert len(spec.series) > 0
     vals = list(spec.series.values())[0]
     assert all(isinstance(v, (int, float)) and v > 0 for v in vals)
+
+
+def test_explicit_equipment_metric_time_series_uses_requested_columns():
+    csv_path = Path("data/demo/equipment_readings.csv")
+    if not csv_path.exists():
+        pytest.skip("Equipment readings demo CSV not found")
+
+    query = "Create a line chart showing the discharge pressure of P-101A over time from the attached CSV."
+    contract = parse_artifact_request_contract(query)
+    specs = build_visualization_specs(csv_path, contract, query)
+
+    assert contract.csv_required is False
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.chart_type == ChartType.LINE
+    assert spec.x_column == "timestamp"
+    assert spec.y_columns == ["discharge_pressure_psi"]
+    assert spec.provenance["filter"] == "component_id = P-101A"
+    assert spec.provenance["row_count"] > 10
+    assert len(spec.x_values) == len(spec.series["discharge_pressure_psi"])
 
 
 def test_build_visualization_specs_dual_charts():
@@ -152,6 +202,13 @@ def test_render_and_validate_png(tmp_path):
     assert is_valid is True, f"Validation failed: {msg}"
 
 
+def test_long_time_series_uses_readable_representative_ticks():
+    positions = _tick_positions(576)
+    assert len(positions) <= 12
+    assert positions[0] == 0
+    assert positions[-1] == 575
+
+
 def test_goal_contract_satisfaction():
     """Verify GoalContract enforcement fails closed when requested deliverables are missing."""
     contract = parse_artifact_request_contract("Create a PDF report and a PNG chart.")
@@ -184,3 +241,12 @@ def test_goal_contract_satisfaction():
     ])
     assert sat is True
     assert len(missing) == 0
+
+
+def test_csv_goal_contract_requires_a_real_nonempty_artifact():
+    goal = GoalContract(
+        artifact_contract=parse_artifact_request_contract("Create a CSV file from this data.")
+    )
+    assert goal.is_satisfied([]) is False
+    assert goal.is_satisfied([{"artifact_type": "csv", "filename": "data.csv", "file_size": 0}]) is False
+    assert goal.is_satisfied([{"artifact_type": "csv", "filename": "data.csv", "file_size": 64}]) is True

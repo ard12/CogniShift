@@ -24,6 +24,7 @@ class ArtifactRequestContract(BaseModel):
     pdf_required: bool = False
     docx_required: bool = False
     xlsx_required: bool = False
+    csv_required: bool = False
     png_required: bool = False
     png_count: int = 0
     requested_chart_type: ChartType = ChartType.AUTO
@@ -40,6 +41,8 @@ class ArtifactRequestContract(BaseModel):
         if self.docx_required:
             count += 1
         if self.xlsx_required:
+            count += 1
+        if self.csv_required:
             count += 1
         count += self.png_count
         return count

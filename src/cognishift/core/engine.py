@@ -33,7 +33,7 @@ from cognishift.core.model_router import (
     LocalModelInventoryUnavailableError,
     update_verified_inventory_cache
 )
-from cognishift.core.semantic_router import get_semantic_router, SemanticIntent, SemanticRoutingResult
+from cognishift.core.semantic_router import get_semantic_router, SemanticIntent, SemanticRoutingResult, DecisionMethod
 from cognishift.core.tool_schemas import (
     parse_agent_action,
     validate_proposed_tool_call,
@@ -87,6 +87,11 @@ logger = logging.getLogger("cognishift.engine")
 
 
 from dataclasses import dataclass, field
+
+
+def _is_presentation_request(text: str) -> bool:
+    """Detect an explicit presentation deliverable without matching 'representation'."""
+    return bool(re.search(r"\b(?:ppt|pptx|powerpoint|slides?|presentation)\b", text or "", re.IGNORECASE))
 
 
 def enforce_rca_evidence_boundaries(content: str, operator_input: str) -> str:
@@ -195,6 +200,14 @@ class GoalContract:
                 ]
                 if not valid_xlsx:
                     missing.append("xlsx_deliverable")
+            if getattr(self.artifact_contract, "csv_required", False):
+                valid_csv = [
+                    a for a in arts
+                    if (a.get("artifact_type") == "csv" or str(a.get("filename", "")).lower().endswith(".csv"))
+                    and a.get("file_size", 0) > 0
+                ]
+                if not valid_csv:
+                    missing.append("csv_deliverable")
         return len(missing) == 0, missing
 
     def is_satisfied(self, current_artifacts: Optional[List[Dict[str, Any]]] = None) -> bool:
@@ -273,11 +286,18 @@ def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[b
     is_corrosion_query = any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "corrosion"]) or bool(re.search(r'\b(?:mpy|nde|ndt)\b', lower_clean))
     is_inspection_report = any(k in lower_clean for k in ["inspection report", "metallurgical report"]) or bool(re.search(r'\b(?:nde|ndt)\s+report\b', lower_clean))
 
-    if not (is_remote_work or is_procurement or is_corrosion_query or is_inspection_report):
-        return True, "Standard query"
+    requested_entities = sorted(set(re.findall(r"\b[A-Z]{1,4}-\d{3,4}[A-Z]?\b", (query or "").upper())))
+    entity_grounding_required = bool(requested_entities) and any(
+        phrase in lower_clean
+        for phrase in ("according to", "document", "manual", "procedure", "sop", "maintenance")
+    )
 
     if not retrieved_context or not retrieved_context.strip():
-        return False, "No context retrieved"
+        if entity_grounding_required:
+            return False, f"No evidence retrieved for requested equipment: {', '.join(requested_entities)}."
+        if is_remote_work or is_procurement or is_corrosion_query or is_inspection_report:
+            return False, "No context retrieved"
+        return True, "Standard query"
 
     lower_ctx = retrieved_context.lower()
     if is_remote_work:
@@ -295,6 +315,15 @@ def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[b
         has_acronyms = bool(re.search(r'\b(?:nde|ndt|mpy)\b', lower_ctx, re.IGNORECASE))
         if not (has_corr_terms or has_acronyms):
             return False, "Query is for corrosion life / inspection report, but retrieved context contains no corrosion or inspection evidence."
+
+    if entity_grounding_required:
+        upper_ctx = retrieved_context.upper()
+        missing_entities = [
+            entity for entity in requested_entities
+            if not re.search(rf"(?<![A-Z0-9-]){re.escape(entity)}(?![A-Z0-9-])", upper_ctx)
+        ]
+        if missing_entities:
+            return False, f"Retrieved evidence does not explicitly mention requested equipment: {', '.join(missing_entities)}."
 
     return True, "Sufficient topical evidence verified"
 
@@ -902,6 +931,18 @@ async def execute_agent_run(
                 details={"reason": "semantic_router_disabled"}
             )
 
+        pre_artifact_contract = parse_artifact_request_contract(clean_input)
+        if pre_artifact_contract.is_deliverable_request and routing_res.intent != SemanticIntent.CODE_EXECUTION:
+            routing_res.intent = SemanticIntent.CODE_EXECUTION
+            routing_res.decision_method = DecisionMethod.RULE
+            routing_res.confidence = 1.0
+            routing_res.abstained = False
+            routing_res.details = {
+                **routing_res.details,
+                "rule": "explicit_artifact_deliverable",
+                "artifact_contract": pre_artifact_contract.to_dict(),
+            }
+
         await log_event(
             db,
             run_id,
@@ -1277,12 +1318,14 @@ async def execute_agent_run(
 
             # Determine requested deliverable format (PDF, XLSX, PPTX, Image, or DOCX)
             req_format = "DOCX"
-            if any(w in lower_goal for w in ["ppt", "pptx", "powerpoint", "slides", "presentation"]):
+            if _is_presentation_request(lower_goal):
                 req_format = "PPTX"
             elif "pdf" in lower_goal and not any(w in lower_goal for w in ["convert to docx", "docx", "word", "ppt", "pptx"]):
                 req_format = "PDF"
             elif any(w in lower_goal for w in ["excel", "xlsx", "spreadsheet"]):
                 req_format = "XLSX"
+            elif re.search(r"\b(?:csv|comma-separated)\b", lower_goal):
+                req_format = "CSV"
             elif any(w in lower_goal for w in ["jpg", "jpeg", "png", "image", "visualize", "plot", "chart", "graph"]):
                 req_format = "IMAGE"
 
@@ -1947,20 +1990,35 @@ async def execute_agent_run(
                 is_policy_query = is_remote_work or is_procurement or is_corrosion_query or is_inspection_report or any(k in lower_clean for k in [
                     "policy", "standard operating procedure", "our sop", "leave rule", "travel rule", "reimbursement"
                 ])
+                requested_entities = sorted(set(re.findall(r"\b[A-Z]{1,4}-\d{3,4}[A-Z]?\b", clean_input.upper())))
+                entity_grounding_required = bool(requested_entities) and any(
+                    phrase in lower_clean
+                    for phrase in ("according to", "document", "manual", "procedure", "sop", "maintenance")
+                )
 
                 # Verify topical relevance and factual sufficiency of retrieved context
-                if context_str:
-                    is_suff, suff_reason = validate_evidence_sufficiency(clean_input, context_str)
+                evidence_text = "\n".join(part for part in (context_str, graph_context) if part)
+                if evidence_text:
+                    is_suff, suff_reason = validate_evidence_sufficiency(clean_input, evidence_text)
                     if not is_suff:
                         logger.info(f"Discarding context: {suff_reason}")
                         context_str = ""
+                        graph_context = ""
 
-                if not context_str and not graph_context and is_policy_query:
+                if not context_str and not graph_context and (is_policy_query or entity_grounding_required):
                     if is_corrosion_query or is_inspection_report:
                         eq_match = re.search(r'\b([A-Z]{1,3}-[0-9]{3,4}[A-Z]?)\b', clean_input)
                         eq_label = f" for {eq_match.group(1)}" if eq_match else ""
                         fail_msg = f"According to the documents currently available in your Knowledge Vault, no inspection report or corrosion life data is available{eq_label}."
                         sources_used = "None (No matching manual found)"
+                    elif entity_grounding_required:
+                        requested_label = ", ".join(requested_entities)
+                        fail_msg = (
+                            f"I could not find {requested_label} in the indexed workspace documents. "
+                            f"I cannot provide a source-grounded procedure for this equipment and will not infer one "
+                            f"from other assets. Please provide the relevant {requested_label} document or ask about a documented asset."
+                        )
+                        sources_used = "None (Insufficient evidence for requested equipment)"
                     else:
                         topic_name = "remote-work-policy" if is_remote_work else ("procurement-policy" if is_procurement else "relevant")
                         fail_msg = f"I couldn't find {topic_name} documentation in the current workspace knowledge base. Please ingest the applicable document before asking for an organization-specific answer."
@@ -2146,20 +2204,35 @@ async def execute_agent_run(
                 is_policy_query = is_remote_work or is_procurement or is_corrosion_query or is_inspection_report or any(k in lower_clean for k in [
                     "policy", "standard operating procedure", "our sop", "leave rule", "travel rule", "reimbursement"
                 ])
+                requested_entities = sorted(set(re.findall(r"\b[A-Z]{1,4}-\d{3,4}[A-Z]?\b", clean_input.upper())))
+                entity_grounding_required = bool(requested_entities) and any(
+                    phrase in lower_clean
+                    for phrase in ("according to", "document", "manual", "procedure", "sop", "maintenance")
+                )
 
                 # Verify topical relevance and factual sufficiency of retrieved context
-                if context_str:
-                    is_suff, suff_reason = validate_evidence_sufficiency(clean_input, context_str)
+                evidence_text = "\n".join(part for part in (context_str, graph_context) if part)
+                if evidence_text:
+                    is_suff, suff_reason = validate_evidence_sufficiency(clean_input, evidence_text)
                     if not is_suff:
                         logger.info(f"Discarding context: {suff_reason}")
                         context_str = ""
+                        graph_context = ""
 
-                if not context_str and not graph_context and is_policy_query:
+                if not context_str and not graph_context and (is_policy_query or entity_grounding_required):
                     if is_corrosion_query or is_inspection_report:
                         eq_match = re.search(r'\b([A-Z]{1,3}-[0-9]{3,4}[A-Z]?)\b', clean_input)
                         eq_label = f" for {eq_match.group(1)}" if eq_match else ""
                         fail_msg = f"According to the documents currently available in your Knowledge Vault, no inspection report or corrosion life data is available{eq_label}."
                         sources_used = "None (No matching manual found)"
+                    elif entity_grounding_required:
+                        requested_label = ", ".join(requested_entities)
+                        fail_msg = (
+                            f"I could not find {requested_label} in the indexed workspace documents. "
+                            f"I cannot provide a source-grounded procedure for this equipment and will not infer one "
+                            f"from other assets. Please provide the relevant {requested_label} document or ask about a documented asset."
+                        )
+                        sources_used = "None (Insufficient evidence for requested equipment)"
                     else:
                         topic_name = "remote-work-policy" if is_remote_work else ("procurement-policy" if is_procurement else "relevant")
                         fail_msg = f"I couldn't find {topic_name} documentation in the current workspace knowledge base. Please ingest the applicable document before asking for an organization-specific answer."
@@ -2293,7 +2366,7 @@ async def execute_agent_run(
                 workspace_name=workspace_name
             )
 
-            target_doc = (
+            target_doc = target_doc or (
                 claimed_task.source_references.get("pinned_source")
                 if (claimed_task and claimed_task.source_references)
                 else (resolved_context.pinned_source or await resolve_target_document_for_query(workspace_id, clean_input, db=db))
@@ -2349,8 +2422,8 @@ async def execute_agent_run(
                 )
 
                 is_doc_or_viz_task = (
-                    (target_doc is not None and any(w in clean_input.lower() for w in ["review", "convert", "report", "document", "docx", "pdf", "xlsx", "excel", "jpg", "png", "audit", "history", "financial", "deliverable", "deliverables"]))
-                    or any(w in clean_input.lower() for w in ["visualize", "plot", "chart", "graph", "matplotlib", "seaborn", "convert it into", "convert the document", "proper audit", "in docx format", "in pdf format"])
+                    (target_doc is not None and any(w in clean_input.lower() for w in ["review", "convert", "report", "document", "docx", "pdf", "xlsx", "excel", "csv", "jpg", "png", "audit", "history", "financial", "deliverable", "deliverables"]))
+                    or any(w in clean_input.lower() for w in ["visualize", "plot", "chart", "graph", "graphical representation", "matplotlib", "seaborn", "convert it into", "convert the document", "proper audit", "in docx format", "in pdf format", "create a csv", "generate a csv"])
                 )
 
                 if (
@@ -2479,8 +2552,8 @@ async def execute_agent_run(
                 )
 
                 is_doc_or_viz_task = (
-                    (target_doc is not None and any(w in clean_input.lower() for w in ["review", "convert", "report", "document", "docx", "pdf", "xlsx", "excel", "jpg", "png", "audit", "history", "financial", "deliverable", "deliverables"]))
-                    or any(w in clean_input.lower() for w in ["visualize", "plot", "chart", "graph", "matplotlib", "seaborn", "convert it into", "convert the document", "two different files", "docx and pdf", "both docx and pdf"])
+                    (target_doc is not None and any(w in clean_input.lower() for w in ["review", "convert", "report", "document", "docx", "pdf", "xlsx", "excel", "csv", "jpg", "png", "audit", "history", "financial", "deliverable", "deliverables"]))
+                    or any(w in clean_input.lower() for w in ["visualize", "plot", "chart", "graph", "graphical representation", "matplotlib", "seaborn", "convert it into", "convert the document", "two different files", "docx and pdf", "both docx and pdf", "create a csv", "generate a csv"])
                 )
 
                 if (
@@ -2551,7 +2624,8 @@ async def execute_agent_run(
                     wants_pdf = "pdf" in lower_input
                     wants_both_docx_and_pdf = (wants_docx and wants_pdf) or any(w in lower_input for w in ["both docx and pdf", "docx and pdf", "two different files"])
                     wants_convert_excel = any(w in lower_input for w in ["convert to excel", "export to excel", "into excel", "as excel", "as xlsx", "as spreadsheet"])
-                    wants_pptx = any(w in lower_input for w in ["ppt", "pptx", "powerpoint", "slides", "presentation"])
+                    wants_csv = bool(getattr(artifact_contract, "csv_required", False))
+                    wants_pptx = _is_presentation_request(lower_input)
                     wants_png_viz = any(w in lower_input for w in ["png", "jpg", "jpeg", "image", "visualize", "plot", "chart", "graph"])
 
                     if wants_both_docx_and_pdf:
@@ -2562,6 +2636,8 @@ async def execute_agent_run(
                         target_fmt = "pdf"
                     elif wants_convert_excel:
                         target_fmt = "xlsx"
+                    elif wants_csv:
+                        target_fmt = "csv"
                     elif wants_png_viz and not (wants_docx or wants_pptx or wants_convert_excel):
                         target_fmt = "image"
                     else:
@@ -3024,13 +3100,28 @@ print("Analysis script finished with returncode 0.")
                             }
                             tool_out = await execute_tool("generate_pptx", doc_params, workspace_id=workspace_id, run_id=run_id)
                             current_step.tool_name = "generate_pptx"
+                        elif target_fmt == "csv":
+                            report_filename = f"Data_{stem_name}.csv"
+                            headers = insights.get("table_headers", ["Item", "Value"])
+                            rows = insights.get("table_rows", [])
+                            if not rows:
+                                rows = [["Source", doc_title], ["Status", "No tabular rows extracted"]]
+                            doc_params = {
+                                "filename": report_filename,
+                                "title": display_title,
+                                "headers": headers,
+                                "rows": rows,
+                            }
+                            tool_out = await execute_tool("generate_csv", doc_params, workspace_id=workspace_id, run_id=run_id)
+                            current_step.tool_name = "generate_csv"
                         elif target_fmt in ("excel", "xlsx"):
                             report_filename = f"Data_{stem_name}.xlsx"
                             doc_params = {
                                 "filename": report_filename,
+                                "title": display_title,
                                 "sheets": [
                                     {
-                                        "sheet_name": "Data_Extract",
+                                        "name": "Data_Extract",
                                         "headers": insights.get("table_headers", ["Item", "Value"]),
                                         "rows": insights.get("table_rows", [["Sample", "Data"]])
                                     }
@@ -3088,6 +3179,7 @@ print("Analysis script finished with returncode 0.")
                         json_art = next((a for a in current_run_artifacts if "metrics" in str(a.get("filename", "")).lower() or a.get("artifact_type") == "json" or str(a.get("filename", "")).endswith(".json")), None)
                         pptx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "pptx" or str(a.get("filename", "")).endswith(".pptx")), None)
                         xlsx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "xlsx" or str(a.get("filename", "")).endswith(".xlsx")), None)
+                        csv_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "csv" or str(a.get("filename", "")).endswith(".csv")), None)
 
                         deliverables_list = []
                         item_num = 1
@@ -3103,6 +3195,9 @@ print("Analysis script finished with returncode 0.")
                         if xlsx_art:
                             deliverables_list.append(f"{item_num}. **Excel Workbook (`.xlsx`)**: `{xlsx_art['filename']}` ({xlsx_art.get('file_size', 0)} bytes) — Artifact #{xlsx_art['id']}")
                             item_num += 1
+                        if csv_art:
+                            deliverables_list.append(f"{item_num}. **CSV Data Export (`.csv`)**: `{csv_art['filename']}` ({csv_art.get('file_size', 0)} bytes) — Artifact #{csv_art['id']}")
+                            item_num += 1
                         for c_art in chart_arts:
                             deliverables_list.append(f"{item_num}. **Visualization Chart (`.png`)**: `{c_art['filename']}` ({c_art.get('file_size', 0)} bytes) — Artifact #{c_art['id']}")
                             item_num += 1
@@ -3117,7 +3212,7 @@ print("Analysis script finished with returncode 0.")
 
                         deliv_str = "\n".join(deliverables_list) if deliverables_list else "None generated"
 
-                        is_viz_only = (target_fmt == "image") or (bool(chart_arts) and not (docx_art or pdf_art or pptx_art or xlsx_art))
+                        is_viz_only = (target_fmt == "image") or (bool(chart_arts) and not (docx_art or pdf_art or pptx_art or xlsx_art or csv_art))
 
                         if is_financial_task:
                             final_text = (

@@ -563,6 +563,73 @@ async def run_benchmark(iterations: int = 20) -> Dict[str, Any]:
             "sla": 1000.0,
         }
 
+        # -------------------------------------------------------------
+        # 12. User Mail Send (Transactional Delivery & SSE Broadcast)
+        # -------------------------------------------------------------
+        print("[12/13] Benchmarking User-to-User Internal Mail Dispatch...")
+        lat_mail_send = []
+        err_mail_send = 0
+        for i in range(iterations):
+            try:
+                t0 = time.perf_counter()
+                res = await client.post(
+                    "/api/v1/mail/send",
+                    json={
+                        "recipients": ["zara", "rohit"],
+                        "subject": f"[BENCHMARK] Operational Status Update #{i}",
+                        "body_text": f"Iteration #{i}: Plant parameters within normal operating thresholds.",
+                    },
+                    headers=tokens["aryan"],
+                )
+                lat = (time.perf_counter() - t0) * 1000
+                if res.status_code == 200:
+                    lat_mail_send.append(lat)
+                else:
+                    err_mail_send += 1
+            except Exception:
+                err_mail_send += 1
+
+        bench_results["12. User Mail Send"] = {
+            "stats": calc_stats(lat_mail_send),
+            "errors": err_mail_send,
+            "sla": 200.0,
+        }
+
+        # -------------------------------------------------------------
+        # 13. Operational Mail Draft Assist (Local LLM / Fallback)
+        # -------------------------------------------------------------
+        print("[13/13] Benchmarking Operational Mail Draft Assist...")
+        lat_draft = []
+        err_draft = 0
+        models_used = []
+        draft_iters = min(iterations, 5)
+        for i in range(draft_iters):
+            try:
+                t0 = time.perf_counter()
+                res = await client.post(
+                    "/api/v1/mail/draft/assist",
+                    json={
+                        "intent": f"Request safety walkdown on heat exchanger E-{101 + i}",
+                        "tone": "professional",
+                    },
+                    headers=tokens["aryan"],
+                )
+                lat = (time.perf_counter() - t0) * 1000
+                if res.status_code == 200:
+                    lat_draft.append(lat)
+                    models_used.append(res.json().get("model", "unknown"))
+                else:
+                    err_draft += 1
+            except Exception:
+                err_draft += 1
+
+        bench_results["13. Mail Draft Assist"] = {
+            "stats": calc_stats(lat_draft),
+            "errors": err_draft,
+            "sla": 6500.0,
+            "models": list(set(models_used)),
+        }
+
     # 4. Format and print authoritative report
     all_passed = True
     print("\n" + "=" * 105)

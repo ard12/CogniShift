@@ -362,6 +362,40 @@ async def execute_tool(
         except Exception as e:
             return f"Error generating XLSX artifact: {str(e)}"
 
+    elif tool_name == "generate_csv":
+        import csv
+        from cognishift.core.artifact_generators import create_and_register_artifact
+        filename = parameters.get("filename", "data.csv")
+        title = parameters.get("title", "Operational Data Export")
+        headers = parameters.get("headers", [])
+        rows = parameters.get("rows", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        def _write_csv(path: Path) -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                if headers:
+                    writer.writerow(headers)
+                writer.writerows(rows)
+
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="csv",
+                generator_fn=_write_csv,
+                title=title,
+                description="Generated CSV data export",
+                run_id=run_id,
+            )
+            return (
+                f"Successfully generated and registered CSV artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating CSV artifact: {str(e)}"
+
     elif tool_name == "generate_pptx":
         from cognishift.core.artifact_generators import create_and_register_artifact, generate_pptx_presentation
         filename = parameters.get("filename", "briefing.pptx")

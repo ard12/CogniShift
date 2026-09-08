@@ -463,7 +463,7 @@ async def init_db() -> None:
                 second_approved_at TEXT,
                 admin_override INTEGER DEFAULT 0,
                 consumed_at TEXT,
-                artifact_id INTEGER REFERENCES workspace_artifacts(id),
+                artifact_id INTEGER REFERENCES workspace_artifacts(id) ON DELETE SET NULL,
                 created_at TEXT NOT NULL
             )
         ''')
@@ -480,7 +480,7 @@ async def init_db() -> None:
                 status TEXT NOT NULL DEFAULT 'PENDING',
                 attempts INTEGER NOT NULL DEFAULT 0,
                 artifact_path TEXT,
-                artifact_id INTEGER REFERENCES workspace_artifacts(id),
+                artifact_id INTEGER REFERENCES workspace_artifacts(id) ON DELETE SET NULL,
                 alert_id INTEGER REFERENCES offline_security_alerts(id),
                 error_message TEXT,
                 created_at TEXT NOT NULL,
@@ -506,6 +506,34 @@ async def init_db() -> None:
         await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_user_read ON notification_recipient_deliveries(recipient_user_id, is_read)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_user_created ON notification_recipient_deliveries(recipient_user_id, created_at DESC)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_alert ON notification_recipient_deliveries(alert_id)")
+
+        # Genuine User Mail & Internal Attachments
+        alert_cols = {
+            row[1]: row for row in await (await db.execute("PRAGMA table_info(offline_security_alerts)")).fetchall()
+        }
+        if "sender_user_id" not in alert_cols:
+            await db.execute("ALTER TABLE offline_security_alerts ADD COLUMN sender_user_id TEXT")
+        if "is_user_mail" not in alert_cols:
+            await db.execute("ALTER TABLE offline_security_alerts ADD COLUMN is_user_mail INTEGER DEFAULT 0")
+        if "delivery_status" not in alert_cols:
+            await db.execute("ALTER TABLE offline_security_alerts ADD COLUMN delivery_status TEXT DEFAULT 'DELIVERED'")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS mail_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER REFERENCES offline_security_alerts(id) ON DELETE CASCADE,
+                uploader_user_id TEXT,
+                filename TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                storage_path TEXT NOT NULL,
+                sha256_hash TEXT NOT NULL,
+                artifact_id INTEGER REFERENCES workspace_artifacts(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_mail_attachments_alert ON mail_attachments(alert_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_mail_attachments_uploader ON mail_attachments(uploader_user_id)")
 
         await db.commit()
 

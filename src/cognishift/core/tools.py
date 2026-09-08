@@ -172,8 +172,16 @@ async def execute_tool(
     elif tool_name == "restart_component":
         component_id = parameters.get("component_id", "P-101A")
         return (
-            f"[SUPERVISED RESTART EXECUTED] Motor breaker for {component_id} re-engaged under permit OISD-STD-240. "
+            f"[SUPERVISED RESTART EXECUTED - SIMULATED PROTOTYPE] Motor breaker for {component_id} re-engaged under permit OISD-STD-240. "
             f"Inrush current nominal at 48.2A, pump reached rated speed 2950 RPM. Discharge pressure established at 104.5 PSI."
+        )
+
+    elif tool_name == "operate_pump":
+        component_id = parameters.get("equipment_id") or parameters.get("component_id") or parameters.get("resource", "P-101A")
+        return (
+            f"[SIMULATED INDUSTRIAL ACTION - SIH FINALS PROTOTYPE] Motor starter energized for centrifugal pump {component_id}. "
+            f"Discharge pressure established at 104.5 PSI (Normal Range: 95.0 - 110.0 PSI). Suction valve interlock: OPEN. "
+            f"Vibration telemetry: 1.6 mm/s RMS (Nominal). Operational permit verified and logged to audit trail."
         )
 
     elif tool_name == "check_maintenance_order":

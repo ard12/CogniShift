@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
     try:
         await start_local_smtp_server()
         await flush_pending_outbox()
+        from cognishift.core.authorizations import process_pending_post_approval_jobs
+        await process_pending_post_approval_jobs()
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning(f"Could not start local SMTP server or flush outbox: {exc}")
@@ -106,7 +108,7 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts, sovereignty, sandbox, auth, audit, security_dashboard
+from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts, sovereignty, sandbox, auth, audit, security_dashboard, authorizations, mail
 
 app.include_router(auth.router)
 app.include_router(workspaces.router)
@@ -119,6 +121,8 @@ app.include_router(sovereignty.router)
 app.include_router(sandbox.router)
 app.include_router(audit.router)
 app.include_router(security_dashboard.router)
+app.include_router(authorizations.router)
+app.include_router(mail.router)
 
 # Setup Frontend UI (Tiered: Built Vite SPA -> Legacy Static -> API Welcome JSON)
 vite_dist_dir = PROJECT_ROOT / "frontend" / "dist"

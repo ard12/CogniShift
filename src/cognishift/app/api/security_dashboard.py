@@ -252,6 +252,10 @@ async def get_alerts_mailbox(
                 d["recipients"] = json.loads(d["recipients"])
             except Exception:
                 pass
+            if d.get("created_at") and isinstance(d["created_at"], str):
+                ts = d["created_at"].strip()
+                if not ts.endswith("Z") and not ("+" in ts[10:] or "-" in ts[10:]):
+                    d["created_at"] = ts.replace(" ", "T") + "Z"
             alerts.append(d)
 
         return {
@@ -294,6 +298,10 @@ async def get_alert_detail(
             d["evidence_pack"] = {}
 
         d["citations"] = [dict(c) for c in citations]
+        if d.get("created_at") and isinstance(d["created_at"], str):
+            ts = d["created_at"].strip()
+            if not ts.endswith("Z") and not ("+" in ts[10:] or "-" in ts[10:]):
+                d["created_at"] = ts.replace(" ", "T") + "Z"
         return d
 
 

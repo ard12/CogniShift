@@ -61,6 +61,15 @@ def _build_subject(evidence: NotificationEvidencePack) -> str:
         name = evidence.artifact_name or "Industrial Deliverable"
         return f"[DELIVERABLE - {sev}] Artifact Generated: {name} (Run #{evidence.run_id})"
 
+    elif evidence.event_type == NotificationType.ACCESS_AUTHORIZATION:
+        target = evidence.tool_name or "Operational Permit"
+        return f"[WORK PERMIT - {sev}] Temporary Operational Authorization — {target}"
+
+    elif evidence.event_type == NotificationType.AUTHORIZATION_CONSUMED:
+        target = evidence.tool_name or "Operational Action"
+        pcode = evidence.permit_code or "PERMIT"
+        return f"[AUDIT - {sev}] Work Permit Consumed: {target} ({pcode})"
+
     elif evidence.event_type == NotificationType.RUN_FAILED:
         return f"[SYSTEM - {sev}] Execution Failure in Run #{evidence.run_id}"
 
@@ -115,8 +124,14 @@ def _render_deterministic_plain_text(
         lines.append(f"  * Primary Supervisor:   {evidence.supervisor_1}")
     if evidence.supervisor_2:
         lines.append(f"  * Secondary Supervisor: {evidence.supervisor_2}")
+    if evidence.permit_code:
+        lines.append(f"  * Permit Document Code: {evidence.permit_code}")
+    if evidence.uses_remaining is not None:
+        lines.append(f"  * Permitted Remaining:  {evidence.uses_remaining}")
     if evidence.artifact_name:
         lines.append(f"  * Generated Artifact:   {evidence.artifact_name} ({evidence.artifact_path or ''})")
+    if evidence.event_type in (NotificationType.ACCESS_AUTHORIZATION, NotificationType.AUTHORIZATION_CONSUMED):
+        lines.append("  * Disclaimer:           [SIMULATED INDUSTRIAL ACTION - SIH FINALS PROTOTYPE]")
 
     lines.extend([
         "--------------------------------------------------------------------------------",
@@ -127,7 +142,20 @@ def _render_deterministic_plain_text(
         lines.append(f"  {evidence.summary}")
     else:
         # Standard contextual narrative
-        if evidence.event_type == NotificationType.UNTRUSTED_DEVICE:
+        if evidence.event_type == NotificationType.ACCESS_AUTHORIZATION:
+            approvers = f"two independent authenticated supervisor approvals ({evidence.supervisor_1} and {evidence.supervisor_2})" if (evidence.supervisor_1 and evidence.supervisor_2) else f"authorized supervisor ({evidence.supervisor_1 or 'supervisor'})"
+            lines.append(
+                f"  ONE-TIME OPERATIONAL ACCESS AUTHORIZED: Operator '{evidence.target_user}' has been granted temporary "
+                f"clearance for '{evidence.tool_name}'. Verified via {approvers}. "
+                f"Permit Code: {evidence.permit_code or 'N/A'}. This is a simulated industrial action. Safety interlocks must be observed."
+            )
+        elif evidence.event_type == NotificationType.AUTHORIZATION_CONSUMED:
+            lines.append(
+                f"  WORK PERMIT CONSUMED: Operational permit '{evidence.permit_code}' for operator '{evidence.target_user}' "
+                f"({evidence.tool_name}) has been executed. Remaining permitted uses: 0. "
+                f"Permit status is now permanently CONSUMED. Re-execution attempts will fail closed."
+            )
+        elif evidence.event_type == NotificationType.UNTRUSTED_DEVICE:
             lines.append(
                 f"  An incoming connection from user '{evidence.target_user}' at address {evidence.client_ip} "
                 f"presented an unregistered WebCrypto ECDSA key. In accordance with zero-trust sovereign policy, "
@@ -210,9 +238,21 @@ def _render_deterministic_html(
     if evidence.run_id:
         rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Run ID</td><td style='color:#f1f5f9;padding:4px 12px;'>#{evidence.run_id}</td></tr>")
     if evidence.tool_name:
-        rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Industrial Tool</td><td style='color:#fbbf24;font-family:monospace;padding:4px 12px;'>{html.escape(str(evidence.tool_name))}</td></tr>")
+        rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Industrial Tool / Action</td><td style='color:#fbbf24;font-family:monospace;padding:4px 12px;'>{html.escape(str(evidence.tool_name))}</td></tr>")
+    if evidence.permit_code:
+        rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Permit Code</td><td style='color:#38bdf8;font-family:monospace;font-weight:700;padding:4px 12px;'>{html.escape(str(evidence.permit_code))}</td></tr>")
+    if evidence.uses_remaining is not None:
+        rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Remaining Uses</td><td style='color:#f1f5f9;font-weight:700;padding:4px 12px;'>{evidence.uses_remaining}</td></tr>")
+    if evidence.supervisor_1:
+        rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Supervisor 1 Approval</td><td style='color:#a7f3d0;font-family:monospace;padding:4px 12px;'>{html.escape(str(evidence.supervisor_1))} (Authenticated)</td></tr>")
+    if evidence.supervisor_2:
+        rows.append(f"<tr><td style='color:#94a3b8;padding:4px 12px;'>Supervisor 2 Approval</td><td style='color:#a7f3d0;font-family:monospace;padding:4px 12px;'>{html.escape(str(evidence.supervisor_2))} (Authenticated)</td></tr>")
 
     telemetry_table = "".join(rows)
+
+    disclaimer_html = ""
+    if evidence.event_type in (NotificationType.ACCESS_AUTHORIZATION, NotificationType.AUTHORIZATION_CONSUMED):
+        disclaimer_html = "<div style='background:#451a03;border:1px solid #b45309;color:#fef3c7;padding:10px 14px;border-radius:6px;font-size:11px;font-weight:700;margin-bottom:16px;text-align:center;letter-spacing:0.5px;'>SIMULATED INDUSTRIAL ACTION — SIH FINALS PROTOTYPE</div>"
 
     citation_chips = []
     for c in evidence.citations:
@@ -242,6 +282,7 @@ def _render_deterministic_html(
       </div>
     </div>
     <div style="padding:24px;">
+      {disclaimer_html}
       <div style="background:#1e293b;border-left:4px solid {sev_color};padding:14px;border-radius:4px;margin-bottom:20px;font-size:14px;line-height:1.6;color:#e2e8f0;">
         {html.escape(summary_text)}
       </div>
@@ -268,18 +309,41 @@ async def _call_local_slm_for_summary(
     timeout_seconds: float = 2.5,
 ) -> Optional[str]:
     """Invoke local Ollama model to synthesize a crisp executive paragraph."""
-    prompt = (
-        "You are the Sovereign Security & Governance AI in CogniShift, an air-gapped industrial system.\n"
-        "Draft a single, highly professional executive paragraph summarizing the following operational event.\n"
-        "Rules: Rely ONLY on the provided facts. Do not invent details. Keep it under 60 words.\n"
-        f"Event Type: {evidence.event_type.value}\n"
-        f"Severity: {evidence.severity.value}\n"
-        f"Target User: {evidence.target_user}\n"
-        f"Client IP: {evidence.client_ip}\n"
-        f"Device: {evidence.device_id}\n"
-        f"Tool/Action: {evidence.tool_name}\n"
-        f"Context Details: {evidence.summary}\n"
-    )
+    if evidence.event_type == NotificationType.ACCESS_AUTHORIZATION:
+        prompt = (
+            "You are the Sovereign Industrial Governance AI at CogniShift, an air-gapped industrial system.\n"
+            "Draft a single, highly professional executive notification message for the issuance of a temporary operational work permit.\n"
+            "Rules: Rely ONLY on the provided facts. Do not invent details. State clearly that authorization was verified by two independent authenticated supervisor approvals. Keep it under 65 words.\n"
+            f"Target Operator: {evidence.target_user}\n"
+            f"Permit Code: {evidence.permit_code}\n"
+            f"Action/Equipment: {evidence.tool_name}\n"
+            f"Primary Supervisor: {evidence.supervisor_1}\n"
+            f"Secondary Supervisor: {evidence.supervisor_2}\n"
+            f"Operational Scope: {evidence.summary}\n"
+        )
+    elif evidence.event_type == NotificationType.AUTHORIZATION_CONSUMED:
+        prompt = (
+            "You are the Sovereign Industrial Governance AI at CogniShift, an air-gapped industrial system.\n"
+            "Draft a single, highly professional executive notification stating that a one-time operational work permit has been successfully consumed.\n"
+            "Rules: Rely ONLY on the provided facts. State clearly that remaining permitted uses are 0 and re-execution will be rejected. Keep it under 55 words.\n"
+            f"Target Operator: {evidence.target_user}\n"
+            f"Permit Code: {evidence.permit_code}\n"
+            f"Action/Equipment: {evidence.tool_name}\n"
+            f"Execution Details: {evidence.summary}\n"
+        )
+    else:
+        prompt = (
+            "You are the Sovereign Security & Governance AI in CogniShift, an air-gapped industrial system.\n"
+            "Draft a single, highly professional executive paragraph summarizing the following operational event.\n"
+            "Rules: Rely ONLY on the provided facts. Do not invent details. Keep it under 60 words.\n"
+            f"Event Type: {evidence.event_type.value}\n"
+            f"Severity: {evidence.severity.value}\n"
+            f"Target User: {evidence.target_user}\n"
+            f"Client IP: {evidence.client_ip}\n"
+            f"Device: {evidence.device_id}\n"
+            f"Tool/Action: {evidence.tool_name}\n"
+            f"Context Details: {evidence.summary}\n"
+        )
 
     try:
         url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"

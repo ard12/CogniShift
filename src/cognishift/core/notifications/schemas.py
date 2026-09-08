@@ -16,6 +16,8 @@ class NotificationType(str, Enum):
     FOUR_EYES_COMPLETED = "FOUR_EYES_COMPLETED"
     CRITICAL_DOCUMENT_FINDING = "CRITICAL_DOCUMENT_FINDING"
     ARTIFACT_COMPLETED = "ARTIFACT_COMPLETED"
+    ACCESS_AUTHORIZATION = "ACCESS_AUTHORIZATION"
+    AUTHORIZATION_CONSUMED = "AUTHORIZATION_CONSUMED"
     RUN_FAILED = "RUN_FAILED"
     TEST_ALERT = "TEST_ALERT"
 
@@ -36,6 +38,7 @@ class CitationClass(str, Enum):
     DOCUMENT = "DOCUMENT"
     DATASET = "DATASET"
     ARTIFACT = "ARTIFACT"
+    AUTHORIZATION = "AUTHORIZATION"
 
 
 class NotificationCitation(BaseModel):
@@ -72,6 +75,9 @@ class NotificationEvidencePack(BaseModel):
     document_page: Optional[int] = None
     supervisor_1: Optional[str] = None
     supervisor_2: Optional[str] = None
+    permit_code: Optional[str] = None
+    correlation_id: Optional[str] = None
+    uses_remaining: Optional[int] = None
     summary: str = ""
     citations: List[NotificationCitation] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)

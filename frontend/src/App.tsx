@@ -16,6 +16,7 @@ import { RunsPage } from "@/pages/RunsPage";
 import { SystemPage } from "@/pages/SystemPage";
 import { WorkspacesPage } from "@/pages/WorkspacesPage";
 import { SecurityPage } from "@/pages/SecurityPage";
+import { MailPage } from "@/pages/MailPage";
 import type { UserRole } from "@/types";
 
 function RoleRoute({ roles, children }: { roles: UserRole[]; children: ReactNode }) {
@@ -50,6 +51,7 @@ function AuthenticatedApp() {
           <Route path="knowledge" element={<RoleRoute roles={["supervisor","administrator"]}><KnowledgePage /></RoleRoute>} />
           <Route path="runs" element={<RunsPage />} />
           <Route path="approvals" element={<RoleRoute roles={["supervisor","administrator"]}><ApprovalsPage /></RoleRoute>} />
+          <Route path="mailbox" element={<MailPage />} />
           <Route path="artifacts" element={<ArtifactsPage />} />
           <Route path="security" element={<SecurityPage />} />
           <Route path="system" element={<RoleRoute roles={["administrator"]}><SystemPage /></RoleRoute>} />

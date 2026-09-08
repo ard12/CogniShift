@@ -441,6 +441,72 @@ async def init_db() -> None:
         except Exception:
             pass
 
+        # Temporary Sovereign Authorizations Engine
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS temporary_authorizations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                permit_code TEXT UNIQUE NOT NULL,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                user_id TEXT NOT NULL,
+                trusted_device_id TEXT,
+                action TEXT NOT NULL,
+                resource TEXT NOT NULL,
+                max_uses INTEGER NOT NULL DEFAULT 1,
+                uses INTEGER NOT NULL DEFAULT 0,
+                valid_from TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+                requested_by TEXT NOT NULL,
+                first_approver TEXT,
+                first_approved_at TEXT,
+                second_approver TEXT,
+                second_approved_at TEXT,
+                admin_override INTEGER DEFAULT 0,
+                consumed_at TEXT,
+                artifact_id INTEGER REFERENCES workspace_artifacts(id),
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_temp_auth_code ON temporary_authorizations(permit_code)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_temp_auth_user_status ON temporary_authorizations(user_id, status)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_temp_auth_status ON temporary_authorizations(status)")
+
+        # Durable Post-Approval Job Queue (Reliable restart/crash recovery)
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS post_approval_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                permit_id INTEGER NOT NULL REFERENCES temporary_authorizations(id) ON DELETE CASCADE,
+                correlation_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                artifact_path TEXT,
+                artifact_id INTEGER REFERENCES workspace_artifacts(id),
+                alert_id INTEGER REFERENCES offline_security_alerts(id),
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_post_approval_status ON post_approval_jobs(status, created_at)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_post_approval_permit ON post_approval_jobs(permit_id)")
+
+        # Multi-Recipient Sovereign Mail Delivery & Read State Ledger
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notification_recipient_deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER NOT NULL REFERENCES offline_security_alerts(id) ON DELETE CASCADE,
+                recipient_email TEXT NOT NULL,
+                recipient_user_id TEXT,
+                is_read INTEGER DEFAULT 0,
+                read_at TEXT,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_user_read ON notification_recipient_deliveries(recipient_user_id, is_read)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_user_created ON notification_recipient_deliveries(recipient_user_id, created_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_alert ON notification_recipient_deliveries(alert_id)")
+
         await db.commit()
 
 @asynccontextmanager

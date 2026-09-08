@@ -576,3 +576,135 @@ async def create_and_register_artifact(
                 temp_path.unlink()
             except Exception:
                 pass
+
+
+def generate_work_permit_docx(dest_path: Path, permit_data: Dict[str, Any]) -> None:
+    """Generate official DOCX temporary operational work permit."""
+    doc = docx.Document()
+    
+    title_p = doc.add_heading("COGNISHIFT SOVEREIGN INDUSTRIAL WORKBENCH", level=0)
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    sub_p = doc.add_paragraph()
+    run = sub_p.add_run("OFFICIAL TEMPORARY OPERATIONAL WORK PERMIT")
+    run.font.size = Pt(13)
+    run.font.bold = True
+    sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    disclaimer_p = doc.add_paragraph()
+    drun = disclaimer_p.add_run("[SIMULATED INDUSTRIAL ACTION - SIH FINALS PROTOTYPE]")
+    drun.font.size = Pt(10)
+    drun.font.bold = True
+    drun.font.italic = True
+    disclaimer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # Section 1: Permit Details Table
+    doc.add_heading("1. Authorization Parameters & Operational Scope", level=1)
+    
+    table_data = [
+        ["Permit Document Code", permit_data.get("permit_code", "N/A")],
+        ["Authorized User (Operator)", permit_data.get("user_id", "N/A")],
+        ["Target Asset / Equipment", permit_data.get("resource", "N/A")],
+        ["Permitted Operational Action", permit_data.get("action", "N/A")],
+        ["Maximum Permitted Uses", str(permit_data.get("max_uses", 1))],
+        ["Current Permit Status", permit_data.get("status", "ACTIVE")],
+        ["Valid Window (Start UTC)", permit_data.get("valid_from", "N/A")],
+        ["Valid Window (Expiry UTC)", permit_data.get("expires_at", "N/A")],
+        ["Device Identity Binding", permit_data.get("trusted_device_id") or "Enclave Default (Unbound)"],
+    ]
+
+    t1 = doc.add_table(rows=len(table_data), cols=2)
+    t1.style = "Table Grid"
+    for r_idx, (col1, col2) in enumerate(table_data):
+        c1 = t1.cell(r_idx, 0)
+        c2 = t1.cell(r_idx, 1)
+        c1.text = col1
+        c2.text = col2
+        for p in c1.paragraphs:
+            for r in p.runs:
+                r.font.bold = True
+
+    doc.add_paragraph()
+
+    # Section 2: Dual Supervisor Governance
+    doc.add_heading("2. Four-Eyes Governance Sign-offs", level=1)
+    doc.add_paragraph(
+        "In accordance with OISD-STD-240 and CogniShift sovereign governance, this permit requires two independent "
+        "authenticated supervisor approvals prior to operational execution:"
+    )
+
+    sup1 = permit_data.get("first_approver", "N/A")
+    sup1_at = permit_data.get("first_approved_at", "N/A")
+    sup2 = permit_data.get("second_approver", "N/A")
+    sup2_at = permit_data.get("second_approved_at", "N/A")
+
+    t2 = doc.add_table(rows=3, cols=3)
+    t2.style = "Table Grid"
+    headers = ["Approval Stage", "Authenticated Supervisor", "Verification Timestamp"]
+    for c_idx, h in enumerate(headers):
+        cell = t2.cell(0, c_idx)
+        cell.text = h
+        for p in cell.paragraphs:
+            for r in p.runs:
+                r.font.bold = True
+    
+    t2.cell(1, 0).text = "Supervisor Approval 1"
+    t2.cell(1, 1).text = f"{sup1} (Authenticated)"
+    t2.cell(1, 2).text = str(sup1_at)
+
+    t2.cell(2, 0).text = "Supervisor Approval 2"
+    t2.cell(2, 1).text = f"{sup2} (Authenticated)"
+    t2.cell(2, 2).text = str(sup2_at)
+
+    doc.add_paragraph()
+
+    # Section 3: Mandatory Safety Interlocks
+    doc.add_heading("3. Mandatory Safety Interlocks & Audit Requirements", level=1)
+    doc.add_paragraph(
+        "• Suction and discharge isolation valves must be in verified positions prior to energization.\n"
+        "• High pressure trip threshold: 450.0 PSI (MAWP 500.0 PSI). Temperature trip: 95.0 C.\n"
+        "• Single-use permit: this authorization is atomically consumed upon first execution.\n"
+        "• Subsequent execution attempts with this permit code will be intercepted and rejected with 403 AUTHORIZATION_CONSUMED."
+    )
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(dest_path))
+
+
+async def generate_and_register_permit_artifact(
+    workspace_id: int,
+    permit_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Generate and register the official work permit DOCX artifact."""
+    permit_code = permit_data.get("permit_code", "PERMIT")
+    filename = f"Work_Permit_{permit_code}.docx"
+    title = f"Operational Work Permit: {permit_code}"
+    description = (
+        f"Official temporary work permit authorizing {permit_data.get('user_id')} "
+        f"for action '{permit_data.get('action')}' on asset '{permit_data.get('resource')}'. "
+        f"Verified by two independent authenticated supervisor approvals."
+    )
+
+    def _gen(dest_path: Path):
+        generate_work_permit_docx(dest_path, permit_data)
+
+    artifact_record = await create_and_register_artifact(
+        workspace_id=workspace_id,
+        filename=filename,
+        artifact_type="docx",
+        title=title,
+        description=description,
+        generator_fn=_gen,
+        metadata={
+            "permit_code": permit_code,
+            "user_id": permit_data.get("user_id"),
+            "resource": permit_data.get("resource"),
+            "action": permit_data.get("action"),
+            "status": permit_data.get("status"),
+            "simulation": True,
+        },
+    )
+    return artifact_record
+

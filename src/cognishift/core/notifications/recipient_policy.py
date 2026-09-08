@@ -37,6 +37,8 @@ def resolve_sender_for_event(event_type: NotificationType) -> str:
         NotificationType.SENSITIVE_ACTION_REQUESTED,
         NotificationType.FIRST_SUPERVISOR_APPROVAL,
         NotificationType.FOUR_EYES_COMPLETED,
+        NotificationType.ACCESS_AUTHORIZATION,
+        NotificationType.AUTHORIZATION_CONSUMED,
     ):
         return "governance-bot@secure.internal"
     else:
@@ -81,7 +83,16 @@ def resolve_recipients_for_event(evidence: NotificationEvidencePack) -> List[str
         recipients.add(op_email)
         return sorted(list(recipients))
 
-    # 5. Artifact Completed -> Requesting Operator & SOC Admin
+    # 5. Work Permit Issued or Consumed -> Target Operator + Both Supervisors + Admin
+    if event_type in (NotificationType.ACCESS_AUTHORIZATION, NotificationType.AUTHORIZATION_CONSUMED):
+        recipients = set(ALL_SUPERVISORS)
+        recipients.add("admin@secure.internal")
+        op = (evidence.target_user or evidence.actor_id or "operator").lower()
+        op_email = KNOWN_USER_EMAILS.get(op, f"{op}@secure.internal")
+        recipients.add(op_email)
+        return sorted(list(recipients))
+
+    # 6. Artifact Completed -> Requesting Operator & SOC Admin
     if event_type == NotificationType.ARTIFACT_COMPLETED:
         recipients = {"admin@secure.internal"}
         op = (evidence.target_user or evidence.actor_id or "operator").lower()

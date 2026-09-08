@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from cognishift.app.db.database import get_db
@@ -99,10 +100,42 @@ async def persist_and_deliver_notification(
                 ),
             )
 
-        # Queue in notification_outbox
+        # Multi-recipient delivery tracking: create independent read state per recipient
+        now_utc_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        email_to_user = {
+            "admin@secure.internal": "sitanshu",
+            "sitanshu@secure.internal": "sitanshu",
+            "zara@secure.internal": "zara",
+            "rakshita@secure.internal": "rakshita",
+            "aryan@secure.internal": "aryan",
+            "vicky@secure.internal": "vicky",
+            "rohit@secure.internal": "rohit",
+        }
+        for recip in composed.recipients:
+            r_clean = recip.strip().lower()
+            r_user = email_to_user.get(r_clean, r_clean.split("@")[0])
+            await db.execute(
+                """
+                INSERT INTO notification_recipient_deliveries (
+                    alert_id, recipient_email, recipient_user_id, is_read, created_at
+                ) VALUES (?, ?, ?, 0, ?)
+                """,
+                (alert_id, r_clean, r_user, now_utc_str),
+            )
+            if r_clean == "admin@secure.internal":
+                await db.execute(
+                    """
+                    INSERT INTO notification_recipient_deliveries (
+                        alert_id, recipient_email, recipient_user_id, is_read, created_at
+                    ) VALUES (?, ?, 'admin', 0, ?)
+                    """,
+                    (alert_id, r_clean, now_utc_str),
+                )
+
+        # Queue in notification_outbox (idempotent ON CONFLICT IGNORE)
         await db.execute(
             """
-            INSERT INTO notification_outbox (
+            INSERT OR IGNORE INTO notification_outbox (
                 dedup_key, event_type, status, evidence_json
             ) VALUES (?, ?, 'pending', ?)
             """,

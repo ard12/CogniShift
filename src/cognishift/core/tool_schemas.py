@@ -415,12 +415,27 @@ EQUIPMENT_ALIASES = {
     "PRESSURE_SENSOR": "PT-101",
     "PUMP-A": "P-101A",
     "PUMP-B": "P-101B",
+    "P-101": "P-101A",
+    "P101": "P-101A",
+    "XV-201": "SV-402",
+    "XV201": "SV-402",
+}
+
+
+CANONICAL_TARGETS = {
+    tag.upper(): tag for tag in SUPPORTED_SIMULATED_TARGETS.keys()
 }
 
 
 def resolve_equipment_alias(target_id: str) -> str:
     cleaned = (target_id or "").strip().upper()
-    return EQUIPMENT_ALIASES.get(cleaned, target_id)
+    for prefix in ("PUMP ", "SENSOR ", "CHAMBER ", "VALVE ", "VESSEL ", "TRANSMITTER ", "UNIT "):
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):].strip()
+    cleaned = re.sub(r'([A-Za-z0-9]+)\s*-\s*([0-9]+)\s*([A-Za-z])\b', r'\1-\2\3', cleaned)
+    cleaned = re.sub(r'([A-Za-z0-9]+)\s*-\s*([0-9]+)\b', r'\1-\2', cleaned)
+    resolved = EQUIPMENT_ALIASES.get(cleaned, cleaned)
+    return CANONICAL_TARGETS.get(resolved.upper(), resolved)
 
 
 def is_supported_equipment_target(target_id: str) -> Tuple[bool, str]:
@@ -544,7 +559,8 @@ def bounded_repair_tool_parameters(
 
     for eq_key in ("sensor_id", "equipment_id", "component_id", "chamber_id", "subsystem"):
         if eq_key in params and isinstance(params[eq_key], str):
-            params[eq_key] = params[eq_key].strip().rstrip(".")
+            raw_val = params[eq_key].strip().rstrip(".")
+            params[eq_key] = resolve_equipment_alias(raw_val)
 
     if "file_path" in params and isinstance(params["file_path"], str):
         fp = params["file_path"].strip()
@@ -563,6 +579,8 @@ def bounded_repair_tool_parameters(
             if len(eq_ids) == 1:
                 params["component_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
+        if not params.get("reason"):
+            params["reason"] = "Operational restart requested by plant operator"
 
     # Handle check_pressure / check_temperature missing sensor_id
     elif tool_name in ("check_pressure", "check_temperature"):
@@ -590,6 +608,10 @@ def bounded_repair_tool_parameters(
             if len(eq_ids) == 1:
                 params["equipment_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
+
+    for eq_key in ("sensor_id", "equipment_id", "component_id", "chamber_id", "subsystem"):
+        if eq_key in params and isinstance(params[eq_key], str):
+            params[eq_key] = resolve_equipment_alias(params[eq_key])
 
     return params, arg_source
 

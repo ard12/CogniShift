@@ -121,8 +121,8 @@ SUPPORTED_CONTROL_CAPABILITIES = {
     "check_pressure": ["check pressure", "read pressure", "pressure reading", "discharge pressure"],
     "check_temperature": ["check temperature", "read temperature", "temperature reading", "bearing temperature"],
     "check_network": ["check network", "network status", "ping"],
-    "restart_component": ["restart", "reboot", "cycle power", "component restart"],
-    "emergency_pressure_relief": ["emergency pressure relief", "pressure relief", "depressurize", "emergency vent", "emergency trip"],
+    "restart_component": ["restart", "reboot", "cycle power", "component restart", "restart pump", "restart the pump"],
+    "emergency_pressure_relief": ["emergency pressure relief", "pressure relief", "depressurize", "emergency vent", "emergency trip", "relief valve", "open relief valve", "emergency override", "actuate emergency pressure relief"],
     "run_diagnostic": ["run diagnostic", "diagnostic tool", "equipment diagnostic", "diagnostic self-test", "run diagnostics"],
     "restart_service": ["restart service", "restart network service", "bounce service"]
 }
@@ -722,7 +722,10 @@ class SemanticIntentRouter:
             or "?" in text_lower
         )
         # Ensure that active imperative control actions (restart, trip, override, open valve) are not suppressed
-        is_explicit_control_imperative = any(text_lower.startswith(w) for w in ["restart ", "trip ", "override ", "depressurize ", "reboot "])
+        is_explicit_control_imperative = (
+            any(text_lower.startswith(w) for w in ["restart ", "trip ", "override ", "depressurize ", "reboot ", "actuate ", "open "])
+            or any(w in text_lower for w in ["actuate emergency", "emergency trip", "execute emergency", "open relief valve"])
+        )
         if is_informational_inquiry and not is_explicit_control_imperative:
             if SemanticIntent.CONTROL_ACTION in scores:
                 scores[SemanticIntent.CONTROL_ACTION] = 0.0
@@ -733,9 +736,10 @@ class SemanticIntentRouter:
         margin = top_score - runner_up_score
 
         # 6. Unsupported Action Guard for CONTROL_ACTION
+        is_supported_control = False
         if top_intent == SemanticIntent.CONTROL_ACTION:
-            is_supported = self._is_supported_control_action(text_lower, refs)
-            if not is_supported:
+            is_supported_control = self._is_supported_control_action(text_lower, refs)
+            if not is_supported_control:
                 logger.info(
                     f"Semantic router intercepted unsupported action command '{raw_text[:50]}': "
                     f"no registered control tool matches. Routing to COMPLEX_AGENT."
@@ -756,7 +760,8 @@ class SemanticIntentRouter:
         should_abstain = (top_score < self.confidence_threshold) or (margin < self.margin_threshold)
 
         if top_intent == SemanticIntent.CONTROL_ACTION:
-            if top_score < self.control_confidence_threshold or margin < self.control_margin_threshold:
+            ctrl_margin = self.margin_threshold if is_supported_control else self.control_margin_threshold
+            if top_score < self.control_confidence_threshold or margin < ctrl_margin:
                 should_abstain = True
 
         if should_abstain:

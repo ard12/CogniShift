@@ -38,9 +38,9 @@ TEAM_PERSONAS = [
     },
     {
         "user_id": "vicky",
-        "role": "operator",
-        "allowed_workspace_ids": [1],
-        "name": "Vicky (Plant Operator 2)",
+        "role": "supervisor",
+        "allowed_workspace_ids": [1, 2],
+        "name": "Vicky (Four-Eyes Supervisor 3)",
     },
     {
         "user_id": "rohit",

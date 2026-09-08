@@ -86,7 +86,7 @@ python scripts/preflight_routes.py
 | **Supervisor 2** | `supervisor_rakshita` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Four-Eyes Signatory #2: Dual-authorization counter-signature |
 | **Operator 1** | `operator_sam` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Primary Operator: Ingests CSVs, triggers telemetry charts, runs SOP queries |
 | **Operator 2** | `operator_aryan` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Multi-terminal verification & parallel operator workstation |
-| **Operator 3** | `operator_vicky` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Plant telemetry & operational workstation |
+| **Supervisor 3** | `vicky` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Plant Supervisor & Four-Eyes Signatory #3 |
 | **Untrusted Showcase** | `rohit` | `OperatorPass123!` | `https://10.10.182.228:8443` | **DELIBERATELY UNTRUSTED (403)** | **Live Security Showcase**: Valid credentials, but blocked by ECDSA challenge until Admin approves! |
 
 > [!TIP]

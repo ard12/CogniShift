@@ -18,6 +18,7 @@ def create_directories():
         settings.data_dir.parent / settings.database_path.parent if not settings.database_path.is_absolute() else settings.database_path.parent,
         settings.chroma_path,
         settings.upload_dir,
+        settings.data_dir / "alerts" / "mailbox",
     ]
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
@@ -41,8 +42,21 @@ async def lifespan(app: FastAPI):
     # Restore active device sessions from database
     from cognishift.app.core.device_security import restore_active_device_sessions
     await restore_active_device_sessions()
+
+    # Start local loopback SMTP server (127.0.0.1:1025)
+    from cognishift.core.notifications import start_local_smtp_server, stop_local_smtp_server
+    try:
+        await start_local_smtp_server()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not start local SMTP server: {exc}")
             
     yield
+
+    try:
+        await stop_local_smtp_server()
+    except Exception:
+        pass
 
 app = FastAPI(
     title="CogniShift API",

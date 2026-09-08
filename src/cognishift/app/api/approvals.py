@@ -103,12 +103,37 @@ async def approve_request(
                     raise HTTPException(status_code=409, detail="Approval request was already resolved concurrently.")
 
                 # Record audit event
-                await db.execute(
+                audit_cur = await db.execute(
                     """INSERT INTO audit_events (workspace_id, actor_id, action, resource_type, resource_id, details, result)
                        VALUES (?, ?, 'approval_stage_1_verified', 'approval_request', ?, ?, 'success')""",
                     (run_row["workspace_id"], approver.user_id, request_id, f"Four-Eyes Stage 1/2 verified by {approver.user_id}. Awaiting Stage 2 sign-off.")
                 )
+                audit_id = audit_cur.lastrowid
                 await db.commit()
+
+                try:
+                    from cognishift.core.notifications import (
+                        NotificationType,
+                        collect_four_eyes_evidence,
+                        fire_and_forget_notification,
+                    )
+                    tool_r = await (await db.execute("SELECT name FROM tool_definitions WHERE id = ?", (approval["tool_id"],))).fetchone()
+                    tool_n = tool_r["name"] if tool_r else "Tool"
+                    fe_ev = collect_four_eyes_evidence(
+                        event_type=NotificationType.FIRST_SUPERVISOR_APPROVAL,
+                        run_id=run_id,
+                        approval_id=request_id,
+                        tool_name=tool_n,
+                        parameters={},
+                        user_id=run_row["user_id"] or "operator",
+                        workspace_id=run_row["workspace_id"],
+                        supervisor_1=approver.user_id,
+                        audit_event_id=audit_id,
+                    )
+                    fire_and_forget_notification(fe_ev)
+                except Exception:
+                    pass
+
                 return ApprovalResponse.model_validate(dict(updated_row))
 
             elif required_approvals == 2 and approval.get("reviewed_by"):
@@ -134,12 +159,37 @@ async def approve_request(
                 if not updated_row:
                     raise HTTPException(status_code=409, detail="Approval request was already resolved concurrently.")
 
-                await db.execute(
+                audit_cur = await db.execute(
                     """INSERT INTO audit_events (workspace_id, actor_id, action, resource_type, resource_id, details, result)
                        VALUES (?, ?, 'approval_stage_2_authorized', 'approval_request', ?, ?, 'success')""",
                     (run_row["workspace_id"], approver.user_id, request_id, f"Four-Eyes Stage 2/2 authorized by {approver.user_id}. Action approved.")
                 )
+                audit_id = audit_cur.lastrowid
                 await db.commit()
+
+                try:
+                    from cognishift.core.notifications import (
+                        NotificationType,
+                        collect_four_eyes_evidence,
+                        fire_and_forget_notification,
+                    )
+                    tool_r = await (await db.execute("SELECT name FROM tool_definitions WHERE id = ?", (approval["tool_id"],))).fetchone()
+                    tool_n = tool_r["name"] if tool_r else "Tool"
+                    fe_ev = collect_four_eyes_evidence(
+                        event_type=NotificationType.FOUR_EYES_COMPLETED,
+                        run_id=run_id,
+                        approval_id=request_id,
+                        tool_name=tool_n,
+                        parameters={},
+                        user_id=run_row["user_id"] or "operator",
+                        workspace_id=run_row["workspace_id"],
+                        supervisor_1=approval["reviewed_by"],
+                        supervisor_2=approver.user_id,
+                        audit_event_id=audit_id,
+                    )
+                    fire_and_forget_notification(fe_ev)
+                except Exception:
+                    pass
 
             else:
                 # Standard single supervisor approval (required_approvals == 1)

@@ -197,3 +197,174 @@ async def block_device_endpoint(
     from cognishift.app.core.device_security import block_device as ds_block_device
     await ds_block_device(device_id, user_id, user.user_id)
     return {"status": "blocked", "device_id": device_id, "user_id": user_id or "all"}
+
+
+# =========================================================================
+# SOVEREIGN SECURITY ALERTS & SOC MAILBOX ENDPOINTS
+# =========================================================================
+
+@router.get("/alerts/smtp-health")
+async def get_smtp_health_endpoint(user: User = Depends(get_current_user)) -> Dict[str, Any]:
+    """Check health and connectivity of the sovereign loopback SMTP listener."""
+    from cognishift.core.notifications import check_smtp_health
+    return await check_smtp_health()
+
+
+@router.get("/alerts/mailbox")
+async def get_alerts_mailbox(
+    limit: int = 100,
+    offset: int = 0,
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Retrieve security inbox alerts for Administrator SOC dashboard."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    import json
+    async with get_db() as db:
+        rows = await (await db.execute(
+            """
+            SELECT id, alert_type, severity, subject, sender, recipients,
+                   related_user, related_ip, related_device_id, related_run_id,
+                   is_read, composition_mode, created_at
+            FROM offline_security_alerts
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        )).fetchall()
+
+        unread_row = await (await db.execute(
+            "SELECT count(*) as unread FROM offline_security_alerts WHERE is_read = 0"
+        )).fetchone()
+        unread_count = unread_row["unread"] if unread_row else 0
+
+        total_row = await (await db.execute(
+            "SELECT count(*) as total FROM offline_security_alerts"
+        )).fetchone()
+        total_count = total_row["total"] if total_row else 0
+
+        alerts = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["recipients"] = json.loads(d["recipients"])
+            except Exception:
+                pass
+            alerts.append(d)
+
+        return {
+            "alerts": alerts,
+            "unread_count": unread_count,
+            "total_count": total_count,
+        }
+
+
+@router.get("/alerts/{alert_id}")
+async def get_alert_detail(
+    alert_id: int,
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Retrieve full detail for a single alert including HTML body and citations."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    import json
+    async with get_db() as db:
+        alert_row = await (await db.execute(
+            "SELECT * FROM offline_security_alerts WHERE id = ?",
+            (alert_id,),
+        )).fetchone()
+        if not alert_row:
+            raise HTTPException(status_code=404, detail="Alert not found.")
+
+        citations = await (await db.execute(
+            "SELECT * FROM notification_citations WHERE alert_id = ? ORDER BY citation_index ASC",
+            (alert_id,),
+        )).fetchall()
+
+        d = dict(alert_row)
+        try:
+            d["recipients"] = json.loads(d["recipients"])
+        except Exception:
+            pass
+        try:
+            d["evidence_pack"] = json.loads(d["evidence_pack_json"])
+        except Exception:
+            d["evidence_pack"] = {}
+
+        d["citations"] = [dict(c) for c in citations]
+        return d
+
+
+@router.post("/alerts/{alert_id}/read")
+async def mark_alert_as_read(
+    alert_id: int,
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Mark an alert as read in the SOC mailbox."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE offline_security_alerts SET is_read = 1 WHERE id = ?",
+            (alert_id,),
+        )
+        await db.commit()
+    return {"status": "ok", "id": alert_id, "is_read": 1}
+
+
+@router.post("/alerts/clear")
+async def clear_alerts_mailbox(
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Purge all security alerts from mailbox (Admin only)."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    async with get_db() as db:
+        await db.execute("DELETE FROM notification_citations")
+        del_a = await db.execute("DELETE FROM offline_security_alerts")
+        count = del_a.rowcount
+        await db.commit()
+    return {"status": "cleared", "deleted_count": count}
+
+
+@router.post("/alerts/dispatch-test")
+async def dispatch_test_alert(
+    user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Dispatch a test alert through the local loopback notification pipeline."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    from cognishift.core.notifications import (
+        NotificationEvidencePack,
+        NotificationType,
+        Severity,
+        NotificationCitation,
+        CitationClass,
+        dispatch_notification_for_event,
+    )
+    ev = NotificationEvidencePack(
+        event_type=NotificationType.TEST_ALERT,
+        severity=Severity.LOW,
+        actor_id=user.user_id,
+        target_user=user.user_id,
+        client_ip="127.0.0.1",
+        summary="This is a verified test dispatch to validate end-to-end local SMTP delivery on 127.0.0.1:1025.",
+        citations=[
+            NotificationCitation(
+                citation_index=1,
+                citation_type=CitationClass.AUDIT,
+                display_label="Test Health Verification Token",
+                source_id="1",
+                validated=True,
+            )
+        ],
+    )
+    alert_id, composed, delivered = await dispatch_notification_for_event(ev)
+    return {
+        "status": "dispatched",
+        "alert_id": alert_id,
+        "subject": composed.subject,
+        "delivered": delivered,
+        "composition_mode": composed.composition_mode,
+    }
+

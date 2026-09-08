@@ -147,6 +147,7 @@ async def init_db() -> None:
                 approved_at TIMESTAMP,
                 last_verified_at TIMESTAMP,
                 last_ip TEXT,
+                previous_ip TEXT,
                 revoked_at TIMESTAMP,
                 blocked_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -173,6 +174,7 @@ async def init_db() -> None:
                     approved_at TIMESTAMP,
                     last_verified_at TIMESTAMP,
                     last_ip TEXT,
+                    previous_ip TEXT,
                     revoked_at TIMESTAMP,
                     blocked_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -192,6 +194,8 @@ async def init_db() -> None:
         else:
             if "last_ip" not in trusted_device_columns:
                 await db.execute("ALTER TABLE trusted_devices ADD COLUMN last_ip TEXT")
+            if "previous_ip" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN previous_ip TEXT")
             if "revoked_at" not in trusted_device_columns:
                 await db.execute("ALTER TABLE trusted_devices ADD COLUMN revoked_at TIMESTAMP")
             if "blocked_at" not in trusted_device_columns:
@@ -355,6 +359,63 @@ async def init_db() -> None:
                 reason TEXT NOT NULL
             )
         ''')
+
+        # Sovereign Security Notifications & Mailbox
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS offline_security_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_type TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                sender TEXT NOT NULL,
+                recipients TEXT NOT NULL,
+                body_text TEXT NOT NULL,
+                body_html TEXT,
+                composition_mode TEXT NOT NULL,
+                evidence_pack_json TEXT NOT NULL,
+                related_user TEXT,
+                related_ip TEXT,
+                related_device_id TEXT,
+                related_run_id INTEGER,
+                is_read INTEGER DEFAULT 0,
+                eml_path TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_security_alerts_created ON offline_security_alerts(created_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_security_alerts_unread ON offline_security_alerts(is_read, created_at DESC)")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notification_citations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER NOT NULL REFERENCES offline_security_alerts(id) ON DELETE CASCADE,
+                citation_index INTEGER NOT NULL,
+                citation_class TEXT NOT NULL,
+                display_label TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                page_number INTEGER,
+                validated INTEGER NOT NULL DEFAULT 1,
+                metadata TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notification_citations_alert ON notification_citations(alert_id)")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notification_outbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dedup_key TEXT UNIQUE,
+                event_type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                retry_count INTEGER DEFAULT 0,
+                evidence_json TEXT NOT NULL,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent_at TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status)")
+
         # Phase 7 Safe Migration: Dual Four-Eyes Approval columns
         for col, col_def in [
             ("reviewed_by_2", "TEXT"),

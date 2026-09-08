@@ -3351,7 +3351,27 @@ print("Analysis script finished with returncode 0.")
                                VALUES (?, ?, 'pending', ?, ?, ?, ?) RETURNING *""",
                             (run_id, tool_def["id"], action.reason, json.dumps(validated_params), tool_def.get("risk_level", "sensitive"), req_approvals)
                         )
-                        await cursor.fetchone()
+                        approval_row = await cursor.fetchone()
+
+                        if approval_row:
+                            try:
+                                from cognishift.core.notifications import (
+                                    NotificationType,
+                                    collect_four_eyes_evidence,
+                                    fire_and_forget_notification,
+                                )
+                                fe_ev = collect_four_eyes_evidence(
+                                    event_type=NotificationType.SENSITIVE_ACTION_REQUESTED,
+                                    run_id=run_id,
+                                    approval_id=approval_row["id"],
+                                    tool_name=resolved_tool,
+                                    parameters=validated_params,
+                                    user_id=user_id,
+                                    workspace_id=workspace_id,
+                                )
+                                fire_and_forget_notification(fe_ev)
+                            except Exception as fe_notif_err:
+                                logger.warning(f"Could not dispatch four-eyes requested notification: {fe_notif_err}")
 
                         # Persist PendingTask for tracking
                         try:

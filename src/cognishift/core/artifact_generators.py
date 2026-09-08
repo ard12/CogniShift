@@ -540,6 +540,27 @@ async def create_and_register_artifact(
                 )
                 row = await cursor.fetchone()
                 await db.commit()
+
+                if row and run_id:
+                    try:
+                        from cognishift.core.notifications import (
+                            collect_artifact_evidence,
+                            fire_and_forget_notification,
+                        )
+                        run_info = await (await db.execute("SELECT user_id FROM agent_runs WHERE id = ?", (run_id,))).fetchone()
+                        run_user = run_info["user_id"] if run_info else "operator"
+                        art_ev = collect_artifact_evidence(
+                            run_id=run_id,
+                            workspace_id=workspace_id,
+                            user_id=run_user,
+                            artifact_id=row["id"],
+                            artifact_name=filename,
+                            artifact_path=target_rel_path,
+                        )
+                        fire_and_forget_notification(art_ev)
+                    except Exception:
+                        pass
+
                 return dict(row)
         except Exception as db_err:
             if final_path.exists():

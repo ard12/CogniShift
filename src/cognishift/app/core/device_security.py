@@ -1,17 +1,7 @@
 """Local trusted-device challenge/response using browser-held ECDSA P-256 keys."""
 import base64
 import hashlib
-import json
-import secrets
-import time
-from typing import Any, Dict, Optional
-
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
-"""Local trusted-device challenge/response using browser-held ECDSA P-256 keys."""
-import base64
-import hashlib
+import ipaddress
 import json
 import secrets
 import time
@@ -24,6 +14,14 @@ from cryptography.hazmat.primitives.hashes import SHA256
 
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
+from cognishift.core.notifications import (
+    NotificationEvidencePack,
+    NotificationType,
+    Severity,
+    collect_untrusted_device_evidence,
+    collect_network_drift_evidence,
+    fire_and_forget_notification,
+)
 
 
 DEVICE_SESSIONS: Dict[str, tuple[str, str, str, float]] = {}
@@ -129,20 +127,44 @@ async def begin_challenge(
                 "VALUES (?, ?, ?, ?, ?, 'pending', ?)",
                 (device_id, user_id, display_name[:100], canonical, fingerprint, client_ip),
             )
-            await db.execute(
+            audit_cur = await db.execute(
                 "INSERT INTO audit_events (actor_id, action, resource_type, details, result) "
                 "VALUES (?, 'device_verification_failed', 'trusted_device', ?, 'blocked')",
                 (user_id, detail_msg),
             )
+            audit_id = audit_cur.lastrowid
             await db.commit()
+
+            untrusted_ev = collect_untrusted_device_evidence(
+                user_id=user_id,
+                device_id=device_id,
+                key_fingerprint=fingerprint,
+                client_ip=client_ip,
+                audit_event_id=audit_id,
+            )
+            fire_and_forget_notification(untrusted_ev)
             return {"status": "unknown_device"}
         elif row["status"] in ("blocked", "revoked"):
-            await db.execute(
+            audit_cur = await db.execute(
                 "INSERT INTO audit_events (actor_id, action, resource_type, details, result) "
                 "VALUES (?, 'device_verification_failed', 'trusted_device', ?, 'blocked')",
                 (user_id, f"Device status is {row['status']}; device_id={device_id}; ip={client_ip}"),
             )
+            audit_id = audit_cur.lastrowid
             await db.commit()
+
+            blocked_ev = NotificationEvidencePack(
+                event_type=NotificationType.DEVICE_BLOCKED if row["status"] == "blocked" else NotificationType.DEVICE_REVOKED,
+                severity=Severity.HIGH,
+                actor_id=user_id,
+                target_user=user_id,
+                device_id=device_id,
+                device_fingerprint=fingerprint,
+                client_ip=client_ip,
+                audit_event_id=audit_id,
+                summary=f"Blocked or revoked device attempted connection. Device ID: {device_id}, Status: {row['status']}, IP: {client_ip}",
+            )
+            fire_and_forget_notification(blocked_ev)
             return {"status": row["status"]}
         elif row["status"] != "approved" or row["key_fingerprint"] != fingerprint:
             if client_ip and ("last_ip" in row.keys() and row["last_ip"] != client_ip):
@@ -150,16 +172,67 @@ async def begin_challenge(
                     "UPDATE trusted_devices SET last_ip = ? WHERE device_id = ? AND user_id = ?",
                     (client_ip, device_id, user_id),
                 )
-            await db.execute(
+            audit_cur = await db.execute(
                 "INSERT INTO audit_events (actor_id, action, resource_type, details, result) "
                 "VALUES (?, 'device_verification_failed', 'trusted_device', ?, 'blocked')",
                 (user_id, f"Device not approved or public key mismatch; status={row['status']}; device_id={device_id}; ip={client_ip}"),
             )
+            audit_id = audit_cur.lastrowid
             await db.commit()
+
+            if row["status"] == "pending":
+                untrusted_ev = collect_untrusted_device_evidence(
+                    user_id=user_id,
+                    device_id=device_id,
+                    key_fingerprint=fingerprint,
+                    client_ip=client_ip,
+                    audit_event_id=audit_id,
+                )
+                fire_and_forget_notification(untrusted_ev)
+
             return {"status": "unknown_device"}
 
-        # Device is approved and fingerprint matches: issue challenge
-        if client_ip:
+        # Device is approved and fingerprint matches: check IP drift and issue challenge
+        old_ip = row["last_ip"] if "last_ip" in row.keys() else None
+        if client_ip and old_ip and client_ip != old_ip:
+            is_foreign = False
+            try:
+                old_net = ipaddress.ip_network(f"{old_ip}/24", strict=False)
+                new_addr = ipaddress.ip_address(client_ip)
+                if new_addr not in old_net:
+                    is_foreign = True
+            except Exception:
+                pass
+
+            action_name = "DEVICE_FOREIGN_NETWORK_OBSERVED" if is_foreign else "DEVICE_NETWORK_DRIFT"
+            audit_wording = (
+                f"Trusted device observed from an unexpected network address; old_ip={old_ip}; new_ip={client_ip}"
+                if is_foreign
+                else f"Trusted device observed from a new network address; old_ip={old_ip}; new_ip={client_ip}"
+            )
+            audit_cursor = await db.execute(
+                "INSERT INTO audit_events (actor_id, action, resource_type, details, result) "
+                "VALUES (?, ?, 'trusted_device', ?, 'info')",
+                (user_id, action_name, f"device_id={device_id}; {audit_wording}"),
+            )
+            audit_id = audit_cursor.lastrowid
+
+            await db.execute(
+                "UPDATE trusted_devices SET last_ip = ?, previous_ip = ? WHERE device_id = ? AND user_id = ?",
+                (client_ip, old_ip, device_id, user_id),
+            )
+
+            drift_ev = collect_network_drift_evidence(
+                user_id=user_id,
+                device_id=device_id,
+                key_fingerprint=fingerprint,
+                client_ip=client_ip,
+                previous_ip=old_ip,
+                is_foreign=is_foreign,
+                audit_event_id=audit_id,
+            )
+            fire_and_forget_notification(drift_ev)
+        elif client_ip:
             await db.execute(
                 "UPDATE trusted_devices SET last_ip = ? WHERE device_id = ? AND user_id = ?",
                 (client_ip, device_id, user_id),
@@ -305,6 +378,16 @@ async def revoke_device(device_id: str, user_id: Optional[str] = None, actor_id:
     for s_hash in to_remove:
         DEVICE_SESSIONS.pop(s_hash, None)
 
+    revoked_ev = NotificationEvidencePack(
+        event_type=NotificationType.DEVICE_REVOKED,
+        severity=Severity.HIGH,
+        actor_id=actor_id,
+        target_user=user_id,
+        device_id=device_id,
+        summary=f"Trusted device {device_id} for user {user_id or 'unknown'} was revoked by {actor_id}.",
+    )
+    fire_and_forget_notification(revoked_ev)
+
 
 async def block_device(device_id: str, user_id: Optional[str] = None, actor_id: str = "administrator") -> None:
     """Block a device completely and immediately terminate active sessions."""
@@ -336,3 +419,13 @@ async def block_device(device_id: str, user_id: Optional[str] = None, actor_id: 
     ]
     for s_hash in to_remove:
         DEVICE_SESSIONS.pop(s_hash, None)
+
+    blocked_ev = NotificationEvidencePack(
+        event_type=NotificationType.DEVICE_BLOCKED,
+        severity=Severity.HIGH,
+        actor_id=actor_id,
+        target_user=user_id,
+        device_id=device_id,
+        summary=f"Device {device_id} for user {user_id or 'unknown'} was blocked by {actor_id}.",
+    )
+    fire_and_forget_notification(blocked_ev)

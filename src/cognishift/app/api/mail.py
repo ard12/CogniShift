@@ -56,8 +56,12 @@ async def list_mailbox_messages(
             # Administrator SOC view: sees all alerts with admin-specific delivery state
             base_sql = """
                 FROM offline_security_alerts a
-                LEFT JOIN notification_recipient_deliveries d
-                  ON a.id = d.alert_id AND (d.recipient_user_id IN (?, 'admin', 'sitanshu'))
+                LEFT JOIN (
+                    SELECT alert_id, MAX(is_read) as is_read, MAX(read_at) as read_at
+                    FROM notification_recipient_deliveries
+                    WHERE recipient_user_id IN (?, 'admin', 'sitanshu')
+                    GROUP BY alert_id
+                ) d ON a.id = d.alert_id
                 WHERE 1=1
             """
             params.append(user.user_id)
@@ -65,8 +69,12 @@ async def list_mailbox_messages(
             # Supervisor sees messages addressed to them or governance events
             base_sql = """
                 FROM offline_security_alerts a
-                JOIN notification_recipient_deliveries d
-                  ON a.id = d.alert_id AND d.recipient_user_id = ?
+                JOIN (
+                    SELECT alert_id, MAX(is_read) as is_read, MAX(read_at) as read_at
+                    FROM notification_recipient_deliveries
+                    WHERE recipient_user_id = ?
+                    GROUP BY alert_id
+                ) d ON a.id = d.alert_id
                 WHERE 1=1
             """
             params.append(user.user_id)
@@ -74,8 +82,12 @@ async def list_mailbox_messages(
             # Operator sees only messages delivered to them
             base_sql = """
                 FROM offline_security_alerts a
-                JOIN notification_recipient_deliveries d
-                  ON a.id = d.alert_id AND d.recipient_user_id = ?
+                JOIN (
+                    SELECT alert_id, MAX(is_read) as is_read, MAX(read_at) as read_at
+                    FROM notification_recipient_deliveries
+                    WHERE recipient_user_id = ?
+                    GROUP BY alert_id
+                ) d ON a.id = d.alert_id
                 WHERE 1=1
             """
             params.append(user.user_id)
@@ -91,7 +103,10 @@ async def list_mailbox_messages(
         filter_sql = " ".join(query_parts)
 
         # Unread count
-        unread_sql = f"SELECT count(*) as unread {base_sql} {filter_sql} AND (d.is_read = 0 OR d.is_read IS NULL)"
+        if user.role == "administrator":
+            unread_sql = f"SELECT count(*) as unread {base_sql} {filter_sql} AND (COALESCE(d.is_read, a.is_read, 0) = 0)"
+        else:
+            unread_sql = f"SELECT count(*) as unread {base_sql} {filter_sql} AND (COALESCE(d.is_read, 0) = 0)"
         unread_row = await (await db.execute(unread_sql, tuple(params))).fetchone()
         unread_count = unread_row["unread"] if unread_row else 0
 
@@ -142,6 +157,13 @@ async def list_mailbox_messages(
             "role": user.role,
             "user_id": user.user_id,
         }
+
+
+@router.get("/smtp-health")
+async def get_smtp_health() -> Dict[str, Any]:
+    """Verify health and reachability of the local loopback SMTP listener."""
+    from cognishift.core.notifications.smtp_transport import check_smtp_health
+    return await check_smtp_health()
 
 
 @router.get("/{alert_id}")
@@ -311,35 +333,3 @@ async def clear_mailbox(
         await db.commit()
 
     return {"status": "cleared", "deleted_count": count}
-
-
-@router.get("/smtp-health")
-async def get_smtp_health() -> Dict[str, Any]:
-    """Verify health and reachability of the local loopback SMTP listener."""
-    host = settings.smtp_host or "127.0.0.1"
-    port = settings.smtp_port or 1025
-
-    def _check() -> Dict[str, Any]:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1.5)
-        try:
-            s.connect((host, port))
-            banner = s.recv(1024).decode("utf-8", errors="ignore").strip()
-            s.close()
-            return {
-                "status": "ACTIVE",
-                "host": host,
-                "port": port,
-                "banner": banner,
-                "loopback_only": host in ("127.0.0.1", "localhost"),
-            }
-        except Exception as exc:
-            return {
-                "status": "UNAVAILABLE",
-                "host": host,
-                "port": port,
-                "error": str(exc),
-                "loopback_only": host in ("127.0.0.1", "localhost"),
-            }
-
-    return await asyncio.to_thread(_check)

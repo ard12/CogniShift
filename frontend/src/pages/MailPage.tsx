@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { mailApi, type MailMessageMetadata, type MailMessageDetail, type SmtpHealthStatus } from "@/api/mail";
+import { securityApi } from "@/api/security";
 import { authorizationsApi, type ExecutionResult } from "@/api/authorizations";
 import { useAuth } from "@/auth/useAuth";
 import { useWorkspaces } from "@/context/useWorkspaces";
@@ -37,6 +38,7 @@ export function MailPage() {
 
   const [smtpHealth, setSmtpHealth] = useState<SmtpHealthStatus | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [isDispatching, setIsDispatching] = useState<boolean>(false);
 
   // Permit Execution State
@@ -56,17 +58,32 @@ export function MailPage() {
   const fetchMail = useCallback(async () => {
     try {
       const folderParam = selectedFolder === "all" ? undefined : selectedFolder;
-      const res = await mailApi.list(folderParam, 100, 0);
-      setMessages(res.messages);
-      setUnreadCount(res.unread_count);
-      setTotalCount(res.total_count);
+      try {
+        const res = await mailApi.list(folderParam, 100, 0);
+        setMessages(res.messages);
+        setUnreadCount(res.unread_count);
+        setTotalCount(res.total_count);
+        setFetchError(null);
+      } catch (err) {
+        console.warn("mailApi.list failed, falling back to securityApi.mailbox:", err);
+        const mb = await securityApi.mailbox(100, 0);
+        setMessages(mb.alerts as any);
+        setUnreadCount(mb.unread_count);
+        setTotalCount(mb.total_count);
+        setFetchError(null);
+      }
       try {
         setSmtpHealth(await mailApi.smtpHealth());
       } catch {
-        // Ignore SMTP health poll fail
+        try {
+          setSmtpHealth(await securityApi.smtpHealth());
+        } catch {
+          // Ignore SMTP health poll fail
+        }
       }
     } catch (err) {
       console.error("Mailbox fetch failed:", err);
+      setFetchError(err instanceof Error ? err.message : "Mailbox unavailable");
     } finally {
       setIsLoading(false);
     }
@@ -85,10 +102,20 @@ export function MailPage() {
     setExecutionResult(null);
     setExecutionError(null);
     try {
-      const detail = await mailApi.get(msgId);
+      let detail: MailMessageDetail;
+      try {
+        detail = await mailApi.get(msgId);
+      } catch {
+        const secDetail = await securityApi.alertDetail(msgId);
+        detail = secDetail as any;
+      }
       setSelectedDetail(detail);
       if (!detail.is_read) {
-        await mailApi.markRead(msgId);
+        try {
+          await mailApi.markRead(msgId);
+        } catch {
+          await securityApi.markAlertRead(msgId);
+        }
         setMessages((prev) =>
           prev.map((m) => (m.id === msgId ? { ...m, is_read: 1 } : m))
         );
@@ -102,7 +129,11 @@ export function MailPage() {
   const handleDispatchTest = async () => {
     setIsDispatching(true);
     try {
-      await mailApi.dispatchTest();
+      try {
+        await mailApi.dispatchTest();
+      } catch {
+        await securityApi.dispatchTestAlert();
+      }
       await fetchMail();
     } catch (err) {
       console.error("Test alert failed:", err);
@@ -114,7 +145,11 @@ export function MailPage() {
   const handleClearMailbox = async () => {
     if (!window.confirm("Purge all messages in internal mailbox (Admin only)?")) return;
     try {
-      await mailApi.clear();
+      try {
+        await mailApi.clear();
+      } catch {
+        await securityApi.clearMailbox();
+      }
       setSelectedMessageId(null);
       setSelectedDetail(null);
       await fetchMail();
@@ -359,6 +394,13 @@ export function MailPage() {
               <div className="flex h-32 items-center justify-center text-xs text-ink-3 gap-2">
                 <IconLoader className="h-4 w-4 animate-spin text-brand" />
                 Loading mailbox...
+              </div>
+            ) : fetchError ? (
+              <div className="p-8 text-center text-xs">
+                <p className="text-status-warning mb-2">{fetchError}</p>
+                <Button size="sm" variant="secondary" onClick={() => void fetchMail()}>
+                  Retry Connection
+                </Button>
               </div>
             ) : filteredMessages.length === 0 ? (
               <div className="p-8 text-center text-xs text-ink-3">

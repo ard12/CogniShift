@@ -6,6 +6,7 @@ import {
   type DeviceRecord,
   type SmtpHealthStatus,
 } from "@/api/security";
+import { mailApi } from "@/api/mail";
 import { useAuth } from "@/auth/useAuth";
 import { useWorkspaces } from "@/context/useWorkspaces";
 import { PageHeader } from "@/components/PageHeader";
@@ -40,16 +41,26 @@ export function SecurityPage() {
         setPending(await securityApi.pendingDevices());
         setAllDevices(await securityApi.listDevices());
         try {
-          const mb = await securityApi.mailbox(1, 0);
+          const mb = await mailApi.list(undefined, 1, 0);
           setUnreadCount(mb.unread_count);
         } catch {
-          // Ignore mailbox error if migrating
+          try {
+            const mb = await securityApi.mailbox(1, 0);
+            setUnreadCount(mb.unread_count);
+          } catch {
+            // Ignore mailbox error if migrating
+          }
         }
         try {
-          const health = await securityApi.smtpHealth();
+          const health = await mailApi.smtpHealth();
           setSmtpHealth(health);
         } catch {
-          // Ignore SMTP health error if inactive
+          try {
+            const health = await securityApi.smtpHealth();
+            setSmtpHealth(health);
+          } catch {
+            // Ignore SMTP health error if inactive
+          }
         }
       }
       setError(null);
@@ -69,7 +80,11 @@ export function SecurityPage() {
   const handleDispatchTest = async () => {
     setIsDispatching(true);
     try {
-      await securityApi.dispatchTestAlert();
+      try {
+        await mailApi.dispatchTest();
+      } catch {
+        await securityApi.dispatchTestAlert();
+      }
       await refresh();
     } catch (err) {
       console.error("Test alert dispatch failed:", err);

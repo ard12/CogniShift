@@ -28,7 +28,7 @@ export function AppShell() {
 
   const sovereigntyTone = sovereignty?.sovereignty_enforced ? "success" : "warning";
   const sovereigntyLabel = sovereignty?.sovereignty_enforced
-    ? "AIRGAP ISOLATED"
+    ? "SOVEREIGN POLICY ACTIVE"
     : sovereignty
     ? "PUBLIC EGRESS ALLOWED"
     : "SOVEREIGNTY UNKNOWN";

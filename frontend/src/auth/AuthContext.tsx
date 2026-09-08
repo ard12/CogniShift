@@ -27,15 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setVerifying(true);
     setError(null);
     try {
-      if (localStorage.getItem(DEMO_SESSION_KEY) === "true") {
-        setDeviceSession(null);
-        const status = await systemApi.sovereignty(candidate);
-        setSovereignty(status);
-        setToken(candidate);
-        setStoredToken(candidate);
-        setDeviceStatus("not_verified");
-        return true;
-      }
       const identity = await ensureDeviceIdentity();
       const challenge = await authApi.challenge(candidate, {
         device_id: identity.deviceId,
@@ -82,21 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const session = await authApi.demoSession(personaId);
-      setDeviceSession(null);
-      const status = await systemApi.sovereignty(session.session_token);
-      setSovereignty(status);
-      setToken(session.session_token);
-      setStoredToken(session.session_token);
-      localStorage.setItem(DEMO_SESSION_KEY, "true");
-      setDeviceStatus("not_verified");
-      return true;
+      return await verify(session.session_token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Demo session unavailable.");
       return false;
     } finally {
       setVerifying(false);
     }
-  }, []);
+  }, [verify]);
 
   useEffect(() => {
     const stored = getStoredToken();

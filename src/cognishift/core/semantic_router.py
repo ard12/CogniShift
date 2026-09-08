@@ -623,18 +623,33 @@ class SemanticIntentRouter:
         )) or bool(re.search(
             r'\b(?:export|create|generate|render|review.*?and\s+(?:convert|create|generate|export|render))\b.*?\b(?:into|to|as|in)?\s*(?:docx|pdf|excel|xlsx|spreadsheet|csv|jpg|jpeg|png|image|ppt|pptx|powerpoint|slides|presentation)\b',
             text_lower
-        ))
-        is_visualization_cmd = bool(re.search(
+        )) or bool(re.search(
+            r'\b(?:want|need|give\s+me|make|generate|create|export|produce|provide|prepare|get)\b.*?\b(?:audit|report|summary|analysis|document|deliverable|file|overview)\b.*?\b(?:docx|word|pdf|excel|xlsx|spreadsheet|csv|pptx|powerpoint)\b',
+            text_lower
+        )) or bool(re.search(
+            r'\b(?:proper\s+)?(?:audit|report|summary|analysis|document|deliverable|overview)\b.*?\b(?:in|as|into)\s+(?:docx|word|pdf|excel|xlsx|spreadsheet|csv|pptx|powerpoint)(?:\s+format)?\b',
+            text_lower
+        )) or bool(re.search(
+            r'\b(?:in|as|into)\s+(?:docx|word|pdf|excel|xlsx|pptx)\s+format\b',
+            text_lower
+        )) or (
+            any(w in text_lower for w in ["docx", "pdf", "pptx", "word format", "docx format", "pdf format"])
+            and any(w in text_lower for w in ["audit", "report", "proper", "format", "deliverable", "generate", "create", "make"])
+            and not any(w in text_lower for w in ["what can you do", "can you convert", "do you support"])
+        )
+        from cognishift.core.visualization.selector import parse_artifact_request_contract
+        artifact_req = parse_artifact_request_contract(raw_text)
+        is_visualization_cmd = artifact_req.png_required or bool(re.search(
             r'\b(?:visualize|visual|plot|chart|graph)\b.*?\b(?:matplotlib|seaborn|telemetry|readings|sensor|data|png|image|excel|history|trend|metric|breakdown)\b',
             text_lower
         )) or any(p in text_lower for p in [
             "visual breakdown", "simple chart", "make a chart", "generate a chart", "plot the", "visual chart"
         ])
         is_analysis_or_audit_cmd = (bool(re.search(
-            r'\b(?:data\s+analysis|financial\s+(?:audit|history|performance)|deep\s+(?:financial\s+)?audit|audit\s+on|quantitative\s+audit)\b',
+            r'\b(?:data\s+analysis|financial\s+(?:audit|history|performance)|deep\s+(?:financial\s+)?audit|audit\s+on|quantitative\s+audit|do\s+(?:a\s+)?(?:complete\s+)?audit|complete\s+audit)\b',
             text_lower
-        )) and any(w in text_lower for w in ["excel", "xlsx", "spreadsheet", "csv", "data", "history", "financial", "png", "image", "chart", "file"])) or any(p in text_lower for p in [
-            "make me a report", "generate a report", "make a report", "compare our operating ebitda", "urgent maintenance jobs in the sap"
+        )) and any(w in text_lower for w in ["excel", "xlsx", "spreadsheet", "csv", "data", "history", "financial", "png", "image", "chart", "file", "registry", "p&id", "pid"])) or any(p in text_lower for p in [
+            "make me a report", "generate a report", "make a report", "compare our operating ebitda", "urgent maintenance jobs in the sap", "do a complete audit", "complete audit"
         ])
 
         if (is_imperative_code or is_document_conversion or is_visualization_cmd or is_analysis_or_audit_cmd) and not is_pure_capability_question:
@@ -991,7 +1006,10 @@ class SemanticIntentRouter:
             "generate pdf", "generate png", "generate docx", "generate chart", "generate audit", "generate visualization",
             "create a png", "create another png", "create a chart", "create another chart", "create a visualization",
             "create another visualization", "create a pdf", "create an audit", "create a report",
-            "make a png", "make another png", "make a chart", "make another chart", "make a visualization"
+            "make a png", "make another png", "make a chart", "make another chart", "make a visualization",
+            "in docx", "in pdf", "in word", "as docx", "as pdf", "docx format", "pdf format",
+            "proper audit", "word format", "audit in", "report in",
+            "do a complete audit", "do an audit", "complete audit", "full audit", "and do a complete audit"
         ]):
             return False
 
@@ -1015,6 +1033,11 @@ class SemanticIntentRouter:
             return True
 
         if not refs.files:
+            return False
+
+        # Deliverable generation requests (charts, PNGs, PDFs, audit documents) belong to CODE_EXECUTION, not passive inspection
+        from cognishift.core.visualization.selector import parse_artifact_request_contract
+        if parse_artifact_request_contract(text).is_deliverable_request:
             return False
 
         # If an explicit file is referenced, check for reading, extraction, inspection, or comparison triggers

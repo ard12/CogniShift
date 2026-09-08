@@ -314,6 +314,8 @@ export interface SecurityStatus {
   workspace: SecurityDatum;
   local_ai: SecurityDatum;
   external_internet: SecurityDatum;
+  network_interface?: SecurityDatum;
+  docker_sandbox?: SecurityDatum;
   sensitive_tools: SecurityDatum;
   audit_logging: SecurityDatum;
   trusted_device_enforcement: boolean;

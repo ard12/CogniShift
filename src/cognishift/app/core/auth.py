@@ -215,7 +215,7 @@ async def get_current_user(request: Request) -> User:
     request.state.identity_verified = True
     request.state.device_trusted = False
     request.state.device_id = None
-    if settings.trusted_device_required and not is_ephemeral_demo_token(token):
+    if settings.trusted_device_required:
         from cognishift.app.core.device_security import validate_device_session
         device_id = validate_device_session(request.headers.get("X-Device-Session", "").strip(), user.user_id)
         if not device_id:

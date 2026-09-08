@@ -4,6 +4,7 @@ Provides DockerPodmanBackend for real container execution and SimulatedSandboxBa
 Zero host-code execution fallback is guaranteed.
 """
 import os
+import json
 import time
 import shutil
 import asyncio

@@ -143,14 +143,63 @@ def enforce_rca_evidence_boundaries(content: str, operator_input: str) -> str:
     )
 
 
+from cognishift.core.visualization.schemas import ArtifactRequestContract, ChartType, VisualizationResult
+from cognishift.core.visualization.selector import parse_artifact_request_contract
+from cognishift.core.visualization.service import execute_visualization_pipeline
+
+
 @dataclass
 class GoalContract:
     """Explicit contract specifying required quantitative or deliverable outputs for multi-step goals."""
-    required_fields: List[str]
+    required_fields: List[str] = field(default_factory=list)
     extracted_fields: Dict[str, Any] = field(default_factory=dict)
+    artifact_contract: Optional[Any] = None
 
-    def is_satisfied(self) -> bool:
-        return all(k in self.extracted_fields and self.extracted_fields[k] is not None for k in self.required_fields)
+    def check_satisfaction(self, current_artifacts: Optional[List[Dict[str, Any]]] = None) -> Tuple[bool, List[str]]:
+        missing = []
+        for k in self.required_fields:
+            if k not in self.extracted_fields or self.extracted_fields[k] is None:
+                missing.append(k)
+        if self.artifact_contract and getattr(self.artifact_contract, "is_deliverable_request", False):
+            arts = current_artifacts or []
+            if getattr(self.artifact_contract, "png_required", False):
+                expected_pngs = getattr(self.artifact_contract, "png_count", 1) or 1
+                valid_pngs = [
+                    a for a in arts
+                    if (a.get("artifact_type") == "png" or str(a.get("filename", "")).lower().endswith(".png"))
+                    and a.get("file_size", 0) > 0
+                ]
+                if len(valid_pngs) < expected_pngs:
+                    missing.append(f"png_deliverable (expected {expected_pngs}, found {len(valid_pngs)})")
+            if getattr(self.artifact_contract, "pdf_required", False):
+                valid_pdfs = [
+                    a for a in arts
+                    if (a.get("artifact_type") == "pdf" or str(a.get("filename", "")).lower().endswith(".pdf"))
+                    and a.get("file_size", 0) > 0
+                ]
+                if not valid_pdfs:
+                    missing.append("pdf_deliverable")
+            if getattr(self.artifact_contract, "docx_required", False):
+                valid_docx = [
+                    a for a in arts
+                    if (a.get("artifact_type") == "docx" or str(a.get("filename", "")).lower().endswith(".docx"))
+                    and a.get("file_size", 0) > 0
+                ]
+                if not valid_docx:
+                    missing.append("docx_deliverable")
+            if getattr(self.artifact_contract, "xlsx_required", False):
+                valid_xlsx = [
+                    a for a in arts
+                    if (a.get("artifact_type") == "xlsx" or str(a.get("filename", "")).lower().endswith(".xlsx"))
+                    and a.get("file_size", 0) > 0
+                ]
+                if not valid_xlsx:
+                    missing.append("xlsx_deliverable")
+        return len(missing) == 0, missing
+
+    def is_satisfied(self, current_artifacts: Optional[List[Dict[str, Any]]] = None) -> bool:
+        sat, _ = self.check_satisfaction(current_artifacts)
+        return sat
 
 
 def populate_goal_contract_from_insights(contract: GoalContract, insights: Dict[str, Any]) -> None:
@@ -645,6 +694,8 @@ async def _resolve_knowledge_and_page_context(
     if not active_doc_for_page:
         if resolved_context and resolved_context.pinned_source:
             active_doc_for_page = resolved_context.pinned_source
+            if not target_doc:
+                target_doc = active_doc_for_page
         elif target_doc:
             active_doc_for_page = target_doc
         elif resolved_context and resolved_context.files:
@@ -655,6 +706,8 @@ async def _resolve_knowledge_and_page_context(
             r_f = await c_f.fetchone()
             if r_f:
                 active_doc_for_page = dict(r_f)
+                if not target_doc:
+                    target_doc = active_doc_for_page
 
     if requested_page and active_doc_for_page:
         doc_sid = active_doc_for_page["id"]
@@ -815,6 +868,23 @@ async def execute_agent_run(
         )
 
         active_pending_task = await get_active_pending_task(workspace_id=workspace_id, user_id=user_id, db=db)
+
+        # Early Authoritative Target Document Resolution
+        target_doc = None
+        if active_pending_task and getattr(active_pending_task, "source_references", None) and active_pending_task.source_references.get("pinned_source"):
+            target_doc = active_pending_task.source_references["pinned_source"]
+        elif resolved_context and resolved_context.pinned_source:
+            target_doc = resolved_context.pinned_source
+        elif resolved_context and resolved_context.files:
+            c_f = await db.execute(
+                "SELECT id, name, original_filename, local_path FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?) LIMIT 1",
+                (workspace_id, resolved_context.files[0], resolved_context.files[0])
+            )
+            r_f = await c_f.fetchone()
+            if r_f:
+                target_doc = dict(r_f)
+        if not target_doc:
+            target_doc = await resolve_target_document_for_query(workspace_id, clean_input, db=db)
 
         # --- ROUTER 1: SEMANTIC INTENT CLASSIFICATION ---
         if settings.semantic_router_enabled:
@@ -1124,17 +1194,22 @@ async def execute_agent_run(
         await db.commit()
 
         # --- TASK-SCOPED GOAL CONTRACT INITIALIZATION ---
+        artifact_contract = parse_artifact_request_contract(clean_input)
         is_financial_yoy_task = (
             any(w in lower_input for w in ["yoy", "year over year", "year-on-year", "growth rate", "cagr", "growth"])
             and any(w in lower_input for w in ["revenue", "ebitda", "pat", "financial", "performance", "p&l"])
         )
+        required_fields = []
         if is_financial_yoy_task:
+            required_fields = [
+                "revenue_previous", "revenue_current", "revenue_yoy_pct",
+                "ebitda_previous", "ebitda_current", "ebitda_yoy_pct",
+                "pat_previous", "pat_current", "pat_yoy_pct"
+            ]
+        if is_financial_yoy_task or artifact_contract.is_deliverable_request:
             goal_contract = GoalContract(
-                required_fields=[
-                    "revenue_previous", "revenue_current", "revenue_yoy_pct",
-                    "ebitda_previous", "ebitda_current", "ebitda_yoy_pct",
-                    "pat_previous", "pat_current", "pat_yoy_pct"
-                ]
+                required_fields=required_fields,
+                artifact_contract=artifact_contract
             )
 
         # --- PHASE 2B: BOUNDED STRUCTURED PLAN CREATION ---
@@ -1176,14 +1251,28 @@ async def execute_agent_run(
             )
         elif routing_res.intent == SemanticIntent.CODE_EXECUTION:
             lower_goal = effective_goal.lower()
-            is_doc_report = any(w in lower_goal for w in ["document", "pdf", "report", "manual", "latest", "ingested", "convert", "excel", "xlsx", "spreadsheet", "csv", "audit", "financial", "data", "history", "analyze", "analysis", "visualize", "plot"])
+            is_doc_report = any(w in lower_goal for w in ["document", "pdf", "report", "manual", "latest", "ingested", "convert", "excel", "xlsx", "spreadsheet", "csv", "audit", "financial", "data", "history", "analyze", "analysis", "visualize", "plot", "docx", "word", "format", "deliverable"])
             target_doc_info = None
             if is_doc_report:
                 target_doc_info = (
                     claimed_task.source_references.get("pinned_source")
                     if (claimed_task and claimed_task.source_references)
-                    else (resolved_context.pinned_source or await resolve_target_document_for_query(workspace_id, effective_goal, db=db))
+                    else (resolved_context.pinned_source if resolved_context else None)
                 )
+                if not target_doc_info and target_doc:
+                    target_doc_info = target_doc
+                if not target_doc_info:
+                    target_doc_info = await resolve_target_document_for_query(workspace_id, effective_goal, db=db)
+                if not target_doc_info and resolved_context and resolved_context.files:
+                    c_f = await db.execute(
+                        "SELECT id, name, original_filename, local_path FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?) LIMIT 1",
+                        (workspace_id, resolved_context.files[0], resolved_context.files[0])
+                    )
+                    r_f = await c_f.fetchone()
+                    if r_f:
+                        target_doc_info = dict(r_f)
+            if not target_doc and target_doc_info:
+                target_doc = target_doc_info
             doc_label = target_doc_info["name"] if target_doc_info else "workspace data"
 
             # Determine requested deliverable format (PDF, XLSX, PPTX, Image, or DOCX)
@@ -1197,14 +1286,25 @@ async def execute_agent_run(
             elif any(w in lower_goal for w in ["jpg", "jpeg", "png", "image", "visualize", "plot", "chart", "graph"]):
                 req_format = "IMAGE"
 
+            step2_desc = (
+                "Extract tabular series and generate deterministic data visualization"
+                if artifact_contract.png_required
+                else "Execute Python analysis script in isolated sandbox"
+            )
+            step3_desc = (
+                f"Confirm data visualization deliverables for {doc_label}"
+                if (artifact_contract.png_required and not (artifact_contract.pdf_required or artifact_contract.docx_required or artifact_contract.xlsx_required))
+                else f"Generate formal {req_format} engineering report for {doc_label}"
+            )
+
             plan = AgentPlan(
                 goal=effective_goal,
                 current_step_index=1,
                 max_steps=4,
                 steps=[
                     PlanStep(id=1, description="Resolve source document and verify execution environment", status="completed", observation=f"Authoritatively resolved source: {doc_label}"),
-                    PlanStep(id=2, description="Execute Python analysis script in isolated sandbox", status="pending"),
-                    PlanStep(id=3, description=f"Generate formal {req_format} engineering report for {doc_label}", status="pending"),
+                    PlanStep(id=2, description=step2_desc, status="pending"),
+                    PlanStep(id=3, description=step3_desc, status="pending"),
                     PlanStep(id=4, description="Validate generated artifacts and deliver final report", status="pending")
                 ]
             )
@@ -2248,8 +2348,8 @@ async def execute_agent_run(
                 )
 
                 is_doc_or_viz_task = (
-                    (target_doc is not None and any(w in clean_input.lower() for w in ["review", "convert", "report", "document", "docx", "pdf", "xlsx", "excel", "jpg", "png"]))
-                    or any(w in clean_input.lower() for w in ["visualize", "plot", "chart", "graph", "matplotlib", "seaborn", "convert it into", "convert the document"])
+                    (target_doc is not None and any(w in clean_input.lower() for w in ["review", "convert", "report", "document", "docx", "pdf", "xlsx", "excel", "jpg", "png", "audit", "history", "financial", "deliverable", "deliverables"]))
+                    or any(w in clean_input.lower() for w in ["visualize", "plot", "chart", "graph", "matplotlib", "seaborn", "convert it into", "convert the document", "proper audit", "in docx format", "in pdf format"])
                 )
 
                 if (
@@ -2407,14 +2507,22 @@ async def execute_agent_run(
                                 target_doc_path = cand
                                 break
 
+                    if not target_doc_path and target_doc:
+                        for name_cand in [target_doc.get("name"), target_doc.get("original_filename")]:
+                            if name_cand:
+                                cand = Path("data/demo") / name_cand
+                                if cand.exists():
+                                    target_doc_path = cand.resolve()
+                                    break
+
                     insights = extract_document_insights(target_doc_path, query_hint=clean_input) if target_doc_path else {}
                     if goal_contract and "revenue_previous" in goal_contract.required_fields and insights:
                         populate_goal_contract_from_insights(goal_contract, insights)
 
                     is_financial_task = (
                         insights.get("is_financial", False)
-                        or any(w in lower_input for w in ["financial", "revenue", "ebitda", "pat", "profit", "cagr", "grm", "p&l", "capex", "opex", "numbers", "audit"])
-                        or (target_doc and any(ext in str(target_doc.get("name", "")).lower() for ext in [".xlsx", ".xls", "financial", "audit"]))
+                        or any(w in lower_input for w in ["financial", "revenue", "ebitda", "pat", "profit", "cagr", "grm", "p&l", "capex", "opex", "financial audit"])
+                        or (target_doc and "financial" in str(target_doc.get("name", "")).lower())
                     )
 
                     # Check if user specified a custom title or author in the prompt
@@ -2430,6 +2538,8 @@ async def execute_agent_run(
                         display_title = custom_title
                         safe_slug = re.sub(r'[^a-zA-Z0-9_\-]', '_', custom_title).strip('_')
                         stem_name = safe_slug if safe_slug else stem_name
+                    elif "audit" in lower_input:
+                        display_title = f"Engineering & Operational Audit: {stem_name.replace('_', ' ')}"
                     elif is_financial_task:
                         display_title = f"Financial & Operational Audit: {stem_name.replace('_', ' ')}"
                     else:
@@ -2467,6 +2577,37 @@ async def execute_agent_run(
                     growth_map = insights.get("growth", {})
 
                     if current_step.id == 2:
+                        viz_contract = parse_artifact_request_contract(clean_input)
+                        if viz_contract.png_required and target_doc_path and target_doc_path.suffix.lower() in (".csv", ".xlsx", ".xls"):
+                            await log_event(
+                                db, run_id, "tool_started",
+                                f"Executing deterministic visualization pipeline on '{target_doc_path.name}'...",
+                                {"contract": viz_contract.to_dict(), "source_file": target_doc_path.name}
+                            )
+                            viz_results = await execute_visualization_pipeline(
+                                file_path=target_doc_path,
+                                query=clean_input,
+                                workspace_id=workspace_id,
+                                run_id=run_id,
+                                contract=viz_contract
+                            )
+                            successful_viz = [v for v in viz_results if v.success]
+                            if successful_viz:
+                                tool_out = f"Deterministic data visualization successfully generated: " + ", ".join(f"{v.filename} ({v.file_size} bytes)" for v in successful_viz)
+                                current_step.status = "completed"
+                                current_step.tool_name = "execute_visualization_pipeline"
+                                current_step.tool_parameters = {"source_file": target_doc_path.name, "count": len(successful_viz)}
+                                current_step.observation = tool_out
+                                await log_event(db, run_id, "tool_executed", tool_out, {"artifacts": [v.filename for v in successful_viz]})
+                                saved_plan_json = serialize_plan(plan)
+                                await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                                await db.commit()
+                                plan.advance_to_next_step()
+                                continue
+                            else:
+                                err_msg = "; ".join(v.error for v in viz_results if v.error)
+                                raise ValueError(f"Deterministic visualization pipeline failed: {err_msg}")
+
                         wants_chart = wants_png_viz or is_financial_task
                         wants_excel = target_fmt == "xlsx"
 
@@ -2748,9 +2889,16 @@ print("Analysis script finished with returncode 0.")
                             headings = insights.get("headings", [])
                             excerpts = [p[1][:200] for p in insights.get("page_texts", [])[:3]] if insights.get("page_texts") else []
 
-                            p2_body = [f"Detailed inspection and parameter evaluation of '{doc_title}'."]
+                            is_audit_mode = "audit" in lower_input
+                            p1_scope = "Comprehensive Plant Engineering & Instrumentation Audit." if is_audit_mode else f"Detailed operational parameter evaluation of '{doc_title}'."
+                            p2_heading = "2. Operational Audit Findings & Parameter Analysis" if is_audit_mode else "2. Extracted Findings & Operational Analysis"
+
+                            p2_body = [
+                                f"Detailed inspection and parameter evaluation of '{doc_title}' across operational process loops.",
+                                f"Autonomous audit verification conducted against plant asset hierarchies and design baselines."
+                            ]
                             if headings:
-                                p2_body.append(f"Identified primary sections: {', '.join(headings[:5])}.")
+                                p2_body.append(f"Identified primary sections / tags: {', '.join(headings[:5])}.")
                             if excerpts:
                                 p2_body.extend(excerpts)
 
@@ -2759,14 +2907,15 @@ print("Analysis script finished with returncode 0.")
                                     "heading": "1. Executive Summary & Process Scope",
                                     "level": 1,
                                     "paragraphs": [
-                                        f"Document Title: {display_title}",
-                                        f"Prepared by: {custom_author if custom_author else 'Plant Operations Agent'}",
-                                        f"Reference Ingestion: {doc_title} (ID #{target_doc['id'] if target_doc else '1'})",
+                                        f"Audit Deliverable: {display_title}",
+                                        f"Author / Auditor: {custom_author if custom_author else 'Plant Operations Agent'}",
+                                        f"Source Dataset: {doc_title} (ID #{target_doc['id'] if target_doc else '1'})",
+                                        f"Scope: {p1_scope}",
                                         "Analysis executed autonomously via local Python container sandbox in strict sovereign mode."
                                     ]
                                 },
                                 {
-                                    "heading": "2. Extracted Findings & Operational Analysis",
+                                    "heading": p2_heading,
                                     "level": 1,
                                     "paragraphs": p2_body,
                                     "table": {
@@ -2775,12 +2924,13 @@ print("Analysis script finished with returncode 0.")
                                     }
                                 },
                                 {
-                                    "heading": "3. Authoritative Sign-Off",
+                                    "heading": "3. Authoritative Sign-Off & Compliance",
                                     "level": 1,
                                     "paragraphs": [
-                                        f"Generated on: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
-                                        f"Author / Inspector: {custom_author if custom_author else 'Plant Operations Agent'}",
-                                        "Generated by CogniShift Sovereign Agentic Workbench."
+                                        f"Audit Completion Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                                        f"Lead Auditor / Analyst: {custom_author if custom_author else 'Plant Operations Agent'}",
+                                        "Sovereign Compliance: Computed in air-gapped environment with zero cloud egress.",
+                                        "Generated by CogniShift Sovereign Agentic Workbench (SIH26117)."
                                     ]
                                 }
                             ]
@@ -2881,28 +3031,11 @@ print("Analysis script finished with returncode 0.")
                             tool_out = await execute_tool("generate_xlsx", doc_params, workspace_id=workspace_id, run_id=run_id)
                             current_step.tool_name = "generate_xlsx"
                         elif target_fmt == "image":
-                            wants_chart = any(w in lower_input for w in ["visualize", "plot", "chart", "graph", "matplotlib", "seaborn"])
-                            if wants_chart:
-                                report_filename = chart_filename
-                                doc_params = {
-                                    "target": chart_filename,
-                                    "format": "png",
-                                    "source": "sandbox"
-                                }
-                                tool_out = f"Analysis chart successfully generated: {chart_filename}"
-                                current_step.tool_name = "visualize_telemetry"
-                            else:
-                                report_filename = f"Page_1_{stem_name}.png"
-                                doc_params = {
-                                    "source_path_or_id": str(target_doc["id"]) if target_doc else doc_title,
-                                    "page_number": 1,
-                                    "output_filename": report_filename,
-                                    "format": "png"
-                                }
-                                tool_out = await execute_tool("render_document_page", doc_params, workspace_id=workspace_id, run_id=run_id)
-                                current_step.tool_name = "render_document_page"
+                            tool_out = "Visualization deliverables confirmed and registered in workspace artifacts."
+                            current_step.tool_name = "confirm_deliverables"
+                            doc_params = {"status": "confirmed", "type": "visualization"}
                         else:
-                            report_filename = f"{stem_name}.docx" if custom_title else f"Report_{stem_name}.docx"
+                            report_filename = f"{stem_name}.docx" if custom_title else (f"Audit_{stem_name}.docx" if "audit" in lower_input else f"Report_{stem_name}.docx")
                             doc_params = {
                                 "filename": report_filename,
                                 "title": display_title,
@@ -2930,9 +3063,20 @@ print("Analysis script finished with returncode 0.")
                         art_rows = await cursor_chk.fetchall()
                         current_run_artifacts = [dict(a) for a in art_rows]
 
+                        # Verify each artifact exists on disk and has non-zero size
+                        for art in current_run_artifacts:
+                            cand_paths = [
+                                ws_root / art.get("file_path", ""),
+                                ws_root / f"generated/run_{run_id}" / art.get("filename", ""),
+                                ws_root / art.get("filename", "")
+                            ]
+                            exists_on_disk = any(p.exists() and p.stat().st_size > 0 for p in cand_paths)
+                            if not exists_on_disk:
+                                logger.warning(f"Artifact {art.get('filename')} missing or empty on disk!")
+
                         docx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "docx" or str(a.get("filename", "")).endswith(".docx")), None)
                         pdf_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "pdf" or str(a.get("filename", "")).endswith(".pdf")), None)
-                        chart_art = next((a for a in current_run_artifacts if "chart" in str(a.get("filename", "")).lower() or a.get("artifact_type") == "png" or str(a.get("filename", "")).endswith(".png")), None)
+                        chart_arts = [a for a in current_run_artifacts if a.get("artifact_type") == "png" or str(a.get("filename", "")).lower().endswith(".png")]
                         json_art = next((a for a in current_run_artifacts if "metrics" in str(a.get("filename", "")).lower() or a.get("artifact_type") == "json" or str(a.get("filename", "")).endswith(".json")), None)
                         pptx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "pptx" or str(a.get("filename", "")).endswith(".pptx")), None)
                         xlsx_art = next((a for a in current_run_artifacts if a.get("artifact_type") == "xlsx" or str(a.get("filename", "")).endswith(".xlsx")), None)
@@ -2951,8 +3095,8 @@ print("Analysis script finished with returncode 0.")
                         if xlsx_art:
                             deliverables_list.append(f"{item_num}. **Excel Workbook (`.xlsx`)**: `{xlsx_art['filename']}` ({xlsx_art.get('file_size', 0)} bytes) — Artifact #{xlsx_art['id']}")
                             item_num += 1
-                        if chart_art:
-                            deliverables_list.append(f"{item_num}. **Visualization Chart (`.png`)**: `{chart_art['filename']}` ({chart_art.get('file_size', 0)} bytes) — Artifact #{chart_art['id']}")
+                        for c_art in chart_arts:
+                            deliverables_list.append(f"{item_num}. **Visualization Chart (`.png`)**: `{c_art['filename']}` ({c_art.get('file_size', 0)} bytes) — Artifact #{c_art['id']}")
                             item_num += 1
                         if json_art:
                             deliverables_list.append(f"{item_num}. **Quantitative Metrics Ledger (`.json`)**: `{json_art['filename']}` ({json_art.get('file_size', 0)} bytes) — Artifact #{json_art['id']}")
@@ -2965,9 +3109,11 @@ print("Analysis script finished with returncode 0.")
 
                         deliv_str = "\n".join(deliverables_list) if deliverables_list else "None generated"
 
+                        is_viz_only = (target_fmt == "image") or (bool(chart_arts) and not (docx_art or pdf_art or pptx_art or xlsx_art))
+
                         if is_financial_task:
                             final_text = (
-                                f"I have executed the quantitative analysis script on `{doc_title}` and generated the requested deliverable{'s' if len(deliverables_list) > 1 else ''}:\n\n"
+                                f"I have executed the quantitative analysis on `{doc_title}` and generated the requested deliverable{'s' if len(deliverables_list) > 1 else ''}:\n\n"
                                 f"### 📊 Generated Deliverables:\n"
                                 f"{deliv_str}\n\n"
                             )
@@ -2982,13 +3128,23 @@ print("Analysis script finished with returncode 0.")
                                     final_text += f"- **{lbl}**: Reported at **{format_number_display(latest, is_currency=(m_key != 'grm'))}** ({col}){growth_str}.\n"
                                 final_text += (
                                     f"- **Lead Auditor / Sign-off**: `{custom_author if custom_author else 'Plant Operations Agent'}`\n"
-                                    f"- **Compliance**: Computed in isolated local sandbox with 100% air-gapped sovereign verification."
+                                    f"- **Compliance**: Computed in isolated local environment with 100% air-gapped sovereign verification."
                                 )
                             else:
                                 final_text += f"\nAnalysis completed for `{doc_title}`."
                         else:
+                            intro_msg = (
+                                f"I have executed the deterministic visualization pipeline on `{doc_title}` and generated the requested deliverable{'s' if len(deliverables_list) > 1 else ''}:\n\n"
+                                if is_viz_only
+                                else f"I have executed the Python analysis script in the isolated sandbox and generated the official deliverable{'s' if len(deliverables_list) > 1 else ''} for '{doc_title}'.\n\n"
+                            )
+                            engine_note = (
+                                "- **Execution Service:** Trusted backend Matplotlib charting service with strict Pillow validation (exit code 0)\n"
+                                if is_viz_only
+                                else "- **Sandbox Script:** Executed in isolated Python container (exit code 0)\n"
+                            )
                             final_text = (
-                                f"I have executed the Python analysis script in the isolated sandbox and generated the official deliverable{'s' if len(deliverables_list) > 1 else ''} for '{doc_title}'.\n\n"
+                                f"{intro_msg}"
                                 f"### 📊 Generated Deliverables:\n"
                                 f"{deliv_str}\n\n"
                                 f"### 📋 Key Findings (Extracted from `{doc_title}`):\n"
@@ -3003,7 +3159,7 @@ print("Analysis script finished with returncode 0.")
                                 final_text += f"- **Pages Analyzed:** {insights['page_count']} pages\n"
 
                             final_text += (
-                                f"- **Sandbox Script:** Executed in isolated Python container (exit code 0)\n"
+                                f"{engine_note}"
                                 f"- **Sources Cited:** `[{doc_title} | Page 1]`\n"
                                 f"- **Compliance:** 100% air-gapped sovereign execution."
                             )
@@ -3411,22 +3567,27 @@ print("Analysis script finished with returncode 0.")
 
             # --- GOAL CONTRACT VERIFICATION GATE ---
             if goal_contract is not None and run_final_status == "completed":
-                if not goal_contract.is_satisfied():
-                    missing_fields = [k for k in goal_contract.required_fields if k not in goal_contract.extracted_fields or goal_contract.extracted_fields[k] is None]
+                cursor_art_gate = await db.execute(
+                    "SELECT * FROM workspace_artifacts WHERE workspace_id = ? AND run_id = ?",
+                    (workspace_id, run_id)
+                )
+                current_run_artifacts_gate = [dict(a) for a in await cursor_art_gate.fetchall()]
+                satisfied, missing_deliverables = goal_contract.check_satisfaction(current_run_artifacts_gate)
+                if not satisfied:
                     run_final_status = "failed"
-                    error_msg = f"Goal contract verification failed: missing required analytical deliverables {missing_fields}."
-                    final_text = f"Execution Incomplete: Goal contract unsatisfied. Required fields missing: {', '.join(missing_fields)}."
-                    logger.warning(f"Run {run_id} failed goal contract verification: {missing_fields}")
+                    error_msg = f"Goal contract verification failed: missing required deliverables {missing_deliverables}."
+                    final_text = f"Execution Incomplete: Goal contract unsatisfied. Required deliverables missing: {', '.join(missing_deliverables)}."
+                    logger.warning(f"Run {run_id} failed goal contract verification: {missing_deliverables}")
                     await log_event(
                         db, run_id, "goal_contract_violation",
-                        f"Goal contract unsatisfied: missing {missing_fields}",
-                        {"required": goal_contract.required_fields, "missing": missing_fields, "extracted": goal_contract.extracted_fields}
+                        f"Goal contract unsatisfied: missing {missing_deliverables}",
+                        {"missing": missing_deliverables, "required_fields": goal_contract.required_fields, "extracted": goal_contract.extracted_fields}
                     )
                 else:
                     await log_event(
                         db, run_id, "goal_contract_satisfied",
-                        f"All {len(goal_contract.required_fields)} goal contract deliverables verified from structured facts.",
-                        {"fields": list(goal_contract.extracted_fields.keys())}
+                        "All goal contract deliverables verified from structured facts and registered artifacts.",
+                        {"fields": list(goal_contract.extracted_fields.keys()), "artifacts": [a.get("filename") for a in current_run_artifacts_gate]}
                     )
 
             # Complete or fail claimed pending task

@@ -70,7 +70,14 @@ ANAPHORA_TRIGGERS = [
     r'\bmake\s+it\s+a\b',
     r'\banother\s+chart\b',
     r'\banother\s+visualization\b',
-    r'\banother\s+png\b'
+    r'\banother\s+png\b',
+    r'\bproper\s+audit\b',
+    r'\bin\s+(?:docx|word|pdf|excel|xlsx|spreadsheet|csv|pptx|powerpoint)\s*(?:format)?\b',
+    r'\bas\s+(?:a\s+)?(?:docx|word|pdf|excel|xlsx|spreadsheet|csv|pptx|powerpoint|report|document)\b',
+    r'\binto\s+(?:docx|word|pdf|excel|xlsx|spreadsheet|csv|pptx|powerpoint)\b',
+    r'\b(?:docx|word|pdf|excel|xlsx|pptx)\s+format\b',
+    r'\b(?:format|deliverable|export)\s+in\s+(?:docx|word|pdf|excel|xlsx|pptx)\b',
+    r'\b(?:audit|report|document|summary)\s+in\s+(?:docx|word|pdf|excel|xlsx|pptx)\b'
 ]
 ANAPHORA_PATTERN = re.compile('|'.join(ANAPHORA_TRIGGERS), re.IGNORECASE)
 

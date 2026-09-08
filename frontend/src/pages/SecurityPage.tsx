@@ -10,7 +10,8 @@ import type { SecurityStatus } from "@/types";
 
 const ITEMS: Array<[keyof SecurityStatus, string]> = [
   ["identity", "Identity"], ["device", "Device"], ["workspace", "Workspace"], ["local_ai", "Local AI"],
-  ["external_internet", "External Internet"], ["sensitive_tools", "Sensitive Tools"], ["audit_logging", "Audit Logging"],
+  ["external_internet", "External Internet"], ["network_interface", "Physical Network"],
+  ["docker_sandbox", "Execution Sandbox"], ["sensitive_tools", "Sensitive Tools"], ["audit_logging", "Audit Logging"],
 ];
 
 export function SecurityPage() {
@@ -31,11 +32,11 @@ export function SecurityPage() {
   return <div className="flex flex-col gap-6">
     <PageHeader title="Security Dashboard" description="Verified identity, device, workspace, local AI, network, approval, and audit posture." />
     {error && <div className="rounded border border-status-warning/40 bg-status-warning/10 p-3 text-xs text-status-warning">{error}</div>}
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {ITEMS.map(([key, label]) => {
         const item = status?.[key];
         if (!item || typeof item === "boolean") return null;
-        const ok = ["verified", "trusted", "authorized", "active", "blocked", "protected"].includes(item.status);
+        const ok = ["verified", "trusted", "authorized", "active", "blocked", "protected", "connected"].includes(item.status);
         return <div key={key} className={`panel p-4 ${ok ? "border-status-success/30" : "border-status-warning/40"}`}>
           <div className="flex items-center gap-2 text-xs font-mono uppercase text-ink-3">{ok ? <IconCheck className="text-status-success" /> : <IconAlertTriangle className="text-status-warning" />}{label}</div>
           <p className="mt-2 text-sm font-semibold text-ink-1">{item.label}</p>

@@ -136,10 +136,22 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
     await session.run()
 
 
+class _ExistingServer:
+    """Placeholder server reference when SMTP listener is already running in a companion process."""
+    def close(self):
+        pass
+
+    async def wait_closed(self):
+        pass
+
+    def is_serving(self):
+        return True
+
+
 async def start_local_smtp_server(
     host: str = LOCAL_SMTP_HOST,
     port: int = LOCAL_SMTP_PORT,
-) -> asyncio.AbstractServer:
+) -> Any:
     """Start local loopback SMTP server. Enforces 127.0.0.1 binding."""
     global _SERVER_INSTANCE
     if host not in ("127.0.0.1", "localhost"):
@@ -159,10 +171,19 @@ async def start_local_smtp_server(
         _SERVER_INSTANCE = None
 
     MAILBOX_DIR.mkdir(parents=True, exist_ok=True)
-    server = await asyncio.start_server(_handle_client, host, port)
-    _SERVER_INSTANCE = server
-    logger.info(f"Sovereign Local SMTP listener active on {host}:{port} (LOOPBACK ONLY)")
-    return server
+    try:
+        server = await asyncio.start_server(_handle_client, host, port)
+        _SERVER_INSTANCE = server
+        logger.info(f"Sovereign Local SMTP listener active on {host}:{port} (LOOPBACK ONLY)")
+        return server
+    except OSError as exc:
+        if "10048" in str(exc) or getattr(exc, "winerror", None) == 10048 or getattr(exc, "errno", None) in (48, 98):
+            health = await check_smtp_health(host, port)
+            if health.get("status") == "ACTIVE":
+                logger.info(f"Sovereign Local SMTP listener is already running on {host}:{port}")
+                return _ExistingServer()
+        raise
+
 
 
 async def stop_local_smtp_server() -> None:

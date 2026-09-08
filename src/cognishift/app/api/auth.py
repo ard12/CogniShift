@@ -70,10 +70,22 @@ DEMO_PERSONAS = {
 
 def _is_loopback(request: Request) -> bool:
     host = request.client.host if request.client else ""
+    if not host:
+        return False
     try:
-        return ipaddress.ip_address(host).is_loopback
+        if ipaddress.ip_address(host).is_loopback:
+            return True
     except ValueError:
-        return host.lower() == "localhost"
+        if host.lower() == "localhost":
+            return True
+    try:
+        import socket
+        local_ips = set(socket.gethostbyname_ex(socket.gethostname())[2])
+        if host in local_ips:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _demo_mode_enabled() -> bool:

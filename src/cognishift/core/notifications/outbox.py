@@ -44,7 +44,12 @@ async def persist_and_deliver_notification(
         )).fetchone()
         if existing:
             logger.info(f"Duplicate notification suppressed by dedup key {dedup_key[:12]}")
-            return existing["id"], True
+            existing_alert = await (await db.execute(
+                "SELECT id FROM offline_security_alerts WHERE related_user = ? AND alert_type = ? ORDER BY id DESC LIMIT 1",
+                (ev.target_user, composed.event_type.value),
+            )).fetchone()
+            matched_id = existing_alert["id"] if existing_alert else existing["id"]
+            return matched_id, True
 
         # Insert into offline_security_alerts
         cursor = await db.execute(
@@ -129,3 +134,53 @@ async def persist_and_deliver_notification(
         await db.commit()
 
     return alert_id, smtp_ok
+
+
+async def flush_pending_outbox() -> int:
+    """Retry delivery for pending or failed outbox notifications.
+
+    Called during application startup or periodic recovery to ensure zero dropped alerts.
+    """
+    async with get_db() as db:
+        rows = await (await db.execute(
+            "SELECT id, dedup_key, evidence_json FROM notification_outbox WHERE status IN ('pending', 'failed') AND retry_count < 5"
+        )).fetchall()
+
+    if not rows:
+        return 0
+
+    from cognishift.core.notifications.composer import compose_notification
+    from cognishift.core.notifications.recipient_policy import evaluate_routing_policy
+    from cognishift.core.notifications.schemas import NotificationEvidencePack
+
+    flushed_count = 0
+    for row in rows:
+        try:
+            ev_data = json.loads(row["evidence_json"])
+            ev = NotificationEvidencePack.model_validate(ev_data)
+            sender, recips = evaluate_routing_policy(ev)
+            composed = await compose_notification(ev, sender, recips)
+            smtp_ok = await send_internal_email(
+                sender=composed.sender,
+                recipients=composed.recipients,
+                subject=composed.subject,
+                body_text=composed.body_text,
+                body_html=composed.body_html,
+            )
+            async with get_db() as db:
+                if smtp_ok:
+                    await db.execute(
+                        "UPDATE notification_outbox SET status = 'sent', sent_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (row["id"],),
+                    )
+                    flushed_count += 1
+                else:
+                    await db.execute(
+                        "UPDATE notification_outbox SET retry_count = retry_count + 1, error_message = 'SMTP retry failed' WHERE id = ?",
+                        (row["id"],),
+                    )
+                await db.commit()
+        except Exception as exc:
+            logger.warning(f"Error flushing outbox item {row['id']}: {exc}")
+    return flushed_count
+

@@ -206,6 +206,8 @@ async def block_device_endpoint(
 @router.get("/alerts/smtp-health")
 async def get_smtp_health_endpoint(user: User = Depends(get_current_user)) -> Dict[str, Any]:
     """Check health and connectivity of the sovereign loopback SMTP listener."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
     from cognishift.core.notifications import check_smtp_health
     return await check_smtp_health()
 

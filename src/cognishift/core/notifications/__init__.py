@@ -26,6 +26,7 @@ from cognishift.core.notifications.smtp_transport import (
     start_local_smtp_server,
     stop_local_smtp_server,
 )
+from cognishift.core.notifications.outbox import flush_pending_outbox
 from cognishift.core.notifications.service import (
     dispatch_notification_for_event,
     fire_and_forget_notification,
@@ -52,6 +53,7 @@ __all__ = [
     "send_internal_email",
     "start_local_smtp_server",
     "stop_local_smtp_server",
+    "flush_pending_outbox",
     "dispatch_notification_for_event",
     "fire_and_forget_notification",
 ]

@@ -43,13 +43,14 @@ async def lifespan(app: FastAPI):
     from cognishift.app.core.device_security import restore_active_device_sessions
     await restore_active_device_sessions()
 
-    # Start local loopback SMTP server (127.0.0.1:1025)
-    from cognishift.core.notifications import start_local_smtp_server, stop_local_smtp_server
+    # Start local loopback SMTP server (127.0.0.1:1025) and flush outbox
+    from cognishift.core.notifications import flush_pending_outbox, start_local_smtp_server, stop_local_smtp_server
     try:
         await start_local_smtp_server()
+        await flush_pending_outbox()
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).warning(f"Could not start local SMTP server: {exc}")
+        logging.getLogger(__name__).warning(f"Could not start local SMTP server or flush outbox: {exc}")
             
     yield
 

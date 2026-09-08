@@ -59,14 +59,14 @@ terminals:
 
   - id: 5
     user_id: "vicky"
-    name: "Vicky (Plant Operator 2)"
-    role: "operator"
+    name: "Vicky (Tester & Plant Supervisor)"
+    role: "supervisor"
     device_hostname: "IGRIS"
     ip: "10.10.164.63"
     loopback: false
     expected_status: "approved"
-    allowed_workspaces: [1]
-    notes: "Plant telemetry & operational console"
+    allowed_workspaces: [1, 2]
+    notes: "Tester and Four-Eyes supervisor console"
 
   - id: 6
     user_id: "rohit"

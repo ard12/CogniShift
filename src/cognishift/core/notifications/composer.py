@@ -3,7 +3,7 @@
 Adheres strictly to the 3-Tier Security Notification Model:
 - Bounded 2.5-second budget for local SLM summary.
 - Automatic fallback to deterministic high-fidelity templates if model is busy, slow, or offline.
-- Guaranteed delivery: alerts are never lost or delayed.
+- Durable delivery: alerts are persisted to SQLite outbox before SMTP dispatch.
 """
 import asyncio
 import html
@@ -256,7 +256,7 @@ def _render_deterministic_html(
     </div>
     <div style="background:#090d16;padding:14px 24px;border-top:1px solid #1e293b;font-size:11px;color:#64748b;display:flex;justify-content:space-between;">
       <span>Dispatched via 127.0.0.1:1025 (Loopback Only)</span>
-      <span>Zero Cloud Egress Guaranteed</span>
+      <span>Air-Gapped Sovereign Enclave</span>
     </div>
   </div>
 </body>

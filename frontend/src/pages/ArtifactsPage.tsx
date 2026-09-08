@@ -19,6 +19,7 @@ export function ArtifactsPage() {
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (!selectedWorkspaceId) {
@@ -46,6 +47,38 @@ export function ArtifactsPage() {
       cancelled = true;
     };
   }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceId || artifacts.length === 0) {
+      setPreviewUrls({});
+      return;
+    }
+
+    let cancelled = false;
+    const createdUrls: string[] = [];
+    const imageArtifacts = artifacts.filter((artifact) =>
+      ["png", "jpg", "jpeg"].includes(artifact.artifact_type.toLowerCase()),
+    );
+
+    void Promise.all(
+      imageArtifacts.map(async (artifact) => {
+        try {
+          const url = await artifactsApi.getBlobUrl(selectedWorkspaceId, artifact.id);
+          createdUrls.push(url);
+          if (!cancelled) {
+            setPreviewUrls((current) => ({ ...current, [artifact.id]: url }));
+          }
+        } catch {
+          // The list remains usable when a protected preview is unavailable.
+        }
+      }),
+    );
+
+    return () => {
+      cancelled = true;
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [artifacts, selectedWorkspaceId]);
 
   async function handleDownload(artifact: Artifact) {
     if (!selectedWorkspaceId) return;
@@ -118,7 +151,22 @@ export function ArtifactsPage() {
                     );
                   })
                   .map((artifact) => (
-                    <li key={artifact.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/30 transition">
+                    <li key={artifact.id} className="flex items-start gap-3 px-4 py-3 hover:bg-surface-2/30 transition">
+                      {previewUrls[artifact.id] && (
+                        <a
+                          href={previewUrls[artifact.id]}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="shrink-0 rounded border border-surface-border bg-surface-1 p-1"
+                          title={`Open preview of ${artifact.filename}`}
+                        >
+                          <img
+                            src={previewUrls[artifact.id]}
+                            alt={artifact.title || artifact.filename}
+                            className="h-24 w-36 object-contain"
+                          />
+                        </a>
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-semibold text-ink-1">

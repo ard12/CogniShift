@@ -163,11 +163,10 @@ async def list_demo_personas():
 
 @router.get("/demo-status", response_model=DemoModeResponse)
 async def get_demo_status(request: Request):
-    """Advertise demo convenience login only to a loopback browser."""
-    enabled = _demo_mode_enabled() and _is_loopback(request)
+    """Advertise demo convenience login only to a loopback browser (permanently disabled for sovereign evaluation)."""
     return DemoModeResponse(
-        enabled=enabled,
-        session_ttl_seconds=settings.demo_session_ttl_seconds if enabled else 0,
+        enabled=False,
+        session_ttl_seconds=0,
     )
 
 

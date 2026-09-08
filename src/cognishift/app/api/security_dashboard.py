@@ -37,23 +37,50 @@ async def security_status(workspace_id: int, request: Request, user: User = Depe
     import shutil
     import psutil
     from pathlib import Path
+    from cognishift.app.core.device_security import (
+        approve_device as ds_approve_device,
+        revoke_device as ds_revoke_device,
+        block_device as ds_block_device,
+    )
 
     # Docker sandbox detection
-    docker_bin = shutil.which("docker")
-    docker_label = "Docker Engine Active" if docker_bin else "Simulated Process Sandbox"
-    docker_evidence = f"Binary: {Path(docker_bin).name}" if docker_bin else "Subprocess isolation active"
+    docker_bin = shutil.which(settings.sandbox_runtime) or shutil.which("docker")
+    if docker_bin:
+        docker_status = "active"
+        docker_label = "Docker Engine Active"
+        docker_evidence = f"Binary: {Path(docker_bin).name}"
+    elif settings.operating_mode == "simulated" or settings.sandbox_runtime == "simulated":
+        docker_status = "active"
+        docker_label = "Simulated Process Sandbox"
+        docker_evidence = "Subprocess isolation / test mode active"
+    else:
+        docker_status = "unavailable"
+        docker_label = "Container Sandbox Unavailable"
+        docker_evidence = f"Runtime '{settings.sandbox_runtime}' not found on host"
 
     # Physical network interface detection
     active_ifaces = []
+    iface_error = False
     try:
         stats = psutil.net_if_stats()
         for if_name, if_stat in stats.items():
             if not if_name.lower().startswith("loopback") and if_stat.isup:
                 active_ifaces.append(if_name)
     except Exception:
-        pass
-    iface_label = f"Interface Connected ({active_ifaces[0]})" if active_ifaces else "Interfaces Disconnected"
-    iface_evidence = f"Active: {', '.join(active_ifaces[:2])}" if active_ifaces else "Physical interface inactive"
+        iface_error = True
+
+    if iface_error:
+        iface_status = "unknown"
+        iface_label = "Interface Status Unknown"
+        iface_evidence = "Interface inspection failed"
+    elif active_ifaces:
+        iface_status = "connected"
+        iface_label = f"Interface Connected ({active_ifaces[0]})"
+        iface_evidence = f"Active: {', '.join(active_ifaces[:2])}"
+    else:
+        iface_status = "disconnected"
+        iface_label = "Interfaces Disconnected"
+        iface_evidence = "Physical interface inactive"
 
     return {
         "identity": {"status": "verified", "label": "Verified", "evidence": user.user_id},
@@ -70,12 +97,12 @@ async def security_status(workspace_id: int, request: Request, user: User = Depe
             "evidence": f"Network policy: {policy.mode.value}",
         },
         "network_interface": {
-            "status": "connected" if active_ifaces else "not_verified",
+            "status": iface_status,
             "label": iface_label,
             "evidence": iface_evidence,
         },
         "docker_sandbox": {
-            "status": "active" if docker_bin else "not_verified",
+            "status": docker_status,
             "label": docker_label,
             "evidence": docker_evidence,
         },
@@ -89,25 +116,39 @@ async def security_status(workspace_id: int, request: Request, user: User = Depe
     }
 
 
+@router.get("/devices")
+async def list_all_devices(user: User = Depends(get_current_user)) -> List[Dict[str, Any]]:
+    if user.role != "administrator":
+        raise HTTPException(status_code=403, detail="Administrator role required.")
+    async with get_db() as db:
+        rows = await (await db.execute(
+            "SELECT id, device_id, user_id, display_name, key_fingerprint, status, approved_by, "
+            "approved_at, last_verified_at, last_ip, revoked_at, blocked_at, created_at "
+            "FROM trusted_devices ORDER BY created_at DESC"
+        )).fetchall()
+        return [dict(row) for row in rows]
+
+
 @router.get("/devices/pending")
 async def pending_devices(user: User = Depends(get_current_user)) -> List[Dict[str, Any]]:
     if user.role != "administrator":
         raise HTTPException(status_code=403, detail="Administrator role required.")
     async with get_db() as db:
         rows = await (await db.execute(
-            "SELECT device_id,user_id,display_name,key_fingerprint,created_at FROM trusted_devices WHERE status='pending' ORDER BY created_at"
+            "SELECT device_id,user_id,display_name,key_fingerprint,last_ip,created_at FROM trusted_devices WHERE status='pending' ORDER BY created_at"
         )).fetchall()
         return [dict(row) for row in rows]
 
 
 @router.post("/devices/{device_id}/approve")
-async def approve_device(
+async def approve_device_endpoint(
     device_id: str,
     user_id: Optional[str] = None,
     user: User = Depends(get_current_user),
 ) -> Dict[str, str]:
     if user.role != "administrator":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    from cognishift.app.core.device_security import approve_device as ds_approve_device
     async with get_db() as db:
         if user_id:
             row = await (await db.execute(
@@ -124,13 +165,35 @@ async def approve_device(
             row = rows[0] if rows else None
         if not row:
             raise HTTPException(status_code=404, detail="Pending device not found.")
-        await db.execute(
-            "UPDATE trusted_devices SET status='approved',approved_by=?,approved_at=CURRENT_TIMESTAMP WHERE device_id=? AND user_id=?",
-            (user.user_id, device_id, row["user_id"]),
-        )
-        await db.execute(
-            "INSERT INTO audit_events (actor_id,action,resource_type,details,result) VALUES (?,'trusted_device_approved','trusted_device',?,'success')",
-            (user.user_id, f"Approved device_id={device_id} for user={row['user_id']}"),
-        )
-        await db.commit()
-    return {"status": "approved", "device_id": device_id, "user_id": row["user_id"]}
+        target_user_id = row["user_id"]
+
+    success = await ds_approve_device(device_id, target_user_id, user.user_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to approve device.")
+    return {"status": "approved", "device_id": device_id, "user_id": target_user_id}
+
+
+@router.post("/devices/{device_id}/revoke")
+async def revoke_device_endpoint(
+    device_id: str,
+    user_id: Optional[str] = None,
+    user: User = Depends(get_current_user),
+) -> Dict[str, str]:
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    from cognishift.app.core.device_security import revoke_device as ds_revoke_device
+    await ds_revoke_device(device_id, user_id, user.user_id)
+    return {"status": "revoked", "device_id": device_id, "user_id": user_id or "all"}
+
+
+@router.post("/devices/{device_id}/block")
+async def block_device_endpoint(
+    device_id: str,
+    user_id: Optional[str] = None,
+    user: User = Depends(get_current_user),
+) -> Dict[str, str]:
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    from cognishift.app.core.device_security import block_device as ds_block_device
+    await ds_block_device(device_id, user_id, user.user_id)
+    return {"status": "blocked", "device_id": device_id, "user_id": user_id or "all"}

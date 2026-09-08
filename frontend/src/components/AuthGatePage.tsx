@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { InlineError } from "@/components/ui/States";
 
 export function AuthGatePage() {
-  const { signIn, signInDemo, verifying, error, deviceStatus } = useAuth();
+  const { signIn, signInDemo, verifying, error, deviceStatus, retryVerification } = useAuth();
   const [tokenInput, setTokenInput] = useState("");
 
   async function handleSubmit(e: FormEvent) {
@@ -77,7 +77,21 @@ export function AuthGatePage() {
 
           {error && (
             deviceStatus === "unknown" ? (
-              <div className="rounded border border-status-warning/50 bg-status-warning/10 p-3 font-mono text-xs leading-6 text-status-warning whitespace-pre-line">{error}</div>
+              <div className="rounded border border-status-warning/50 bg-status-warning/10 p-3 font-mono text-xs leading-6 text-status-warning whitespace-pre-line">
+                {error}
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={verifying}
+                    onClick={() => void retryVerification()}
+                    className="w-full border-status-warning/50 text-status-warning hover:bg-status-warning/20 font-sans text-xs"
+                  >
+                    Retry Device Verification
+                  </Button>
+                </div>
+              </div>
             ) : <InlineError message={error} />
           )}
 

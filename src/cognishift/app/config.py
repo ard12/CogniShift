@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     max_raster_dpi: int = 150
     max_concurrent_ocr: int = 2
     max_concurrent_vision: int = 1
+    max_concurrent_model_requests: int = 1
     ocr_page_timeout: int = 60
     document_processing_timeout: int = 300
     vision_max_pages_per_doc: int = 5

@@ -445,9 +445,8 @@ def get_sandbox_backend() -> SandboxBackend:
     if settings.operating_mode == "simulated" or settings.sandbox_runtime == "simulated":
         return SimulatedSandboxBackend()
     if not shutil.which(settings.sandbox_runtime):
-        logger.warning(
-            f"Container runtime '{settings.sandbox_runtime}' not found on host PATH. "
-            f"Falling back to sovereign SimulatedSandboxBackend for offline operation."
+        raise SandboxUnavailableError(
+            f"Container runtime '{settings.sandbox_runtime}' is not installed or available on host. "
+            f"Host code execution fallback is strictly prohibited by security policy."
         )
-        return SimulatedSandboxBackend()
     return DockerPodmanBackend()

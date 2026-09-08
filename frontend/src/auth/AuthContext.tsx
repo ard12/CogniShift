@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sovereignty, setSovereignty] = useState<SovereigntyStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deviceStatus, setDeviceStatus] = useState<"trusted" | "unknown" | "not_verified">("not_verified");
+  const [candidateToken, setCandidateToken] = useState<string | null>(null);
 
   const verify = useCallback(async (candidate: string): Promise<boolean> => {
     setVerifying(true);
@@ -44,19 +45,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const status = await systemApi.sovereignty(candidate);
       setSovereignty(status);
       setToken(candidate);
+      setCandidateToken(null);
       setStoredToken(candidate);
       localStorage.removeItem(DEMO_SESSION_KEY);
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 403 && typeof err.detail === "object" && err.detail && (err.detail as {code?: string}).code === "UNKNOWN_DEVICE") {
         setDeviceStatus("unknown");
+        setCandidateToken(candidate);
         setError("⚠ Unknown Device\nCredentials Verified\nDevice Verification Failed\nAdministrator Approval Required");
-      } else if (err instanceof ApiError && err.status === 401) {
-        setError("That token was not recognized. Check the credential and try again.");
-      } else if (err instanceof ApiError) {
-        setError(err.message);
       } else {
-        setError("Could not reach the CogniShift backend. Is the server running?");
+        setCandidateToken(null);
+        if (err instanceof ApiError && err.status === 401) {
+          setError("That token was not recognized. Check the credential and try again.");
+        } else if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError("Could not reach the CogniShift backend. Is the server running?");
+        }
       }
       setToken(null);
       setDeviceSession(null);
@@ -67,6 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setVerifying(false);
     }
   }, []);
+
+  const retryVerification = useCallback(async (): Promise<boolean> => {
+    if (!candidateToken) return false;
+    return await verify(candidateToken);
+  }, [candidateToken, verify]);
 
   const signInDemo = useCallback(async (personaId: string) => {
     setVerifying(true);
@@ -140,8 +151,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInDemo,
       signOut,
       refreshSovereignty,
+      retryVerification,
     }),
-    [token, ready, verifying, sovereignty, error, deviceStatus, signIn, signInDemo, signOut, refreshSovereignty]
+    [token, ready, verifying, sovereignty, error, deviceStatus, signIn, signInDemo, signOut, refreshSovereignty, retryVerification]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

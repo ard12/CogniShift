@@ -94,7 +94,16 @@ def _credential_user(request: Request) -> User:
 async def create_device_challenge(payload: DeviceChallengeRequest, request: Request):
     """Verify credentials, then challenge an approved browser-held public key."""
     user = _credential_user(request)
-    result = await begin_challenge(user.user_id, user.role, payload.device_id, payload.display_name, payload.public_key_jwk)
+    client_ip = request.client.host if request.client else None
+    result = await begin_challenge(
+        user.user_id,
+        user.role,
+        payload.device_id,
+        payload.display_name,
+        payload.public_key_jwk,
+        is_loopback=_is_loopback(request),
+        client_ip=client_ip,
+    )
     if result["status"] != "challenge":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -104,6 +113,7 @@ async def create_device_challenge(payload: DeviceChallengeRequest, request: Requ
                 "credentials": "Credentials Verified",
                 "device": "Device Verification Failed",
                 "action": "Administrator Approval Required",
+                "device_status": result.get("status", "unknown_device"),
             },
         )
     return DeviceChallengeResponse(**result)

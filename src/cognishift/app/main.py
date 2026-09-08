@@ -37,6 +37,10 @@ async def lifespan(app: FastAPI):
         if not await cursor.fetchone():
             await db.execute("INSERT INTO workspaces (id, name, description) VALUES (1, 'Main Refinery Workspace', 'Default workspace')")
             await db.commit()
+
+    # Restore active device sessions from database
+    from cognishift.app.core.device_security import restore_active_device_sessions
+    await restore_active_device_sessions()
             
     yield
 
@@ -52,6 +56,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8000",
         "http://127.0.0.1:8000",
+        "https://localhost:8443",
+        "https://127.0.0.1:8443",
+        "https://10.10.182.228:8443",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",

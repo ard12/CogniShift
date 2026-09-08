@@ -262,7 +262,8 @@ def build_visualization_specs(
             query=query,
             primary_spec=spec1
         )
-        specs.append(spec2)
+        if spec2 is not None:
+            specs.append(spec2)
 
     return specs
 
@@ -472,7 +473,7 @@ def _generate_secondary_spec(
     contract: ArtifactRequestContract,
     query: str,
     primary_spec: VisualizationSpec
-) -> VisualizationSpec:
+) -> Optional[VisualizationSpec]:
     """Builds a distinct secondary visualization spec when 2 charts are requested."""
     stem = file_path.stem
     primary_x = primary_spec.x_column
@@ -524,28 +525,5 @@ def _generate_secondary_spec(
             }
         )
 
-    # Fallback to downtime or row frequency
-    x_vals = primary_spec.x_values
-    reversed_vals = list(reversed(list(primary_spec.series.values())[0]))
-    return VisualizationSpec(
-        title=f"Secondary Operational Trend: {primary_spec.title}",
-        source_file=file_path.name,
-        source_sheet=sheet_name,
-        chart_type=ChartType.LINE,
-        x_column=primary_spec.x_column,
-        y_columns=["Trend Metric"],
-        x_values=x_vals,
-        series={"Trend Metric": reversed_vals},
-        x_label=primary_spec.x_label,
-        y_label="Trend Metric",
-        output_filename=f"{stem}_secondary_trend.png",
-        provenance={
-            "source_file": file_path.name,
-            "source_sheet": sheet_name,
-            "x_column": primary_spec.x_column,
-            "y_columns": ["Trend Metric"],
-            "transformation": "SECONDARY_SEQUENCE",
-            "chart_type": "line",
-            "row_count": len(x_vals)
-        }
-    )
+    # Return None if no legitimate independent second chart can be derived (fail closed)
+    return None

@@ -186,15 +186,12 @@ async def get_current_user(request: Request) -> User:
     """
     auth_header = request.headers.get("Authorization", "").strip()
     api_key = request.headers.get("X-API-Key", "").strip()
-    query_token = request.query_params.get("token", "").strip()
     token = ""
 
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
     elif api_key:
         token = api_key
-    elif query_token:
-        token = query_token
 
     if not token:
         raise HTTPException(

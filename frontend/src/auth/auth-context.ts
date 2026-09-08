@@ -19,6 +19,7 @@ export interface AuthContextValue {
   signInDemo: (personaId: string) => Promise<boolean>;
   signOut: () => void;
   refreshSovereignty: () => Promise<void>;
+  retryVerification: () => Promise<boolean>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

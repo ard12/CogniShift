@@ -136,68 +136,100 @@ async def init_db() -> None:
 
         await db.execute('''
             CREATE TABLE IF NOT EXISTS trusted_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 device_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
-                display_name TEXT NOT NULL,
+                display_name TEXT,
                 public_key_jwk TEXT NOT NULL,
                 key_fingerprint TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 approved_by TEXT,
                 approved_at TIMESTAMP,
                 last_verified_at TIMESTAMP,
+                last_ip TEXT,
+                revoked_at TIMESTAMP,
+                blocked_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (device_id, user_id)
+                UNIQUE(user_id, device_id)
             )
         ''')
 
-        # Older databases used device_id as the sole primary key. A browser key
-        # represents a physical browser profile and may legitimately be approved
-        # for more than one application user. Migrate in place so switching demo
-        # personas cannot collide on the old primary key and surface as HTTP 500.
-        trusted_device_columns = await (await db.execute("PRAGMA table_info(trusted_devices)")).fetchall()
-        trusted_device_pk = [
-            row[1] for row in sorted(trusted_device_columns, key=lambda item: item[5]) if row[5]
-        ]
-        if trusted_device_pk == ["device_id"]:
-            await db.execute("ALTER TABLE trusted_devices RENAME TO trusted_devices_legacy")
+        # Idempotent migration for trusted_devices columns
+        trusted_device_columns = {
+            row[1]: row for row in await (await db.execute("PRAGMA table_info(trusted_devices)")).fetchall()
+        }
+        if "id" not in trusted_device_columns:
+            await db.execute("ALTER TABLE trusted_devices RENAME TO trusted_devices_migration_legacy")
             await db.execute('''
                 CREATE TABLE trusted_devices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     device_id TEXT NOT NULL,
                     user_id TEXT NOT NULL,
-                    display_name TEXT NOT NULL,
+                    display_name TEXT,
                     public_key_jwk TEXT NOT NULL,
                     key_fingerprint TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',
                     approved_by TEXT,
                     approved_at TIMESTAMP,
                     last_verified_at TIMESTAMP,
+                    last_ip TEXT,
+                    revoked_at TIMESTAMP,
+                    blocked_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (device_id, user_id)
+                    UNIQUE(user_id, device_id)
                 )
             ''')
             await db.execute('''
                 INSERT INTO trusted_devices (
-                    device_id,user_id,display_name,public_key_jwk,key_fingerprint,
-                    status,approved_by,approved_at,last_verified_at,created_at
+                    device_id, user_id, display_name, public_key_jwk, key_fingerprint,
+                    status, approved_by, approved_at, last_verified_at, created_at
                 )
-                SELECT device_id,user_id,display_name,public_key_jwk,key_fingerprint,
-                       status,approved_by,approved_at,last_verified_at,created_at
-                FROM trusted_devices_legacy
+                SELECT device_id, user_id, display_name, public_key_jwk, key_fingerprint,
+                       status, approved_by, approved_at, last_verified_at, created_at
+                FROM trusted_devices_migration_legacy
             ''')
-            await db.execute("DROP TABLE trusted_devices_legacy")
+            await db.execute("DROP TABLE trusted_devices_migration_legacy")
+        else:
+            if "last_ip" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN last_ip TEXT")
+            if "revoked_at" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN revoked_at TIMESTAMP")
+            if "blocked_at" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN blocked_at TIMESTAMP")
+
         await db.execute("CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id, status)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_trusted_devices_fingerprint ON trusted_devices(key_fingerprint)")
 
         await db.execute('''
             CREATE TABLE IF NOT EXISTS device_challenges (
                 challenge_id TEXT PRIMARY KEY,
                 device_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
+                key_fingerprint TEXT,
                 challenge_b64 TEXT NOT NULL,
                 expires_at REAL NOT NULL,
                 used INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        challenge_cols = {
+            row[1]: row for row in await (await db.execute("PRAGMA table_info(device_challenges)")).fetchall()
+        }
+        if "key_fingerprint" not in challenge_cols:
+            await db.execute("ALTER TABLE device_challenges ADD COLUMN key_fingerprint TEXT")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS active_device_sessions (
+                session_hash TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                key_fingerprint TEXT NOT NULL,
+                expires_at REAL NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_device_sessions_user_dev ON active_device_sessions(user_id, device_id)")
 
         await db.execute('''
             CREATE TABLE IF NOT EXISTS graph_nodes (

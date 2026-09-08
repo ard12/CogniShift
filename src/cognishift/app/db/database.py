@@ -135,6 +135,34 @@ async def init_db() -> None:
         ''')
 
         await db.execute('''
+            CREATE TABLE IF NOT EXISTS trusted_devices (
+                device_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                public_key_jwk TEXT NOT NULL,
+                key_fingerprint TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                approved_by TEXT,
+                approved_at TIMESTAMP,
+                last_verified_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id, status)")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS device_challenges (
+                challenge_id TEXT PRIMARY KEY,
+                device_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                challenge_b64 TEXT NOT NULL,
+                expires_at REAL NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        await db.execute('''
             CREATE TABLE IF NOT EXISTS graph_nodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 workspace_id INTEGER NOT NULL REFERENCES workspaces(id),

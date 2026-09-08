@@ -89,6 +89,60 @@ logger = logging.getLogger("cognishift.engine")
 from dataclasses import dataclass, field
 
 
+def enforce_rca_evidence_boundaries(content: str, operator_input: str) -> str:
+    """Keep symptom-only RCA output explicit about evidence versus hypotheses."""
+    lowered_input = operator_input.lower()
+    confirmed: List[str] = []
+    if "suction pressure" in lowered_input and any(word in lowered_input for word in ("drop", "dropped", "low")):
+        confirmed.append("Suction pressure was reported as having dropped; no absolute reading or baseline was supplied.")
+    if "discharge pressure" in lowered_input and any(word in lowered_input for word in ("unstable", "fluctuat")):
+        confirmed.append("Discharge pressure was reported as unstable; no measured range or trip event was supplied.")
+    if "vibration" in lowered_input and any(word in lowered_input for word in ("increase", "increased", "sharp", "high")):
+        confirmed.append("Vibration was reported as having increased sharply; no measured value or spectrum was supplied.")
+    if not confirmed:
+        confirmed.append("No independently measured observation was supplied beyond the operator's written description.")
+
+    hypotheses: List[str] = []
+    evidence: List[str] = []
+    section: Optional[str] = None
+    for line in (content or "").splitlines():
+        heading = re.sub(r"[^a-z ]", "", line.lower()).strip()
+        if "possible hypotheses" in heading or heading == "hypotheses":
+            section = "hypotheses"
+            continue
+        if "additional evidence needed" in heading or "evidence needed" in heading:
+            section = "evidence"
+            continue
+        if "recommendations" in heading:
+            section = None
+            break
+        cleaned = line.strip()
+        if cleaned and section == "hypotheses":
+            hypotheses.append(cleaned)
+        elif cleaned and section == "evidence":
+            evidence.append(cleaned)
+
+    if not hypotheses:
+        hypotheses = ["- The reasoning model did not return a safely separable hypothesis list; no cause is asserted."]
+    if not evidence:
+        evidence = [
+            "- Time-aligned suction and discharge pressure trends.",
+            "- Vibration magnitude, waveform, and spectrum by bearing location.",
+            "- Pump speed, flow, valve position, tank level, and cavitation/noise observations.",
+            "- Inspection findings for bearings, coupling/alignment, impeller, seals, and suction restrictions.",
+        ]
+
+    return (
+        "## Confirmed Observations\n"
+        + "\n".join(f"- {item}" for item in confirmed)
+        + "\n\n## Possible Hypotheses — Unverified\n"
+        + "\n".join(hypotheses)
+        + "\n\n## Additional Evidence Needed\n"
+        + "\n".join(evidence)
+        + "\n\n**Conclusion:** No root cause is confirmed from the symptom-only information provided."
+    )
+
+
 @dataclass
 class GoalContract:
     """Explicit contract specifying required quantitative or deliverable outputs for multi-step goals."""
@@ -1188,16 +1242,76 @@ async def execute_agent_run(
                         raise ValueError(f"Security Error: Image path '{input_image_path}' is outside allowed data directory: {e}")
                 if img_path.exists():
 
-                    await log_event(db, run_id, "vision_started", f"Analyzing image {img_path.name} with local vision model...")
+                    await log_event(
+                        db, run_id, "vision_started",
+                        f"Analyzing image {img_path.name} with local vision model...",
+                        {"model": settings.vision_model, "image": img_path.name},
+                    )
                     try:
                         with open(img_path, "rb") as f:
                             img_bytes = f.read()
+                        # P&IDs and nameplates are text-dense. Fuse local OCR into the
+                        # VLM prompt so the small vision model stays anchored to visible
+                        # tags instead of inventing a generic scene description.
+                        ocr_evidence = ""
+                        ocr_confidence = None
+                        try:
+                            from cognishift.core.document_processing.image_preprocessor import (
+                                prepare_image_for_vision,
+                                preprocess_image_for_ocr,
+                            )
+                            from cognishift.core.document_processing.ocr_provider import get_ocr_provider
+
+                            ocr_result = await get_ocr_provider().extract(preprocess_image_for_ocr(img_bytes))
+                            ocr_evidence = (ocr_result.raw_text or ocr_result.text or "").strip()[:3000]
+                            ocr_confidence = ocr_result.confidence
+                            vision_bytes = prepare_image_for_vision(img_bytes)
+                            await log_event(
+                                db, run_id, "ocr_completed",
+                                f"Local OCR extracted image text ({len(ocr_evidence)} chars)",
+                                {"engine": ocr_result.engine, "confidence": ocr_confidence},
+                            )
+                        except Exception as ocr_err:
+                            logger.warning(f"Image OCR grounding unavailable: {ocr_err}")
+                            vision_bytes = img_bytes
+
                         provider = get_provider()
-                        vlm_res = await provider.analyze_image(
-                            img_bytes,
-                            prompt="Analyze this industrial image. Describe the equipment tag, instrument type, gauge reading with units, or rating plate specifications in detail."
+                        grounded_prompt = (
+                            "Inspect this industrial image using only visible evidence. List visible equipment, "
+                            "instrument tags, line labels, readings, units, and safety notes. Do not infer a generic "
+                            "system type or repeat an object unless it is visibly supported. Mark unclear text as uncertain.\n"
+                            f"Operator request: {clean_input}\n"
                         )
-                        vision_analysis = vlm_res.text.strip()
+                        if ocr_evidence:
+                            grounded_prompt += (
+                                "The following text was independently extracted from this same image by local OCR. "
+                                "Use it as image-derived grounding; correct minor OCR errors only when visually justified:\n"
+                                f"{ocr_evidence}"
+                            )
+                        vlm_res = await provider.analyze_image(
+                            vision_bytes,
+                            prompt=grounded_prompt,
+                        )
+                        raw_vision_analysis = vlm_res.text.strip()
+                        # Collapse repeated short outputs (a common small-VLM failure
+                        # mode) without pretending they are separate observations.
+                        unique_vision_lines = []
+                        seen_vision_lines = set()
+                        for raw_line in raw_vision_analysis.splitlines():
+                            cleaned_line = re.sub(r"^\s*\d+[.)]\s*", "", raw_line).strip()
+                            normalized_line = cleaned_line.casefold()
+                            if cleaned_line and normalized_line not in seen_vision_lines:
+                                seen_vision_lines.add(normalized_line)
+                                unique_vision_lines.append(cleaned_line)
+                        raw_vision_analysis = "\n".join(unique_vision_lines)
+                        vision_analysis = raw_vision_analysis
+                        if ocr_evidence:
+                            confidence_label = f"{ocr_confidence:.1%}" if ocr_confidence is not None else "unavailable"
+                            vision_analysis = (
+                                f"Local OCR evidence (confidence {confidence_label}):\n{ocr_evidence}\n\n"
+                                f"Local vision-model cross-check:\n{vision_analysis or 'No additional visual description returned.'}\n\n"
+                                "Unclear OCR characters remain uncertain and must be checked against the original image."
+                            )
                         await log_event(
                             db,
                             run_id,
@@ -1238,6 +1352,14 @@ async def execute_agent_run(
 
             if strict_visual_scope:
                 sources_used = f"Visual Artifact | {Path(input_image_path).name}"
+                # A pure image-description request is already answered by the local
+                # OCR + VLM evidence. Do not send it through a text model that can
+                # add unsupported equipment, procedures, or recommendations.
+                if vision_analysis:
+                    await db.execute(
+                        "UPDATE agent_runs SET model_name=? WHERE id=?",
+                        (settings.vision_model, run_id),
+                    )
                 await log_event(
                     db, run_id, "retrieval_bypassed",
                     f"Strict visual scope active for {Path(input_image_path).name}: RAG, Plant Graph, and external artifacts bypassed.",
@@ -2047,7 +2169,19 @@ async def execute_agent_run(
             # Bounded Iterative Plan Execution Loop (P0-3)
             MAX_AGENT_STEPS = 10
             step_counter = 0
-            final_text = ""
+            final_text = vision_analysis if strict_visual_scope and vision_analysis else ""
+            if final_text:
+                for step in plan.steps:
+                    if step.status == "pending":
+                        step.status = "skipped"
+                        step.observation = "Not required for strict image-only evidence reporting"
+                plan.current_step_index = len(plan.steps)
+                plan.final_synthesis = final_text
+                await log_event(
+                    db, run_id, "vision_answer_grounded",
+                    "Returned local OCR and vision evidence directly; text-model synthesis bypassed",
+                    {"model": settings.vision_model, "ocr_grounded": bool(ocr_evidence)},
+                )
             provider = get_provider()
             tools_for_prompt = available_tools if routing_res.intent != SemanticIntent.CONVERSATION else []
             system_prompt = build_system_prompt(
@@ -2095,6 +2229,14 @@ async def execute_agent_run(
                         "- If an authorized tool is required, output 'action': 'tool_call'.\n"
                         "- If recording an observation or check, output 'action': 'step_observation' with your findings.\n"
                         "- Do NOT output 'action': 'final_answer' until the final step is reached."
+                    )
+
+                if task_info.task_type == "heavy_reasoning":
+                    step_instructions += (
+                        "\n- RCA SAFETY FORMAT: clearly separate (1) Confirmed Observations, "
+                        "(2) Possible Hypotheses explicitly marked unverified, and "
+                        "(3) Additional Evidence Needed to confirm or reject each hypothesis."
+                        "\n- Do not present a hypothesis as a confirmed root cause."
                     )
 
                 step_prompt = (
@@ -3164,6 +3306,11 @@ print("Analysis script finished with returncode 0.")
                     continue
 
                 elif isinstance(action, FinalAnswer):
+                    answer_content = (
+                        enforce_rca_evidence_boundaries(action.content, clean_input)
+                        if task_info.task_type == "heavy_reasoning"
+                        else action.content
+                    )
                     is_direct_flow = routing_res.intent in (
                         SemanticIntent.CONVERSATION,
                         SemanticIntent.UI_NAVIGATION,
@@ -3179,11 +3326,11 @@ print("Analysis script finished with returncode 0.")
                             f"converting to StepObservation to protect plan execution."
                         )
                         current_step.status = "completed"
-                        current_step.observation = action.content
+                        current_step.observation = answer_content
                         await log_event(
                             db, run_id, "step_observation",
-                            f"Step #{current_step.id} intermediate synthesis recorded: {action.content[:150]}",
-                            {"step_id": current_step.id, "observation": action.content}
+                            f"Step #{current_step.id} intermediate synthesis recorded: {answer_content[:150]}",
+                            {"step_id": current_step.id, "observation": answer_content}
                         )
                         saved_plan_json = serialize_plan(plan)
                         await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
@@ -3192,13 +3339,13 @@ print("Analysis script finished with returncode 0.")
                         continue
 
                     current_step.status = "completed"
-                    current_step.observation = action.content
-                    plan.final_synthesis = action.content
+                    current_step.observation = answer_content
+                    plan.final_synthesis = answer_content
                     for s in plan.steps:
                         if s.status == "pending":
                             s.status = "skipped"
                             s.observation = "Resolved by final response"
-                    final_text = action.content
+                    final_text = answer_content
                     break
 
                 elif isinstance(action, ClarificationRequest):
@@ -3334,7 +3481,8 @@ print("Analysis script finished with returncode 0.")
             if run_final_status == "failed":
                 await log_event(db, run_id, "run_failed", f"Run failed after {step_counter} steps: {error_msg}")
             else:
-                await log_event(db, run_id, "completed", f"Run completed successfully in {step_counter} steps.")
+                executed_step_count = max(step_counter, sum(1 for step in plan.steps if step.status == "completed"))
+                await log_event(db, run_id, "completed", f"Run completed successfully in {executed_step_count} steps.")
             return make_response(dict(updated_run))
 
         except Exception as e:

@@ -152,6 +152,13 @@ def authenticate_token(raw_token: str) -> Optional[User]:
     return None
 
 
+def is_ephemeral_demo_token(raw_token: str) -> bool:
+    """Return whether a credential belongs to a live loopback demo session."""
+    token_hash = hash_token(raw_token)
+    session = EPHEMERAL_DEMO_SESSIONS.get(token_hash)
+    return bool(session and session[1] > time.time())
+
+
 def create_ephemeral_demo_session(user: User, ttl_seconds: Optional[int] = None) -> tuple[str, int]:
     """Create a random, process-local demo credential that is never written to disk."""
     ttl = max(60, min(ttl_seconds or settings.demo_session_ttl_seconds, 3600))
@@ -204,6 +211,26 @@ async def get_current_user(request: Request) -> User:
             detail="Invalid or unrecognized authentication token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    request.state.identity_verified = True
+    request.state.device_trusted = False
+    request.state.device_id = None
+    if settings.trusted_device_required and not is_ephemeral_demo_token(token):
+        from cognishift.app.core.device_security import validate_device_session
+        device_id = validate_device_session(request.headers.get("X-Device-Session", "").strip(), user.user_id)
+        if not device_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "UNKNOWN_DEVICE",
+                    "title": "⚠ Unknown Device",
+                    "credentials": "Credentials Verified",
+                    "device": "Device Verification Failed",
+                    "action": "Administrator Approval Required",
+                },
+            )
+        request.state.device_trusted = True
+        request.state.device_id = device_id
 
     return user
 

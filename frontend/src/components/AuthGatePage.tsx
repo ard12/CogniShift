@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { InlineError } from "@/components/ui/States";
 
 export function AuthGatePage() {
-  const { signIn, verifying, error } = useAuth();
+  const { signIn, signInDemo, verifying, error, deviceStatus } = useAuth();
   const [tokenInput, setTokenInput] = useState("");
 
   async function handleSubmit(e: FormEvent) {
@@ -34,7 +34,7 @@ export function AuthGatePage() {
               autoComplete="off"
               spellCheck={false}
               className="input font-mono"
-              placeholder="zara, rohit, sitanshu…"
+              placeholder="Paste an issued access token"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               autoFocus
@@ -45,26 +45,26 @@ export function AuthGatePage() {
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setTokenInput("zara"); void signIn("zara"); }}
+                  onClick={() => { setTokenInput(""); void signInDemo("operator"); }}
                   className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-brand hover:bg-brand/10 transition"
                 >
-                  <span className="block font-bold text-brand">Zara</span>
+                  <span className="block font-bold text-brand">Sam</span>
                   <span className="text-[10px] text-ink-3">Operator</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setTokenInput("rohit"); void signIn("rohit"); }}
+                  onClick={() => { setTokenInput(""); void signInDemo("supervisor"); }}
                   className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-status-warning hover:bg-status-warning/10 transition"
                 >
-                  <span className="block font-bold text-status-warning">Rohit</span>
+                  <span className="block font-bold text-status-warning">Jane</span>
                   <span className="text-[10px] text-ink-3">Supervisor</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setTokenInput("sitanshu"); void signIn("sitanshu"); }}
+                  onClick={() => { setTokenInput(""); void signInDemo("administrator"); }}
                   className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-status-knowledge hover:bg-status-knowledge/10 transition"
                 >
-                  <span className="block font-bold text-status-knowledge">Sitanshu</span>
+                  <span className="block font-bold text-status-knowledge">Rohit</span>
                   <span className="text-[10px] text-ink-3">Admin</span>
                 </button>
               </div>
@@ -75,7 +75,11 @@ export function AuthGatePage() {
             </p>
           </div>
 
-          {error && <InlineError message={error} />}
+          {error && (
+            deviceStatus === "unknown" ? (
+              <div className="rounded border border-status-warning/50 bg-status-warning/10 p-3 font-mono text-xs leading-6 text-status-warning whitespace-pre-line">{error}</div>
+            ) : <InlineError message={error} />
+          )}
 
           <Button type="submit" variant="primary" loading={verifying} disabled={!tokenInput.trim()}>
             Connect

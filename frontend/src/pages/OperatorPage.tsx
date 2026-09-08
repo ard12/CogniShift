@@ -8,6 +8,7 @@ import { knowledgeApi } from "@/api/knowledge";
 import { runsApi } from "@/api/runs";
 import { ApprovalCard } from "@/components/ApprovalCard";
 import { EventTimeline } from "@/components/EventTimeline";
+import { RequestFlow } from "@/components/RequestFlow";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,7 +26,7 @@ import { Select } from "@/components/ui/Select";
 import { EmptyState, InlineError } from "@/components/ui/States";
 import { useWorkspaces } from "@/context/useWorkspaces";
 import { formatBytes, runStatusLabel, runStatusTone } from "@/lib/format";
-import type { Agent, Approval, Artifact, Run, RunEvent } from "@/types";
+import type { Agent, Approval, Artifact, Run, RunEvent, RunStatusSummary } from "@/types";
 
 const QUICK_SCENARIOS = [
   {
@@ -71,6 +72,14 @@ export function OperatorPage() {
   const [relatedApproval, setRelatedApproval] = useState<Approval | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [artifactImages, setArtifactImages] = useState<Record<number, string>>({});
+  const [statusSummary, setStatusSummary] = useState<RunStatusSummary | null>(null);
+
+  useEffect(() => {
+    if (!run) { setStatusSummary(null); return; }
+    let cancelled = false;
+    runsApi.statusSummary(run.id).then((summary) => { if (!cancelled) setStatusSummary(summary); }).catch(() => { if (!cancelled) setStatusSummary(null); });
+    return () => { cancelled = true; };
+  }, [run, events.length]);
 
   // Rehydrate draft prompt on workspace change
   useEffect(() => {
@@ -236,7 +245,9 @@ export function OperatorPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedWorkspaceId, run?.id, run?.status]);
+    // Fetching image blobs updates artifactImages; rerunning for that state would refetch every artifact.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWorkspaceId, run]);
 
   const handleClearSession = () => {
     setPrompt("");
@@ -494,6 +505,8 @@ export function OperatorPage() {
               </div>
             </div>
 
+            <RequestFlow summary={statusSummary} />
+
             {/* Execution timeline */}
             <div className="panel flex flex-1 flex-col overflow-hidden">
               <div className="flex h-10 shrink-0 items-center justify-between border-b border-surface-border bg-surface-3/40 px-4">
@@ -511,7 +524,7 @@ export function OperatorPage() {
 
               {run?.sources_used && (
                 <div className="border-t border-surface-border bg-surface-1/60 px-4 py-2.5 font-mono text-xs">
-                  <span className="font-semibold text-ink-2">VERIFIED KNOWLEDGE CITATIONS:</span>
+                  <span className="font-semibold text-ink-2">DATA SOURCES USED:</span>
                   <p className="mt-0.5 truncate text-status-knowledge/90">{run.sources_used}</p>
                 </div>
               )}
@@ -524,7 +537,7 @@ export function OperatorPage() {
                     </span>
                     {run.model_name && (
                       <span className="font-mono text-[10px] text-ink-3">
-                        GENERATED LOCALLY ({run.model_name.toUpperCase()})
+                        {run.operating_mode?.toLowerCase() === "local" ? "GENERATED LOCALLY" : "EXECUTION LOCATION UNAVAILABLE"} ({run.model_name.toUpperCase()})
                       </span>
                     )}
                   </div>
@@ -539,9 +552,14 @@ export function OperatorPage() {
 
                   {/* Interactive UI Navigation Action */}
                   {(() => {
-                    const routingInfo = (run as any)?.routing_info;
-                    const targetRoute = routingInfo?.target_route 
-                      || routingInfo?.details?.target_route
+                    const routingInfo = run.routing_info;
+                    const details = routingInfo?.details;
+                    const nestedTarget = details && typeof details === "object" && "target_route" in details
+                      ? (details as { target_route?: unknown }).target_route
+                      : undefined;
+                    const directTarget = routingInfo?.target_route;
+                    const targetRoute = (typeof directTarget === "string" ? directTarget : undefined)
+                      || (typeof nestedTarget === "string" ? nestedTarget : undefined)
                       || (run.result_text?.includes("/knowledge") ? "/knowledge"
                       : run.result_text?.includes("/approvals") ? "/approvals"
                       : run.result_text?.includes("/agents") ? "/agents"
@@ -557,7 +575,10 @@ export function OperatorPage() {
 
                     if (!targetRoute || !isNav) return null;
 
-                    const friendlyName = routingInfo?.details?.friendly_name 
+                    const nestedFriendly = details && typeof details === "object" && "friendly_name" in details
+                      ? (details as { friendly_name?: unknown }).friendly_name
+                      : undefined;
+                    const friendlyName = (typeof nestedFriendly === "string" ? nestedFriendly : undefined)
                       || (targetRoute === "/knowledge" ? "Knowledge Vault"
                       : targetRoute === "/approvals" ? "Approvals"
                       : targetRoute === "/agents" ? "Agents"
@@ -712,8 +733,8 @@ export function OperatorPage() {
                 <dd className="text-ink-1">{selectedWorkspace?.name ?? "—"}</dd>
                 <dt className="text-ink-3">Mode</dt>
                 <dd className="text-ink-1">{selectedWorkspace?.operating_mode ?? "—"}</dd>
-                <dt className="text-ink-3">Model</dt>
-                <dd className="text-ink-1">{run?.model_name ?? "—"}</dd>
+                  <dt className="text-ink-3">Model</dt>
+                  <dd className="text-ink-1">{run?.model_name ? `${run.model_name}${run.input_type === "multimodal" ? " (orchestrator)" : ""}` : "—"}</dd>
               </dl>
             </div>
           </div>

@@ -1,11 +1,12 @@
 import ipaddress
-from typing import List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from cognishift.app.config import settings
-from cognishift.app.core.auth import User, create_ephemeral_demo_session, get_current_user
+from cognishift.app.core.auth import User, authenticate_token, create_ephemeral_demo_session, get_current_user, refresh_credential_store_if_changed
+from cognishift.app.core.device_security import begin_challenge, verify_challenge
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -36,6 +37,30 @@ class DemoSessionResponse(BaseModel):
     expires_in_seconds: int
 
 
+class DeviceChallengeRequest(BaseModel):
+    device_id: str
+    display_name: str = "Local browser"
+    public_key_jwk: Dict[str, Any]
+
+
+class DeviceChallengeResponse(BaseModel):
+    status: str
+    challenge_id: str
+    challenge: str
+
+
+class DeviceVerifyRequest(BaseModel):
+    device_id: str
+    challenge_id: str
+    signature: str
+
+
+class DeviceVerifyResponse(BaseModel):
+    device_session: str
+    expires_in_seconds: int
+    device_status: str = "trusted"
+
+
 DEMO_PERSONAS = {
     "operator": User(user_id="operator_sam", role="operator", allowed_workspace_ids=[1]),
     "supervisor": User(user_id="supervisor_jane", role="supervisor", allowed_workspace_ids=[1, 2]),
@@ -53,6 +78,45 @@ def _is_loopback(request: Request) -> bool:
 
 def _demo_mode_enabled() -> bool:
     return settings.cognishift_demo_mode and settings.operating_mode.lower() == "local"
+
+
+def _credential_user(request: Request) -> User:
+    auth_header = request.headers.get("Authorization", "").strip()
+    token = auth_header[7:].strip() if auth_header.startswith("Bearer ") else request.headers.get("X-API-Key", "").strip()
+    refresh_credential_store_if_changed()
+    user = authenticate_token(token)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or unrecognized authentication token.")
+    return user
+
+
+@router.post("/device/challenge", response_model=DeviceChallengeResponse)
+async def create_device_challenge(payload: DeviceChallengeRequest, request: Request):
+    """Verify credentials, then challenge an approved browser-held public key."""
+    user = _credential_user(request)
+    result = await begin_challenge(user.user_id, user.role, payload.device_id, payload.display_name, payload.public_key_jwk)
+    if result["status"] != "challenge":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "UNKNOWN_DEVICE",
+                "title": "⚠ Unknown Device",
+                "credentials": "Credentials Verified",
+                "device": "Device Verification Failed",
+                "action": "Administrator Approval Required",
+            },
+        )
+    return DeviceChallengeResponse(**result)
+
+
+@router.post("/device/verify", response_model=DeviceVerifyResponse)
+async def complete_device_challenge(payload: DeviceVerifyRequest, request: Request):
+    user = _credential_user(request)
+    try:
+        session = await verify_challenge(user.user_id, payload.device_id, payload.challenge_id, payload.signature)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    return DeviceVerifyResponse(device_session=session, expires_in_seconds=settings.device_session_ttl_seconds)
 
 
 @router.get("/me", response_model=UserProfileResponse)

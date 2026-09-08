@@ -140,7 +140,7 @@ export interface Run {
   started_at: IsoDateTime;
   completed_at?: IsoDateTime | null;
   error_message?: string | null;
-  routing_info?: Record<string, any> | null;
+  routing_info?: Record<string, unknown> | null;
   structured_plan?: string | null;
 }
 
@@ -174,6 +174,20 @@ export interface RunCreateRequest {
   input_type?: string;
   input_image_path?: string | null;
   conversation_history?: Array<{ role: string; content: string; timestamp?: string }>;
+}
+
+export interface RunFlowStage {
+  key: string;
+  label: string;
+  value: string;
+  detail?: string | null;
+  status: "complete" | "warning" | "unavailable";
+}
+
+export interface RunStatusSummary {
+  run_id: ID;
+  run_status: string;
+  stages: RunFlowStage[];
 }
 
 // ---------------------------------------------------------------------------
@@ -286,4 +300,21 @@ export interface NetworkEventsResponse {
   limit: number;
   offset: number;
   events: NetworkEvent[];
+}
+
+export interface SecurityDatum {
+  status: string;
+  label: string;
+  evidence?: string | null;
+}
+
+export interface SecurityStatus {
+  identity: SecurityDatum;
+  device: SecurityDatum;
+  workspace: SecurityDatum;
+  local_ai: SecurityDatum;
+  external_internet: SecurityDatum;
+  sensitive_tools: SecurityDatum;
+  audit_logging: SecurityDatum;
+  trusted_device_enforcement: boolean;
 }

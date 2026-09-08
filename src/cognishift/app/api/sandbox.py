@@ -88,6 +88,8 @@ async def execute_in_sandbox(
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Execute Python code in an isolated Docker container with --network none."""
+    if current_user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required for direct sandbox access.")
     verify_workspace_access(req.workspace_id, current_user)
 
     code_to_run = req.code or DEFAULT_ANALYSIS_CODE

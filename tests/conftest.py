@@ -19,6 +19,7 @@ os.environ["DATABASE_PATH"] = str(TEST_RUNTIME_ROOT / "cognishift.db")
 os.environ["CHROMA_PATH"] = str(TEST_RUNTIME_ROOT / "chroma")
 os.environ["UPLOAD_DIR"] = str(TEST_RUNTIME_ROOT / "uploads")
 os.environ["AUTH_STORE_PATH"] = str(TEST_RUNTIME_ROOT / "private" / "auth_store.json")
+os.environ["TRUSTED_DEVICE_REQUIRED"] = "false"
 
 from cognishift.app.config import settings
 from cognishift.app.core.auth import (

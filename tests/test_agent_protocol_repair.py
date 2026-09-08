@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db, init_db
-from cognishift.core.engine import execute_agent_run
+from cognishift.core.engine import execute_agent_run, enforce_rca_evidence_boundaries
 from cognishift.core.providers import ModelResponse
 from cognishift.core.simulated_provider import SimulatedProvider
 from cognishift.core.tool_schemas import parse_agent_action, FinalAnswer
@@ -104,3 +104,44 @@ async def test_protocol_repair_with_production_final_answer_schema():
     # 4. Verify run completed successfully
     assert res.status == "completed", f"Run failed with status {res.status}: {res.error_message}"
     assert "Root cause verified: bearing failure on P-101A" in res.result_text
+
+
+def test_deepseek_structured_rca_content_is_rendered_as_final_answer():
+    raw = json.dumps({
+        "action": "final_answer",
+        "content": {
+            "confirmed_observations": ["Suction pressure dropped", "Vibration increased sharply"],
+            "plausible_causes": [{"cause": "Suction restriction", "confidence": "unverified"}],
+            "evidence_needed": ["Suction strainer differential pressure"],
+            "safe_next_steps": ["Inspect before restart"],
+        },
+        "citations": [],
+    })
+    parsed = parse_agent_action(raw)
+    assert isinstance(parsed, FinalAnswer)
+    assert "Confirmed Observations" in parsed.content
+    assert "Suction pressure dropped" in parsed.content
+    assert "Evidence Needed" in parsed.content
+    assert "{'cause':" not in parsed.content
+
+
+def test_rca_evidence_gate_keeps_unsupplied_values_out_of_confirmed_section():
+    unsafe_model_answer = """## Confirmed Observations
+- Discharge exceeded 450 PSI.
+## Possible Hypotheses
+- Cavitation may be present.
+## Additional Evidence Needed
+- Obtain pressure and vibration trends.
+## Recommendations
+- Restart the pump.
+"""
+    result = enforce_rca_evidence_boundaries(
+        unsafe_model_answer,
+        "Suction pressure dropped, discharge pressure is unstable, and vibration increased sharply.",
+    )
+    confirmed = result.split("## Possible Hypotheses", 1)[0]
+    assert "450 PSI" not in confirmed
+    assert "no absolute reading" in confirmed
+    assert "Cavitation may be present" in result
+    assert "Restart the pump" not in result
+    assert "No root cause is confirmed" in result

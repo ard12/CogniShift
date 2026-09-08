@@ -6,10 +6,14 @@ import {
   type ReactNode,
 } from "react";
 import { ApiError } from "@/api/clients";
+import { authApi } from "@/api/auth";
 import { systemApi } from "@/api/system";
+import { ensureDeviceIdentity, setDeviceSession } from "@/lib/device-identity";
 import { getStoredToken, setStoredToken } from "../lib/token-storage";
 import type { SovereigntyStatus } from "@/types";
 import { AuthContext, type AuthContextValue } from "./auth-context";
+
+const DEMO_SESSION_KEY = "cognishift_demo_session";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -17,18 +21,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [verifying, setVerifying] = useState(false);
   const [sovereignty, setSovereignty] = useState<SovereigntyStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deviceStatus, setDeviceStatus] = useState<"trusted" | "unknown" | "not_verified">("not_verified");
 
   const verify = useCallback(async (candidate: string): Promise<boolean> => {
     setVerifying(true);
     setError(null);
     try {
+      if (localStorage.getItem(DEMO_SESSION_KEY) === "true") {
+        setDeviceSession(null);
+        const status = await systemApi.sovereignty(candidate);
+        setSovereignty(status);
+        setToken(candidate);
+        setStoredToken(candidate);
+        setDeviceStatus("not_verified");
+        return true;
+      }
+      const identity = await ensureDeviceIdentity();
+      const challenge = await authApi.challenge(candidate, {
+        device_id: identity.deviceId,
+        display_name: identity.displayName,
+        public_key_jwk: identity.publicKeyJwk,
+      });
+      const signature = await identity.sign(challenge.challenge);
+      const verifiedDevice = await authApi.verifyDevice(candidate, {
+        device_id: identity.deviceId,
+        challenge_id: challenge.challenge_id,
+        signature,
+      });
+      setDeviceSession(verifiedDevice.device_session);
+      setDeviceStatus("trusted");
       const status = await systemApi.sovereignty(candidate);
       setSovereignty(status);
       setToken(candidate);
       setStoredToken(candidate);
+      localStorage.removeItem(DEMO_SESSION_KEY);
       return true;
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
+      if (err instanceof ApiError && err.status === 403 && typeof err.detail === "object" && err.detail && (err.detail as {code?: string}).code === "UNKNOWN_DEVICE") {
+        setDeviceStatus("unknown");
+        setError("⚠ Unknown Device\nCredentials Verified\nDevice Verification Failed\nAdministrator Approval Required");
+      } else if (err instanceof ApiError && err.status === 401) {
         setError("That token was not recognized. Check the credential and try again.");
       } else if (err instanceof ApiError) {
         setError(err.message);
@@ -36,7 +68,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError("Could not reach the CogniShift backend. Is the server running?");
       }
       setToken(null);
+      setDeviceSession(null);
       setStoredToken(null);
+      localStorage.removeItem(DEMO_SESSION_KEY);
+      return false;
+    } finally {
+      setVerifying(false);
+    }
+  }, []);
+
+  const signInDemo = useCallback(async (personaId: string) => {
+    setVerifying(true);
+    setError(null);
+    try {
+      const session = await authApi.demoSession(personaId);
+      setDeviceSession(null);
+      const status = await systemApi.sovereignty(session.session_token);
+      setSovereignty(status);
+      setToken(session.session_token);
+      setStoredToken(session.session_token);
+      localStorage.setItem(DEMO_SESSION_KEY, "true");
+      setDeviceStatus("not_verified");
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Demo session unavailable.");
       return false;
     } finally {
       setVerifying(false);
@@ -60,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError("Enter a credential token.");
         return false;
       }
+      localStorage.removeItem(DEMO_SESSION_KEY);
       return verify(trimmed);
     },
     [verify]
@@ -70,6 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSovereignty(null);
     setError(null);
     setStoredToken(null);
+    setDeviceSession(null);
+    localStorage.removeItem(DEMO_SESSION_KEY);
+    setDeviceStatus("not_verified");
   }, []);
 
   const refreshSovereignty = useCallback(async () => {
@@ -92,11 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: sovereignty?.user_role ?? null,
       sovereignty,
       error,
+      deviceStatus,
       signIn,
+      signInDemo,
       signOut,
       refreshSovereignty,
     }),
-    [token, ready, verifying, sovereignty, error, signIn, signOut, refreshSovereignty]
+    [token, ready, verifying, sovereignty, error, deviceStatus, signIn, signInDemo, signOut, refreshSovereignty]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

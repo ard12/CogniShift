@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     auth_store_path: Path = PROJECT_ROOT / "data" / "private" / "auth_store.json"
     cognishift_demo_mode: bool = True
     demo_session_ttl_seconds: int = 1800
+    trusted_device_required: bool = True
+    device_challenge_ttl_seconds: int = 120
+    device_session_ttl_seconds: int = 28800
     max_upload_size_mb: int = 50
     log_level: str = "INFO"
 

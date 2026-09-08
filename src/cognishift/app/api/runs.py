@@ -1,11 +1,12 @@
 import json
-from fastapi import APIRouter, HTTPException, Query, Depends, status
+from fastapi import APIRouter, HTTPException, Query, Depends, Request, status
 from typing import List, Optional, Any
 
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import RunCreate, RunResponse, RunEventResponse
 from cognishift.app.core.auth import get_current_user, verify_workspace_access, User
 from cognishift.core.engine import execute_agent_run, resume_agent_run
+from cognishift.core.network.guard import get_active_network_policy
 
 router = APIRouter(prefix="/api/v1/runs", tags=["Runs"])
 
@@ -23,6 +24,7 @@ def _format_run_response(row: Any) -> RunResponse:
 @router.post("", response_model=RunResponse)
 async def create_run(
     run_req: RunCreate,
+    request: Request,
     user: User = Depends(get_current_user)
 ):
     """Trigger a new agent reasoning run.
@@ -41,6 +43,12 @@ async def create_run(
             input_image_path=run_req.input_image_path,
             conversation_history=run_req.conversation_history
         )
+        async with get_db() as db:
+            await db.execute(
+                "INSERT INTO audit_events (workspace_id,actor_id,action,resource_type,resource_id,details,result) VALUES (?,?, 'agent_run_recorded','agent_run',?,?,?)",
+                (run_req.workspace_id, user.user_id, run_res.id, f"status={run_res.status}; authenticated request recorded", "success" if run_res.status != "failed" else "failed"),
+            )
+            await db.commit()
         return run_res
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -117,6 +125,57 @@ async def get_run_events(
         )
         rows = await cursor.fetchall()
         return [RunEventResponse.model_validate(dict(r)) for r in rows]
+
+
+@router.get("/{run_id}/status-summary")
+async def get_run_status_summary(run_id: int, request: Request, user: User = Depends(get_current_user)):
+    """Return a compact, evidence-backed visualization of stages that actually occurred."""
+    async with get_db() as db:
+        run = await (await db.execute("SELECT * FROM agent_runs WHERE id=?", (run_id,))).fetchone()
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        verify_workspace_access(run["workspace_id"], user)
+        events = await (await db.execute("SELECT * FROM run_events WHERE run_id=? ORDER BY id", (run_id,))).fetchall()
+        approval = await (await db.execute("SELECT * FROM approval_requests WHERE run_id=? ORDER BY id DESC LIMIT 1", (run_id,))).fetchone()
+        audit = await (await db.execute("SELECT id FROM audit_events WHERE resource_type='agent_run' AND resource_id=? ORDER BY id DESC LIMIT 1", (run_id,))).fetchone()
+
+    by_type = {}
+    for event in events:
+        by_type.setdefault(event["event_type"], []).append(event)
+    stages = []
+    classified = by_type.get("task_classified", [])
+    if classified:
+        data = json.loads(classified[-1]["structured_data"] or "{}")
+        stages.append({"key": "task", "label": "Task Detected", "value": str(data.get("task_type", "unknown")).replace("_", " ").title(), "status": "complete"})
+    selected = by_type.get("model_selected", [])
+    if selected:
+        data = json.loads(selected[-1]["structured_data"] or "{}")
+        vision = by_type.get("vision_completed", [])
+        specialist = None
+        if vision:
+            specialist = json.loads(vision[-1]["structured_data"] or "{}").get("model")
+        model_value = specialist or data.get("selected_model") or run["model_name"] or "Unavailable"
+        detail = data.get("reason")
+        if specialist and run["model_name"] and run["model_name"] != specialist:
+            model_value = f"{specialist} + {run['model_name']}"
+            detail = f"{specialist} inspected the image; {run['model_name']} orchestrated the response"
+        stages.append({"key": "model", "label": "Model Selected", "value": model_value, "detail": detail, "status": "complete" if model_value != "Unavailable" else "unavailable"})
+    if run["sources_used"]:
+        stages.append({"key": "source", "label": "Data Source Used", "value": run["sources_used"], "status": "complete"})
+    if run["operating_mode"]:
+        stages.append({"key": "location", "label": "Execution Location", "value": "LOCAL" if run["operating_mode"].lower() == "local" else run["operating_mode"].upper(), "status": "complete"})
+    policy = get_active_network_policy()
+    stages.append({"key": "network", "label": "Network Status", "value": "External Internet Blocked" if policy.mode.value == "strict" else "Not Verified", "detail": f"Policy: {policy.mode.value}", "status": "complete" if policy.mode.value == "strict" else "warning"})
+    tool_events = by_type.get("tool_executing", []) + by_type.get("tool_executed", [])
+    sandbox_events = [e for e in events if "sandbox" in e["event_type"]]
+    if tool_events or sandbox_events:
+        label = "Isolated Sandbox Used" if sandbox_events else "Tool Used"
+        stages.append({"key": "tool", "label": "Tool / Sandbox", "value": label, "detail": (tool_events[-1]["message"] if tool_events else sandbox_events[-1]["message"]), "status": "complete"})
+    stages.append({"key": "security", "label": "Security Checks", "value": "User Verified · Device Trusted · Workspace Authorized" if getattr(request.state, "device_trusted", False) else "User Verified · Device Not Verified · Workspace Authorized", "status": "complete" if getattr(request.state, "device_trusted", False) else "warning"})
+    if approval:
+        stages.append({"key": "approval", "label": "Approval Status", "value": str(approval["status"]).title(), "detail": f"{approval['risk_level'] or 'sensitive'} action; {approval['required_approvals']} approval(s) required", "status": "complete" if approval["status"] == "approved" else "warning"})
+    stages.append({"key": "audit", "label": "Audit Status", "value": "Recorded" if audit else "Not Verified", "status": "complete" if audit else "warning"})
+    return {"run_id": run_id, "run_status": run["status"], "stages": stages}
 
 
 @router.post("/{run_id}/resume", response_model=RunResponse)

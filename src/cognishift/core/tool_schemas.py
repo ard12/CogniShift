@@ -672,6 +672,28 @@ def validate_proposed_tool_call(
 # -----------------------------------------------------------------------------
 # 4. ROBUST JSON ACTION PARSER
 # -----------------------------------------------------------------------------
+def _render_structured_final_content(value: Any, depth: int = 0) -> str:
+    """Render an SLM's structured final content as readable, bounded Markdown."""
+    if depth > 5:
+        return str(value)[:2000]
+    if isinstance(value, dict):
+        parts: List[str] = []
+        for key, item in list(value.items())[:40]:
+            label = str(key).replace("_", " ").strip().title()
+            if isinstance(item, (dict, list)):
+                parts.append(f"{'#' * min(depth + 2, 6)} {label}\n{_render_structured_final_content(item, depth + 1)}")
+            else:
+                parts.append(f"- **{label}:** {item}")
+        return "\n\n".join(parts)
+    if isinstance(value, list):
+        parts = []
+        for item in value[:100]:
+            rendered = _render_structured_final_content(item, depth + 1)
+            parts.append(rendered if isinstance(item, (dict, list)) else f"- {rendered}")
+        return "\n".join(parts)
+    return str(value)
+
+
 def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentAction]:
     """
     Extracts and validates a structured AgentAction from model text output.
@@ -704,6 +726,8 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                     content = data.get("content") if data.get("content") is not None else data.get("answer", "")
                     if not content and strict:
                         return None
+                    if isinstance(content, (dict, list)):
+                        content = _render_structured_final_content(content)
                     return FinalAnswer(
                         action="final_answer",
                         content=str(content),

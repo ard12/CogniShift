@@ -26,6 +26,7 @@
  */
 
 import { getStoredToken } from "../lib/token-storage";
+import { getDeviceSession } from "../lib/device-identity";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -98,7 +99,11 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
 
 function authHeader(token?: string): Record<string, string> {
   const effective = token ?? getStoredToken();
-  return effective ? { Authorization: `Bearer ${effective}` } : {};
+  const deviceSession = getDeviceSession();
+  return {
+    ...(effective ? { Authorization: `Bearer ${effective}` } : {}),
+    ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+  };
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {

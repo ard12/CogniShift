@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import openpyxl
 import pandas as pd
 
+from cognishift.core.document_insights import detect_header_row_index
 from cognishift.core.visualization.schemas import (
     ArtifactRequestContract,
     ChartType,
@@ -150,8 +151,8 @@ def select_target_sheet(
         best_sheet = sheet_names[0]
         best_score = -1.0
         q_words = set(re.findall(r"\b\w{3,}\b", query.lower()))
-        generic_financial_trend = (
-            contract.requested_chart_type == ChartType.LINE
+        generic_financial_visualization = (
+            contract.png_required
             and not contract.explicit_sheet
             and any(term in workbook_path.stem.lower() for term in ("financial", "history", "statement"))
         )
@@ -161,7 +162,7 @@ def select_target_sheet(
             score = 0.0
             # Sheet name relevance
             sname_clean = sname.lower().replace("_", " ")
-            if generic_financial_trend and "income statement" in sname_clean:
+            if generic_financial_visualization and "income statement" in sname_clean:
                 # Prefer the primary time-series statement over an arbitrary
                 # numerically dense project/CAPEX sheet for a generic trend.
                 score += 50.0
@@ -198,14 +199,9 @@ def select_target_sheet(
     if not raw_rows:
         raise ValueError(f"Selected sheet '{target_sheet_name}' is empty.")
 
-    # Header row detection
-    header_idx = 0
-    max_text_cells = 0
-    for idx, r in enumerate(raw_rows[:10]):
-        non_empty = [c for c in r if c is not None and str(c).strip()]
-        if len(non_empty) > max_text_cells and any("fy" in str(c).lower() or "metric" in str(c).lower() or "tag" in str(c).lower() or "date" in str(c).lower() for c in non_empty):
-            max_text_cells = len(non_empty)
-            header_idx = idx
+    # Reuse the shared multi-feature detector so a numeric first data row cannot
+    # become the header merely because it contains a label such as "Q1 FY21".
+    header_idx = detect_header_row_index(raw_rows)
 
     headers = [str(c).strip() if c is not None else f"Col_{i}" for i, c in enumerate(raw_rows[header_idx])]
     data_rows = [list(r) for r in raw_rows[header_idx + 1:] if any(c is not None for c in r)]
@@ -307,13 +303,16 @@ def _generate_single_spec(
         "from", "graph", "graphical", "line", "of", "over", "plot", "showing",
         "spreadsheet", "the", "time", "visualization",
     }
+    unit_words = {"amps", "bar", "c", "f", "h", "hz", "m3", "mm", "psi", "psig", "rpm"}
 
-    def _metric_score(column: Any) -> Tuple[int, int]:
-        words = [word for word in _column_words(column) if word not in {"value", "reading"}]
+    def _metric_score(column: Any) -> Tuple[int, int, int]:
+        words = [
+            word for word in _column_words(column)
+            if word not in {"value", "reading"} and word not in unit_words
+        ]
         overlap = sum(1 for word in words if word in query_words and word not in generic_words)
-        # Requiring two matching semantic tokens prevents a generic word such as
-        # "pressure" from silently selecting the wrong pressure measurement.
-        return overlap, len(words)
+        required = min(2, len(words))
+        return overlap, len(words), required
 
     scored_metrics = sorted(
         ((_metric_score(column), column) for column in numeric_cols),
@@ -322,7 +321,7 @@ def _generate_single_spec(
     )
     explicit_metric_col = (
         scored_metrics[0][1]
-        if scored_metrics and scored_metrics[0][0][0] >= 2
+        if scored_metrics and scored_metrics[0][0][0] >= scored_metrics[0][0][2]
         else None
     )
     time_cols = [
@@ -334,23 +333,81 @@ def _generate_single_spec(
         or re.search(r"\b(?:over\s+time|time\s+series|trend)\b", q_lower)
     )
 
+    metric_phrase_match = re.search(
+        r"\bshowing\s+(?:the\s+)?(.+?)(?=\s+(?:for|of)\s+[A-Z]{1,5}-\d{2,5}[A-Z]?|\s+over\s+time|\s+from\b|$)",
+        query,
+        re.IGNORECASE,
+    ) or re.search(
+        r"\b(?:chart|graph|plot)\s+(?:of|for)\s+(?:the\s+)?(.+?)(?=\s+(?:for|of)\s+[A-Z]{1,5}-\d{2,5}[A-Z]?|\s+over\s+time|\s+from\b|$)",
+        query,
+        re.IGNORECASE,
+    )
+    requested_metric_phrase = metric_phrase_match.group(1).strip() if metric_phrase_match else None
+    # Some financial workbooks store metrics as rows with fiscal years across
+    # columns. Treat a requested row label as a real metric before applying the
+    # missing-column guard below.
+    first_col_for_metric_rows = clean_cols[0] if clean_cols else df.columns[0]
+    fiscal_year_cols = [
+        c for c in clean_cols if re.search(r"\bfy\b|\b20\d\d\b", str(c).lower())
+    ]
+    requested_phrase_words = {
+        word for word in _column_words(requested_metric_phrase or "")
+        if word not in generic_words and word not in unit_words
+    }
+    row_metric_found = bool(
+        requested_phrase_words
+        and len(fiscal_year_cols) >= 3
+        and any(
+            len(requested_phrase_words.intersection(_column_words(value)))
+            >= min(2, len(requested_phrase_words))
+            for value in df[first_col_for_metric_rows].dropna().astype(str)
+        )
+    )
+    if (
+        requested_metric_phrase
+        and explicit_metric_col is None
+        and not row_metric_found
+        and (
+            time_series_requested
+            or "_" in requested_metric_phrase
+            or "metric" in requested_metric_phrase.lower()
+        )
+    ):
+        raise ValueError(
+            f"Requested metric '{requested_metric_phrase}' was not found in source '{file_path.name}'. "
+            "No substitute column was selected."
+        )
+
     if explicit_metric_col is not None and time_series_requested and time_cols:
         selected_df = df.copy()
         filter_description = None
+        requested_equipment_ids = re.findall(r"\b[A-Z]{1,5}-\d{2,5}[A-Z]?\b", query, re.IGNORECASE)
         equipment_cols = [
             c for c in clean_cols
             if any(token in _column_words(c) for token in ("component", "equipment", "asset", "tag"))
         ]
-        for equipment_col in equipment_cols:
-            values = selected_df[equipment_col].dropna().astype(str).unique().tolist()
-            requested_value = next(
-                (value for value in values if re.search(rf"(?<![A-Za-z0-9]){re.escape(value)}(?![A-Za-z0-9])", query, re.IGNORECASE)),
-                None,
-            )
-            if requested_value is not None:
-                selected_df = selected_df[selected_df[equipment_col].astype(str) == requested_value]
-                filter_description = f"{equipment_col} = {requested_value}"
-                break
+        if requested_equipment_ids:
+            requested_value = None
+            requested_equipment_col = None
+            for equipment_col in equipment_cols:
+                value_lookup = {
+                    value.lower(): value
+                    for value in selected_df[equipment_col].dropna().astype(str).unique().tolist()
+                }
+                for requested_id in requested_equipment_ids:
+                    if requested_id.lower() in value_lookup:
+                        requested_value = value_lookup[requested_id.lower()]
+                        requested_equipment_col = equipment_col
+                        break
+                if requested_value is not None:
+                    break
+            if requested_value is None or requested_equipment_col is None:
+                raise ValueError(
+                    f"Requested equipment '{requested_equipment_ids[0]}' was not found in source "
+                    f"'{file_path.name}'. No unfiltered or substitute chart was generated."
+                )
+            selected_df = selected_df[selected_df[requested_equipment_col].astype(str) == requested_value]
+            filter_description = f"{requested_equipment_col} = {requested_value}"
 
         time_col = time_cols[0]
         selected_df = selected_df[[time_col, explicit_metric_col]].dropna()
@@ -387,7 +444,7 @@ def _generate_single_spec(
             )
 
     # Strategy 1: Horizontal Metric Row in Financial Matrix (e.g. Operating EBITDA across FY columns)
-    first_col = clean_cols[0] if clean_cols else df.columns[0]
+    first_col = first_col_for_metric_rows
     metric_rows = df[first_col].dropna().astype(str).tolist()
     fy_cols = [c for c in clean_cols if re.search(r"\bfy\b|\b20\d\d\b", str(c).lower())]
 

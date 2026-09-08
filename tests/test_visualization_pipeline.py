@@ -16,6 +16,7 @@ from cognishift.core.visualization.renderer import _tick_positions, render_visua
 from cognishift.core.visualization.validator import validate_png_artifact
 from cognishift.core.engine import GoalContract, _is_presentation_request
 from cognishift.core.conversation_context import _explicit_filename_matches_source
+from cognishift.core.document_insights import extract_document_insights
 
 
 def test_parse_artifact_request_contract():
@@ -126,6 +127,36 @@ def test_explicit_equipment_metric_time_series_uses_requested_columns():
     assert len(spec.x_values) == len(spec.series["discharge_pressure_psi"])
 
 
+def test_nonexistent_equipment_fails_closed_without_unfiltered_chart():
+    csv_path = Path("data/demo/equipment_readings.csv")
+    if not csv_path.exists():
+        pytest.skip("Equipment readings demo CSV not found")
+
+    query = "Create a line chart showing discharge_pressure_psi for P-9999 over time from the attached CSV."
+    with pytest.raises(ValueError, match="P-9999.*not found.*No unfiltered or substitute chart"):
+        build_visualization_specs(csv_path, parse_artifact_request_contract(query), query)
+
+
+def test_nonexistent_metric_fails_closed_without_substitute_column():
+    csv_path = Path("data/demo/equipment_readings.csv")
+    if not csv_path.exists():
+        pytest.skip("Equipment readings demo CSV not found")
+
+    query = "Create a line chart showing nonexistent_metric for P-101A over time from the attached CSV."
+    with pytest.raises(ValueError, match="nonexistent_metric.*not found.*No substitute column"):
+        build_visualization_specs(csv_path, parse_artifact_request_contract(query), query)
+
+
+def test_png_and_csv_combined_contract_requires_both_outputs():
+    contract = parse_artifact_request_contract(
+        "Create a PNG chart and also export the filtered data as CSV"
+    )
+    assert contract.png_required is True
+    assert contract.png_count == 1
+    assert contract.csv_required is True
+    assert contract.total_artifacts_expected == 2
+
+
 def test_build_visualization_specs_dual_charts():
     """Verify generation of 2 distinct chart specs when requested."""
     csv_path = Path("data/demo/MRPL_Enterprise_Plant_Asset_and_Maintenance_Log_5Y.csv")
@@ -175,6 +206,32 @@ def test_generic_financial_line_graph_prefers_income_statement_ebitda():
     assert spec.source_sheet == "Income_Statement_10Y"
     assert "Operating EBITDA" in spec.y_columns[0]
     assert spec.output_filename.endswith("_ebitda_trend.png")
+
+
+def test_generic_financial_graph_and_pdf_uses_named_metric_not_data_value():
+    xlsx_path = Path("data/demo/MRPL_Enterprise_Financial_and_Operational_History_10Y.xlsx")
+    if not xlsx_path.exists():
+        pytest.skip("Demo XLSX not found")
+
+    query = (
+        "create a graphical representation on "
+        "MRPL_Enterprise_Financial_and_Operational_History_10Y.xls, explain the data, and create a pdf"
+    )
+    contract = parse_artifact_request_contract(query)
+    specs = build_visualization_specs(xlsx_path, contract, query)
+
+    assert contract.png_required is True
+    assert contract.pdf_required is True
+    assert specs[0].source_sheet == "Income_Statement_10Y"
+    assert specs[0].y_columns[0] in {
+        "Revenue from Operations (Gross)",
+        "Operating EBITDA",
+    }
+    assert not specs[0].y_columns[0].replace(".", "", 1).isdigit()
+
+    insights = extract_document_insights(xlsx_path, query_hint=query)
+    assert insights["primary_sheet"] == "Income_Statement_10Y"
+    assert "revenue" in insights["metrics"]
 
 
 def test_render_and_validate_png(tmp_path):

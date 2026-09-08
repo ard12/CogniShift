@@ -192,15 +192,35 @@ def extract_spreadsheet_insights(file_path: Path, query_hint: str = "") -> Dict[
             "chart_data": None
         }
 
-    # Select primary sheet: prefer sheet matching query hint or containing numeric rows
+    # Select primary sheet. An explicitly named sheet always wins. For a generic
+    # financial-history request, prefer the annual income statement so the
+    # narrative, report table, and deterministic chart use the same source.
     primary = sheets_data[0]
-    for s in sheets_data:
-        if lower_hint and s["sheet_name"].lower() in lower_hint:
-            primary = s
-            break
-        elif any(k in s["sheet_name"].lower() for k in ["p&l", "profit", "financial", "telemetry", "data", "revenue"]):
-            primary = s
-            break
+    explicit_sheet = next(
+        (s for s in sheets_data if lower_hint and s["sheet_name"].lower() in lower_hint),
+        None,
+    )
+    if explicit_sheet is not None:
+        primary = explicit_sheet
+    else:
+        financial_request = any(
+            term in lower_hint or term in file_path.stem.lower()
+            for term in ("financial", "income statement", "revenue", "ebitda", "profit")
+        )
+        income_statement = next(
+            (
+                s for s in sheets_data
+                if "income" in s["sheet_name"].lower() and "statement" in s["sheet_name"].lower()
+            ),
+            None,
+        )
+        if financial_request and income_statement is not None:
+            primary = income_statement
+        else:
+            for s in sheets_data:
+                if any(k in s["sheet_name"].lower() for k in ["p&l", "profit", "financial", "telemetry", "data", "revenue"]):
+                    primary = s
+                    break
 
     headers = primary["headers"]
     rows = primary["rows"]
@@ -982,6 +1002,5 @@ def validate_scada_anomaly_prose(model_prose: str, anomaly: Dict[str, Any], sour
             pass
 
     return True, model_prose
-
 
 

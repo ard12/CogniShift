@@ -6,65 +6,123 @@
 ---
 
 ## Table of Contents
-1. [Services Startup Commands](#1-services-startup-commands)
-2. [How to Remove & Reset System History Before a Live Demo](#2-how-to-remove--reset-system-history-before-a-live-demo)
+1. [The 30-Second Jury Demo Quickstart (Copy-Paste Ready)](#1-the-30-second-jury-demo-quickstart-copy-paste-ready)
+2. [How to Reset System History Before a Live Demo](#2-how-to-reset-system-history-before-a-live-demo)
 3. [Understanding the ChatGPT API Test (Sovereignty Proof)](#3-understanding-the-chatgpt-api-test-sovereignty-proof)
 4. [Hardware Execution Notice (Prototype Disclaimer)](#4-hardware-execution-notice-prototype-disclaimer)
-5. [Comprehensive Catalog of 28 Informal Showcase Prompts](#5-comprehensive-catalog-of-28-informal-showcase-prompts)
+5. [The 5-Minute Winning Demonstration Script (For SIH Judges)](#5-the-5-minute-winning-demonstration-script-for-sih-judges)
+6. [Comprehensive Catalog of 28 Informal Showcase Prompts](#6-comprehensive-catalog-of-28-informal-showcase-prompts)
    - [Category 1: Financial & Spreadsheet Sandboxed Analytics (Prompts 1–5)](#category-1-financial--spreadsheet-sandboxed-analytics)
    - [Category 2: Plant SOP, Maintenance Manuals & Regulatory Compliance (Prompts 6–10)](#category-2-plant-sop-maintenance-manuals--regulatory-compliance)
    - [Category 3: Human-in-the-Loop Plant Safety & Four-Eyes Approvals (Prompts 11–15)](#category-3-human-in-the-loop-plant-safety--four-eyes-approvals)
    - [Category 4: Engineering Schematics (P&ID) & Process Topology (Prompts 16–20)](#category-4-engineering-schematics-pid--process-topology)
    - [Category 5: Computer Vision, Analog Gauge & Note Inspection (Prompts 21–24)](#category-5-computer-vision-analog-gauge--note-inspection)
    - [Category 6: Zero-Cloud Sovereignty & Air-Gap Probing (Prompts 25–28)](#category-6-zero-cloud-sovereignty--air-gap-probing)
-6. [Pre-Demonstration Verification Checklist](#6-pre-demonstration-verification-checklist)
+7. [Pre-Demonstration Verification Checklist](#7-pre-demonstration-verification-checklist)
 
 ---
 
-## 1. Services Startup Commands
+## 1. The 30-Second Jury Demo Quickstart (Copy-Paste Ready)
 
-Open **two PowerShell terminal windows** on your machine:
+### Option A: The 1-Click Windows Launcher (Easiest)
+Just double-click **`run_demo.bat`** in the project root!  
+It automatically:
+- Verifies Python and local dependencies.
+- Confirms the local Ollama inference service is reachable.
+- Detects any prior process on port 8443 and restarts cleanly without port collision.
+- Checks and issues cryptographic X.509 local TLS certificates.
+- Launches the unified server on `https://0.0.0.0:8443` serving both APIs and the built production React frontend over same-origin HTTPS.
 
-### Terminal 1: Start Backend (FastAPI + Engine + Sandbox)
+### Option B: The Master PowerShell One-Liner (Terminal)
+Open **PowerShell** in the project root (`C:\Users\sitan\OneDrive\Desktop\CogniShift`):
 ```powershell
-cd C:\Users\sitan\OneDrive\Desktop\CogniShift
-$env:PYTHONPATH = "src"
-python -m uvicorn cognishift.app.main:app --host 127.0.0.1 --port 8000 --reload
+powershell -ExecutionPolicy Bypass -File .\scripts\start_lan_demo.ps1 -RestartExisting
 ```
-- **Backend API:** `http://localhost:8000`
-- **Interactive Swagger Docs:** `http://localhost:8000/docs`
-- **Sovereignty & Health Status:** `http://localhost:8000/api/v1/system/sovereignty`
 
-### Terminal 2: Start Frontend (React + Vite + Tailwind)
-```powershell
-cd C:\Users\sitan\OneDrive\Desktop\CogniShift\frontend
-npm run dev
-```
-- **Operator Workbench UI:** `http://localhost:5173`
-
-> **Note on Local LLM:** Ensure the local Ollama daemon is running in the background (`ollama serve`). You can verify at any time by opening `http://localhost:11434/api/tags` in your browser.
+### Option C: 2-Terminal Development Setup (If editing code live)
+- **Terminal 1 (Backend):**
+  ```powershell
+  $env:PYTHONPATH = "src"
+  python -m uvicorn cognishift.app.main:app --host 0.0.0.0 --port 8443 --ssl-keyfile data/certs/server_key.pem --ssl-certfile data/certs/server_cert.pem
+  ```
+- **Terminal 2 (Frontend Dev Server):**
+  ```powershell
+  cd frontend
+  npm run dev
+  ```
 
 ---
 
-## 2. How to Remove & Reset System History Before a Live Demo
+### Step 0: Background Services Checklist
+Before presenting to the judges, ensure these background services are running:
+1. **Local Ollama Inference Service:**
+   ```powershell
+   ollama serve
+   ```
+   *(Verify models via `http://localhost:11434/api/tags` - `qwen2.5:7b` and `moondream:latest`)*
+2. **Local Loopback SMTP Sink (For Sovereign Mail & Real-Time Alerts):**
+   ```powershell
+   python scripts/run_local_smtp_sink.py
+   ```
+   *(Listens silently on `127.0.0.1:1025` with zero cloud egress)*
 
-During rehearsal or testing, chat transcripts, execution traces, pending approval cards, and generated charts accumulate in the database. When presenting to evaluators, teachers, or SIH judges, you want a **clean, fresh workbench** with zero clutter.
+---
 
-### The 1-Second Reset Command
-Run this command from the project root in PowerShell:
+### Step 1: Pre-Demo 1-Click Route Health Verification
+Run this command right before or in front of the judges:
 ```powershell
-cd C:\Users\sitan\OneDrive\Desktop\CogniShift
+python scripts/preflight_routes.py
+```
+*(Or double-click `preflight.bat`). In 2 seconds, it tests 21 critical endpoints across auth, WebCrypto device security, internal mail, SSE streaming, authorizations, and health, printing all green `[OK]`.*
+
+---
+
+### Step 2: Access URLs & Evaluator Persona Roster
+
+| Role | Username | Password | Access URL | Device Trust Status | Primary Demonstration Responsibility |
+|---|---|---|---|---|---|
+| **Host Admin** | `admin` *(or `sitanshu`)* | `AdminPass123!` | `https://localhost:8443` | **Approved (Bootstrapped via Loopback)** | Edge Host Admin: `/security` Console, Device Approval, System Telemetry |
+| **Supervisor 1** | `supervisor_zara` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Four-Eyes Signatory #1: First approval on high-risk operations |
+| **Supervisor 2** | `supervisor_rakshita` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Four-Eyes Signatory #2: Dual-authorization counter-signature |
+| **Operator 1** | `operator_sam` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Primary Operator: Ingests CSVs, triggers telemetry charts, runs SOP queries |
+| **Operator 2** | `operator_aryan` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Multi-terminal verification & parallel operator workstation |
+| **Operator 3** | `operator_vicky` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Plant telemetry & operational workstation |
+| **Untrusted Showcase** | `rohit` | `OperatorPass123!` | `https://10.10.182.228:8443` | **DELIBERATELY UNTRUSTED (403)** | **Live Security Showcase**: Valid credentials, but blocked by ECDSA challenge until Admin approves! |
+
+> [!TIP]
+> **Browser Certificate Note for Client Terminals:**
+> When opening `https://10.10.182.228:8443` or `https://localhost:8443`, the browser will show a self-signed certificate warning.
+> Click **Advanced -> Proceed to [IP] (unsafe)**.
+> To eliminate the warning completely on team laptops, run:
+> `powershell -ExecutionPolicy Bypass -File .\scripts\install_cognishift_demo_ca.ps1`
+
+---
+
+## 2. How to Reset System History Before a Live Demo
+
+### Option 1: The 1-Click Evaluator Showcase Reset (Recommended)
+Double-click **`reset_demo.bat`** OR run:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\reset_demo_for_judges.ps1
+```
+- Sets Rohit's terminal to **untrusted** (`pending`), resetting the cryptographic ECDSA showcase.
+- Preserves all other logged-in team laptops (Aryan, Vicky, Zara, Rakshita).
+- Preserves all 100% of uploaded knowledge documents, ChromaDB vectors, and model weights.
+
+### Option 2: Full History Purge (Wipes Chats & Approval Cards)
+If you want a completely pristine chat and approval queue for Workspace #1:
+```powershell
 python scripts/clear_demo_history.py
 ```
 
-### What This Script Does:
-1. **Cleans Agent Runs & Chat History (`agent_runs`)**: Empties past conversational turns and execution logs for Workspace #1.
-2. **Cleans Execution Events (`run_events`)**: Clears step-by-step thinking traces and tool invocation events.
-3. **Cleans Pending Approval Requests (`approval_requests`)**: Empties previous supervisor approval requests so the approval queue starts at 0.
-4. **Cleans Multi-Turn Pending Tasks (`pending_tasks`)**: Clears any unconfirmed atomic CAS states.
-5. **Cleans Deliverables Ledger (`workspace_artifacts`)**: Clears generated report/chart records from the UI.
-6. **Cleans Physical Files on Disk (`data/workspaces/1/generated/*` & `temporary/*`)**: Removes generated Word documents and PNG charts from disk.
-7. **Resets Operational Audit Events (`audit_events`)**: Cleans transient test logs.
+### What the Reset Script Cleans:
+1. **Agent Runs & Chat History (`agent_runs`)**: Empties past conversational turns and execution logs for Workspace #1.
+2. **Execution Events (`run_events`)**: Clears step-by-step thinking traces and tool invocation events.
+3. **Pending Approval Requests (`approval_requests`)**: Empties previous supervisor approval requests so the approval queue starts at 0.
+4. **Multi-Turn Pending Tasks (`pending_tasks`)**: Clears any unconfirmed atomic CAS states.
+5. **Deliverables Ledger (`workspace_artifacts`)**: Clears generated report/chart records from the UI.
+6. **Physical Files on Disk (`data/workspaces/1/generated/*` & `temporary/*`)**: Removes generated Word documents and PNG charts from disk.
+7. **Operational Audit Events (`audit_events`)**: Cleans transient test logs.
 
 ### Absolute Safeguards (What is PRESERVED):
 - **100% of Ingested Knowledge Documents:** All uploaded files (`MRPL_Financial_History_3Y.xlsx`, `Pump_Maintenance_SOP.pdf`, `pid_schematic_cdu_hydrocracker_manifold.png`, `gauge_photo.png`, etc.) remain in the Knowledge Vault.
@@ -72,16 +130,6 @@ python scripts/clear_demo_history.py
 - **Physical Uploads Directory:** `data/workspaces/1/uploads/` is untouched.
 - **Agent Definitions:** Registered agents (Refinery Maintenance Specialist, Plant Operations Agent) remain active.
 - **Tool Definitions:** All safety-critical and read-only tools remain configured.
-
-### Optional Switches:
-- To also reset the network firewall audit log back to zero:
-  ```powershell
-  python scripts/clear_demo_history.py --include-network
-  ```
-- To reset across all workspaces:
-  ```powershell
-  python scripts/clear_demo_history.py --all-workspaces
-  ```
 
 ---
 
@@ -109,12 +157,80 @@ When testing control prompts like *"restart pump P-101A"*:
   2. Blocks autonomous execution.
   3. Formulates a structured proposal with parameters (`component_id: P-101A`).
   4. Inserts a **Pending Approval Request** into the Four-Eyes supervisor queue requiring cryptographic sign-off.
-- **What to say to the judges:**
-  > *"In a critical infrastructure refinery, an AI agent should never have direct uncontrolled access to switch on 500kW pumps. CogniShift acts as an air-gapped co-pilot that validates the procedure against safety standards and routes the command into a dual-supervisor authorization workflow before any hardware actuator can be signaled."*
+## 5. The 5-Minute Winning Demonstration Script (For SIH Judges)
+
+Follow this 5-act demonstration script to showcase every technical dimension of CogniShift in under 5 minutes:
+
+### Act 1: Hardware-Bound WebCrypto ECDSA Security & Untrusted Interception (Minute 0–1)
+1. **Show the Multi-Terminal Architecture:**
+   - Explain to the judges: *"CogniShift operates across multiple laptops on our local venue Wi-Fi with Zero Cloud Egress. Devices authenticate not just with passwords, but via client-side WebCrypto ECDSA public key pairs generated in browser memory."*
+2. **Demonstrate Rohit's Terminal Getting Intercepted:**
+   - Have Rohit open `https://10.10.182.228:8443` and type valid operator credentials (`rohit` / `OperatorPass123!`).
+   - The browser generates an ECDSA key pair, submits a challenge, and is **blocked** with `UNKNOWN_DEVICE` (403 Forbidden).
+   - Point out to judges: *"Even with legitimate credentials and network connectivity, an unapproved laptop cannot access plant controls."*
+3. **Approve via Host Admin:**
+   - On Sitanshu's laptop (`https://localhost:8443`), open the **/security** console.
+   - Point out the security alert, the client IP (`10.10.145.22`), and the SHA-256 key fingerprint.
+   - Click **Approve**.
+   - Rohit clicks **"Retry Device Verification"** on his laptop -> Access instantly granted!
 
 ---
 
-## 5. Comprehensive Catalog of 28 Informal Showcase Prompts
+### Act 2: Operator Data Attachment & Time-Series SCADA Visualization (Minute 1–2)
+1. **Log in as Operator Sam:**
+   - Open `/workbench` (Operator view).
+   - Click **Attach File** and upload `equipment_readings.csv` (or select it from the dropdown).
+2. **Execute Data Analysis Prompt:**
+   - Type: `"Analyze the attached CSV equipment readings and create a line chart of temperature over time"`
+   - Watch the local engine execute:
+     - Automatically resolves the uploaded file in the Knowledge Vault.
+     - Detects the datetime/timestamp column and sorts chronologically.
+     - Applies dynamic tick thinning to prevent cluttered axis labels.
+     - Generates the line chart with inline preview (CSP blob enabled) and displays `equipment_readings.csv` under **Data Source Used**.
+
+---
+
+### Act 3: Sovereign Multi-Recipient Mail & Live SSE Delivery (Minute 2–3)
+1. **Compose Internal Mail:**
+   - Navigate to `/mailbox`.
+   - Click **Compose Message**.
+   - Select recipient: `supervisor_zara`.
+   - Subject: `Temperature Excursion on CDU Feed Pump P-101A`.
+   - Body: `Attaching latest telemetry data for review before scheduled maintenance.`
+   - Attach the generated CSV or report. Click **Send**.
+2. **Live Delivery via SSE:**
+   - Switch to Supervisor Zara's laptop screen.
+   - Without refreshing the page, the new message pops into the inbox instantly via Server-Sent Events (SSE).
+   - Show independent read receipts and secure attachment download.
+
+---
+
+### Act 4: Human-in-the-Loop Four-Eyes Plant Safety Authorization (Minute 3–4)
+1. **Propose Safety-Critical Action:**
+   - In Operator console, prompt: `"restart pump P-101A due to pressure fluctuations"`
+   - CogniShift's Safety Interception Protocol flags `restart_component` as a service-interrupting high-risk action.
+   - The system halts execution and issues a **Temporary Operational Authorization Request**.
+2. **Dual-Supervisor Cryptographic Signatures:**
+   - Supervisor 1 (Zara) reviews the technical justification and signs (`reviewed_by`).
+   - Supervisor 2 (Rakshita) reviews and counter-signs (`reviewed_by_2`).
+   - The system generates an authoritative, tamper-evident DOCX permit.
+3. **Atomic Single-Use Permit Execution:**
+   - Operator triggers execution with the issued permit code.
+   - Show the atomic execution succeeding once and permanently consuming the permit (subsequent attempts fail closed).
+
+---
+
+### Act 5: Air-Gap Verification & Strict Sovereignty Probe (Minute 4–5)
+1. **Ask the Sovereignty Test Prompt:**
+   - Type: `"Can you connect to ChatGPT API or send this telemetry to OpenAI?"`
+   - Model responds: *"CogniShift operates strictly on-premise without cloud connections..."*
+2. **Show the Network Audit Trail:**
+   - Open `/security` -> **Network Audit Trail**.
+   - Prove that all outbound socket connections outside localhost are logged and blocked by policy.
+
+---
+
+## 6. Comprehensive Catalog of 28 Informal Showcase Prompts
 
 You do **not** need to type formal academic queries. Type these **natural, everyday plant operator prompts** exactly as written.
 
@@ -324,19 +440,21 @@ You do **not** need to type formal academic queries. Type these **natural, every
 
 ---
 
-## 6. Pre-Demonstration Verification Checklist
+## 7. Pre-Demonstration Verification Checklist
 
 Run through this 30-second checklist right before calling over teachers or judges:
 
-- [ ] **Ollama Model Running:** `http://localhost:11434/api/tags` shows `qwen2.5:7b` (or active SLM).
-- [ ] **Backend Running:** Terminal 1 running `uvicorn cognishift.app.main:app` without exceptions.
-- [ ] **Frontend Running:** Terminal 2 running `npm run dev` at `http://localhost:5173`.
-- [ ] **Clean Slate Applied:** Ran `python scripts/clear_demo_history.py` (chat and approvals are fresh).
-- [ ] **Knowledge Documents Verified:** Open `http://localhost:5173`, check the **Knowledge** tab:
+- [ ] **Ollama Service Active:** `http://localhost:11434/api/tags` shows `qwen2.5:7b` (or `llama3.2:3b`) and `moondream:latest`.
+- [ ] **Sovereign Server Active:** Double-clicked `run_demo.bat` (or running `.\scripts\start_lan_demo.ps1`). Server listening on `https://0.0.0.0:8443`.
+- [ ] **Local Loopback SMTP Active:** Terminal running `python scripts/run_local_smtp_sink.py` on `127.0.0.1:1025`.
+- [ ] **Route Preflight Passed:** Ran `preflight.bat` or `python scripts/preflight_routes.py` with all 21 routes passing `[OK]`.
+- [ ] **Clean Showcase Slate Applied:** Double-clicked `reset_demo.bat` (Rohit is untrusted for the live interception showcase; all other accounts and knowledge sources preserved).
+- [ ] **Knowledge Documents Verified:** Open `https://localhost:8443` -> check the **Knowledge** tab:
   - `MRPL_Financial_History_3Y.xlsx` (Spreadsheet)
   - `Pump_Maintenance_SOP.pdf` (PDF Manual)
   - `MRPL_OISD_106_PRV.pdf` (Safety Standard)
   - `pid_schematic_cdu_hydrocracker_manifold.png` (Engineering Schematic)
   - `gauge_photo.png` (Analog Gauge Image)
-- [ ] **Approvals Tab Clean:** Shows 0 pending requests (ready to demonstrate the `restart pump P-101A` interception).
-- [ ] **Network Audit Tab Ready:** Shows active local loopback traffic with zero unauthorized external egress.
+  - `equipment_readings.csv` (Time-Series Operational Readings)
+- [ ] **Approvals Queue Clean:** Shows 0 pending requests (ready to demonstrate the `restart pump P-101A` Four-Eyes interception).
+- [ ] **Security Console Ready:** `/security` shows local loopback authorized and Rohit in pending untrusted state ready to be approved live.

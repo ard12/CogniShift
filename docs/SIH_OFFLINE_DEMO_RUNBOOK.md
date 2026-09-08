@@ -103,17 +103,24 @@ python scripts/seed_sih_demo.py
 
 ## 5. Launch the Operations Console
 
-Start the FastAPI application on `127.0.0.1:8000`:
+### Option A: The 1-Click Windows Launcher (Recommended for Judges)
+Double-click **`run_demo.bat`** in the project root!  
+This launches the integrated sovereign server on `https://0.0.0.0:8443` with TLS encryption and serves both backend APIs and the built production React frontend over same-origin HTTPS.
 
+### Option B: The Master PowerShell Command
 ```powershell
-$env:COGNISHIFT_DEMO_MODE='true'
+powershell -ExecutionPolicy Bypass -File .\scripts\start_lan_demo.ps1 -RestartExisting
+```
+
+### Option C: Local Loopback Development Server
+```powershell
+$env:PYTHONPATH = "src"
 python -m uvicorn cognishift.app.main:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
-Select Sam, Jane, or Rohit in the local authentication screen. These buttons request short-lived, process-memory sessions and are rejected when demo mode is disabled or the client is not loopback. Manual bearer authentication remains under the Advanced section.
-
 Open Google Chrome or Edge and navigate to:
-**`http://127.0.0.1:8000/`** (redirects to the Secure Industrial Operations Console)
+- **Unified HTTPS Console (Multi-Terminal):** **`https://localhost:8443/`** (or `https://<Host-Wi-Fi-IP>:8443/`)
+- **Single-Machine Dev Server:** **`http://127.0.0.1:8000/`**
 
 ---
 

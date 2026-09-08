@@ -6,5 +6,5 @@ export interface PendingDevice { device_id: string; user_id: string; display_nam
 export const securityApi = {
   status: (workspaceId: number) => apiFetch<SecurityStatus>("/api/v1/security/status", {query: {workspace_id: workspaceId}}),
   pendingDevices: () => apiFetch<PendingDevice[]>("/api/v1/security/devices/pending"),
-  approveDevice: (deviceId: string) => apiFetch<{status: string; device_id: string}>(`/api/v1/security/devices/${encodeURIComponent(deviceId)}/approve`, {method: "POST"}),
+  approveDevice: (deviceId: string, userId: string) => apiFetch<{status: string; device_id: string; user_id: string}>(`/api/v1/security/devices/${encodeURIComponent(deviceId)}/approve`, {method: "POST", query: {user_id: userId}}),
 };

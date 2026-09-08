@@ -1,5 +1,5 @@
 """Truthful security posture and trusted-device administration endpoints."""
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
@@ -101,20 +101,36 @@ async def pending_devices(user: User = Depends(get_current_user)) -> List[Dict[s
 
 
 @router.post("/devices/{device_id}/approve")
-async def approve_device(device_id: str, user: User = Depends(get_current_user)) -> Dict[str, str]:
+async def approve_device(
+    device_id: str,
+    user_id: Optional[str] = None,
+    user: User = Depends(get_current_user),
+) -> Dict[str, str]:
     if user.role != "administrator":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
     async with get_db() as db:
-        row = await (await db.execute("SELECT * FROM trusted_devices WHERE device_id=? AND status='pending'", (device_id,))).fetchone()
+        if user_id:
+            row = await (await db.execute(
+                "SELECT * FROM trusted_devices WHERE device_id=? AND user_id=? AND status='pending'",
+                (device_id, user_id),
+            )).fetchone()
+        else:
+            rows = await (await db.execute(
+                "SELECT * FROM trusted_devices WHERE device_id=? AND status='pending'",
+                (device_id,),
+            )).fetchall()
+            if len(rows) > 1:
+                raise HTTPException(status_code=409, detail="Multiple users are pending for this device; specify user_id.")
+            row = rows[0] if rows else None
         if not row:
             raise HTTPException(status_code=404, detail="Pending device not found.")
         await db.execute(
-            "UPDATE trusted_devices SET status='approved',approved_by=?,approved_at=CURRENT_TIMESTAMP WHERE device_id=?",
-            (user.user_id, device_id),
+            "UPDATE trusted_devices SET status='approved',approved_by=?,approved_at=CURRENT_TIMESTAMP WHERE device_id=? AND user_id=?",
+            (user.user_id, device_id, row["user_id"]),
         )
         await db.execute(
             "INSERT INTO audit_events (actor_id,action,resource_type,details,result) VALUES (?,'trusted_device_approved','trusted_device',?,'success')",
             (user.user_id, f"Approved device_id={device_id} for user={row['user_id']}"),
         )
         await db.commit()
-    return {"status": "approved", "device_id": device_id}
+    return {"status": "approved", "device_id": device_id, "user_id": row["user_id"]}

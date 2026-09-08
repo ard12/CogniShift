@@ -5,6 +5,7 @@ FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
 APP_TSX = FRONTEND_DIR / "src" / "App.tsx"
 SIDEBAR_TSX = FRONTEND_DIR / "src" / "components" / "Sidebar.tsx"
 OPERATOR_TSX = FRONTEND_DIR / "src" / "pages" / "OperatorPage.tsx"
+ARTIFACTS_API_TS = FRONTEND_DIR / "src" / "api" / "artifacts.ts"
 
 
 def test_console_routes_every_primary_view_and_preserves_agent_fallback():
@@ -53,3 +54,12 @@ def test_conversational_command_bar_remains_available_outside_dashboard():
     assert 'to: "/operator"' in sidebar_code
     assert 'to: "/dashboard"' in sidebar_code
 
+
+def test_artifact_downloads_carry_device_proof_and_labels_do_not_invent_sandboxing():
+    artifact_code = ARTIFACTS_API_TS.read_text(encoding="utf-8")
+    operator_code = OPERATOR_TSX.read_text(encoding="utf-8")
+
+    assert "getDeviceSession" in artifact_code
+    assert '"X-Device-Session"' in artifact_code
+    assert "BACKEND-VERIFIED RUN ARTIFACTS" in operator_code
+    assert "ISOLATED SANDBOX ARTIFACTS" not in operator_code

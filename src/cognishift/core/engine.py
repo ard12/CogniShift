@@ -410,7 +410,7 @@ DEFAULT_SYSTEM_PERSONA = (
     "4. Never imply access to live systems or telemetry that are not actually connected.\n"
     "5. When operational execution is required, propose actions using the structured action protocol. Sensitive actions remain subject to deterministic backend policy and human approval.\n"
     "6. Grounding: Never invent intranet URLs, internal portals, organizational policies, or standard operating procedures not present in the local context. If information is not in the context, explicitly state that it is not available.\n"
-    "7. Sovereignty & Air-Gap: This system is 100% offline and air-gapped. NEVER fabricate or output external HTTP/HTTPS URLs (such as docs.mrpl.com or any external domain). All portals and tools are hosted locally in the application sidebar (Dashboard, Operator, Workspaces, Agents, Knowledge, Runs, Approvals, Artifacts, System)."
+    "7. Network sovereignty: external internet access is blocked by strict application policy. Do not claim physical air-gap isolation or zero egress unless runtime evidence explicitly proves it. NEVER fabricate or output external HTTP/HTTPS URLs (such as docs.mrpl.com or any external domain). All portals and tools are hosted locally in the application sidebar (Dashboard, Operator, Workspaces, Agents, Knowledge, Runs, Approvals, Artifacts, System)."
 )
 
 
@@ -932,7 +932,7 @@ async def execute_agent_run(
                 goal=clean_input,
                 current_step_index=0,
                 max_steps=1,
-                steps=[PlanStep(id=1, description="Enforce sovereign air-gap policy and reject outbound egress request", status="completed", observation="Blocked by Sovereign Air-Gap Egress Policy")]
+                steps=[PlanStep(id=1, description="Enforce sovereign network policy and reject outbound egress request", status="completed", observation="Blocked by strict Sovereign Network Policy")]
             )
             saved_plan_json = serialize_plan(plan)
             await db.execute(
@@ -942,7 +942,7 @@ async def execute_agent_run(
                 (result_text, saved_plan_json, run_id)
             )
             await db.commit()
-            await log_event(db, run_id, "sovereign_egress_blocked", "External egress request blocked by air-gap sovereign policy.")
+            await log_event(db, run_id, "sovereign_egress_blocked", "External egress request blocked by strict sovereign network policy.")
             cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
             return make_response(dict(await cursor.fetchone()))
 
@@ -2269,6 +2269,7 @@ async def execute_agent_run(
             # Bounded Iterative Plan Execution Loop (P0-3)
             MAX_AGENT_STEPS = 10
             step_counter = 0
+            sandbox_used = False
             final_text = vision_analysis if strict_visual_scope and vision_analysis else ""
             if final_text:
                 for step in plan.steps:
@@ -2804,6 +2805,7 @@ print("Analysis script finished with returncode 0.")
                             tool_params["input_files"] = [{"source_path": rel_input_path, "dest_name": target_doc_path.name}]
 
                         tool_out = await execute_tool("execute_code", tool_params, workspace_id=workspace_id, run_id=run_id)
+                        sandbox_used = True
                         current_step.status = "completed"
                         current_step.tool_name = "execute_code"
                         current_step.tool_parameters = {"code": py_code}
@@ -2857,10 +2859,10 @@ print("Analysis script finished with returncode 0.")
                                     "level": 1,
                                     "paragraphs": [
                                         f"Audit Deliverable: {display_title}",
-                                        f"Author / Auditor: {custom_author if custom_author else 'Plant Operations Agent'}",
+                                        f"Prepared by: {custom_author if custom_author else 'CogniShift automated analysis'}",
                                         f"Source Dataset: {doc_title} (Ingested into Knowledge Vault)",
                                         f"Scope: Comprehensive Multi-Year Financial Performance Audit.",
-                                        "Quantitative analysis conducted autonomously inside local sovereign sandbox with 100% offline verification."
+                                        "Analysis executed by local CogniShift services. External internet access was blocked by strict application policy; physical network isolation was not asserted."
                                     ]
                                 },
                                 {
@@ -2873,12 +2875,13 @@ print("Analysis script finished with returncode 0.")
                                     }
                                 },
                                 {
-                                    "heading": "3. Authoritative Audit Sign-Off",
+                                    "heading": "3. Verification and Approval Status",
                                     "level": 1,
                                     "paragraphs": [
                                         f"Audit Completion Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
-                                        f"Lead Auditor / Analyst: {custom_author if custom_author else 'Plant Operations Agent'}",
-                                        "Sovereign Compliance: Computed in air-gapped environment with zero cloud egress.",
+                                        f"Prepared by: {custom_author if custom_author else 'CogniShift automated analysis'}",
+                                        "Human approval / sign-off: Not recorded for this run.",
+                                        "Network control: External internet access blocked by strict application policy; physical isolation not asserted.",
                                         "Generated by CogniShift Sovereign Agentic Workbench (SIH26117)."
                                     ]
                                 }
@@ -2908,10 +2911,14 @@ print("Analysis script finished with returncode 0.")
                                     "level": 1,
                                     "paragraphs": [
                                         f"Audit Deliverable: {display_title}",
-                                        f"Author / Auditor: {custom_author if custom_author else 'Plant Operations Agent'}",
+                                        f"Prepared by: {custom_author if custom_author else 'CogniShift automated analysis'}",
                                         f"Source Dataset: {doc_title} (ID #{target_doc['id'] if target_doc else '1'})",
                                         f"Scope: {p1_scope}",
-                                        "Analysis executed autonomously via local Python container sandbox in strict sovereign mode."
+                                        (
+                                            "Analysis executed in an isolated local Python container. External internet access was blocked by strict application policy."
+                                            if sandbox_used
+                                            else "Analysis executed by trusted local backend services. External internet access was blocked by strict application policy."
+                                        )
                                     ]
                                 },
                                 {
@@ -2924,12 +2931,13 @@ print("Analysis script finished with returncode 0.")
                                     }
                                 },
                                 {
-                                    "heading": "3. Authoritative Sign-Off & Compliance",
+                                    "heading": "3. Verification and Approval Status",
                                     "level": 1,
                                     "paragraphs": [
                                         f"Audit Completion Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
-                                        f"Lead Auditor / Analyst: {custom_author if custom_author else 'Plant Operations Agent'}",
-                                        "Sovereign Compliance: Computed in air-gapped environment with zero cloud egress.",
+                                        f"Prepared by: {custom_author if custom_author else 'CogniShift automated analysis'}",
+                                        "Human approval / sign-off: Not recorded for this run.",
+                                        "Network control: External internet access blocked by strict application policy; physical isolation not asserted.",
                                         "Generated by CogniShift Sovereign Agentic Workbench (SIH26117)."
                                     ]
                                 }
@@ -3127,8 +3135,9 @@ print("Analysis script finished with returncode 0.")
                                     growth_str = f" with growth of **{growth_val}%**" if growth_val is not None else ""
                                     final_text += f"- **{lbl}**: Reported at **{format_number_display(latest, is_currency=(m_key != 'grm'))}** ({col}){growth_str}.\n"
                                 final_text += (
-                                    f"- **Lead Auditor / Sign-off**: `{custom_author if custom_author else 'Plant Operations Agent'}`\n"
-                                    f"- **Compliance**: Computed in isolated local environment with 100% air-gapped sovereign verification."
+                                    f"- **Prepared by**: `{custom_author if custom_author else 'CogniShift automated analysis'}`\n"
+                                    f"- **Human approval / sign-off**: Not recorded for this run.\n"
+                                    f"- **Network control**: External internet access blocked by strict application policy; physical isolation not asserted."
                                 )
                             else:
                                 final_text += f"\nAnalysis completed for `{doc_title}`."
@@ -3136,12 +3145,20 @@ print("Analysis script finished with returncode 0.")
                             intro_msg = (
                                 f"I have executed the deterministic visualization pipeline on `{doc_title}` and generated the requested deliverable{'s' if len(deliverables_list) > 1 else ''}:\n\n"
                                 if is_viz_only
-                                else f"I have executed the Python analysis script in the isolated sandbox and generated the official deliverable{'s' if len(deliverables_list) > 1 else ''} for '{doc_title}'.\n\n"
+                                else (
+                                    f"I have executed the analysis in an isolated local sandbox and generated the official deliverable{'s' if len(deliverables_list) > 1 else ''} for '{doc_title}'.\n\n"
+                                    if sandbox_used
+                                    else f"I have used trusted local backend services to generate the official deliverable{'s' if len(deliverables_list) > 1 else ''} for '{doc_title}'.\n\n"
+                                )
                             )
                             engine_note = (
                                 "- **Execution Service:** Trusted backend Matplotlib charting service with strict Pillow validation (exit code 0)\n"
                                 if is_viz_only
-                                else "- **Sandbox Script:** Executed in isolated Python container (exit code 0)\n"
+                                else (
+                                    "- **Execution Service:** Isolated local Python container (exit code 0)\n"
+                                    if sandbox_used
+                                    else "- **Execution Service:** Trusted local backend document service\n"
+                                )
                             )
                             final_text = (
                                 f"{intro_msg}"
@@ -3161,7 +3178,7 @@ print("Analysis script finished with returncode 0.")
                             final_text += (
                                 f"{engine_note}"
                                 f"- **Sources Cited:** `[{doc_title} | Page 1]`\n"
-                                f"- **Compliance:** 100% air-gapped sovereign execution."
+                                f"- **Network control:** External internet access blocked by strict application policy; physical isolation not asserted."
                             )
 
                         current_step.status = "completed"
@@ -3605,7 +3622,7 @@ print("Analysis script finished with returncode 0.")
                 or routing_res.intent == SemanticIntent.CODE_EXECUTION
             )
             if timing_trigger and run_final_status == "completed":
-                timing_block = f"\n\n---\n**Execution Timing & Provenance (Authoritative Backend Clock):**\n- Execution Completed: `{execution_finish_utc}`\n- Operating Mode: `{settings.operating_mode}`\n- Verified Zero Egress: 100% On-Premise Sovereign Execution"
+                timing_block = f"\n\n---\n**Execution Timing & Provenance (Authoritative Backend Clock):**\n- Execution Completed: `{execution_finish_utc}`\n- Operating Mode: `{settings.operating_mode}`\n- External Internet: Blocked by strict application policy\n- Physical Network Isolation: Not asserted"
                 if timing_block not in final_text:
                     final_text += timing_block
             # DeepSeek & LLM Output Hygiene: Ensure <think>...</think> blocks never leak to result_text

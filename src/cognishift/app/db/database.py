@@ -136,7 +136,7 @@ async def init_db() -> None:
 
         await db.execute('''
             CREATE TABLE IF NOT EXISTS trusted_devices (
-                device_id TEXT PRIMARY KEY,
+                device_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 public_key_jwk TEXT NOT NULL,
@@ -145,9 +145,46 @@ async def init_db() -> None:
                 approved_by TEXT,
                 approved_at TIMESTAMP,
                 last_verified_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (device_id, user_id)
             )
         ''')
+
+        # Older databases used device_id as the sole primary key. A browser key
+        # represents a physical browser profile and may legitimately be approved
+        # for more than one application user. Migrate in place so switching demo
+        # personas cannot collide on the old primary key and surface as HTTP 500.
+        trusted_device_columns = await (await db.execute("PRAGMA table_info(trusted_devices)")).fetchall()
+        trusted_device_pk = [
+            row[1] for row in sorted(trusted_device_columns, key=lambda item: item[5]) if row[5]
+        ]
+        if trusted_device_pk == ["device_id"]:
+            await db.execute("ALTER TABLE trusted_devices RENAME TO trusted_devices_legacy")
+            await db.execute('''
+                CREATE TABLE trusted_devices (
+                    device_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    public_key_jwk TEXT NOT NULL,
+                    key_fingerprint TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    approved_by TEXT,
+                    approved_at TIMESTAMP,
+                    last_verified_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (device_id, user_id)
+                )
+            ''')
+            await db.execute('''
+                INSERT INTO trusted_devices (
+                    device_id,user_id,display_name,public_key_jwk,key_fingerprint,
+                    status,approved_by,approved_at,last_verified_at,created_at
+                )
+                SELECT device_id,user_id,display_name,public_key_jwk,key_fingerprint,
+                       status,approved_by,approved_at,last_verified_at,created_at
+                FROM trusted_devices_legacy
+            ''')
+            await db.execute("DROP TABLE trusted_devices_legacy")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id, status)")
 
         await db.execute('''

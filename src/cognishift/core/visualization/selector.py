@@ -137,12 +137,21 @@ def select_target_sheet(
         best_sheet = sheet_names[0]
         best_score = -1.0
         q_words = set(re.findall(r"\b\w{3,}\b", query.lower()))
+        generic_financial_trend = (
+            contract.requested_chart_type == ChartType.LINE
+            and not contract.explicit_sheet
+            and any(term in workbook_path.stem.lower() for term in ("financial", "history", "statement"))
+        )
 
         for sname in sheet_names:
             ws = wb[sname]
             score = 0.0
             # Sheet name relevance
             sname_clean = sname.lower().replace("_", " ")
+            if generic_financial_trend and "income statement" in sname_clean:
+                # Prefer the primary time-series statement over an arbitrary
+                # numerically dense project/CAPEX sheet for a generic trend.
+                score += 50.0
             for w in q_words:
                 if w in sname_clean:
                     score += 15.0
@@ -278,6 +287,15 @@ def _generate_single_spec(
 
     # Check if user mentioned a specific row item (e.g. Operating EBITDA, Gross Revenue)
     matched_row_idx = None
+    requested_metric = any(
+        term in q_lower
+        for term in ("ebitda", "revenue", "turnover", "profit after tax", " pat ")
+    )
+    if not requested_metric and contract.requested_chart_type == ChartType.LINE:
+        matched_row_idx = next(
+            (idx for idx, value in enumerate(metric_rows) if "operating ebitda" in value.lower()),
+            None,
+        )
     for r_idx, val in enumerate(metric_rows):
         val_clean = val.lower()
         if any(term in val_clean for term in ["operating ebitda", "ebitda", "gross revenue", "revenue from operations", "pat", "profit after tax"]):

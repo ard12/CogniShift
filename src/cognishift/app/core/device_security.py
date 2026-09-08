@@ -57,7 +57,10 @@ async def begin_challenge(user_id: str, role: str, device_id: str, display_name:
                 (user_id, f"First trusted administrator device registered; device_id={device_id}; fingerprint={fingerprint}"),
             )
             await db.commit()
-            row = await (await db.execute("SELECT * FROM trusted_devices WHERE device_id = ?", (device_id,))).fetchone()
+            row = await (await db.execute(
+                "SELECT * FROM trusted_devices WHERE device_id = ? AND user_id = ?",
+                (device_id, user_id),
+            )).fetchone()
         elif not row:
             await db.execute(
                 "INSERT INTO trusted_devices (device_id,user_id,display_name,public_key_jwk,key_fingerprint,status) VALUES (?,?,?,?,?,'pending')",
@@ -120,7 +123,10 @@ async def verify_challenge(user_id: str, device_id: str, challenge_id: str, sign
             await db.commit()
             raise ValueError("Device signature verification failed.") from exc
         await db.execute("UPDATE device_challenges SET used=1 WHERE challenge_id=?", (challenge_id,))
-        await db.execute("UPDATE trusted_devices SET last_verified_at=CURRENT_TIMESTAMP WHERE device_id=?", (device_id,))
+        await db.execute(
+            "UPDATE trusted_devices SET last_verified_at=CURRENT_TIMESTAMP WHERE device_id=? AND user_id=?",
+            (device_id, user_id),
+        )
         await db.execute(
             "INSERT INTO audit_events (actor_id,action,resource_type,details,result) VALUES (?,'device_verified','trusted_device',?,'success')",
             (user_id, f"Cryptographic challenge verified; device_id={device_id}"),

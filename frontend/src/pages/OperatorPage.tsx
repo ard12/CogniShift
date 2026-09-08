@@ -619,7 +619,7 @@ export function OperatorPage() {
                       Generated Artifacts & Visualizations ({artifacts.length})
                     </span>
                     <span className="font-mono text-[10px] text-ink-3">
-                      ISOLATED SANDBOX ARTIFACTS
+                      BACKEND-VERIFIED RUN ARTIFACTS
                     </span>
                   </div>
 

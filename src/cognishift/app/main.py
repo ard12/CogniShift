@@ -167,3 +167,24 @@ async def privacy_status():
 async def list_models():
     _, available_models = await check_ollama()
     return available_models
+
+
+# React Router uses browser history paths. Serve the SPA shell for known client
+# routes so refreshing /security, /operator, etc. does not become a backend 404.
+# API, documentation, asset, and unknown file-like paths continue to fail closed.
+_SPA_CLIENT_ROUTES = {
+    "dashboard", "operator", "workspaces", "agents", "knowledge",
+    "runs", "approvals", "artifacts", "security", "system",
+}
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_history_fallback(full_path: str):
+    first_segment = full_path.strip("/").split("/", 1)[0]
+    if (
+        vite_dist_dir.exists()
+        and (vite_dist_dir / "index.html").exists()
+        and first_segment in _SPA_CLIENT_ROUTES
+    ):
+        return FileResponse(str(vite_dist_dir / "index.html"))
+    raise HTTPException(status_code=404, detail="Not Found")

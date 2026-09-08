@@ -110,6 +110,23 @@ def test_build_visualization_specs_excel_sheet_selection():
     assert any("FY" in str(x) for x in spec.x_values)
 
 
+def test_generic_financial_line_graph_prefers_income_statement_ebitda():
+    """The evaluator's short prompt must not select an arbitrary CAPEX sheet."""
+    xlsx_path = Path("data/demo/MRPL_Enterprise_Financial_and_Operational_History_10Y.xlsx")
+    if not xlsx_path.exists():
+        pytest.skip("Demo XLSX not found")
+
+    query = "Create a line graph and give me the PNG."
+    contract = parse_artifact_request_contract(query)
+    specs = build_visualization_specs(xlsx_path, contract, query)
+
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec.source_sheet == "Income_Statement_10Y"
+    assert "Operating EBITDA" in spec.y_columns[0]
+    assert spec.output_filename.endswith("_ebitda_trend.png")
+
+
 def test_render_and_validate_png(tmp_path):
     """Verify trusted matplotlib rendering and strict Pillow cryptographic validation."""
     spec = VisualizationSpec(

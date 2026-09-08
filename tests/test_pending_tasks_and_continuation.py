@@ -140,7 +140,8 @@ async def test_direct_low_risk_execution_runs_without_confirmation():
     assert run_res.error_message is None
     # Verify authoritative backend completion timestamp is attached
     assert "Execution Completed:" in run_res.result_text
-    assert "Verified Zero Egress: 100% On-Premise Sovereign Execution" in run_res.result_text
+    assert "External Internet: Blocked by strict application policy" in run_res.result_text
+    assert "Physical Network Isolation: Not asserted" in run_res.result_text
 
     # Verify structured plan authoritatively resolved document
     plan_data = json.loads(run_res.structured_plan)

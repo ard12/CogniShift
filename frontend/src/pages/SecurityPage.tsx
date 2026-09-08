@@ -47,9 +47,9 @@ export function SecurityPage() {
     {role === "administrator" && <Panel>
       <PanelHeader icon={<IconShieldCheck className="h-4 w-4" />} title="Pending Device Approvals" />
       <PanelBody>
-        {pending.length === 0 ? <p className="text-xs text-ink-3">No unknown devices are awaiting approval.</p> : <div className="space-y-2">{pending.map((device) => <div key={device.device_id} className="flex flex-wrap items-center gap-3 rounded border border-status-warning/30 p-3">
+        {pending.length === 0 ? <p className="text-xs text-ink-3">No unknown devices are awaiting approval.</p> : <div className="space-y-2">{pending.map((device) => <div key={`${device.device_id}:${device.user_id}`} className="flex flex-wrap items-center gap-3 rounded border border-status-warning/30 p-3">
           <IconLock className="text-status-warning" /><div className="min-w-0 flex-1"><p className="text-xs text-ink-1">{device.display_name} · {device.user_id}</p><p className="truncate font-mono text-[10px] text-ink-3">{device.key_fingerprint}</p></div>
-          <Button size="sm" onClick={async () => { await securityApi.approveDevice(device.device_id); await refresh(); }}>Approve device</Button>
+          <Button size="sm" onClick={async () => { await securityApi.approveDevice(device.device_id, device.user_id); await refresh(); }}>Approve device</Button>
         </div>)}</div>}
       </PanelBody>
     </Panel>}

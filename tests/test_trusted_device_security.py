@@ -76,6 +76,37 @@ async def test_unknown_device_block_audit_admin_approval_and_challenge_response(
         assert posture.json()["device"]["status"] == "trusted"
         assert posture.json()["workspace"]["status"] == "authorized"
 
+        # One physical browser/device key can be registered for multiple users.
+        # This is the quick-connect persona-switch regression that previously
+        # collided on device_id and surfaced as an unhandled HTTP 500.
+        shared_identity = dict(admin_identity)
+        shared = await client.post(
+            "/api/v1/auth/device/challenge",
+            json=shared_identity,
+            headers={"Authorization": f"Bearer {TEST_OPERATOR_TOKEN}"},
+        )
+        assert shared.status_code == status.HTTP_403_FORBIDDEN
+        shared_pending = await client.get("/api/v1/security/devices/pending", headers=admin_headers)
+        shared_row = next(
+            item for item in shared_pending.json()
+            if item["device_id"] == shared_identity["device_id"]
+        )
+        approved_shared = await client.post(
+            f"/api/v1/security/devices/{shared_identity['device_id']}/approve",
+            params={"user_id": shared_row["user_id"]},
+            headers=admin_headers,
+        )
+        assert approved_shared.status_code == 200, approved_shared.text
+        shared_session = await prove(client, TEST_OPERATOR_TOKEN, admin_key, shared_identity)
+        shared_me = await client.get(
+            "/api/v1/auth/me",
+            headers={
+                "Authorization": f"Bearer {TEST_OPERATOR_TOKEN}",
+                "X-Device-Session": shared_session,
+            },
+        )
+        assert shared_me.status_code == 200
+
     async with get_db() as db:
         row = await (await db.execute("SELECT action,result FROM audit_events WHERE action='device_verification_failed' ORDER BY id DESC LIMIT 1")).fetchone()
         assert row["result"] == "blocked"

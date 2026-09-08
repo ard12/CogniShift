@@ -1,11 +1,30 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { authApi } from "@/api/auth";
 import { Button } from "@/components/ui/Button";
 import { InlineError } from "@/components/ui/States";
 
 export function AuthGatePage() {
   const { signIn, signInDemo, verifying, error, deviceStatus, retryVerification } = useAuth();
   const [tokenInput, setTokenInput] = useState("");
+  const [demoEnabled, setDemoEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    authApi
+      .demoStatus()
+      .then((res) => {
+        if (mounted && res?.enabled) {
+          setDemoEnabled(true);
+        }
+      })
+      .catch(() => {
+        if (mounted) setDemoEnabled(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -40,38 +59,42 @@ export function AuthGatePage() {
               autoFocus
             />
             
-            <div className="mt-3 flex flex-col gap-1.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-3">Quick Connect Personas:</span>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setTokenInput(""); void signInDemo("operator"); }}
-                  className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-brand hover:bg-brand/10 transition"
-                >
-                  <span className="block font-bold text-brand">Sam</span>
-                  <span className="text-[10px] text-ink-3">Operator</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setTokenInput(""); void signInDemo("supervisor"); }}
-                  className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-status-warning hover:bg-status-warning/10 transition"
-                >
-                  <span className="block font-bold text-status-warning">Jane</span>
-                  <span className="text-[10px] text-ink-3">Supervisor</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setTokenInput(""); void signInDemo("administrator"); }}
-                  className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-status-knowledge hover:bg-status-knowledge/10 transition"
-                >
-                  <span className="block font-bold text-status-knowledge">Rohit</span>
-                  <span className="text-[10px] text-ink-3">Admin</span>
-                </button>
+            {demoEnabled && (
+              <div className="mt-3 flex flex-col gap-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-ink-3">Quick Connect Personas (Local Loopback Only):</span>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setTokenInput(""); void signInDemo("operator"); }}
+                    className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-brand hover:bg-brand/10 transition"
+                  >
+                    <span className="block font-bold text-brand">Sam</span>
+                    <span className="text-[10px] text-ink-3">Operator</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTokenInput(""); void signInDemo("supervisor"); }}
+                    className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-status-warning hover:bg-status-warning/10 transition"
+                  >
+                    <span className="block font-bold text-status-warning">Jane</span>
+                    <span className="text-[10px] text-ink-3">Supervisor</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTokenInput(""); void signInDemo("administrator"); }}
+                    className="rounded border border-surface-border bg-surface-2 px-2 py-2 text-center text-xs font-mono font-medium text-ink-1 hover:border-status-knowledge hover:bg-status-knowledge/10 transition"
+                  >
+                    <span className="block font-bold text-status-knowledge">Rohit</span>
+                    <span className="text-[10px] text-ink-3">Admin</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
-              Enter your access token or select a quick-connect role above.
+              {demoEnabled
+                ? "Enter your access token or select a quick-connect role above."
+                : "Enter your issued sovereign access token to connect."}
             </p>
           </div>
 

@@ -25,7 +25,9 @@ if (-not (Test-Path $CertFile) -or -not (Test-Path $KeyFile)) {
 
 Write-Host "`n[STARTING UVICORN SERVER]" -ForegroundColor Green
 Write-Host "Listening on: https://0.0.0.0:8443 (LAN IP: https://10.10.182.228:8443)" -ForegroundColor Yellow
-Write-Host "Sovereign Mode: LOCAL (Zero Cloud Egress)" -ForegroundColor Cyan
+Write-Host "Client CA Certificate: data/certs/cognishift_demo_ca.crt (Distribute to team browsers)" -ForegroundColor Cyan
+Write-Host "Client Auth Tokens:    data/private/team_tokens_summary.txt (Gitignored)" -ForegroundColor Cyan
+Write-Host "Sovereign Mode:        LOCAL (CogniShift Public Egress: BLOCKED)" -ForegroundColor Green
 Write-Host "Press Ctrl+C to terminate.`n" -ForegroundColor Gray
 
-python -m uvicorn cognishift.app.main:app --host 0.0.0.0 --port 8443 --ssl-keyfile $KeyFile --ssl-certfile $CertFile
+python -m uvicorn cognishift.app.main:app --app-dir src --host 0.0.0.0 --port 8443 --ssl-keyfile $KeyFile --ssl-certfile $CertFile

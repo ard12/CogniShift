@@ -156,6 +156,21 @@ def generate_server_cert(
     return cert, server_key
 
 
+def get_cert_sans(cert_path: Path) -> Tuple[List[str], List[str]]:
+    """Return (hostnames, ips) extracted from certificate SubjectAlternativeName."""
+    if not cert_path.exists():
+        return [], []
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        san_ext = cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+        hostnames = [str(name.value) for name in san_ext.value if isinstance(name, x509.DNSName)]
+        ips = [str(name.value) for name in san_ext.value if isinstance(name, x509.IPAddress)]
+        return hostnames, ips
+    except Exception as e:
+        logger.warning(f"Failed reading SANs from {cert_path}: {e}")
+        return [], []
+
+
 def ensure_local_tls_certificates(
     cert_dir: Optional[Path] = None,
     server_ips: Optional[List[str]] = None,
@@ -163,6 +178,8 @@ def ensure_local_tls_certificates(
 ) -> Tuple[Path, Path, Path]:
     """
     Ensure Root CA, server cert, and server key exist.
+    Validates that existing server certificate SANs cover the requested server IPs.
+    If IP drift is detected (e.g. DHCP IP change), regenerates server cert automatically.
     Returns (ca_cert_path, server_cert_path, server_key_path).
     """
     target_dir = cert_dir or get_default_cert_dir()
@@ -177,7 +194,20 @@ def ensure_local_tls_certificates(
     else:
         ca_cert, ca_key = generate_ca(ca_cert_path, ca_key_path)
 
-    if not (server_cert_path.exists() and server_key_path.exists()):
+    needs_generation = not (server_cert_path.exists() and server_key_path.exists())
+    if not needs_generation:
+        # Check SAN coverage for IP drift
+        req_ips = server_ips or DEFAULT_SERVER_IPS
+        _, cert_ips = get_cert_sans(server_cert_path)
+        missing_ips = [ip for ip in req_ips if ip not in cert_ips]
+        if missing_ips:
+            logger.warning(
+                f"Server cert SAN mismatch! Missing IPs: {missing_ips}. "
+                f"Regenerating server certificate to match current host address."
+            )
+            needs_generation = True
+
+    if needs_generation:
         generate_server_cert(
             server_cert_path,
             server_key_path,

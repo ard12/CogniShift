@@ -101,6 +101,17 @@ async def lifespan(app: FastAPI):
             await db.execute("INSERT INTO workspaces (id, name, description) VALUES (1, 'Main Refinery Workspace', 'Default workspace')")
             await db.commit()
 
+        # Reclaim zombie runs left in 'running' or 'pending' status across server restarts
+        from datetime import datetime, timezone
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute(
+            """UPDATE agent_runs 
+               SET status = 'failed', completed_at = ?, error_message = 'Interrupted: Server restarted before run finished' 
+               WHERE status IN ('running', 'pending')""",
+            (now_str,)
+        )
+        await db.commit()
+
     # Restore active device sessions from database
     from cognishift.app.core.device_security import restore_active_device_sessions
     await restore_active_device_sessions()

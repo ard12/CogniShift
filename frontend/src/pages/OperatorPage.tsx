@@ -182,7 +182,17 @@ export function OperatorPage() {
         if (cancelled) return;
         setRecentRuns(list.slice(0, 10));
 
-        const activeExecutingRun = list.find((r) => r.status === "running" || r.status === "pending");
+        const isRecent = (startedAt?: string | null) => {
+          if (!startedAt) return false;
+          const parsed = Date.parse(startedAt.endsWith("Z") ? startedAt : startedAt.replace(" ", "T") + "Z");
+          return !isNaN(parsed) && Date.now() - parsed < 5 * 60 * 1000;
+        };
+
+        const latest = list[0] ?? null;
+        const activeExecutingRun =
+          latest && (latest.status === "running" || latest.status === "pending") && isRecent(latest.started_at)
+            ? latest
+            : null;
         const hasActiveDispatch = selectedWorkspaceId !== null && activeDispatches.has(selectedWorkspaceId);
         const isNewCmd = sessionStorage.getItem(`cognishift_operator_new_cmd_${selectedWorkspaceId}`) === "true";
 
@@ -205,7 +215,7 @@ export function OperatorPage() {
           const savedRunId = sessionStorage.getItem(`cognishift_operator_run_id_${selectedWorkspaceId}`);
           if (savedRunId) {
             const found = list.find((r) => r.id === Number(savedRunId));
-            if (found) {
+            if (found && found.status !== "running" && found.status !== "pending") {
               targetRun = found;
             }
           }
@@ -221,7 +231,11 @@ export function OperatorPage() {
           if (cancelled) return;
           setEvents(loadedEvents);
 
-          if (targetRun.status === "running" || targetRun.status === "pending" || hasActiveDispatch) {
+          const isActivelyRunning =
+            (targetRun.status === "running" || targetRun.status === "pending") &&
+            isRecent(targetRun.started_at);
+
+          if (isActivelyRunning || hasActiveDispatch) {
             setLifecycle("dispatching");
             setDispatchStage("Agent execution in progress (reasoning & tool verification)…");
           } else {
@@ -288,9 +302,11 @@ export function OperatorPage() {
     if (!isRunning && !isPaused) return;
 
     let cancelled = false;
+    let pollCount = 0;
     const intervalMs = isRunning ? 1000 : 2500;
 
     const interval = setInterval(async () => {
+      pollCount += 1;
       try {
         const [updated, evts] = await Promise.all([
           runsApi.get(run.id),
@@ -300,6 +316,14 @@ export function OperatorPage() {
 
         // Always update events trace in real time
         setEvents(evts);
+
+        // Safeguard: if polling an uncompleted run for > 90 seconds without completion,
+        // release the executing UI lock so the console is not permanently trapped.
+        if (isRunning && pollCount > 90) {
+          setLifecycle("settled");
+          setDispatchStage(null);
+          return;
+        }
 
         if (updated.status !== run.status || updated.result_text !== run.result_text) {
           setRun(updated);
@@ -366,6 +390,11 @@ export function OperatorPage() {
   }, [selectedWorkspaceId, run]);
 
   const handleClearSession = () => {
+    if (selectedWorkspaceId !== null) {
+      activeDispatches.delete(selectedWorkspaceId);
+    }
+    setLifecycle("idle");
+    setDispatchStage(null);
     setPrompt("");
     setRun(null);
     setEvents([]);
@@ -567,7 +596,7 @@ export function OperatorPage() {
                   Command Deck
                 </span>
                 <div className="flex items-center gap-3">
-                  {(prompt.trim().length > 0 || run !== null) && (
+                  {(prompt.trim().length > 0 || run !== null || isExecuting) && (
                     <button
                       type="button"
                       onClick={handleClearSession}
@@ -691,6 +720,16 @@ export function OperatorPage() {
                     >
                       <IconImage className="h-3.5 w-3.5" /> Attach file / image
                     </Button>
+                    {isExecuting && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleClearSession}
+                        title="Cancel waiting and unlock the console"
+                      >
+                        <IconX className="h-3.5 w-3.5" /> Reset Console
+                      </Button>
+                    )}
                     <Button
                       variant="primary"
                       onClick={() => void dispatch()}

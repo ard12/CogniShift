@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Query, Depends, Request, status
 from typing import List, Optional, Any, Dict
 
@@ -80,6 +81,15 @@ async def list_runs(
 ):
     """List past agent runs authorized for current user."""
     async with get_db() as db:
+        # Auto-reclaim any run that has been stuck in 'running' for > 10 minutes
+        cutoff_str = (datetime.now(timezone.utc) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute(
+            "UPDATE agent_runs SET status = 'failed', completed_at = ?, error_message = 'Execution timed out' WHERE status = 'running' AND started_at < ?",
+            (now_str, cutoff_str)
+        )
+        await db.commit()
+
         clauses = []
         params = []
         if workspace_id is not None:
@@ -112,6 +122,13 @@ async def get_run(
 ):
     """Get status and result for a specific run with workspace access check."""
     async with get_db() as db:
+        cutoff_str = (datetime.now(timezone.utc) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute(
+            "UPDATE agent_runs SET status = 'failed', completed_at = ?, error_message = 'Execution timed out' WHERE id = ? AND status = 'running' AND started_at < ?",
+            (now_str, run_id, cutoff_str)
+        )
+        await db.commit()
         cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
         row = await cursor.fetchone()
         if not row:

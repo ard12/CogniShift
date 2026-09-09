@@ -99,7 +99,7 @@ async def list_runs(
             params.append(agent_id)
 
         where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-        query = f"SELECT * FROM agent_runs {where_sql} ORDER BY started_at DESC"
+        query = f"SELECT * FROM agent_runs {where_sql} ORDER BY started_at DESC, id DESC"
         cursor = await db.execute(query, tuple(params))
         rows = await cursor.fetchall()
         return [_format_run_response(r) for r in rows]

@@ -51,6 +51,17 @@ const QUICK_SCENARIOS = [
 
 type RunLifecycle = "idle" | "dispatching" | "settled";
 
+interface ActiveDispatchState {
+  workspaceId: number;
+  agentId: number;
+  prompt: string;
+  promise: Promise<Run>;
+  startedAt: number;
+}
+
+// Module-level tracker for active dispatches so background execution survives component remounts across route switching
+const activeDispatches = new Map<number, ActiveDispatchState>();
+
 export function OperatorPage() {
   const navigate = useNavigate();
   const { selectedWorkspaceId, selectedWorkspace, workspaces, loading: workspacesLoading } =
@@ -68,11 +79,23 @@ export function OperatorPage() {
   const [dispatchStage, setDispatchStage] = useState<string | null>(null);
   const [dispatchError, setDispatchError] = useState<string | null>(null);
   const [run, setRun] = useState<Run | null>(null);
+  const [recentRuns, setRecentRuns] = useState<Run[]>([]);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [relatedApproval, setRelatedApproval] = useState<Approval | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [artifactImages, setArtifactImages] = useState<Record<number, string>>({});
   const [statusSummary, setStatusSummary] = useState<RunStatusSummary | null>(null);
+  const traceContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll trace to bottom as new live events arrive
+  useEffect(() => {
+    if (traceContainerRef.current && events.length > 0) {
+      traceContainerRef.current.scrollTo({
+        top: traceContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [events.length]);
 
   useEffect(() => {
     if (!run) { setStatusSummary(null); return; }
@@ -148,42 +171,106 @@ export function OperatorPage() {
     if (!selectedWorkspaceId) {
       setRun(null);
       setEvents([]);
+      setRecentRuns([]);
       return;
     }
     let cancelled = false;
-    const savedRunId = sessionStorage.getItem(`cognishift_operator_run_id_${selectedWorkspaceId}`);
 
     async function loadInitialRun() {
       try {
-        if (savedRunId) {
-          const runIdNum = Number(savedRunId);
-          const [loadedRun, loadedEvents] = await Promise.all([
-            runsApi.get(runIdNum),
-            runsApi.events(runIdNum),
-          ]);
-          if (!cancelled) {
-            setRun(loadedRun);
-            setEvents(loadedEvents);
-            if (loadedRun.status === "paused") {
-              void checkForApproval(loadedRun.id);
+        const list = await runsApi.list({ workspaceId: selectedWorkspaceId ?? undefined });
+        if (cancelled) return;
+        setRecentRuns(list.slice(0, 10));
+
+        const activeExecutingRun = list.find((r) => r.status === "running" || r.status === "pending");
+        const hasActiveDispatch = selectedWorkspaceId !== null && activeDispatches.has(selectedWorkspaceId);
+        const isNewCmd = sessionStorage.getItem(`cognishift_operator_new_cmd_${selectedWorkspaceId}`) === "true";
+
+        // If operator explicitly clicked "+ New Command" and no run is actively running:
+        if (isNewCmd && !activeExecutingRun && !hasActiveDispatch) {
+          setRun(null);
+          setEvents([]);
+          setLifecycle("idle");
+          setDispatchStage(null);
+          return;
+        }
+
+        let targetRun: Run | null = null;
+        if (activeExecutingRun) {
+          // Actively executing run takes absolute precedence so switching back shows live execution
+          targetRun = activeExecutingRun;
+        } else if (hasActiveDispatch) {
+          targetRun = list[0] ?? null;
+        } else {
+          const savedRunId = sessionStorage.getItem(`cognishift_operator_run_id_${selectedWorkspaceId}`);
+          if (savedRunId) {
+            const found = list.find((r) => r.id === Number(savedRunId));
+            if (found) {
+              targetRun = found;
+            }
+          }
+          if (!targetRun && list.length > 0) {
+            targetRun = list[0];
+          }
+        }
+
+        if (targetRun) {
+          sessionStorage.setItem(`cognishift_operator_run_id_${selectedWorkspaceId}`, String(targetRun.id));
+          setRun(targetRun);
+          const loadedEvents = await runsApi.events(targetRun.id);
+          if (cancelled) return;
+          setEvents(loadedEvents);
+
+          if (targetRun.status === "running" || targetRun.status === "pending" || hasActiveDispatch) {
+            setLifecycle("dispatching");
+            setDispatchStage("Agent execution in progress (reasoning & tool verification)…");
+          } else {
+            setLifecycle("settled");
+            setDispatchStage(null);
+            if (targetRun.status === "paused") {
+              void checkForApproval(targetRun.id);
             }
           }
         } else {
-          const list = await runsApi.list({ workspaceId: selectedWorkspaceId ?? undefined });
-          if (!cancelled && list.length > 0) {
-            const latest = list[0];
-            const loadedEvents = await runsApi.events(latest.id);
-            if (!cancelled) {
-              setRun(latest);
-              setEvents(loadedEvents);
-              if (latest.status === "paused") {
-                void checkForApproval(latest.id);
-              }
-            }
+          setRun(null);
+          setEvents([]);
+          setLifecycle("idle");
+          setDispatchStage(null);
+        }
+
+        // Attach listener if active dispatch is in progress across route navigation
+        if (hasActiveDispatch && selectedWorkspaceId !== null) {
+          const active = activeDispatches.get(selectedWorkspaceId);
+          if (active) {
+            setLifecycle("dispatching");
+            setDispatchStage("Agent execution in progress (reasoning & tool verification)…");
+
+            active.promise
+              .then(async (created) => {
+                if (cancelled) return;
+                sessionStorage.setItem(`cognishift_operator_run_id_${selectedWorkspaceId}`, String(created.id));
+                setRun(created);
+                const evts = await runsApi.events(created.id);
+                if (!cancelled) setEvents(evts);
+                if (created.status === "paused") {
+                  void checkForApproval(created.id);
+                }
+                setLifecycle("settled");
+                setDispatchStage(null);
+                runsApi.list({ workspaceId: selectedWorkspaceId }).then((l) => {
+                  if (!cancelled) setRecentRuns(l.slice(0, 10));
+                }).catch(() => {});
+              })
+              .catch((err) => {
+                if (cancelled) return;
+                setDispatchError(err instanceof ApiError ? err.message : "Dispatch failed unexpectedly.");
+                setLifecycle("idle");
+                setDispatchStage(null);
+              });
           }
         }
-      } catch {
-        // Fallback gracefully
+      } catch (err) {
+        console.error("Failed to load initial run:", err);
       }
     }
 
@@ -193,25 +280,54 @@ export function OperatorPage() {
     };
   }, [selectedWorkspaceId, checkForApproval]);
 
-  // Live auto-sync polling for paused runs
+  // Live auto-sync polling for active runs: "running", "pending", or "paused"
   useEffect(() => {
-    if (!run || run.status !== "paused") return;
+    if (!run) return;
+    const isRunning = run.status === "running" || run.status === "pending";
+    const isPaused = run.status === "paused";
+    if (!isRunning && !isPaused) return;
+
+    let cancelled = false;
+    const intervalMs = isRunning ? 1000 : 2500;
+
     const interval = setInterval(async () => {
       try {
-        const updated = await runsApi.get(run.id);
-        if (updated.status !== "paused") {
+        const [updated, evts] = await Promise.all([
+          runsApi.get(run.id),
+          runsApi.events(run.id),
+        ]);
+        if (cancelled) return;
+
+        // Always update events trace in real time
+        setEvents(evts);
+
+        if (updated.status !== run.status || updated.result_text !== run.result_text) {
           setRun(updated);
-          const evts = await runsApi.events(run.id);
-          setEvents(evts);
-          setRelatedApproval(null);
+          if (updated.status !== "running" && updated.status !== "pending") {
+            setLifecycle(updated.status === "paused" ? "dispatching" : "settled");
+            setDispatchStage(null);
+            if (updated.status === "paused") {
+              void checkForApproval(updated.id);
+            } else {
+              setRelatedApproval(null);
+            }
+            if (selectedWorkspaceId) {
+              runsApi.list({ workspaceId: selectedWorkspaceId }).then((l) => {
+                if (!cancelled) setRecentRuns(l.slice(0, 10));
+              }).catch(() => {});
+            }
+          }
         }
       } catch {
-        // Continue polling
+        // Continue polling resiliently
       }
-    }, 2500);
+    }, intervalMs);
 
-    return () => clearInterval(interval);
-  }, [run]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [run, selectedWorkspaceId, checkForApproval]);
 
   // Load deliverables/artifacts for active run
   useEffect(() => {
@@ -260,13 +376,51 @@ export function OperatorPage() {
     if (selectedWorkspaceId) {
       sessionStorage.removeItem(`cognishift_operator_prompt_${selectedWorkspaceId}`);
       sessionStorage.removeItem(`cognishift_operator_run_id_${selectedWorkspaceId}`);
+      sessionStorage.setItem(`cognishift_operator_new_cmd_${selectedWorkspaceId}`, "true");
+    }
+  };
+
+  const handleSelectPastRun = async (runId: number) => {
+    if (selectedWorkspaceId) {
+      sessionStorage.setItem(`cognishift_operator_run_id_${selectedWorkspaceId}`, String(runId));
+      sessionStorage.removeItem(`cognishift_operator_new_cmd_${selectedWorkspaceId}`);
+    }
+    try {
+      const [loadedRun, loadedEvents] = await Promise.all([
+        runsApi.get(runId),
+        runsApi.events(runId),
+      ]);
+      setRun(loadedRun);
+      setEvents(loadedEvents);
+      if (loadedRun.status === "paused") {
+        void checkForApproval(loadedRun.id);
+      } else {
+        setRelatedApproval(null);
+      }
+      setLifecycle(loadedRun.status === "running" ? "dispatching" : "settled");
+      setDispatchStage(loadedRun.status === "running" ? "Agent execution in progress…" : null);
+    } catch (err) {
+      console.error("Failed to load selected run:", err);
     }
   };
 
   async function dispatch() {
     if (!selectedWorkspaceId || !selectedAgentId || !prompt.trim()) return;
+    if (isExecuting) return;
+
+    const currentWorkspaceId = selectedWorkspaceId;
+    const currentAgentId = selectedAgentId;
+    const currentPrompt = prompt.trim();
+    const currentImageFile = imageFile;
+
+    // Reset new command flag & clear draft prompt immediately
+    sessionStorage.removeItem(`cognishift_operator_new_cmd_${currentWorkspaceId}`);
+    sessionStorage.removeItem(`cognishift_operator_prompt_${currentWorkspaceId}`);
+    setPrompt("");
+    clearImage();
 
     setLifecycle("dispatching");
+    setDispatchStage("Dispatching to agent runtime…");
     setDispatchError(null);
     const priorRun = run;
     setRun(null);
@@ -274,43 +428,67 @@ export function OperatorPage() {
     setArtifacts([]);
     setRelatedApproval(null);
 
-    try {
+    const dispatchPromise = (async () => {
       let inputImagePath: string | null = null;
       let attachedSourceName: string | null = null;
-      if (imageFile) {
+      if (currentImageFile) {
         setDispatchStage("Ingesting attached file through the knowledge pipeline…");
-        const source = await knowledgeApi.upload(imageFile, selectedWorkspaceId);
-        const isImage = imageFile.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(imageFile.name);
+        const source = await knowledgeApi.upload(currentImageFile, currentWorkspaceId);
+        const isImage = currentImageFile.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(currentImageFile.name);
         if (isImage) {
           inputImagePath = source.local_path ?? null;
         } else {
-          attachedSourceName = source.original_filename ?? source.name ?? imageFile.name;
+          attachedSourceName = source.original_filename ?? source.name ?? currentImageFile.name;
         }
       }
 
-      // Auto-clear image attachment immediately so subsequent prompts do not re-upload it
-      clearImage();
-
-      setDispatchStage("Dispatching to agent runtime…");
+      setDispatchStage("Executing sovereign agent run…");
       const history: Array<{ role: string; content: string }> = [];
       if (priorRun && priorRun.input_text && priorRun.result_text) {
         history.push({ role: "user", content: priorRun.input_text });
         history.push({ role: "assistant", content: priorRun.result_text });
       }
 
-      const created = await runsApi.create({
-        workspace_id: selectedWorkspaceId,
-        agent_id: selectedAgentId,
+      return await runsApi.create({
+        workspace_id: currentWorkspaceId,
+        agent_id: currentAgentId,
         input_text: attachedSourceName
-          ? `${prompt.trim()}\n\nAttached source file: ${attachedSourceName}`
-          : prompt.trim(),
+          ? `${currentPrompt}\n\nAttached source file: ${attachedSourceName}`
+          : currentPrompt,
         input_image_path: inputImagePath,
         conversation_history: history,
       });
+    })();
 
-      // Persist active runId in sessionStorage
-      sessionStorage.setItem(`cognishift_operator_run_id_${selectedWorkspaceId}`, String(created.id));
+    activeDispatches.set(currentWorkspaceId, {
+      workspaceId: currentWorkspaceId,
+      agentId: currentAgentId,
+      prompt: currentPrompt,
+      promise: dispatchPromise,
+      startedAt: Date.now(),
+    });
 
+    // Probe after 350ms to immediately link the newly created running record
+    const probeTimer = setTimeout(async () => {
+      try {
+        const list = await runsApi.list({ workspaceId: currentWorkspaceId });
+        if (list.length > 0 && (list[0].status === "running" || list[0].status === "pending")) {
+          sessionStorage.setItem(`cognishift_operator_run_id_${currentWorkspaceId}`, String(list[0].id));
+          setRun(list[0]);
+          const evts = await runsApi.events(list[0].id);
+          setEvents(evts);
+        }
+      } catch {
+        // Handled by dispatchPromise or live poller
+      }
+    }, 350);
+
+    try {
+      const created = await dispatchPromise;
+      clearTimeout(probeTimer);
+      activeDispatches.delete(currentWorkspaceId);
+
+      sessionStorage.setItem(`cognishift_operator_run_id_${currentWorkspaceId}`, String(created.id));
       setRun(created);
 
       setDispatchStage("Fetching execution trace…");
@@ -320,11 +498,21 @@ export function OperatorPage() {
       if (created.status === "paused") {
         await checkForApproval(created.id);
       }
-    } catch (err) {
-      setDispatchError(err instanceof ApiError ? err.message : "Dispatch failed unexpectedly.");
-    } finally {
-      setDispatchStage(null);
       setLifecycle("settled");
+      setDispatchStage(null);
+
+      // Refresh recent runs
+      runsApi.list({ workspaceId: currentWorkspaceId }).then((list) => {
+        setRecentRuns(list.slice(0, 10));
+      }).catch(() => {});
+    } catch (err) {
+      clearTimeout(probeTimer);
+      activeDispatches.delete(currentWorkspaceId);
+      setDispatchError(err instanceof ApiError ? err.message : "Dispatch failed unexpectedly.");
+      // Restore prompt on failure so user doesn't lose input
+      setPrompt(currentPrompt);
+      setLifecycle("idle");
+      setDispatchStage(null);
     }
   }
 
@@ -341,11 +529,21 @@ export function OperatorPage() {
     }
   }
 
-  const canDispatch =
-    lifecycle !== "dispatching" && !!selectedWorkspaceId && !!selectedAgentId && prompt.trim().length > 0;
+  const isExecuting =
+    lifecycle === "dispatching" ||
+    run?.status === "running" ||
+    run?.status === "pending" ||
+    (selectedWorkspaceId !== null && activeDispatches.has(selectedWorkspaceId));
 
-  const runBadgeTone = run ? runStatusTone(run.status) : "neutral";
-  const runBadgeLabel = lifecycle === "dispatching" ? "DISPATCHING" : run ? runStatusLabel(run.status).toUpperCase() : "IDLE";
+  const canDispatch =
+    !isExecuting && !!selectedWorkspaceId && !!selectedAgentId && prompt.trim().length > 0;
+
+  const runBadgeTone = isExecuting ? "info" : run ? runStatusTone(run.status) : "neutral";
+  const runBadgeLabel = isExecuting
+    ? "EXECUTING"
+    : run
+    ? runStatusLabel(run.status).toUpperCase()
+    : "IDLE";
 
   return (
     <div className="flex flex-col gap-6">
@@ -434,6 +632,7 @@ export function OperatorPage() {
                     className="textarea flex-1 font-mono"
                     placeholder="Enter operational command, telemetry query, or safety intervention…"
                     value={prompt}
+                    disabled={isExecuting}
                     onChange={(e) => {
                       setPrompt(e.target.value);
                       if (selectedWorkspaceId) {
@@ -456,6 +655,7 @@ export function OperatorPage() {
                     <button
                       type="button"
                       onClick={clearImage}
+                      disabled={isExecuting}
                       className="ml-auto shrink-0 text-ink-3 hover:text-ink-1"
                       aria-label="Remove attached file"
                     >
@@ -469,7 +669,7 @@ export function OperatorPage() {
                     <span className="hidden sm:inline">
                       <span className="kbd">Ctrl</span> + <span className="kbd">Enter</span> to execute
                     </span>
-                    <Badge tone={runBadgeTone} pulse={lifecycle === "dispatching"}>
+                    <Badge tone={runBadgeTone} pulse={isExecuting}>
                       {runBadgeLabel}
                     </Badge>
                   </div>
@@ -479,12 +679,14 @@ export function OperatorPage() {
                       type="file"
                       accept=".xlsx,.csv,.pdf,.png,.jpg,.jpeg"
                       className="hidden"
+                      disabled={isExecuting}
                       onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
                     />
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isExecuting}
                       title="Attach file (Excel spreadsheet, PDF manual, CSV, or inspection photo)"
                     >
                       <IconImage className="h-3.5 w-3.5" /> Attach file / image
@@ -493,9 +695,9 @@ export function OperatorPage() {
                       variant="primary"
                       onClick={() => void dispatch()}
                       disabled={!canDispatch}
-                      loading={lifecycle === "dispatching"}
+                      loading={isExecuting}
                     >
-                      <IconPlay className="h-3.5 w-3.5" /> Execute
+                      <IconPlay className="h-3.5 w-3.5" /> {isExecuting ? "Executing…" : "Execute"}
                     </Button>
                   </div>
                 </div>
@@ -518,11 +720,38 @@ export function OperatorPage() {
                 <span className="text-xs font-mono font-semibold uppercase tracking-wider text-ink-1">
                   Execution Trace
                 </span>
-                {run && <span className="font-mono text-[10px] text-ink-3">RUN #{run.id}</span>}
+                <div className="flex items-center gap-2">
+                  {recentRuns.length > 1 && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-ink-3">
+                      <span>RUN:</span>
+                      <select
+                        className="rounded border border-surface-border bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink-2 transition hover:bg-surface-3 focus:outline-none"
+                        value={run?.id ?? ""}
+                        onChange={(e) => {
+                          const targetId = Number(e.target.value);
+                          if (targetId) void handleSelectPastRun(targetId);
+                        }}
+                        aria-label="Select past run"
+                      >
+                        {recentRuns.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            #{r.id} [{r.status}] {r.input_text ? `— ${r.input_text.slice(0, 30)}…` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {run && recentRuns.length <= 1 && (
+                    <span className="font-mono text-[10px] text-ink-3">RUN #{run.id}</span>
+                  )}
+                </div>
               </div>
-              <div className="max-h-[420px] overflow-y-auto bg-surface-1/40 p-4">
-                {dispatchStage && (
-                  <p className="mb-2 font-mono text-[11px] text-status-info">{dispatchStage}</p>
+              <div ref={traceContainerRef} className="max-h-[420px] overflow-y-auto bg-surface-1/40 p-4">
+                {isExecuting && (
+                  <div className="mb-2 flex items-center gap-2 rounded border border-status-info/30 bg-status-info/10 px-2.5 py-1.5 font-mono text-[11px] text-status-info">
+                    <span className="inline-block h-2 w-2 animate-ping rounded-full bg-status-info" />
+                    <span>{dispatchStage || "Agent execution in progress (reasoning & tool verification)…"}</span>
+                  </div>
                 )}
                 <EventTimeline events={events} />
               </div>

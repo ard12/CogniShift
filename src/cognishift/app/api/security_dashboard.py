@@ -43,16 +43,25 @@ async def security_status(workspace_id: int, request: Request, user: User = Depe
         block_device as ds_block_device,
     )
 
-    # Docker sandbox detection
+    # Container sandbox detection. A binary on PATH is not evidence that the
+    # daemon is reachable, so report Active only after the same health probe
+    # used by the execution backend succeeds.
     docker_bin = shutil.which(settings.sandbox_runtime) or shutil.which("docker")
-    if docker_bin:
-        docker_status = "active"
-        docker_label = "Docker Engine Active"
-        docker_evidence = f"Binary: {Path(docker_bin).name}"
-    elif settings.operating_mode == "simulated" or settings.sandbox_runtime == "simulated":
+    if settings.operating_mode == "simulated" or settings.sandbox_runtime == "simulated":
         docker_status = "active"
         docker_label = "Simulated Process Sandbox"
         docker_evidence = "Subprocess isolation / test mode active"
+    elif docker_bin:
+        from cognishift.core.sandbox.backend import DockerPodmanBackend
+
+        docker_ready = await DockerPodmanBackend(settings.sandbox_runtime).health_check()
+        docker_status = "active" if docker_ready else "unavailable"
+        docker_label = "Docker Engine Active" if docker_ready else "Container Sandbox Unavailable"
+        docker_evidence = (
+            f"Daemon verified via {Path(docker_bin).name}"
+            if docker_ready
+            else f"Binary found ({Path(docker_bin).name}); daemon health check failed"
+        )
     else:
         docker_status = "unavailable"
         docker_label = "Container Sandbox Unavailable"

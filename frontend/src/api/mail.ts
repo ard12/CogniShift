@@ -1,4 +1,6 @@
 import { apiFetch, apiUpload, buildUrl, authHeader, ApiError } from "./clients";
+import { getStoredToken } from "@/lib/token-storage";
+import { getDeviceSession } from "@/lib/device-identity";
 
 export interface MailAttachment {
   id: number;
@@ -128,8 +130,13 @@ export const mailApi = {
   downloadAttachmentUrl: (alertId: number, attachmentId: number) =>
     `/api/v1/mail/${alertId}/attachments/${attachmentId}`,
   async downloadAttachment(alertId: number, attachmentId: number, filename: string): Promise<void> {
+    const token = getStoredToken();
+    const deviceSession = getDeviceSession();
     const res = await fetch(buildUrl(`/api/v1/mail/${alertId}/attachments/${attachmentId}`), {
-      headers: authHeader(),
+      headers: {
+        ...authHeader(token ?? undefined),
+        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+      },
     });
     if (!res.ok) {
       let detail: unknown;

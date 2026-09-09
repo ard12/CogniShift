@@ -8,7 +8,7 @@
 
 ## 1. System Architecture & Zero-Cloud Sovereign Philosophy
 
-CogniShift is an entirely sovereign, on-premise agentic AI workbench engineered for mission-critical industrial environments (e.g., refinery operations, power generation, and critical manufacturing).
+CogniShift is a sovereign, on-premise agentic AI prototype intended for evaluation in industrial-operations scenarios.
 
 ```
                       +-------------------------------------------------+
@@ -46,7 +46,7 @@ CogniShift is an entirely sovereign, on-premise agentic AI workbench engineered 
 ```
 
 ### Sovereign Invariants:
-1. **Zero Cloud Telemetry & Zero External APIs:** The system operates 100% air-gapped without making outbound HTTP/HTTPS requests to OpenAI, Anthropic, Google, or any remote IP.
+1. **Local Runtime & Application Egress Policy:** The configured inference path uses local services and application-level controls block disallowed outbound destinations. Physical air-gap status must be verified from the deployment network and host controls.
 2. **Local Embedding & Inference:** All vector embeddings are generated locally via `fastembed` (BAAI/bge-small-en-v1.5) on CPU. All LLM and vision reasoning runs on local hardware via `Ollama`.
 3. **Workspace Multi-Tenant Isolation:** Documents, artifacts, vector collections, and execution sandboxes are strictly isolated by `workspace_id`. Cross-workspace bleeding is prevented at the database, storage, and retriever layers.
 4. **Deterministic Fail-Closed Grounding:** If evidence is missing from local documents or artifacts, the system deterministically replies with fail-closed notices rather than hallucinating external URLs, fake portals, or ungrounded procedures.

@@ -1,5 +1,6 @@
 import { apiFetch, buildUrl, authHeader, ApiError } from "./clients";
 import type { Artifact, ArtifactListResponse } from "@/types";
+import { getDeviceSession } from "@/lib/device-identity";
 
 const PATHS = {
   list: (workspaceId: number) => `/api/v1/workspaces/${workspaceId}/artifacts`,
@@ -23,8 +24,12 @@ export const artifactsApi = {
    * blob URL. A raw navigation cannot carry either required custom header.
    */
   async download(workspaceId: number, artifactId: number, filename: string): Promise<void> {
+    const deviceSession = getDeviceSession();
     const res = await fetch(buildUrl(PATHS.download(workspaceId, artifactId)), {
-      headers: authHeader(),
+      headers: {
+        ...authHeader(),
+        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+      },
     });
     if (!res.ok) {
       let detail: unknown;
@@ -51,8 +56,12 @@ export const artifactsApi = {
    * a temporary object URL that can be used as an <img src> or iframe source.
    */
   async getBlobUrl(workspaceId: number, artifactId: number): Promise<string> {
+    const deviceSession = getDeviceSession();
     const res = await fetch(buildUrl(PATHS.download(workspaceId, artifactId)), {
-      headers: authHeader(),
+      headers: {
+        ...authHeader(),
+        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+      },
     });
     if (!res.ok) {
       throw new ApiError(`Failed to fetch artifact blob (${res.status})`, res.status);

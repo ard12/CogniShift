@@ -204,7 +204,7 @@ def _render_deterministic_plain_text(
     lines.extend([
         "================================================================================",
         "This is an automated dispatch from the CogniShift Sovereign Platform.",
-        "Delivered via local loopback transport (127.0.0.1:1025). Zero Cloud Egress.",
+        "Delivered via local loopback transport (127.0.0.1:1025).",
         "================================================================================",
     ])
     return "\n".join(lines)
@@ -297,7 +297,7 @@ def _render_deterministic_html(
     </div>
     <div style="background:#090d16;padding:14px 24px;border-top:1px solid #1e293b;font-size:11px;color:#64748b;display:flex;justify-content:space-between;">
       <span>Dispatched via 127.0.0.1:1025 (Loopback Only)</span>
-      <span>Air-Gapped Sovereign Enclave</span>
+      <span>Local Sovereign Workbench</span>
     </div>
   </div>
 </body>
@@ -311,7 +311,7 @@ async def _call_local_slm_for_summary(
     """Invoke local Ollama model to synthesize a crisp executive paragraph."""
     if evidence.event_type == NotificationType.ACCESS_AUTHORIZATION:
         prompt = (
-            "You are the Sovereign Industrial Governance AI at CogniShift, an air-gapped industrial system.\n"
+            "You are the Sovereign Industrial Governance AI at CogniShift, a local industrial workbench.\n"
             "Draft a single, highly professional executive notification message for the issuance of a temporary operational work permit.\n"
             "Rules: Rely ONLY on the provided facts. Do not invent details. State clearly that authorization was verified by two independent authenticated supervisor approvals. Keep it under 65 words.\n"
             f"Target Operator: {evidence.target_user}\n"
@@ -323,7 +323,7 @@ async def _call_local_slm_for_summary(
         )
     elif evidence.event_type == NotificationType.AUTHORIZATION_CONSUMED:
         prompt = (
-            "You are the Sovereign Industrial Governance AI at CogniShift, an air-gapped industrial system.\n"
+            "You are the Sovereign Industrial Governance AI at CogniShift, a local industrial workbench.\n"
             "Draft a single, highly professional executive notification stating that a one-time operational work permit has been successfully consumed.\n"
             "Rules: Rely ONLY on the provided facts. State clearly that remaining permitted uses are 0 and re-execution will be rejected. Keep it under 55 words.\n"
             f"Target Operator: {evidence.target_user}\n"
@@ -333,7 +333,7 @@ async def _call_local_slm_for_summary(
         )
     else:
         prompt = (
-            "You are the Sovereign Security & Governance AI in CogniShift, an air-gapped industrial system.\n"
+            "You are the Sovereign Security & Governance AI in CogniShift, a local industrial workbench.\n"
             "Draft a single, highly professional executive paragraph summarizing the following operational event.\n"
             "Rules: Rely ONLY on the provided facts. Do not invent details. Keep it under 60 words.\n"
             f"Event Type: {evidence.event_type.value}\n"

@@ -10,10 +10,10 @@
 [![Local Embeddings](https://img.shields.io/badge/Embeddings-FastEmbed%20CPU%20ONNX-blue.svg)](https://github.com/qdrant/fastembed)
 [![Vector Store](https://img.shields.io/badge/Vector%20Store-ChromaDB%20(Local)-lightgrey.svg)](https://www.trychroma.com/)
 [![Database](https://img.shields.io/badge/Database-Async%20SQLite%20(WAL%20Mode)-003B57.svg)](https://sqlite.org/)
-[![Tests](https://img.shields.io/badge/Tests-401%2B%20Passing%20(100%25)-brightgreen.svg)]()
-[![Network Sovereignty](https://img.shields.io/badge/Network%20Security-100%25%20Air--Gapped%20%2F%20Zero%20Cloud-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-Run%20Locally-informational.svg)]()
+[![Network Sovereignty](https://img.shields.io/badge/Network%20Security-Policy%20Enforced-informational.svg)]()
 
-**CogniShift** is an industrial-grade, sovereign, on-premise agentic AI workbench engineered for mission-critical infrastructure in oil refineries, petrochemical complexes, and power plants (Purdue Level 3/3.5 DMZ). It executes open-weight language, vision, and embedding models on local air-gapped workstations without external cloud APIs, internet connectivity, or telemetry exfiltration.
+**CogniShift** is a sovereign, on-premise agentic AI prototype for industrial operations. It executes open-weight language, vision, and embedding models locally. Application-level egress controls and their current backend-verified state are exposed in the UI; a deployment is physically air-gapped only when its network environment has been independently verified.
 
 Engineered for the Smart India Hackathon problem statement **SIH26117** in collaboration with **Mangalore Refinery and Petrochemicals Limited (MRPL)**.
 
@@ -61,7 +61,7 @@ Traditional cloud-hosted LLM services (OpenAI, Anthropic, Gemini) introduce crit
 
 ## Core Architectural Pillars
 
-* **100% Air-Gapped & Sovereign:** Zero internet egress. Outbound sockets are intercepted pre-connection, FastEmbed runs locally cached ONNX weights, and the web console contains zero third-party CDNs.
+* **Local-first & Sovereign:** Local model and embedding runtimes are used. Application-level outbound controls are enforced and audited; physical isolation depends on deployment configuration and verification.
 * **Deterministic Safety Interlocks:** Dangerous physical control actions (emergency relief, pump reboots) cannot be triggered directly by LLMs; they halt the execution state machine until independent supervisors sign off.
 * **Hybrid Knowledge Substrate:** Combines dense semantic vector retrieval over technical SOPs with structural graph traversal over physical plant topology (equipment piping, instrumentation, relief valves).
 * **Audited Multi-Turn State Machine:** Compare-And-Swap (CAS) atomic task resumption, safe cancellations, 15-minute TTL expiration, and cross-turn pronoun resolution.
@@ -516,15 +516,9 @@ CogniShift includes an exhaustive test suite covering unit, integration, and sec
 pytest -v
 ```
 
-### Test Suite Execution Summary:
-```text
-============================ 401 passed, 23 skipped in 112.61s =============================
-```
-
-* **Total Tests:** 424
-* **Passing:** 401 (100% pass rate)
-* **Skipped:** 23 (environmental skips when live GPU or Docker daemon is absent)
-* **Failed / Errored:** 0
+Test counts change as the product evolves. Run the command above on the intended
+release commit and report its exact output, including failures and environmental
+skips; do not treat historical counts as current release evidence.
 
 ### Targeted Test Suites:
 ```bash

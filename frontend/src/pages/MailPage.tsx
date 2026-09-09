@@ -126,7 +126,7 @@ export function MailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedFolder]);
+  }, [selectedFolder, role]);
 
   useEffect(() => {
     void fetchMail();

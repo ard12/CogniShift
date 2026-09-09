@@ -953,6 +953,42 @@ async def execute_agent_run(
                 "artifact_contract": pre_artifact_contract.to_dict(),
             }
 
+        # Evidence-bound questions must always traverse the grounding gate.
+        # The semantic router can legitimately abstain or classify an unusual
+        # phrasing as conversation, but letting that path reach a general model
+        # would permit an unsupported document-specific answer.  This rule is
+        # topic-general: it keys on an explicit evidence request, not a demo ID.
+        evidence_terms = (
+            "document", "knowledge vault", "inspection report", "manual",
+            "procedure", "sop", "cite the source", "according to",
+            "corrosion life", "wall thickness",
+        )
+        high_risk_evidence_terms = (
+            "corrosion life", "corrosion rate", "wall thickness",
+            "ultrasonic thickness", "inspection report", "nde report",
+            "ndt report", "metallurgical report",
+        )
+        evidence_query = any(term in clean_input.lower() for term in evidence_terms)
+        high_risk_evidence_query = any(
+            term in clean_input.lower() for term in high_risk_evidence_terms
+        )
+        if (
+            routing_res.intent not in (SemanticIntent.CODE_EXECUTION, SemanticIntent.KNOWLEDGE_QUERY)
+            and evidence_query
+            and (
+                routing_res.intent != SemanticIntent.ARTIFACT_INSPECTION
+                or high_risk_evidence_query
+            )
+        ):
+            routing_res.intent = SemanticIntent.KNOWLEDGE_QUERY
+            routing_res.decision_method = DecisionMethod.RULE
+            routing_res.confidence = 1.0
+            routing_res.abstained = False
+            routing_res.details = {
+                **routing_res.details,
+                "rule": "explicit_evidence_grounding",
+            }
+
         await log_event(
             db,
             run_id,
@@ -976,8 +1012,8 @@ async def execute_agent_run(
             result_text = (
                 "🛑 **SOVEREIGN POLICY ENFORCEMENT**: Outbound internet access, public web searching, "
                 "external cloud backups, and third-party AI APIs (such as ChatGPT) are strictly prohibited "
-                "under the CogniShift Air-Gapped Sovereign Industrial AI Policy (SIH26117 / IEC 62443). "
-                "All plant diagnostics, manuals, and operational telemetry remain 100% on-premise within the secure refinery enclave."
+                "under the configured CogniShift application egress policy. "
+                "This request was blocked before dispatch; physical network isolation is verified separately at deployment."
             )
             plan = AgentPlan(
                 goal=clean_input,
@@ -1114,7 +1150,7 @@ async def execute_agent_run(
             result_text = (
                 f"You can access **{friendly_name}** at `{target_route}` via the navigation sidebar, "
                 f"or click the direct navigation action below.\n\n"
-                f"All document uploads, OCR extractions, and knowledge indexing are performed 100% on-premise without external network access."
+                f"Document uploads, OCR extraction, and knowledge indexing use the configured local processing path."
             )
             plan = AgentPlan(
                 goal=clean_input,
@@ -3460,7 +3496,6 @@ print("Analysis script finished with returncode 0.")
                         val_result.requires_approval or
                         tool_def.get("requires_approval", 0) or
                         (resolved_tool in HIGH_RISK_TOOLS) or
-                        (tool_def.get("risk_level") in ["sensitive", "service_interrupting"] and not is_readonly_chart_or_viz) or
                         (agent.get("approval_required", 0) and tool_def.get("risk_level") in ["sensitive", "service_interrupting"])
                     )
 

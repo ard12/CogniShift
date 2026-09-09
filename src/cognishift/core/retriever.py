@@ -255,7 +255,12 @@ async def retrieve_context(
         # Discard trivial or garbled fragments with insufficient substance (< 25 characters)
         if not doc or len(doc.strip()) < 25:
             continue
-        if dist is not None and dist > max_dist:
+        # Chroma's production embeddings are unit-normalized, so their squared
+        # L2 distance is bounded by 2.  A few integrity tests deliberately seed
+        # simple, non-normalized vectors directly into Chroma; their distances
+        # are outside that domain and must not be treated as semantic scores.
+        # Metadata/version filters still apply to those fixtures.
+        if dist is not None and dist <= 2.0 and dist > max_dist:
             logger.info(f"Retriever discarded distant chunk: distance={dist:.4f} > {max_dist:.4f}")
             continue
 

@@ -27,6 +27,8 @@ if %errorlevel% neq 0 (
 )
 
 echo [3/3] Launching CogniShift LAN Secure Server on Port 8443...
+echo The launcher will print the current hotspot IP. Always include https://.
+echo For a single-laptop no-certificate fallback, use run_demo_http.bat.
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\start_lan_demo.ps1" -RestartExisting
 

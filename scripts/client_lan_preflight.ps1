@@ -1,6 +1,7 @@
 # Client LAN Preflight Diagnostics (Run on client laptops)
 param(
-    [string]$ServerHost = "10.10.182.228:8443"
+    [Parameter(Mandatory = $true)]
+    [string]$ServerHost
 )
 
 $ErrorActionPreference = "Continue"

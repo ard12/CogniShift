@@ -1,7 +1,7 @@
 # CogniShift — Complete Demonstration Runbook & Showcase Guide
 
 **Sovereign On-Premise Industrial Agentic AI Workbench (SIH26117)**  
-*Air-Gapped | Zero Cloud Egress | Human-in-the-Loop | Multimodal Industrial Intelligence*
+*Local Inference | Application-Level Egress Controls | Human-in-the-Loop | Multimodal Industrial Intelligence*
 
 ---
 
@@ -19,6 +19,7 @@
    - [Category 5: Computer Vision, Analog Gauge & Note Inspection (Prompts 21–24)](#category-5-computer-vision-analog-gauge--note-inspection)
    - [Category 6: Zero-Cloud Sovereignty & Air-Gap Probing (Prompts 25–28)](#category-6-zero-cloud-sovereignty--air-gap-probing)
 7. [Pre-Demonstration Verification Checklist](#7-pre-demonstration-verification-checklist)
+8. [Air-Gapped Mobile Hotspot Setup](#8-air-gapped-mobile-hotspot-setup-mobile-data-off)
 
 ---
 
@@ -64,7 +65,12 @@ Before presenting to the judges, ensure these background services are running:
    ```powershell
    python scripts/run_local_smtp_sink.py
    ```
-   *(Listens silently on `127.0.0.1:1025` with zero cloud egress)*
+   *(Listens on loopback `127.0.0.1:1025`; verify host firewall and adapter state separately.)*
+
+> [!IMPORTANT]
+> Do not reuse an IP address printed during an earlier session. Phone hotspots
+> assign addresses dynamically. `run_demo.bat` detects the current address,
+> synchronizes it into the TLS certificate, and prints the exact URL to use.
 
 ---
 
@@ -82,16 +88,16 @@ python scripts/preflight_routes.py
 | Role | Username | Password | Access URL | Device Trust Status | Primary Demonstration Responsibility |
 |---|---|---|---|---|---|
 | **Host Admin** | `admin` *(or `sitanshu`)* | `AdminPass123!` | `https://localhost:8443` | **Approved (Bootstrapped via Loopback)** | Edge Host Admin: `/security` Console, Device Approval, System Telemetry |
-| **Supervisor 1** | `supervisor_zara` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Four-Eyes Signatory #1: First approval on high-risk operations |
-| **Supervisor 2** | `supervisor_rakshita` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Four-Eyes Signatory #2: Dual-authorization counter-signature |
-| **Operator 1** | `operator_sam` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Primary Operator: Ingests CSVs, triggers telemetry charts, runs SOP queries |
-| **Operator 2** | `operator_aryan` | `OperatorPass123!` | `https://10.10.182.228:8443` | **Approved** | Multi-terminal verification & parallel operator workstation |
-| **Supervisor 3** | `vicky` | `SuperPass123!` | `https://10.10.182.228:8443` | **Approved** | Plant Supervisor & Four-Eyes Signatory #3 |
-| **Untrusted Showcase** | `rohit` | `OperatorPass123!` | `https://10.10.182.228:8443` | **DELIBERATELY UNTRUSTED (403)** | **Live Security Showcase**: Valid credentials, but blocked by ECDSA challenge until Admin approves! |
+| **Supervisor 1** | `supervisor_zara` | `SuperPass123!` | `https://<PRINTED_LAN_IP>:8443` | **Approved** | Four-Eyes Signatory #1: First approval on high-risk operations |
+| **Supervisor 2** | `supervisor_rakshita` | `SuperPass123!` | `https://<PRINTED_LAN_IP>:8443` | **Approved** | Four-Eyes Signatory #2: Dual-authorization counter-signature |
+| **Operator 1** | `operator_sam` | `OperatorPass123!` | `https://<PRINTED_LAN_IP>:8443` | **Approved** | Primary Operator: Ingests CSVs, triggers telemetry charts, runs SOP queries |
+| **Operator 2** | `operator_aryan` | `OperatorPass123!` | `https://<PRINTED_LAN_IP>:8443` | **Approved** | Multi-terminal verification & parallel operator workstation |
+| **Supervisor 3** | `vicky` | `SuperPass123!` | `https://<PRINTED_LAN_IP>:8443` | **Approved** | Plant Supervisor & Four-Eyes Signatory #3 |
+| **Untrusted Showcase** | `rohit` | `OperatorPass123!` | `https://<PRINTED_LAN_IP>:8443` | **DELIBERATELY UNTRUSTED (403)** | **Live Security Showcase**: Valid credentials, but blocked by ECDSA challenge until Admin approves! |
 
 > [!TIP]
 > **Browser Certificate Note for Client Terminals:**
-> When opening `https://10.10.182.228:8443` or `https://localhost:8443`, the browser will show a self-signed certificate warning.
+> When opening `https://<PRINTED_LAN_IP>:8443` or `https://localhost:8443`, the browser may show a certificate warning.
 > Click **Advanced -> Proceed to [IP] (unsafe)**.
 > To eliminate the warning completely on team laptops, run:
 > `powershell -ExecutionPolicy Bypass -File .\scripts\install_cognishift_demo_ca.ps1`
@@ -143,7 +149,7 @@ CogniShift's local model (`qwen2.5:7b`) responds:
 
 ### Why this is a major presentation highlight for Judges:
 1. **Model Alignment:** It proves the offline SLM is strictly aligned with the industrial boundary. It will never pretend to have internet access or attempt to call cloud APIs.
-2. **Network-Level Hardening:** Even if a malicious prompt or compromised tool attempted an outbound socket call to `api.openai.com`, CogniShift's **Zero Cloud Egress Socket Layer** intercepts the call at OS level, blocks the transmission, and logs it to the **Network Audit Trail** as `BLOCKED (Policy: Strict Air-Gap)`.
+2. **Application-Level Hardening:** CogniShift applies an outbound transport policy to application network calls and records observed decisions in the **Network Audit Trail**. This is not proof of OS-wide or physical isolation; demonstrate firewall and adapter state separately when claiming an air gap.
 3. **Double Verification:** Show the judges the **Network Audit Trail** tab in the UI — show them that all outbound connections are blocked while local loopback (`127.0.0.1`) is authorized.
 
 ---
@@ -163,9 +169,9 @@ Follow this 5-act demonstration script to showcase every technical dimension of 
 
 ### Act 1: Hardware-Bound WebCrypto ECDSA Security & Untrusted Interception (Minute 0–1)
 1. **Show the Multi-Terminal Architecture:**
-   - Explain to the judges: *"CogniShift operates across multiple laptops on our local venue Wi-Fi with Zero Cloud Egress. Devices authenticate not just with passwords, but via client-side WebCrypto ECDSA public key pairs generated in browser memory."*
+   - Explain to the judges: *"CogniShift operates across multiple laptops on a local network and uses local inference. Devices authenticate with credentials plus a browser-generated WebCrypto ECDSA key pair; the security dashboard shows the backend-verified network-policy state."*
 2. **Demonstrate Rohit's Terminal Getting Intercepted:**
-   - Have Rohit open `https://10.10.182.228:8443` and type valid operator credentials (`rohit` / `OperatorPass123!`).
+   - Have Rohit open the dynamically printed `https://<PRINTED_LAN_IP>:8443` URL and type valid operator credentials (`rohit` / `OperatorPass123!`).
    - The browser generates an ECDSA key pair, submits a challenge, and is **blocked** with `UNKNOWN_DEVICE` (403 Forbidden).
    - Point out to judges: *"Even with legitimate credentials and network connectivity, an unapproved laptop cannot access plant controls."*
 3. **Approve via Host Admin:**
@@ -210,7 +216,7 @@ Follow this 5-act demonstration script to showcase every technical dimension of 
    - In Operator console, prompt: `"restart pump P-101A due to pressure fluctuations"`
    - CogniShift's Safety Interception Protocol flags `restart_component` as a service-interrupting high-risk action.
    - The system halts execution and issues a **Temporary Operational Authorization Request**.
-2. **Dual-Supervisor Cryptographic Signatures:**
+2. **Two Authenticated Supervisor Approvals:**
    - Supervisor 1 (Zara) reviews the technical justification and signs (`reviewed_by`).
    - Supervisor 2 (Rakshita) reviews and counter-signs (`reviewed_by_2`).
    - The system generates an authoritative, tamper-evident DOCX permit.
@@ -458,3 +464,65 @@ Run through this 30-second checklist right before calling over teachers or judge
   - `equipment_readings.csv` (Time-Series Operational Readings)
 - [ ] **Approvals Queue Clean:** Shows 0 pending requests (ready to demonstrate the `restart pump P-101A` Four-Eyes interception).
 - [ ] **Security Console Ready:** `/security` shows local loopback authorized and Rohit in pending untrusted state ready to be approved live.
+
+---
+
+## 8. Air-Gapped Mobile Hotspot Setup (Mobile Data OFF)
+
+Use HTTPS for every multi-laptop demonstration. The HTTP launcher is a
+single-laptop emergency fallback only; remote HTTP origins are not secure
+contexts and cannot provide CogniShift's WebCrypto trusted-device proof.
+
+### One-time Windows firewall setup
+
+1. Right-click `scripts\allow_firewall_lan.bat` and select **Run as administrator**.
+2. Confirm the script reports that HTTPS port 8443 is allowed from the local subnet.
+3. The rule covers Domain, Private, and Public profiles because Windows commonly
+   classifies phone hotspots as Public, but it does not permit non-local sources.
+
+### Start the disconnected hotspot
+
+1. Turn on the phone's Wi-Fi hotspot.
+2. Turn mobile data off. CogniShift does not require internet service.
+3. Connect both laptops to that hotspot.
+4. If the phone exposes **AP isolation**, **client isolation**, or **guest isolation**,
+   turn it off so hotspot clients can communicate with each other.
+
+### Launch on the host laptop
+
+1. Double-click `run_demo.bat`.
+2. The launcher detects current active IPv4 addresses and regenerates the server
+   certificate automatically if the DHCP address changed.
+3. On the host, use `https://127.0.0.1:8443`. This literal address bypasses DNS.
+4. Do not type only `localhost:8443`; include the `https://` prefix.
+
+### Connect the second laptop
+
+1. Copy the exact `https://<CURRENT_IP>:8443` URL printed by the launcher.
+2. Open it on the second laptop while connected to the same hotspot.
+3. Trust `data\certs\cognishift_demo_ca.crt`, or use the browser's one-time
+   **Advanced → Proceed** option.
+4. Sign in and complete normal trusted-device verification.
+
+### Refresh and routing check
+
+Open `/operator`, `/dashboard`, `/mailbox`, and `/security`, then press F5 on
+each page. Every route must reload the React application rather than return a
+FastAPI 404 response.
+
+### Single-laptop HTTP fallback
+
+If a certificate warning would interrupt a presentation on the host laptop,
+double-click `run_demo_http.bat` and use `http://127.0.0.1:8000`. This launcher
+binds only to loopback and is intentionally not advertised to other laptops.
+
+### Troubleshooting
+
+- **The host works but the second laptop times out:** rerun the firewall helper
+  as Administrator and confirm client isolation is disabled on the hotspot.
+- **Certificate name error:** stop the server and rerun `run_demo.bat` after
+  joining the hotspot; the new address will be added to the certificate SANs.
+- **Page works until F5:** confirm `frontend\dist\index.html` exists and run the
+  SPA fallback tests.
+- **Slow first navigation with mobile data off:** use literal IP addresses rather
+  than DNS hostnames, starting with `https://127.0.0.1:8443` on the host.

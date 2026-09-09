@@ -71,7 +71,7 @@ export function AuthGatePage() {
         </form>
 
         <p className="mt-4 text-center text-[11px] text-ink-3">
-          Runs entirely on local infrastructure — no cloud AI APIs, no external egress.
+          Designed for local inference. Verified network policy is shown after sign-in.
         </p>
       </div>
     </div>

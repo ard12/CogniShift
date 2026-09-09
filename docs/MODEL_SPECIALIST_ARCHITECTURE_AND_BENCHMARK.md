@@ -6,8 +6,8 @@
 
 **Official Classification:** **Multi-Model Routed Agentic Workbench**
 
-CogniShift operates as a sovereign, 100% on-premise industrial AI workbench designed for critical industrial infrastructure (refineries, petrochemical complexes, and power plants). It enforces a strict **Zero-Cloud-Egress** air-gap boundary:
-- **Zero External API Calls**: Operates exclusively with on-premise SLMs hosted locally via Ollama.
+CogniShift operates as a sovereign, on-premise industrial AI prototype. Its tested configuration uses local runtimes and an application-level outbound policy; this must not be presented as proof of physical isolation:
+- **Local Model Path**: Configured inference uses SLMs hosted locally via Ollama.
 - **Deterministic Single-Provenance Pipeline**: Factual claims are bound cryptographically to verified raw evidence (SHA-256 verified inputs, structured cell coordinate mapping, and deterministic anomaly guards).
 - **Truthful Multi-Model Routing**: Rather than making false claims of an autonomous "multi-agent swarm" with unverified peer-to-peer delegation, CogniShift routes each incoming operator task dynamically to the optimal local specialist model based on task classification, required capabilities, and local VRAM budgets.
 
@@ -78,12 +78,12 @@ graph TD
 ## 5. Live SIH Demonstration Q&A (Judge-Ready Defense)
 
 ### Q1: Is CogniShift an autonomous multi-agent swarm?
-> **Answer:** "No. To be technically rigorous and truthful, CogniShift is an **air-gapped Multi-Model Routed Agentic Workbench**. Rather than pretending to have dozens of autonomous agents gossiping over unverified channels, we route each operational phase to a specialized local Small Language Model (SLM) under strict single-agent governance, deterministic human-in-the-loop approvals, and frozen single-provenance evidence pipelines."
+> **Answer:** "No. CogniShift is a **local Multi-Model Routed Agentic Workbench**. It routes each operational phase to a specialist local Small Language Model under a governed execution flow, authenticated human approvals, and single-provenance evidence controls. Physical air-gap status is a deployment property and is verified separately."
 
 ### Q2: How do you guarantee the model does not hallucinate numbers in financial audits or SCADA logs?
 > **Answer:** "The LLM never computes the numbers. In CogniShift, tabular extraction, multi-feature header detection, YoY growth calculation, and SCADA anomaly detection are performed **deterministically in isolated code sandboxes**. Once the `StructuredAnomalyResult` is computed, its facts (timestamp, measurements, valve state) are frozen. The LLM is permitted to explain the event, but if its prose contradicts the frozen facts, the system overrides the prose deterministically."
 
-### Q3: How do you ensure 100% offline sovereignty?
+### Q3: How do you support offline operation?
 > **Answer:** "All inference runs locally via Ollama on local hardware. Embeddings are generated locally using FastEmbed. Vector similarity search runs in local ChromaDB. Metadata, runs, approvals, and audit trails reside in SQLite with WAL mode. Code execution runs in an ephemeral container sandbox with strict workspace path resolution and zero outbound network access."
 
 ---
@@ -104,4 +104,3 @@ Profiled on-premise on developer workstation with NVIDIA GeForce RTX 3050 (4GB/6
 1. **Tool Calling Precision**: `qwen2.5:7b` achieves 100% adherence to zero-preamble JSON output schemas, making it the premier choice for tool dispatch.
 2. **Vision Efficiency**: `moondream:latest` exhibits the lowest latency (8.16s warm) and highest throughput (14.5 tok/s), ideal for real-time edge dial inspection.
 3. **Deep Reasoning**: `deepseek-r1:7b` handles deep diagnostic thinking; its reasoning tokens are captured for audit logging and cleanly stripped from user-facing text.
-

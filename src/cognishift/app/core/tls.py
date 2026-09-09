@@ -14,7 +14,7 @@ from cognishift.app.config import settings
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVER_IPS = ["10.10.182.228", "127.0.0.1"]
+DEFAULT_SERVER_IPS = ["127.0.0.1"]
 DEFAULT_SERVER_HOSTNAMES = ["localhost"]
 
 

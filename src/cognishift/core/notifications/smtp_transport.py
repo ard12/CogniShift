@@ -2,7 +2,7 @@
 
 Adheres strictly to air-gap and sovereignty rules:
 - Loopback binding only (127.0.0.1). Any attempt to bind to 0.0.0.0 is rejected.
-- Zero Cloud Egress: all traffic stays on the local machine.
+- Loopback-only transport: this SMTP listener accepts local connections only.
 - Decoupled from core security decisions: transport failure never halts primary controls.
 - Thunderbird / Outlook / EML compatible: writes to data/alerts/mailbox/*.eml.
 """
@@ -55,7 +55,7 @@ class SMTPSession:
                 arg = parts[1] if len(parts) > 1 else ""
 
                 if cmd in ("HELO", "EHLO"):
-                    self.writer.write(b"250-CogniShift Sovereign SMTP (Air-Gapped)\r\n250-8BITMIME\r\n250 OK\r\n")
+                    self.writer.write(b"250-CogniShift Local Loopback SMTP\r\n250-8BITMIME\r\n250 OK\r\n")
                     await self.writer.drain()
 
                 elif cmd == "MAIL":

@@ -38,8 +38,21 @@ if (Test-Path $authStore) {
     Write-Host "[4] Team Auth Store: MISSING (Run scripts\bootstrap_team_demo_auth.py)" -ForegroundColor Yellow
 }
 
-# 5. Check Host LAN IP
-$ipConfig = Get-NetIPAddress -InterfaceAlias "*Wi-Fi*" -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty IPAddress
-Write-Host "[5] Host Wi-Fi IPv4: $ipConfig (Expected: 10.10.182.228)" -ForegroundColor Cyan
+# 5. Show current active LAN/hotspot addresses (DHCP addresses may change).
+$ipConfig = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.IPAddress -notmatch '^(127\.|169\.254\.)' -and
+        $_.AddressState -eq 'Preferred' -and
+        $_.InterfaceAlias -notmatch 'vEthernet|Loopback'
+    } |
+    Select-Object -ExpandProperty IPAddress -Unique)
+if ($ipConfig.Count -gt 0) {
+    Write-Host "[5] Active LAN URLs:" -ForegroundColor Cyan
+    foreach ($ip in $ipConfig) {
+        Write-Host "    -> https://${ip}:8443" -ForegroundColor Cyan
+    }
+} else {
+    Write-Host "[5] Active LAN URL: NONE (connect to hotspot/LAN and retry)" -ForegroundColor Yellow
+}
 
 Write-Host "`n=== PREFLIGHT COMPLETE ===" -ForegroundColor Cyan

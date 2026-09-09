@@ -79,7 +79,7 @@ def print_banner():
     banner_text = (
         "[bold cyan]COGNISHIFT[/bold cyan] [bold green]v0.1.0[/bold green] "
         "| [bold yellow]Sovereign On-Premise Agentic AI Workbench[/bold yellow]\n"
-        "[dim]MRPL Industrial Operations | IEC 62443 Level 3.5 | Air-Gapped Zero-Cloud[/dim]"
+        "[dim]MRPL Industrial Operations | Local Inference | Application Egress Policy[/dim]"
     )
     console.print(Panel(banner_text, border_style="cyan", box=box.ROUNDED))
 
@@ -131,7 +131,7 @@ def system_status():
         table.add_row(
             "Operating Mode",
             f"[green]{settings.operating_mode.upper()}[/green]",
-            "Strict zero cloud egress enforced",
+            "Application egress policy enforced",
         )
         table.add_row(
             "Database Engine",

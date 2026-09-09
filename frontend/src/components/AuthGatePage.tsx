@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { InlineError } from "@/components/ui/States";
 
 export function AuthGatePage() {
-  const { signIn, verifying, error } = useAuth();
+  const { signIn, verifying, error, deviceStatus, retryVerification } = useAuth();
   const [tokenInput, setTokenInput] = useState("");
 
   async function handleSubmit(e: FormEvent) {
@@ -30,24 +30,40 @@ export function AuthGatePage() {
             </label>
             <input
               id="token"
-              type="password"
+              type="text"
               autoComplete="off"
               spellCheck={false}
               className="input font-mono"
-              placeholder="cog_op_…"
+              placeholder="Paste an issued access token"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               autoFocus
             />
-            <p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">
-              CogniShift has no username/password login — every request is authenticated with a
-              server-issued bearer credential. Ask an administrator to run{" "}
-              <code className="kbd">scripts/bootstrap_demo_auth.py</code> and share a token with
-              you.
+
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
+              Enter your issued sovereign access token to connect.
             </p>
           </div>
 
-          {error && <InlineError message={error} />}
+          {error && (
+            deviceStatus === "unknown" ? (
+              <div className="rounded border border-status-warning/50 bg-status-warning/10 p-3 font-mono text-xs leading-6 text-status-warning whitespace-pre-line">
+                {error}
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={verifying}
+                    onClick={() => void retryVerification()}
+                    className="w-full border-status-warning/50 text-status-warning hover:bg-status-warning/20 font-sans text-xs"
+                  >
+                    Retry Device Verification
+                  </Button>
+                </div>
+              </div>
+            ) : <InlineError message={error} />
+          )}
 
           <Button type="submit" variant="primary" loading={verifying} disabled={!tokenInput.trim()}>
             Connect
@@ -55,7 +71,7 @@ export function AuthGatePage() {
         </form>
 
         <p className="mt-4 text-center text-[11px] text-ink-3">
-          Runs entirely on local infrastructure — no cloud AI APIs, no external egress.
+          Designed for local inference. Verified network policy is shown after sign-in.
         </p>
       </div>
     </div>

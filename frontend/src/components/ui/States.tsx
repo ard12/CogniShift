@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { IconAlertTriangle } from "./Icon";
+import { IconAlertTriangle, IconLoader } from "./Icon";
 
 /** Single shimmering placeholder block. Compose several to shape a loader. */
 export function Skeleton({ className }: { className?: string }) {
@@ -9,12 +9,10 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function LoadingState({ label = "Loading…" }: { label?: string }) {
   return (
-    <div className="flex flex-col gap-3 py-4" role="status" aria-busy="true" aria-live="polite">
-      <Skeleton className="h-3 w-1/3" />
-      <Skeleton className="h-3 w-4/5" />
-      <Skeleton className="h-3 w-2/3" />
-      <Skeleton className="h-3 w-3/4" />
-      <span className="sr-only">{label}</span>
+    <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-ink-3">
+      <IconLoader className="h-5 w-5" />
+      <span>{label}</span>
+
     </div>
   );
 }

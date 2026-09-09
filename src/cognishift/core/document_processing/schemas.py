@@ -89,6 +89,9 @@ class OCRTextBlock(BaseModel):
 
 class OCRResult(BaseModel):
     text: str
+    raw_text: str = ""
+    layout_warnings: List[str] = Field(default_factory=list)
+    tables: List[Dict[str, Any]] = Field(default_factory=list)
     confidence: Optional[float] = None
     blocks: List[OCRTextBlock] = Field(default_factory=list)
     engine: str = "rapidocr"

@@ -1,7 +1,17 @@
+export function parseUtcDate(iso?: string | null): Date | null {
+  if (!iso) return null;
+  let normalized = iso.trim();
+  // Handle SQLite CURRENT_TIMESTAMP ("YYYY-MM-DD HH:MM:SS" without Z or offset)
+  if (!normalized.endsWith("Z") && !normalized.includes("+") && !/-\d\d:\d\d$/.test(normalized)) {
+    normalized = normalized.replace(" ", "T") + "Z";
+  }
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatRelativeTime(iso?: string | null): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
+  const date = parseUtcDate(iso);
+  if (!date) return "—";
 
   const diffMs = date.getTime() - Date.now();
   const diffSec = Math.round(diffMs / 1000);
@@ -27,16 +37,56 @@ export function formatRelativeTime(iso?: string | null): string {
   return "just now";
 }
 
+export const FINALS_TIMEZONE = "Asia/Kolkata";
+
 export function formatDateTime(iso?: string | null): string {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
+  const date = parseUtcDate(iso);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: FINALS_TIMEZONE,
     month: "short",
     day: "numeric",
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
-  });
+  }).format(date);
+}
+
+export function formatFullDateTime(iso?: string | null): string {
+  const date = parseUtcDate(iso);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: FINALS_TIMEZONE,
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  }).format(date);
+}
+
+export function formatIstTime(iso?: string | null): string {
+  const date = parseUtcDate(iso);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: FINALS_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+export function formatIstDate(iso?: string | null): string {
+  const date = parseUtcDate(iso);
+  if (!date) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: FINALS_TIMEZONE,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
 }
 
 export function formatBytes(bytes?: number | null): string {

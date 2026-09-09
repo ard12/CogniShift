@@ -17,22 +17,29 @@ async def add_node(
     workspace_id: int,
     name: str,
     entity_type: str,
-    properties: Optional[Dict[str, Any]] = None
+    properties: Optional[Dict[str, Any]] = None,
+    db: Optional[Any] = None
 ) -> int:
     """Add or update an entity node in the workspace knowledge graph."""
     props_str = json.dumps(properties or {})
-    async with get_db() as db:
-        cursor = await db.execute(
-            """INSERT INTO graph_nodes (workspace_id, name, entity_type, properties)
+    query = """INSERT INTO graph_nodes (workspace_id, name, entity_type, properties)
                VALUES (?, ?, ?, ?)
                ON CONFLICT(workspace_id, name) DO UPDATE SET
                    entity_type = excluded.entity_type,
                    properties = excluded.properties
-               RETURNING id""",
-            (workspace_id, name.strip(), entity_type.strip().lower(), props_str)
-        )
+               RETURNING id"""
+    params = (workspace_id, name.strip(), entity_type.strip().lower(), props_str)
+
+    if db is not None:
+        cursor = await db.execute(query, params)
         row = await cursor.fetchone()
         await db.commit()
+        return row["id"]
+
+    async with get_db() as conn:
+        cursor = await conn.execute(query, params)
+        row = await cursor.fetchone()
+        await conn.commit()
         return row["id"]
 
 
@@ -50,7 +57,7 @@ async def add_edge(
         cursor = await db.execute("SELECT id FROM graph_nodes WHERE workspace_id = ? AND name = ?", (workspace_id, source_name.strip()))
         src_row = await cursor.fetchone()
         if not src_row:
-            src_id = await add_node(workspace_id, source_name.strip(), "entity")
+            src_id = await add_node(workspace_id, source_name.strip(), "entity", db=db)
         else:
             src_id = src_row["id"]
 
@@ -58,7 +65,7 @@ async def add_edge(
         cursor = await db.execute("SELECT id FROM graph_nodes WHERE workspace_id = ? AND name = ?", (workspace_id, target_name.strip()))
         tgt_row = await cursor.fetchone()
         if not tgt_row:
-            tgt_id = await add_node(workspace_id, target_name.strip(), "entity")
+            tgt_id = await add_node(workspace_id, target_name.strip(), "entity", db=db)
         else:
             tgt_id = tgt_row["id"]
 

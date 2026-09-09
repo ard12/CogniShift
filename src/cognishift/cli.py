@@ -3,6 +3,7 @@ import asyncio
 import json
 import sys
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -78,7 +79,7 @@ def print_banner():
     banner_text = (
         "[bold cyan]COGNISHIFT[/bold cyan] [bold green]v0.1.0[/bold green] "
         "| [bold yellow]Sovereign On-Premise Agentic AI Workbench[/bold yellow]\n"
-        "[dim]MRPL Industrial Operations | IEC 62443 Level 3.5 | Air-Gapped Zero-Cloud[/dim]"
+        "[dim]MRPL Industrial Operations | Local Inference | Application Egress Policy[/dim]"
     )
     console.print(Panel(banner_text, border_style="cyan", box=box.ROUNDED))
 
@@ -130,7 +131,7 @@ def system_status():
         table.add_row(
             "Operating Mode",
             f"[green]{settings.operating_mode.upper()}[/green]",
-            "Strict zero cloud egress enforced",
+            "Application egress policy enforced",
         )
         table.add_row(
             "Database Engine",
@@ -755,18 +756,62 @@ def approve_action(
                 console.print(f"[bold red]{e}[/bold red]")
                 return
 
+            required_approvals = req.get("required_approvals") or 1
+            now = datetime.now(timezone.utc).isoformat()
+
             # Reconcilable update: mark approved if pending
             if req["status"] == "pending":
-                cursor_up = await db.execute(
-                    """UPDATE approval_requests
-                       SET status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
-                       WHERE id = ? AND status = 'pending' RETURNING id""",
-                    (approver.user_id, request_id),
-                )
-                if not await cursor_up.fetchone():
-                    console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                if required_approvals == 2 and not req.get("reviewed_by"):
+                    # Step 1 of 2: First supervisor approval recorded
+                    cursor_up = await db.execute(
+                        """UPDATE approval_requests
+                           SET reviewed_by = ?, reviewed_at = ?
+                           WHERE id = ? AND status = 'pending' AND reviewed_by IS NULL RETURNING id""",
+                        (approver.user_id, now, request_id),
+                    )
+                    if not await cursor_up.fetchone():
+                        console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                        return
+                    await db.commit()
+                    console.print(
+                        f"[bold yellow][Four-Eyes Stage 1/2 Verified] Request #{request_id} signed by {approver.user_id}.\n"
+                        f"Action remains PENDING until an independent second supervisor provides Stage 2 authorization.[/bold yellow]"
+                    )
                     return
-                await db.commit()
+
+                elif required_approvals == 2 and req.get("reviewed_by"):
+                    # Step 2 of 2: Second supervisor must differ from First Approver
+                    first_approver = req["reviewed_by"].lower().strip()
+                    if approver.user_id.lower().strip() == first_approver:
+                        console.print(
+                            f"[bold red]Four-Eyes Violation: User '{approver.user_id}' already provided Stage 1 approval. "
+                            f"Stage 2 must be authorized by an independent, different supervisor.[/bold red]"
+                        )
+                        return
+
+                    cursor_up = await db.execute(
+                        """UPDATE approval_requests
+                           SET status = 'approved', reviewed_by_2 = ?, reviewed_at_2 = ?
+                           WHERE id = ? AND status = 'pending' AND reviewed_by = ? AND reviewed_by_2 IS NULL RETURNING id""",
+                        (approver.user_id, now, request_id, req["reviewed_by"]),
+                    )
+                    if not await cursor_up.fetchone():
+                        console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                        return
+                    await db.commit()
+
+                else:
+                    # Single supervisor approval
+                    cursor_up = await db.execute(
+                        """UPDATE approval_requests
+                           SET status = 'approved', reviewed_by = ?, reviewed_at = ?
+                           WHERE id = ? AND status = 'pending' RETURNING id""",
+                        (approver.user_id, now, request_id),
+                    )
+                    if not await cursor_up.fetchone():
+                        console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
+                        return
+                    await db.commit()
             elif req["status"] != "approved":
                 console.print(f"[bold red]Error: Request #{request_id} cannot be approved from status '{req['status']}'.[/bold red]")
                 return

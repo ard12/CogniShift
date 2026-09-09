@@ -1,0 +1,368 @@
+{
+  "title": "CogniShift Adversarial Multi-Domain Validation Report",
+  "timestamp": "2026-09-05T16:40:08.449609+00:00",
+  "overall_status": "PASSED",
+  "suites": {
+    "suite_1_invariants_and_isolation": {
+      "status": "PASSED",
+      "simulation_workspace_id": 1000,
+      "simulation_vector_count": 11,
+      "fixtures_verified": 13,
+      "unrelated_workspaces_verified": 29,
+      "dry_run_invariant_preserved": true
+    },
+    "suite_2_semantic_routing_matrix": {
+      "status": "PASSED",
+      "total_cases": 10,
+      "correct": 10,
+      "accuracy_pct": 100.0,
+      "cases": [
+        {
+          "query": "Can you run Python?",
+          "expected_intent": "CONVERSATION",
+          "predicted_intent": "CONVERSATION",
+          "decision_method": "SEMANTIC",
+          "confidence": 0.987,
+          "margin": 0.179,
+          "passed": true
+        },
+        {
+          "query": "Explain how restarting equipment works.",
+          "expected_intent": "CONVERSATION",
+          "predicted_intent": "CONVERSATION",
+          "decision_method": "RULE",
+          "confidence": null,
+          "margin": null,
+          "passed": true
+        },
+        {
+          "query": "What does our procurement policy say?",
+          "expected_intent": "KNOWLEDGE_QUERY",
+          "predicted_intent": "KNOWLEDGE_QUERY",
+          "decision_method": "SEMANTIC",
+          "confidence": 0.836,
+          "margin": 0.223,
+          "passed": true
+        },
+        {
+          "query": "What is the continuous speed limit on compressor K-203?",
+          "expected_intent": "KNOWLEDGE_QUERY",
+          "predicted_intent": "KNOWLEDGE_QUERY",
+          "decision_method": "SEMANTIC",
+          "confidence": 0.978,
+          "margin": 0.363,
+          "passed": true
+        },
+        {
+          "query": "Summarize Q4_budget.xlsx.",
+          "expected_intent": "ARTIFACT_INSPECTION",
+          "predicted_intent": "ARTIFACT_INSPECTION",
+          "decision_method": "RULE",
+          "confidence": null,
+          "margin": null,
+          "passed": true
+        },
+        {
+          "query": "Review Vendor_Contract_Alpha.docx SLA penalties",
+          "expected_intent": "ARTIFACT_INSPECTION",
+          "predicted_intent": "ARTIFACT_INSPECTION",
+          "decision_method": "RULE",
+          "confidence": null,
+          "margin": null,
+          "passed": true
+        },
+        {
+          "query": "Write a python script to calculate payroll variance",
+          "expected_intent": "CODE_EXECUTION",
+          "predicted_intent": "CODE_EXECUTION",
+          "decision_method": "SEMANTIC",
+          "confidence": 0.967,
+          "margin": 0.34,
+          "passed": true
+        },
+        {
+          "query": "Check discharge pressure on K-203",
+          "expected_intent": "CONTROL_ACTION",
+          "predicted_intent": "CONTROL_ACTION",
+          "decision_method": "SEMANTIC",
+          "confidence": 0.986,
+          "margin": 0.208,
+          "passed": true
+        },
+        {
+          "query": "Open documents.",
+          "expected_intent": "UI_NAVIGATION",
+          "predicted_intent": "UI_NAVIGATION",
+          "decision_method": "RULE",
+          "confidence": null,
+          "margin": null,
+          "passed": true
+        },
+        {
+          "query": "Take me to approvals view",
+          "expected_intent": "UI_NAVIGATION",
+          "predicted_intent": "UI_NAVIGATION",
+          "decision_method": "RULE",
+          "confidence": null,
+          "margin": null,
+          "passed": true
+        }
+      ]
+    },
+    "suite_3_retrieval_distance_calibration": {
+      "status": "PASSED",
+      "configured_threshold": 0.78,
+      "relevant_distances": {
+        "min": 0.4315,
+        "max": 0.7594,
+        "mean": 0.611,
+        "all_admitted": true
+      },
+      "distractor_distances": {
+        "samples": [
+          0.5185,
+          0.7528,
+          0.829
+        ]
+      },
+      "irrelevant_distances": {
+        "min": 0.8253,
+        "max": 0.9668,
+        "mean": 0.9153,
+        "all_rejected": true
+      },
+      "separation_gap": 0.0659,
+      "threshold_recommendation": "Configured threshold 0.78 is well-calibrated. Relevant chunks average 0.6110 (max 0.7594), while irrelevant chunks average 0.9153 (min 0.8253), giving a separation margin of 0.0659.",
+      "query_evaluations": [
+        {
+          "query": "What does our procurement policy say?",
+          "results": [
+            {
+              "source": "Procurement_Policy_2026.pdf",
+              "category": "relevant",
+              "squared_l2_distance": 0.4315,
+              "admitted_by_0_78": true,
+              "text_snippet": "MRPL Corporate Policy \u00b7 Procurement & Capital Expenditure (Policy Ref: PR-2026-V..."
+            },
+            {
+              "source": "Procurement_Policy_2024_ARCHIVED.pdf",
+              "category": "distractor",
+              "squared_l2_distance": 0.5185,
+              "admitted_by_0_78": true,
+              "text_snippet": "ARCHIVED AND SUPERSEDED \u00b7 DO NOT USE FOR CURRENT OPERATIONS\n\nHistorical Policy: ..."
+            },
+            {
+              "source": "Procurement_Policy_2026.pdf",
+              "category": "relevant",
+              "squared_l2_distance": 0.6143,
+              "admitted_by_0_78": true,
+              "text_snippet": "ment requisitions must be processed through the central enterprise ERP system.\n\n..."
+            },
+            {
+              "source": "Procurement_Policy_2026.pdf",
+              "category": "relevant",
+              "squared_l2_distance": 0.7086,
+              "admitted_by_0_78": true,
+              "text_snippet": "0 require competitive tendering with a minimum of three qualified vendor bids.\n\n..."
+            },
+            {
+              "source": "Adversarial_Vendor_Note.pdf",
+              "category": "distractor",
+              "squared_l2_distance": 0.7528,
+              "admitted_by_0_78": true,
+              "text_snippet": "Vendor Communication Note \u00b7 Alpha Industrial Spares\n\nNotice to Operators: System..."
+            },
+            {
+              "source": "Board_Meeting_Notes.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.8253,
+              "admitted_by_0_78": false,
+              "text_snippet": "Executive Committee Board Minutes \u00b7 Confidential Management Review\n\nAgenda Item ..."
+            },
+            {
+              "source": "Cybersecurity_Removable_Media_Policy.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9027,
+              "admitted_by_0_78": false,
+              "text_snippet": "m being connected to any Level 2, Level 3, or Level 3.5 workstation or server.\n\n..."
+            },
+            {
+              "source": "Compressor_K203_Maintenance_Manual.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9072,
+              "admitted_by_0_78": false,
+              "text_snippet": "4\n- Normal discharge pressure: 32.5 bar (operating window: 30.0 to 35.0 bar).\n\n-..."
+            },
+            {
+              "source": "Cybersecurity_Removable_Media_Policy.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9117,
+              "admitted_by_0_78": false,
+              "text_snippet": "MRPL Refinery Information Security Standard \u00b7 Removable Media & USB Policy (Sec-..."
+            },
+            {
+              "source": "Compressor_K203_Maintenance_Manual.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9668,
+              "admitted_by_0_78": false,
+              "text_snippet": "Equipment Maintenance Manual \u00b7 K-203 Centrifugal Gas Compressor\n\nSection 1:Opera..."
+            }
+          ]
+        },
+        {
+          "query": "What is the continuous speed limit on compressor K-203?",
+          "results": [
+            {
+              "source": "Compressor_K203_Maintenance_Manual.pdf",
+              "category": "relevant",
+              "squared_l2_distance": 0.5413,
+              "admitted_by_0_78": true,
+              "text_snippet": "Equipment Maintenance Manual \u00b7 K-203 Centrifugal Gas Compressor\n\nSection 1:Opera..."
+            },
+            {
+              "source": "Compressor_K203_Maintenance_Manual.pdf",
+              "category": "relevant",
+              "squared_l2_distance": 0.7594,
+              "admitted_by_0_78": true,
+              "text_snippet": "4\n- Normal discharge pressure: 32.5 bar (operating window: 30.0 to 35.0 bar).\n\n-..."
+            },
+            {
+              "source": "Legacy_P101A_Training_Document.pdf",
+              "category": "distractor",
+              "squared_l2_distance": 0.829,
+              "admitted_by_0_78": false,
+              "text_snippet": "ARCHIVED TRAINING SIMULATION ONLY \u00b7 NOT ACTIVE TELEMETRY\n\nCourse: Historic DCS S..."
+            },
+            {
+              "source": "Procurement_Policy_2024_ARCHIVED.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.8841,
+              "admitted_by_0_78": false,
+              "text_snippet": "ARCHIVED AND SUPERSEDED \u00b7 DO NOT USE FOR CURRENT OPERATIONS\n\nHistorical Policy: ..."
+            },
+            {
+              "source": "Board_Meeting_Notes.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.8886,
+              "admitted_by_0_78": false,
+              "text_snippet": "Executive Committee Board Minutes \u00b7 Confidential Management Review\n\nAgenda Item ..."
+            },
+            {
+              "source": "Cybersecurity_Removable_Media_Policy.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9304,
+              "admitted_by_0_78": false,
+              "text_snippet": "m being connected to any Level 2, Level 3, or Level 3.5 workstation or server.\n\n..."
+            },
+            {
+              "source": "Adversarial_Vendor_Note.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9325,
+              "admitted_by_0_78": false,
+              "text_snippet": "Vendor Communication Note \u00b7 Alpha Industrial Spares\n\nNotice to Operators: System..."
+            },
+            {
+              "source": "Cybersecurity_Removable_Media_Policy.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9381,
+              "admitted_by_0_78": false,
+              "text_snippet": "MRPL Refinery Information Security Standard \u00b7 Removable Media & USB Policy (Sec-..."
+            },
+            {
+              "source": "Procurement_Policy_2026.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9473,
+              "admitted_by_0_78": false,
+              "text_snippet": "0 require competitive tendering with a minimum of three qualified vendor bids.\n\n..."
+            },
+            {
+              "source": "Procurement_Policy_2026.pdf",
+              "category": "irrelevant",
+              "squared_l2_distance": 0.9485,
+              "admitted_by_0_78": false,
+              "text_snippet": "ment requisitions must be processed through the central enterprise ERP system.\n\n..."
+            }
+          ]
+        }
+      ]
+    },
+    "suite_4_fail_closed_grounding": {
+      "status": "PASSED",
+      "test_4a_missing_knowledge": {
+        "query": "What does our procurement policy say? (in workspace without policy)",
+        "result_text": "I couldn't find procurement-policy documentation in the current workspace knowledge base. Please ingest the applicable document before asking for an organization-specific answer.",
+        "sources_used": "None (No matching manual found)",
+        "has_not_found_msg": true,
+        "zero_hallucinated_urls": true,
+        "reasoning_step_skipped": true
+      },
+      "test_4b_missing_artifact": {
+        "query": "Summarize missing_sales_plan.xlsx",
+        "result_text": "I couldn't find 'missing_sales_plan.xlsx' in the current workspace.",
+        "sources_used": "Workspace Artifact | missing_sales_plan.xlsx (Not Found)",
+        "fail_closed_exact_match": true,
+        "read_step_skipped": true
+      },
+      "test_4c_unsupported_xls": {
+        "query": "Summarize archive_2018.xls",
+        "result_text": "The file 'archive_2018.xls' is in legacy .xls format which is not supported in the local environment. Please convert it to .xlsx or .csv.",
+        "explicit_unsupported_notice": true,
+        "openpyxl_not_attempted": true
+      }
+    },
+    "suite_5_conversation_continuity": {
+      "status": "PASSED",
+      "turn_1": {
+        "query": "Summarize Q4_budget.xlsx.",
+        "sources_used": "Workspace Artifact | Q4_budget.xlsx",
+        "result_preview": "The Q4_budget.xlsx artifact contains a summary of the allocated budget and actual spend for the company across various departments. The summary is divided into four sections: Operations, Maintenance, Engineering, and IT Infrastructure. Each section provides information on the allocated budget, actua",
+        "passed": true
+      },
+      "turn_2_follow_up": {
+        "raw_input": "[Recent Conversation Context]\nOperator: Summarize Q4_budget.xlsx.\nAssistant: The Q4_budget.xlsx artifact contains a summary of the allocated budget and actual spend for the company across various departments. The summary is divided into four sections: Operations, Maintenance, ...\n[Current Operator Query]\nyes help me generate a report on that",
+        "resolved_target": "Q4_budget.xlsx",
+        "sources_used": "Workspace Artifact | Q4_budget.xlsx",
+        "result_preview": "To generate a report based on the provided budget data, I can summarize the key points for each department.\n\nThe Operations department has allocated a budget of INR 12,500,000 and has spent INR 11,850,000, resulting in a variance of INR 650,000. The utilization rate is 94.8%.\n\nThe Maintenance depart",
+        "no_p101a_context_leak": true,
+        "retained_budget_topic": true,
+        "five_stage_stepper_valid": true,
+        "passed": true
+      }
+    },
+    "suite_6_workflow_stepper": {
+      "status": "PASSED",
+      "conversation_plan": {
+        "expected_steps": 3,
+        "actual_steps": 3,
+        "all_completed": true,
+        "step_descriptions": [
+          "Route semantic intent and verify conversational policy",
+          "Synthesize direct conversational response",
+          "Present answer to operator"
+        ]
+      },
+      "ui_navigation_plan": {
+        "expected_steps": 2,
+        "actual_steps": 2,
+        "all_completed": true,
+        "step_descriptions": [
+          "Parse navigation command",
+          "Confirm view navigation"
+        ]
+      },
+      "artifact_inspection_plan": {
+        "expected_steps": 5,
+        "actual_steps": 5,
+        "all_completed": true,
+        "step_descriptions": [
+          "Route semantic intent to workspace artifact inspection",
+          "Resolve referenced workspace artifact",
+          "Read artifact content",
+          "Analyze artifact data",
+          "Synthesize report for operator"
+        ]
+      },
+      "no_hardcoded_eight_card_display": true
+    }
+  }
+}

@@ -51,7 +51,9 @@ function useAsync<T>(loader: () => Promise<T>, deps: unknown[]) {
 }
 
 export function DashboardPage() {
-  const { sovereignty } = useAuth();
+  const { sovereignty, role } = useAuth();
+  const canReview = role === "supervisor" || role === "administrator";
+  const isAdmin = role === "administrator";
   const { workspaces, selectedWorkspaceId, selectedWorkspace, loading: workspacesLoading } =
     useWorkspaces();
 
@@ -66,13 +68,13 @@ export function DashboardPage() {
   );
 
   const { data: approvals, loading: approvalsLoading } = useAsync<Approval[]>(
-    () => approvalsApi.listPending(),
-    []
+    () => (canReview ? approvalsApi.listPending() : Promise.resolve([])),
+    [canReview]
   );
 
   const { data: knowledge, loading: knowledgeLoading } = useAsync<KnowledgeSource[]>(
-    () => (selectedWorkspaceId ? knowledgeApi.list(selectedWorkspaceId) : Promise.resolve([])),
-    [selectedWorkspaceId]
+    () => (canReview && selectedWorkspaceId ? knowledgeApi.list(selectedWorkspaceId) : Promise.resolve([])),
+    [canReview, selectedWorkspaceId]
   );
 
   const recentRuns = [...(runs ?? [])]
@@ -103,17 +105,17 @@ export function DashboardPage() {
           label="Workspaces"
           value={workspacesLoading ? "…" : String(workspaces.length)}
         />
-        <StatCard
+        {canReview && <StatCard
           icon={<IconShieldCheck className="h-4 w-4" />}
           label="Pending Approvals"
           value={approvalsLoading ? "…" : String(approvals?.length ?? 0)}
           tone={approvals && approvals.length > 0 ? "warning" : "success"}
-        />
-        <StatCard
+        />}
+        {canReview && <StatCard
           icon={<IconBook className="h-4 w-4" />}
           label="Knowledge Sources"
           value={knowledgeLoading ? "…" : String(knowledge?.length ?? 0)}
-        />
+        />}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -159,8 +161,8 @@ export function DashboardPage() {
             ) : (
               <EmptyState title="No data" />
             )}
-            <Link to="/system" className="inline-block text-[11px] font-mono text-brand hover:underline">
-              View full system status →
+            <Link to={isAdmin ? "/system" : "/security"} className="inline-block text-[11px] font-mono text-brand hover:underline">
+              {isAdmin ? "View full system status" : "View security status"} →
             </Link>
           </PanelBody>
         </Panel>
@@ -190,14 +192,14 @@ export function DashboardPage() {
                 description="Create or select a workspace to begin operating."
               />
             )}
-            <Link to="/workspaces" className="inline-block text-[11px] font-mono text-brand hover:underline">
+            {canReview && <Link to="/workspaces" className="inline-block text-[11px] font-mono text-brand hover:underline">
               Manage workspaces →
-            </Link>
+            </Link>}
           </PanelBody>
         </Panel>
 
-        {/* Knowledge summary */}
-        <Panel>
+        {/* Knowledge summary is restricted to roles that may access the vault. */}
+        {canReview && <Panel>
           <PanelHeader icon={<IconBook className="h-3.5 w-3.5" />} title="Knowledge Vault" />
           <PanelBody className="space-y-2">
             {knowledgeLoading ? (
@@ -218,7 +220,7 @@ export function DashboardPage() {
               Open knowledge vault →
             </Link>
           </PanelBody>
-        </Panel>
+        </Panel>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -251,8 +253,8 @@ export function DashboardPage() {
           </PanelBody>
         </Panel>
 
-        {/* Pending approvals */}
-        <Panel>
+        {/* Approval data is restricted to supervisors and administrators. */}
+        {canReview && <Panel>
           <PanelHeader icon={<IconShieldCheck className="h-3.5 w-3.5" />} title="Pending Approvals" />
           <PanelBody>
             {approvalsLoading ? (
@@ -278,7 +280,7 @@ export function DashboardPage() {
               Review approvals →
             </Link>
           </PanelBody>
-        </Panel>
+        </Panel>}
       </div>
 
       <Panel>
@@ -290,9 +292,9 @@ export function DashboardPage() {
           <Link to="/artifacts" className="btn btn-secondary text-xs">
             Browse Artifacts
           </Link>
-          <Link to="/agents" className="btn btn-secondary text-xs">
+          {isAdmin && <Link to="/agents" className="btn btn-secondary text-xs">
             Manage Agents
-          </Link>
+          </Link>}
         </PanelBody>
       </Panel>
     </div>

@@ -1,0 +1,136 @@
+[
+  {
+    "model": "deepseek-r1:7b",
+    "role": "Analytical Reasoning & RCA Candidate",
+    "test_type": "reasoning",
+    "status": "SEMANTIC_WARNING",
+    "cold_latency_s": 18.628,
+    "warm_latency_median_s": 11.77,
+    "warm_latency_min_s": 11.649,
+    "warm_latency_max_s": 12.122,
+    "tokens_per_sec": 27.3,
+    "semantic_accuracy_pass": false,
+    "semantic_notes": "RCA evaluation (2 fixtures): evidence=0.0%, hypotheses=0.0%, cause_accuracy=0.0%. Classification: Experimental / Heavy-Reasoning Candidate",
+    "warm_trials_count": 5,
+    "metrics": {
+      "evidence_retention_score": 0.0,
+      "hypothesis_separation_score": 0.0,
+      "plausible_cause_accuracy": 0.0,
+      "classification": "Experimental / Heavy-Reasoning Candidate",
+      "fixtures_evaluated": 2,
+      "trial_details": [
+        {
+          "scenario": "CDU_Startup_Overpressure",
+          "evidence_retained": [],
+          "hypotheses_found": [],
+          "cause_identified": false,
+          "reasoning_detected": false,
+          "reasoning_chars": 0
+        },
+        {
+          "scenario": "Feed_Pump_Cavitation",
+          "evidence_retained": [],
+          "hypotheses_found": [],
+          "cause_identified": false,
+          "reasoning_detected": false,
+          "reasoning_chars": 0
+        }
+      ]
+    }
+  },
+  {
+    "model": "qwen2.5-coder:7b",
+    "role": "Code Synthesis & Sandbox Execution",
+    "test_type": "coding",
+    "status": "PASSED",
+    "cold_latency_s": 11.136,
+    "warm_latency_median_s": 4.161,
+    "warm_latency_min_s": 3.952,
+    "warm_latency_max_s": 4.306,
+    "tokens_per_sec": 27.0,
+    "semantic_accuracy_pass": true,
+    "semantic_notes": "Real Docker sandbox execution verified: detect_excursions returned expected [1, 3]",
+    "warm_trials_count": 5,
+    "metrics": {
+      "sandbox_backend": "DockerPodmanBackend",
+      "container_started": true,
+      "output": [
+        1,
+        3
+      ],
+      "expected": [
+        1,
+        3
+      ],
+      "status": "COMPLETED"
+    }
+  },
+  {
+    "model": "qwen2.5:7b",
+    "role": "Structured Tool Calling & SOP Orchestration",
+    "test_type": "structured_tool",
+    "status": "PASSED",
+    "cold_latency_s": 10.471,
+    "warm_latency_median_s": 3.869,
+    "warm_latency_min_s": 3.689,
+    "warm_latency_max_s": 3.973,
+    "tokens_per_sec": 27.3,
+    "semantic_accuracy_pass": true,
+    "semantic_notes": "25 Scenarios: valid=23/25, exact_tool=25/25, param_match=25/25, malformed=0/25",
+    "warm_trials_count": 5,
+    "metrics": {
+      "total_scenarios": 25,
+      "valid_count": 23,
+      "exact_tool_match_count": 25,
+      "parameter_match_count": 25,
+      "malformed_count": 0,
+      "valid_ratio": 0.92,
+      "exact_match_ratio": 1.0,
+      "param_match_ratio": 1.0
+    }
+  },
+  {
+    "model": "moondream:latest",
+    "role": "Multimodal Vision & Analog Gauge Inspection",
+    "test_type": "vision",
+    "status": "SEMANTIC_WARNING",
+    "cold_latency_s": 6.565,
+    "warm_latency_median_s": 2.656,
+    "warm_latency_min_s": 2.433,
+    "warm_latency_max_s": 2.684,
+    "tokens_per_sec": null,
+    "semantic_accuracy_pass": false,
+    "semantic_notes": "Positive: pred=None, exp=485.0, err=None, unit=False, tag=False, pass=False; Negative: abstained=True, pass=True",
+    "warm_trials_count": 5,
+    "metrics": {
+      "predicted_value": null,
+      "expected_value": 485.0,
+      "absolute_error": null,
+      "tolerance": 5.0,
+      "unit_match": false,
+      "tag_match": false,
+      "positive_case_pass": false,
+      "negative_case_abstained": true,
+      "negative_case_pass": true,
+      "overall_vision_pass": false
+    }
+  },
+  {
+    "model": "llama3.2:3b",
+    "role": "Edge Dialogue & Real-Time Status Routing",
+    "test_type": "edge_dialogue",
+    "status": "PASSED",
+    "cold_latency_s": 6.433,
+    "warm_latency_median_s": 3.424,
+    "warm_latency_min_s": 3.255,
+    "warm_latency_max_s": 3.501,
+    "tokens_per_sec": 63.5,
+    "semantic_accuracy_pass": true,
+    "semantic_notes": "Edge dialogue: sentences=2, readiness_terms=True",
+    "warm_trials_count": 5,
+    "metrics": {
+      "sentence_count": 2,
+      "has_readiness": true
+    }
+  }
+]

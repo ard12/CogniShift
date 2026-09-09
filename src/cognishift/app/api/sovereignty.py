@@ -15,16 +15,49 @@ from cognishift.app.db.database import get_db
 router = APIRouter(prefix="/api/v1/system", tags=["System"])
 
 
+def check_physical_interface_state() -> Dict[str, Any]:
+    """Examine local OS network adapters without emitting any network packets."""
+    try:
+        import psutil
+        stats = psutil.net_if_stats()
+        addrs = psutil.net_if_addrs()
+        external_active = []
+        for iface_name, iface_stat in stats.items():
+            lower = iface_name.lower()
+            if "loopback" in lower or "veth" in lower or "wsl" in lower or "docker" in lower:
+                continue
+            if iface_stat.isup:
+                for addr in addrs.get(iface_name, []):
+                    if str(addr.family).endswith("AF_INET") or addr.family == 2:
+                        ip = addr.address
+                        if not ip.startswith("127.") and not ip.startswith("169.254."):
+                            external_active.append(iface_name)
+                            break
+        is_connected = len(external_active) > 0
+        return {
+            "physical_network_state": "CONNECTED" if is_connected else "DISCONNECTED",
+            "active_external_interfaces": external_active,
+            "external_connectivity": "AVAILABLE" if is_connected else "UNAVAILABLE"
+        }
+    except Exception:
+        return {
+            "physical_network_state": "DISCONNECTED",
+            "active_external_interfaces": [],
+            "external_connectivity": "UNAVAILABLE"
+        }
+
+
 @router.get("/sovereignty")
 async def get_sovereignty_status(
     current_user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
-    Returns verified system sovereignty status and local component readiness.
+    Returns verified system sovereignty status, physical network state, and local component readiness.
     Authenticated endpoint; does not expose confidential secrets or raw request data.
     """
     policy = get_active_network_policy()
     preflight = await run_network_preflight()
+    phys_state = check_physical_interface_state()
 
     # Query count of blocked events
     blocked_count = 0
@@ -53,6 +86,9 @@ async def get_sovereignty_status(
         "components": component_summary,
         "allowed_destinations_count": len(policy.allowed_destinations),
         "total_blocked_attempts": blocked_count,
+        "physical_network_state": phys_state["physical_network_state"],
+        "active_external_interfaces": phys_state["active_external_interfaces"],
+        "external_connectivity": phys_state["external_connectivity"],
         "user_role": current_user.role,
     }
 

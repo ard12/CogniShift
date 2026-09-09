@@ -4,6 +4,7 @@ Phase 3 Implementation.
 Provides authenticated, IDOR-protected, and tamper-verified artifact listing and downloads.
 """
 
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from typing import List, Optional
@@ -99,7 +100,7 @@ async def download_artifact(
         )
 
     # TAMPER DETECTION: Verify file bytes match registered SHA-256 hash
-    actual_hash = compute_sha256(file_path)
+    actual_hash = await asyncio.to_thread(compute_sha256, file_path)
     registered_hash = row["sha256_hash"]
     if actual_hash != registered_hash:
         raise HTTPException(

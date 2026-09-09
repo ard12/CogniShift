@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "@/auth/useAuth";
 import { cn } from "@/lib/cn";
 import {
   IconArchive,
@@ -7,27 +8,31 @@ import {
   IconCpu,
   IconGauge,
   IconLayers,
+  IconMail,
   IconPlayCircle,
   IconShieldCheck,
   IconTerminal,
 } from "@/components/ui/Icon";
 
 const NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: IconGauge },
-  { to: "/operator", label: "Operator", icon: IconTerminal },
-  { to: "/workspaces", label: "Workspaces", icon: IconLayers },
-  { to: "/agents", label: "Agents", icon: IconBot },
-  { to: "/knowledge", label: "Knowledge", icon: IconBook },
-  { to: "/runs", label: "Runs", icon: IconPlayCircle },
-  { to: "/approvals", label: "Approvals", icon: IconShieldCheck },
-  { to: "/artifacts", label: "Artifacts", icon: IconArchive },
-  { to: "/system", label: "System", icon: IconCpu },
+  { to: "/dashboard", label: "Dashboard", icon: IconGauge, roles: ["operator","supervisor","administrator"] },
+  { to: "/operator", label: "Operator", icon: IconTerminal, roles: ["operator","supervisor","administrator"] },
+  { to: "/workspaces", label: "Workspaces", icon: IconLayers, roles: ["supervisor","administrator"] },
+  { to: "/agents", label: "Agents", icon: IconBot, roles: ["administrator"] },
+  { to: "/knowledge", label: "Knowledge", icon: IconBook, roles: ["supervisor","administrator"] },
+  { to: "/runs", label: "Runs", icon: IconPlayCircle, roles: ["operator","supervisor","administrator"] },
+  { to: "/approvals", label: "Approvals", icon: IconShieldCheck, roles: ["supervisor","administrator"] },
+  { to: "/mailbox", label: "Mailbox", icon: IconMail, roles: ["operator","supervisor","administrator"] },
+  { to: "/artifacts", label: "Artifacts", icon: IconArchive, roles: ["operator","supervisor","administrator"] },
+  { to: "/security", label: "Security", icon: IconShieldCheck, roles: ["operator","supervisor","administrator"] },
+  { to: "/system", label: "System", icon: IconCpu, roles: ["administrator"] },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { role } = useAuth();
   return (
     <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Primary">
-      {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+      {NAV_ITEMS.filter((item) => role && item.roles.includes(role)).map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}

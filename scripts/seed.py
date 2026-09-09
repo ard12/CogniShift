@@ -1,5 +1,10 @@
 import asyncio
 import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
 from cognishift.app.db.database import init_db, get_db
 
 async def seed_data():
@@ -29,28 +34,28 @@ async def seed_data():
         
         # Seed Tools
         tools = [
-            (1, 'check_pressure', 'Check Pressure Reading', 'read_only', 0, 'check_pressure'),
-            (2, 'check_temperature', 'Check Temperature Reading', 'read_only', 0, 'check_temperature'),
-            (3, 'run_diagnostic', 'Run Equipment Diagnostic', 'low_risk', 0, 'run_diagnostic'),
-            (4, 'emergency_pressure_relief', 'Emergency Pressure Relief', 'service_interrupting', 1, 'emergency_pressure_relief'),
-            (5, 'restart_component', 'Restart System Component', 'sensitive', 1, 'restart_component'),
-            (6, 'check_network', 'Check Network Status', 'read_only', 0, 'check_network'),
-            (7, 'restart_service', 'Restart Network Service', 'low_risk', 1, 'restart_service'),
-            (8, 'file_list', 'List Workspace Files', 'read_only', 0, 'file_list'),
-            (9, 'file_read', 'Read Workspace File', 'read_only', 0, 'file_read'),
-            (10, 'file_write', 'Write Workspace File', 'low_risk', 0, 'file_write'),
-            (11, 'directory_create', 'Create Workspace Directory', 'low_risk', 0, 'directory_create'),
-            (12, 'generate_docx', 'Generate DOCX Report', 'low_risk', 0, 'generate_docx'),
-            (13, 'generate_xlsx', 'Generate XLSX Telemetry Workbook', 'low_risk', 0, 'generate_xlsx'),
-            (14, 'generate_pptx', 'Generate PPTX Slide Presentation', 'low_risk', 0, 'generate_pptx'),
-            (15, 'execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 0, 'execute_code')
+            ('check_pressure', 'Check Pressure Reading', 'read_only', 0, 'check_pressure'),
+            ('check_temperature', 'Check Temperature Reading', 'read_only', 0, 'check_temperature'),
+            ('run_diagnostic', 'Run Equipment Diagnostic', 'low_risk', 0, 'run_diagnostic'),
+            ('emergency_pressure_relief', 'Emergency Pressure Relief', 'service_interrupting', 1, 'emergency_pressure_relief'),
+            ('restart_component', 'Restart System Component', 'sensitive', 1, 'restart_component'),
+            ('check_network', 'Check Network Status', 'read_only', 0, 'check_network'),
+            ('restart_service', 'Restart Network Service', 'service_interrupting', 1, 'restart_service'),
+            ('file_list', 'List Workspace Files', 'read_only', 0, 'file_list'),
+            ('file_read', 'Read Workspace File', 'read_only', 0, 'file_read'),
+            ('file_write', 'Write Workspace File', 'low_risk', 0, 'file_write'),
+            ('directory_create', 'Create Workspace Directory', 'low_risk', 0, 'directory_create'),
+            ('generate_docx', 'Generate DOCX Report', 'low_risk', 0, 'generate_docx'),
+            ('generate_xlsx', 'Generate XLSX Telemetry Workbook', 'low_risk', 0, 'generate_xlsx'),
+            ('generate_pptx', 'Generate PPTX Slide Presentation', 'low_risk', 0, 'generate_pptx'),
+            ('execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 1, 'execute_code')
         ]
         
         for t in tools:
             await db.execute('''
-                INSERT INTO tool_definitions (id, name, description, risk_level, requires_approval, implementation_key)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(name) DO NOTHING
+                INSERT INTO tool_definitions (name, description, risk_level, requires_approval, implementation_key)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(name) DO UPDATE SET risk_level = excluded.risk_level, requires_approval = excluded.requires_approval, description = excluded.description
             ''', t)
 
         # Seed Plant Topology Graph Memory (MRPL Unit 1)

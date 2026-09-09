@@ -1,0 +1,80 @@
+# CogniShift Live Multi-Terminal Demonstration Configuration
+# Environment: Shared Hackathon Wi-Fi (10.10.128.0/18)
+# Sovereignty: Sovereign Policy Active (Zero Cloud Egress)
+
+server:
+  host: "0.0.0.0"
+  port: 8443
+  https: true
+  server_ip: "10.10.182.228"
+  server_hostname: "localhost"
+  ssl_cert: "data/certs/server_cert.pem"
+  ssl_key: "data/certs/server_key.pem"
+  ca_cert: "data/certs/cognishift_demo_ca.crt"
+
+terminals:
+  - id: 1
+    user_id: "sitanshu"
+    name: "Sitanshu (Host Admin)"
+    role: "administrator"
+    device_hostname: "localhost"
+    ip: "10.10.182.228"
+    loopback: true
+    expected_status: "approved"
+    allowed_workspaces: [1, 2, 3]
+    notes: "Runs FastAPI backend, Ollama inference, SQLite, ChromaDB, artifact generation"
+
+  - id: 2
+    user_id: "zara"
+    name: "Zara (Four-Eyes Supervisor 1)"
+    role: "supervisor"
+    device_hostname: "DESKTOP-FIU74GG"
+    ip: "10.10.163.208"
+    loopback: false
+    expected_status: "approved"
+    allowed_workspaces: [1, 2]
+    notes: "Four-Eyes reviewer #1"
+
+  - id: 3
+    user_id: "rakshita"
+    name: "Rakshita (Four-Eyes Supervisor 2)"
+    role: "supervisor"
+    device_hostname: "DESKTOP-03098C7"
+    ip: "10.10.163.213"
+    loopback: false
+    expected_status: "approved"
+    allowed_workspaces: [1, 2]
+    notes: "Four-Eyes reviewer #2"
+
+  - id: 4
+    user_id: "aryan"
+    name: "Aryan (Plant Operator 1)"
+    role: "operator"
+    device_hostname: "LAPTOP-MUJLBJO0"
+    ip: "10.10.144.247"
+    loopback: false
+    expected_status: "approved"
+    allowed_workspaces: [1]
+    notes: "Physical Wi-Fi client (Cloudflare WARP virtual IP 172.16.0.2 detected/tolerated)"
+
+  - id: 5
+    user_id: "vicky"
+    name: "Vicky (Tester & Plant Supervisor)"
+    role: "supervisor"
+    device_hostname: "IGRIS"
+    ip: "10.10.164.63"
+    loopback: false
+    expected_status: "approved"
+    allowed_workspaces: [1, 2]
+    notes: "Tester and Four-Eyes supervisor console"
+
+  - id: 6
+    user_id: "rohit"
+    name: "Rohit (Untrusted Terminal Demo)"
+    role: "operator"
+    device_hostname: "ROHITSINGH"
+    ip: "10.10.145.22"
+    loopback: false
+    expected_status: "pending"
+    allowed_workspaces: [1]
+    notes: "DELIBERATELY UNTRUSTED TERMINAL. Valid Operator credentials, but unapproved device."

@@ -1,5 +1,5 @@
 import { apiFetch } from "./clients";
-import type { Run, RunCreateRequest, RunEvent } from "@/types";
+import type { Run, RunCreateRequest, RunEvent, RunStatusSummary } from "@/types";
 
 // NOTE: the backend (src/cognishift/app/api/runs.py) exposes exactly:
 //   POST   /api/v1/runs
@@ -12,6 +12,7 @@ const PATHS = {
   list: "/api/v1/runs",
   detail: (id: number) => `/api/v1/runs/${id}`,
   events: (id: number) => `/api/v1/runs/${id}/events`,
+  summary: (id: number) => `/api/v1/runs/${id}/status-summary`,
   resume: (id: number) => `/api/v1/runs/${id}/resume`,
 };
 
@@ -30,6 +31,9 @@ export const runsApi = {
   events: (id: number, signal?: AbortSignal) =>
     apiFetch<RunEvent[]>(PATHS.events(id), { signal }),
 
+  statusSummary: (id: number, signal?: AbortSignal) =>
+    apiFetch<RunStatusSummary>(PATHS.summary(id), { signal }),
+
   /**
    * Dispatches a new agent run. This call blocks until the backend engine
    * reaches a terminal or paused state (runs execute synchronously) —
@@ -44,6 +48,7 @@ export const runsApi = {
         input_text: payload.input_text,
         input_type: payload.input_image_path ? "multimodal" : payload.input_type ?? "text",
         input_image_path: payload.input_image_path ?? null,
+        conversation_history: payload.conversation_history ?? [],
       },
       signal,
     }),

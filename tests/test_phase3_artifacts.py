@@ -10,7 +10,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cognishift.app.config import settings
-settings.operating_mode = "simulated"
+
+@pytest.fixture(autouse=True)
+def ensure_simulated_mode(monkeypatch):
+    monkeypatch.setattr(settings, "operating_mode", "simulated")
 
 from cognishift.core.security import (
     ensure_workspace_layout,
@@ -47,12 +50,16 @@ async def setup_artifacts_db():
     async with get_db() as db:
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Refinery-1', 'MRPL')")
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (2, 'Refinery-2', 'Mangalore')")
+        await db.execute("INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name, description) VALUES (1, 1, 'Refinery Agent', 'Maintenance')")
         await db.execute(
             "INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (10, 1, 1, 'completed', 'operator_sam')"
         )
         await db.execute(
             "INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (20, 2, 1, 'completed', 'operator_t2')"
         )
+        await db.execute("DELETE FROM mail_attachments WHERE artifact_id IN (SELECT id FROM workspace_artifacts WHERE workspace_id IN (1, 2))")
+        await db.execute("DELETE FROM post_approval_jobs WHERE artifact_id IN (SELECT id FROM workspace_artifacts WHERE workspace_id IN (1, 2))")
+        await db.execute("DELETE FROM temporary_authorizations WHERE artifact_id IN (SELECT id FROM workspace_artifacts WHERE workspace_id IN (1, 2))")
         await db.execute("DELETE FROM workspace_artifacts WHERE workspace_id IN (1, 2)")
         await db.commit()
 
@@ -235,6 +242,28 @@ async def test_generate_and_validate_xlsx_with_formula_sanitization():
 
 
 @pytest.mark.asyncio
+async def test_generate_and_validate_csv():
+    res = await execute_tool(
+        "generate_csv",
+        {
+            "filename": "pressure_export.csv",
+            "title": "P-101A Pressure Export",
+            "headers": ["timestamp", "discharge_pressure_psi"],
+            "rows": [["2026-09-08 10:00:00", 143.2], ["2026-09-08 10:05:00", 144.1]],
+        },
+        workspace_id=1,
+        run_id=10,
+    )
+    assert "Successfully generated and registered CSV artifact" in res
+    csv_path = resolve_workspace_path(1, "generated/run_10/pressure_export.csv", purpose="read")
+    assert csv_path.read_text(encoding="utf-8").splitlines() == [
+        "timestamp,discharge_pressure_psi",
+        "2026-09-08 10:00:00,143.2",
+        "2026-09-08 10:05:00,144.1",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_generate_and_validate_pptx():
     res = await execute_tool(
         "generate_pptx",
@@ -257,6 +286,64 @@ async def test_generate_and_validate_pptx():
     prs_path = resolve_workspace_path(1, "generated/run_10/operations_briefing.pptx", purpose="read")
     prs = pptx.Presentation(str(prs_path))
     assert len(prs.slides) == 2  # Title slide + 1 content slide
+
+
+@pytest.mark.asyncio
+async def test_generate_and_validate_pdf():
+    res = await execute_tool(
+        "generate_pdf",
+        {
+            "filename": "operations_report.pdf",
+            "title": "MRPL Unit 1 Operations Report",
+            "sections": [
+                {
+                    "heading": "1. Operational Status",
+                    "level": 1,
+                    "paragraphs": ["Reactor-B pressure nominal at 105.2 PSI.", "Safety interlocks fully armed."],
+                    "table": {
+                        "headers": ["Sensor", "Reading", "Status"],
+                        "rows": [["PT-101", "105.2 PSI", "NOMINAL"], ["TT-204", "78.4 °C", "NOMINAL"]]
+                    }
+                }
+            ]
+        },
+        workspace_id=1,
+        run_id=10
+    )
+    assert "Successfully generated" in res
+    pdf_path = resolve_workspace_path(1, "generated/run_10/operations_report.pdf", purpose="read")
+    assert pdf_path.exists() and pdf_path.stat().st_size > 0
+    import fitz
+    doc = fitz.open(str(pdf_path))
+    assert len(doc) >= 1
+    doc.close()
+
+
+@pytest.mark.asyncio
+async def test_render_document_page_to_image():
+    # First generate a PDF document
+    pdf_p = resolve_workspace_path(1, "documents/test_source.pdf", purpose="write", allow_create_parent=True)
+    from cognishift.core.artifact_generators import generate_pdf_document
+    generate_pdf_document(pdf_p, "Test Page Render", [{"heading": "Page 1 Content", "paragraphs": ["Telemetry reading 105.2 PSI"]}])
+
+    res = await execute_tool(
+        "render_document_page",
+        {
+            "source_path_or_id": "documents/test_source.pdf",
+            "page_number": 1,
+            "output_filename": "rendered_page_1.png",
+            "format": "png"
+        },
+        workspace_id=1,
+        run_id=10
+    )
+    assert "Successfully rendered" in res
+    img_path = resolve_workspace_path(1, "generated/run_10/rendered_page_1.png", purpose="read")
+    assert img_path.exists() and img_path.stat().st_size > 0
+    from PIL import Image
+    with Image.open(str(img_path)) as im:
+        assert im.format == "PNG"
+        assert im.size[0] > 100
 
 
 # -----------------------------------------------------------------------------

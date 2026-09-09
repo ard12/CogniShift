@@ -7,6 +7,8 @@ Standalone terminal command-line interface for the CogniShift on-premise workben
 * **Framework:** Typer + Rich
 * **No Browser Required:** Full feature parity with the REST API for headless edge servers and SSH sessions.
 
+**Validated:** 2026-09-04. Help, status, workspace, agent, knowledge, approval, and run-history commands were exercised against the local deployment. Use `--workspace`/`-w`; `--workspace-id` is not a valid CLI option.
+
 ---
 
 ## 1. Overview

@@ -1,23 +1,43 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { artifactsApi } from "@/api/artifacts";
 import { ApiError } from "@/api/clients";
 import { runsApi } from "@/api/runs";
 import { EventTimeline } from "@/components/EventTimeline";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { IconPlayCircle, IconRefresh } from "@/components/ui/Icon";
+import { IconArchive, IconDownload, IconPlayCircle, IconRefresh } from "@/components/ui/Icon";
 import { PageHeader } from "@/components/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
 import { EmptyState, ErrorState, InlineError, LoadingState } from "@/components/ui/States";
 import { useWorkspaces } from "@/context/useWorkspaces";
-import { formatDateTime, formatRelativeTime, runStatusLabel, runStatusTone } from "@/lib/format";
-import type { Run, RunEvent } from "@/types";
+import { formatBytes, formatDateTime, formatRelativeTime, runStatusLabel, runStatusTone } from "@/lib/format";
+import type { Artifact, Run, RunEvent } from "@/types";
 
 function RunDetail({ run, onResumed }: { run: Run; onResumed: (r: Run) => void }) {
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [resuming, setResuming] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    artifactsApi
+      .list(run.workspace_id)
+      .then((res) => {
+        if (!cancelled) {
+          setArtifacts(res.artifacts.filter((a) => a.run_id === run.id));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setArtifacts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [run.id, run.workspace_id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +137,51 @@ function RunDetail({ run, onResumed }: { run: Run; onResumed: (r: Run) => void }
           {run.confidence !== null && run.confidence !== undefined && (
             <p className="mt-1 font-mono text-[10px] text-ink-3">Confidence: {(run.confidence * 100).toFixed(0)}%</p>
           )}
+        </div>
+      )}
+
+      {artifacts.length > 0 && (
+        <div className="space-y-2.5 rounded border border-surface-border bg-surface-2/60 p-3.5">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-ink-1">
+              <IconArchive className="h-3.5 w-3.5 text-brand" />
+              Generated Deliverables ({artifacts.length})
+            </span>
+            <span className="font-mono text-[10px] text-ink-3">CLICK TO DOWNLOAD</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {artifacts.map((art) => (
+              <div
+                key={art.id}
+                className="flex items-center justify-between rounded border border-surface-border bg-surface-1 p-2.5 shadow-sm"
+              >
+                <div className="min-w-0 flex-1 pr-2">
+                  <p className="truncate text-xs font-semibold text-ink-1" title={art.filename}>
+                    {art.title || art.filename}
+                  </p>
+                  <p className="font-mono text-[10px] text-ink-3">
+                    <span className="text-brand font-medium uppercase">{art.artifact_type}</span> · {formatBytes(art.file_size)}
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    setDownloadingId(art.id);
+                    try {
+                      await artifactsApi.download(run.workspace_id, art.id, art.filename);
+                    } finally {
+                      setDownloadingId(null);
+                    }
+                  }}
+                  loading={downloadingId === art.id}
+                  title={`Download ${art.filename}`}
+                >
+                  <IconDownload className="h-3 w-3" /> Download
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -1,7 +1,13 @@
 __pycache__/
 *.pyc
 .env
-data/
+data/*
+!data/demo/
+!data/demo/**
+!data/benchmarks/
+!data/benchmarks/**
+!data/vision_test/
+!data/vision_test/**
 *.db
 .venv/
 venv/
@@ -10,14 +16,15 @@ dist/
 build/
 .pytest_cache/
 .ruff_cache/
-data/
 data/private/
 *.auth.json
 auth_store.json
 .env.local
-
-# Benchmarks Raw Data and Runtime Outputs (Preserve structure via .gitkeep)
-benchmarks/datasets/**/raw/*
-!benchmarks/datasets/**/raw/.gitkeep
-benchmarks/results/*
-!benchmarks/results/.gitkeep
+scratch/
+work/
+node_modules/
+frontend/dist/
+.pytest-tmp*
+*.ppt
+*.pptx
+/demo/

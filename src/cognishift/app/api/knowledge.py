@@ -1,5 +1,5 @@
 import os
-import shutil
+import json
 import hashlib
 import uuid
 from pathlib import Path
@@ -7,9 +7,9 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from typing import List, Optional
 
 from cognishift.app.db.database import get_db
-from cognishift.app.db.models import KnowledgeSourceResponse, DocumentProcessingJobResponse
+from cognishift.app.db.models import KnowledgeSourceResponse, DocumentProcessingJobResponse, DocumentPageResponse
 from cognishift.app.config import settings
-from cognishift.core.retriever import process_pdf, chroma_client, purge_knowledge_source
+from cognishift.core.retriever import purge_knowledge_source
 from cognishift.core.security import resolve_workspace_path
 from cognishift.app.core.auth import get_current_user, verify_workspace_access, User
 from fastapi import Depends
@@ -28,8 +28,16 @@ async def upload_document(
     # 1. Validate file extension (case-insensitive)
     filename = file.filename or "document.pdf"
     ext = Path(filename).suffix.lower()
-    if ext not in [".pdf", ".png", ".jpg", ".jpeg"]:
-        raise HTTPException(status_code=400, detail="Only PDF (.pdf), PNG (.png), and JPEG (.jpg/.jpeg) files are supported.")
+    if ext == ".xls":
+        raise HTTPException(
+            status_code=400,
+            detail="Legacy .xls format is unsupported. Please convert your spreadsheet to modern .xlsx or .csv format."
+        )
+    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Supported formats: PDF (.pdf), PNG (.png), JPEG (.jpg/.jpeg), Excel (.xlsx), and CSV (.csv)."
+        )
 
     # 2. Validate workspace existence BEFORE saving to disk
     async with get_db() as db:
@@ -67,7 +75,7 @@ async def upload_document(
     checksum = hasher.hexdigest()
 
     # 4. Insert record into database as 'processing'
-    source_type = "pdf" if ext == ".pdf" else "image"
+    source_type = "spreadsheet" if ext in [".xlsx", ".xls", ".csv"] else ("pdf" if ext == ".pdf" else "image")
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO knowledge_sources 
@@ -79,7 +87,215 @@ async def upload_document(
         await db.commit()
         source_id = row["id"]
 
-    # 6. Process document (Native PDF, OCR, or Vision)
+    # 5. Process document
+    if ext in [".xlsx", ".csv"]:
+        # Spreadsheet Ingestion: Parse sheets, create structured markdown tables, embed and index
+        try:
+            import openpyxl
+            import csv
+            import asyncio
+            from cognishift.core.retriever import chroma_client, embedding_model
+            from cognishift.core.document_insights import detect_header_row_index
+
+            chunks = []
+            metadatas = []
+            ids = []
+            MAX_WINDOW_CHARS = 3500
+
+            def _process_sheet_rows(sheet_name: str, raw_rows: list, sheet_idx: int):
+                if not raw_rows:
+                    return
+                header_idx = detect_header_row_index(raw_rows)
+                raw_header = raw_rows[header_idx]
+                headers = [str(c).strip() if c is not None and str(c).strip() else f"Col_{i+1}" for i, c in enumerate(raw_header)]
+                header_row_num = header_idx + 1
+                data_rows = raw_rows[header_idx + 1:]
+
+                header_prefix = f"=== SPREADSHEET: {safe_basename} | SHEET: {sheet_name} (Header Row: #{header_row_num}) ===\nColumns: {', '.join(headers)}\n"
+
+                current_lines = []
+                current_chars = len(header_prefix)
+                chunk_start_row = None
+                chunk_end_row = None
+
+                for r_idx, row in enumerate(data_rows):
+                    orig_row = header_row_num + 1 + r_idx
+                    if not any(c is not None and str(c).strip() for c in row):
+                        continue
+
+                    row_str = f"Row #{orig_row}: " + " | ".join(str(c).strip() if c is not None else "" for c in row)
+                    row_chars = len(row_str) + 1
+
+                    # If an individual row exceeds the budget, subsegment it without dropping
+                    if row_chars > MAX_WINDOW_CHARS - 500:
+                        if current_lines:
+                            chunk_text = header_prefix + "\n".join(current_lines)
+                            chunks.append(chunk_text)
+                            metadatas.append({
+                                "source_id": int(source_id),
+                                "filename": safe_basename,
+                                "document_name": safe_basename,
+                                "sheet_name": sheet_name,
+                                "header_row": header_row_num,
+                                "row_start": chunk_start_row,
+                                "row_end": chunk_end_row,
+                                "segment_index": 1,
+                                "segment_count": 1,
+                                "checksum": checksum,
+                                "workspace_id": int(workspace_id),
+                                "extraction_method": "spreadsheet",
+                                "processing_version": "v1"
+                            })
+                            ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+                            current_lines = []
+                            current_chars = len(header_prefix)
+                            chunk_start_row = None
+                            chunk_end_row = None
+
+                        cols_per_slice = 10
+                        total_cols = len(row)
+                        slices = [row[i:i+cols_per_slice] for i in range(0, total_cols, cols_per_slice)]
+                        num_segs = max(1, len(slices))
+                        for seg_idx, sl in enumerate(slices, start=1):
+                            sl_headers = headers[(seg_idx-1)*cols_per_slice : seg_idx*cols_per_slice]
+                            seg_text = (
+                                f"=== SPREADSHEET: {safe_basename} | SHEET: {sheet_name} (Row #{orig_row} Segment {seg_idx}/{num_segs}) ===\n"
+                                f"Columns: {', '.join(sl_headers)}\n"
+                                f"Values: {' | '.join(str(c).strip() if c is not None else '' for c in sl)}"
+                            )
+                            chunks.append(seg_text)
+                            metadatas.append({
+                                "source_id": int(source_id),
+                                "filename": safe_basename,
+                                "document_name": safe_basename,
+                                "sheet_name": sheet_name,
+                                "header_row": header_row_num,
+                                "row_start": orig_row,
+                                "row_end": orig_row,
+                                "segment_index": seg_idx,
+                                "segment_count": num_segs,
+                                "checksum": checksum,
+                                "workspace_id": int(workspace_id),
+                                "extraction_method": "spreadsheet",
+                                "processing_version": "v1"
+                            })
+                            ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{orig_row}_{orig_row}_seg_{seg_idx}")
+                        continue
+
+                    # Regular row accumulation
+                    if current_chars + row_chars > MAX_WINDOW_CHARS and current_lines:
+                        chunk_text = header_prefix + "\n".join(current_lines)
+                        chunks.append(chunk_text)
+                        metadatas.append({
+                            "source_id": int(source_id),
+                            "filename": safe_basename,
+                            "document_name": safe_basename,
+                            "sheet_name": sheet_name,
+                            "header_row": header_row_num,
+                            "row_start": chunk_start_row,
+                            "row_end": chunk_end_row,
+                            "segment_index": 1,
+                            "segment_count": 1,
+                            "checksum": checksum,
+                            "workspace_id": int(workspace_id),
+                            "extraction_method": "spreadsheet",
+                            "processing_version": "v1"
+                        })
+                        ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+
+                        current_lines = [row_str]
+                        current_chars = len(header_prefix) + row_chars
+                        chunk_start_row = orig_row
+                        chunk_end_row = orig_row
+                    else:
+                        if not current_lines:
+                            chunk_start_row = orig_row
+                        current_lines.append(row_str)
+                        current_chars += row_chars
+                        chunk_end_row = orig_row
+
+                if current_lines:
+                    chunk_text = header_prefix + "\n".join(current_lines)
+                    chunks.append(chunk_text)
+                    metadatas.append({
+                        "source_id": int(source_id),
+                        "filename": safe_basename,
+                        "document_name": safe_basename,
+                        "sheet_name": sheet_name,
+                        "header_row": header_row_num,
+                        "row_start": chunk_start_row,
+                        "row_end": chunk_end_row,
+                        "segment_index": 1,
+                        "segment_count": 1,
+                        "checksum": checksum,
+                        "workspace_id": int(workspace_id),
+                        "extraction_method": "spreadsheet",
+                        "processing_version": "v1"
+                    })
+                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+
+            def _parse_spreadsheet():
+                if ext == ".xlsx":
+                    wb = openpyxl.load_workbook(file_path, data_only=True)
+                    for sheet_idx, sname in enumerate(wb.sheetnames):
+                        ws = wb[sname]
+                        raw_rows = list(ws.iter_rows(values_only=True))
+                        _process_sheet_rows(sname, raw_rows, sheet_idx)
+                else:
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                        raw_rows = list(csv.reader(f))
+                    _process_sheet_rows("CSV_Data", raw_rows, 0)
+
+            await asyncio.to_thread(_parse_spreadsheet)
+
+            def _embed_and_upsert():
+                if chunks:
+                    gen = embedding_model.embed(chunks)
+                    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in gen]
+                    col = chroma_client.get_or_create_collection(f"workspace_{workspace_id}")
+                    col.upsert(documents=chunks, embeddings=embs, metadatas=metadatas, ids=ids)
+
+            await asyncio.to_thread(_embed_and_upsert)
+
+            async with get_db() as db:
+                # Save page/sheet records in document_pages table for direct page retrieval
+                for idx, chunk_text in enumerate(chunks, start=1):
+                    await db.execute(
+                        """INSERT INTO document_pages (source_id, workspace_id, processing_version, page_number, text_content, extraction_method)
+                           VALUES (?, ?, 'v1', ?, ?, 'spreadsheet')""",
+                        (source_id, workspace_id, idx, chunk_text)
+                    )
+                await db.execute(
+                    "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ?, active_processing_version = 'v1' WHERE id = ?",
+                    (len(chunks), source_id)
+                )
+                # Auto-append source_id to agents in this workspace so newly ingested knowledge is immediately accessible
+                c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+                for ag in await c_agents.fetchall():
+                    try:
+                        curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                        if not isinstance(curr_ids, list):
+                            curr_ids = []
+                    except Exception:
+                        curr_ids = []
+                    if source_id not in curr_ids:
+                        curr_ids.append(source_id)
+                        await db.execute(
+                            "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                            (json.dumps(curr_ids), ag["id"])
+                        )
+                await db.commit()
+                cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
+                updated_row = await cursor.fetchone()
+                return KnowledgeSourceResponse.model_validate(dict(updated_row))
+        except Exception as e:
+            logger.error(f"Failed to process spreadsheet {source_id}: {e}", exc_info=True)
+            async with get_db() as db:
+                await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
+                await db.commit()
+            raise HTTPException(status_code=500, detail="Failed to process spreadsheet. Internal processing error.")
+
+    # 6. Native PDF, OCR, or Vision
     try:
         from cognishift.core.document_processing.service import DocumentProcessingService
         service = DocumentProcessingService()
@@ -91,6 +307,22 @@ async def upload_document(
         )
         
         async with get_db() as db:
+            # Auto-append source_id to agents in this workspace so newly ingested knowledge is immediately accessible
+            c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+            for ag in await c_agents.fetchall():
+                try:
+                    curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                    if not isinstance(curr_ids, list):
+                        curr_ids = []
+                except Exception:
+                    curr_ids = []
+                if source_id not in curr_ids:
+                    curr_ids.append(source_id)
+                    await db.execute(
+                        "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                        (json.dumps(curr_ids), ag["id"])
+                    )
+            await db.commit()
             cursor = await db.execute(
                 "SELECT * FROM knowledge_sources WHERE id = ?",
                 (source_id,)
@@ -98,7 +330,8 @@ async def upload_document(
             updated_row = await cursor.fetchone()
             return KnowledgeSourceResponse.model_validate(dict(updated_row))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        logger.error(f"Failed to process document {source_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to process document. Internal processing error.")
 
 @router.get("", response_model=List[KnowledgeSourceResponse])
 async def list_knowledge_sources(
@@ -171,7 +404,21 @@ async def delete_knowledge_source(
             except OSError:
                 pass
 
-        # 5. Delete database record
+        # 5. Clean agent_definitions knowledge_source_ids
+        c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+        for ag in await c_agents.fetchall():
+            try:
+                curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                if isinstance(curr_ids, list) and source_id in curr_ids:
+                    curr_ids.remove(source_id)
+                    await db.execute(
+                        "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                        (json.dumps(curr_ids), ag["id"])
+                    )
+            except Exception:
+                pass
+
+        # 6. Delete database record
         await db.execute("DELETE FROM knowledge_sources WHERE id = ?", (source_id,))
         await db.commit()
 
@@ -196,4 +443,25 @@ async def list_processing_jobs(
         )
         job_rows = await cursor.fetchall()
         return [DocumentProcessingJobResponse.model_validate(dict(r)) for r in job_rows]
+
+
+@router.get("/{source_id}/pages", response_model=List[DocumentPageResponse])
+async def list_document_pages(
+    source_id: int,
+    user: User = Depends(get_current_user)
+):
+    """List all extracted pages and OCR/Vision provenance for a knowledge source."""
+    async with get_db() as db:
+        cursor = await db.execute("SELECT workspace_id FROM knowledge_sources WHERE id = ?", (source_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Knowledge source not found.")
+        verify_workspace_access(row["workspace_id"], user)
+
+        cursor = await db.execute(
+            "SELECT * FROM document_pages WHERE source_id = ? ORDER BY page_number ASC",
+            (source_id,)
+        )
+        page_rows = await cursor.fetchall()
+        return [DocumentPageResponse.model_validate(dict(r)) for r in page_rows]
 

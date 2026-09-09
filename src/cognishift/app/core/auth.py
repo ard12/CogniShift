@@ -2,6 +2,8 @@ import os
 import json
 import hashlib
 import secrets
+import threading
+import time
 from pathlib import Path
 from typing import Optional, List, Literal, Dict
 from fastapi import Request, HTTPException, Security, status
@@ -32,6 +34,9 @@ class CredentialRecord(BaseModel):
 # SERVER-SIDE LOCAL CREDENTIAL STORE (Zero Cloud / Cryptographically Verified)
 # -----------------------------------------------------------------------------
 LOCAL_CREDENTIAL_STORE: Dict[str, CredentialRecord] = {}
+EPHEMERAL_DEMO_SESSIONS: Dict[str, tuple[User, float]] = {}
+_CREDENTIAL_STORE_SIGNATURE: Optional[tuple[int, int]] = None
+_CREDENTIAL_STORE_LOCK = threading.RLock()
 
 
 def hash_token(raw_token: str) -> str:
@@ -41,7 +46,7 @@ def hash_token(raw_token: str) -> str:
 
 def load_credential_store(store_path: Optional[Path] = None) -> int:
     """Load user credentials from external local configuration file."""
-    global LOCAL_CREDENTIAL_STORE
+    global _CREDENTIAL_STORE_SIGNATURE
     path = store_path or getattr(settings, "auth_store_path", None)
     if not path or not Path(path).exists():
         return 0
@@ -49,13 +54,13 @@ def load_credential_store(store_path: Optional[Path] = None) -> int:
     try:
         content = Path(path).read_text(encoding="utf-8")
         data = json.loads(content)
-        users = data.get("users", [])
-        loaded = 0
-        for u in users:
-            record = CredentialRecord.model_validate(u)
-            LOCAL_CREDENTIAL_STORE[record.credential_hash] = record
-            loaded += 1
-        return loaded
+        records = [CredentialRecord.model_validate(u) for u in data.get("users", [])]
+        with _CREDENTIAL_STORE_LOCK:
+            LOCAL_CREDENTIAL_STORE.clear()
+            LOCAL_CREDENTIAL_STORE.update({record.credential_hash: record for record in records})
+            stat = Path(path).stat()
+            _CREDENTIAL_STORE_SIGNATURE = (stat.st_mtime_ns, stat.st_size)
+        return len(records)
     except Exception:
         return 0
 
@@ -73,7 +78,37 @@ def save_credential_store(store_path: Optional[Path] = None) -> bool:
         "users": [rec.model_dump() for rec in LOCAL_CREDENTIAL_STORE.values()]
     }
     p.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    stat = p.stat()
+    global _CREDENTIAL_STORE_SIGNATURE
+    _CREDENTIAL_STORE_SIGNATURE = (stat.st_mtime_ns, stat.st_size)
     return True
+
+
+def refresh_credential_store_if_changed() -> bool:
+    """Atomically reload credentials when another process updates the configured store."""
+    path = Path(settings.auth_store_path)
+    if not path.exists():
+        return False
+    stat = path.stat()
+    signature = (stat.st_mtime_ns, stat.st_size)
+    if signature == _CREDENTIAL_STORE_SIGNATURE:
+        return False
+    load_credential_store(path)
+    return True
+
+
+def remove_credentials_for_users(user_ids: List[str]) -> int:
+    """Remove persisted persona credentials before an explicit credential rotation."""
+    normalized = {user_id.strip().lower() for user_id in user_ids}
+    with _CREDENTIAL_STORE_LOCK:
+        stale_hashes = [
+            credential_hash
+            for credential_hash, record in LOCAL_CREDENTIAL_STORE.items()
+            if record.user_id.strip().lower() in normalized
+        ]
+        for credential_hash in stale_hashes:
+            LOCAL_CREDENTIAL_STORE.pop(credential_hash, None)
+    return len(stale_hashes)
 
 
 def register_local_credential(raw_token: str, user: User, enabled: bool = True) -> str:
@@ -95,8 +130,18 @@ def authenticate_token(raw_token: str) -> Optional[User]:
     if not raw_token:
         return None
     incoming_hash = hash_token(raw_token)
+    incoming_lower_hash = hash_token(raw_token.lower())
+    now = time.time()
+    expired = [token_hash for token_hash, (_, expires_at) in EPHEMERAL_DEMO_SESSIONS.items() if expires_at <= now]
+    for token_hash in expired:
+        EPHEMERAL_DEMO_SESSIONS.pop(token_hash, None)
+
+    demo_session = EPHEMERAL_DEMO_SESSIONS.get(incoming_hash) or EPHEMERAL_DEMO_SESSIONS.get(incoming_lower_hash)
+    if demo_session:
+        return demo_session[0].model_copy(deep=True)
+
     for stored_hash, record in LOCAL_CREDENTIAL_STORE.items():
-        if secrets.compare_digest(stored_hash, incoming_hash):
+        if secrets.compare_digest(stored_hash, incoming_hash) or secrets.compare_digest(stored_hash, incoming_lower_hash):
             if not record.enabled:
                 return None
             return User(
@@ -105,6 +150,25 @@ def authenticate_token(raw_token: str) -> Optional[User]:
                 allowed_workspace_ids=record.allowed_workspace_ids
             )
     return None
+
+
+def is_ephemeral_demo_token(raw_token: str) -> bool:
+    """Return whether a credential belongs to a live loopback demo session."""
+    token_hash = hash_token(raw_token)
+    session = EPHEMERAL_DEMO_SESSIONS.get(token_hash)
+    return bool(session and session[1] > time.time())
+
+
+def create_ephemeral_demo_session(user: User, ttl_seconds: Optional[int] = None) -> tuple[str, int]:
+    """Create a random, process-local demo credential that is never written to disk."""
+    ttl = max(60, min(ttl_seconds or settings.demo_session_ttl_seconds, 3600))
+    raw_token = f"cog_demo_{secrets.token_urlsafe(32)}"
+    EPHEMERAL_DEMO_SESSIONS[hash_token(raw_token)] = (user.model_copy(deep=True), time.time() + ttl)
+    return raw_token, ttl
+
+
+def clear_ephemeral_demo_sessions() -> None:
+    EPHEMERAL_DEMO_SESSIONS.clear()
 
 
 # Initial load from local config if available
@@ -136,6 +200,7 @@ async def get_current_user(request: Request) -> User:
             headers={"WWW-Authenticate": "Bearer"}
         )
 
+    refresh_credential_store_if_changed()
     user = authenticate_token(token)
     if not user:
         raise HTTPException(
@@ -143,6 +208,26 @@ async def get_current_user(request: Request) -> User:
             detail="Invalid or unrecognized authentication token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    request.state.identity_verified = True
+    request.state.device_trusted = False
+    request.state.device_id = None
+    if settings.trusted_device_required:
+        from cognishift.app.core.device_security import validate_device_session
+        device_id = validate_device_session(request.headers.get("X-Device-Session", "").strip(), user.user_id)
+        if not device_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "UNKNOWN_DEVICE",
+                    "title": "⚠ Unknown Device",
+                    "credentials": "Credentials Verified",
+                    "device": "Device Verification Failed",
+                    "action": "Administrator Approval Required",
+                },
+            )
+        request.state.device_trusted = True
+        request.state.device_id = device_id
 
     return user
 

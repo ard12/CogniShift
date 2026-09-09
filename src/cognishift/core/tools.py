@@ -112,14 +112,48 @@ async def execute_tool(
         return f"Thermocouple {sensor_id} reports bearing temperature is 68.4 C (Normal Operating Range: 60.0 - 80.0 C). Status: NORMAL."
 
     elif tool_name == "run_diagnostic":
-        subsystem = parameters.get("subsystem", "P-101A Crude Feed Booster Pump")
+        subsystem = str(parameters.get("component_id") or parameters.get("equipment_id") or parameters.get("subsystem", "P-101A Crude Feed Booster Pump")).strip()
+        tag_upper = subsystem.upper()
+
+        if any(tag_upper.startswith(p) for p in ["K-", "COMP"]) or "COMPRESSOR" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Stage 1 suction pressure: 2.8 bar, discharge pressure: 9.4 bar (Compression Ratio: 3.35). "
+                f"Lube oil header pressure: 2.4 bar (Normal: > 1.8 bar). Axial shaft displacement: +0.03 mm (Tolerance: ±0.08 mm). "
+                f"Vibration: 1.8 mm/s RMS (ISO 10816 Zone A - Good). Surge margin: 18.5% above minimum control line. Overall asset health: NOMINAL / OPERATIONAL."
+            )
+        elif any(tag_upper.startswith(p) for p in ["SV-", "PSV-", "MOV-", "PV-", "FV-"]) or "VALVE" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Actuator stroke time: 2.8s (Specification: < 4.0s). "
+                f"Seat tightness leakage rate: 0.0 sccm (Bubble-tight, API 527 Class VI). Pilot pop pressure verified at calibrated setpoint. "
+                f"Limit switch feedback: Verified. Overall asset health: VERIFIED / STANDBY."
+            )
+        elif any(tag_upper.startswith(p) for p in ["TK-", "VESSEL", "DRUM", "REACTOR"]) or (tag_upper.startswith("V-") and not tag_upper.startswith("VALVE")):
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Ultrasonic shell wall thickness: 18.4 mm (Nominal: 18.5 mm, Corrosion Allowance Remaining: 3.8 mm). "
+                f"Cathodic protection potential: -920 mV vs CSE (NACE SP0169 Compliant). Relief nozzle visual inspection: Clear of deposits. "
+                f"Hydrostatic test certification valid through 2027. Overall asset health: SOUND / IN SERVICE."
+            )
+        elif any(tag_upper.startswith(p) for p in ["MOTOR-", "M-"]) or "MOTOR" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Stator winding temperature: 68.2 °C (Class F insulation, limit 105 °C). "
+                f"Insulation resistance (Megger 1000V): 185 MΩ (IEEE 43 threshold: > 5 MΩ). 3-Phase current balance: U=42.1A, V=41.8A, W=42.4A (Unbalance: 0.7%). "
+                f"Bearing DE/NDE vibration: 1.2 mm/s RMS. Overall asset health: NOMINAL / OPERATIONAL."
+            )
+        elif any(tag_upper.startswith(p) for p in ["PT-", "TT-", "FT-", "LT-"]) or "TRANSMITTER" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: 4-20mA current loop output: 12.84 mA (Zero error: +0.05%, Span error: -0.08%). "
+                f"Hart diagnostics: Healthy, no loop noise or damping faults. Process connection impulse line: Cleared of obstruction. "
+                f"Calibration validity: Current (Calibrated per ISA-RP55.1). Overall asset health: CALIBRATED / ONLINE."
+            )
+
+        # Default pump / rotary equipment diagnostic
         maint_data = _load_json(MAINTENANCE_PATH)
         past_order = ""
         if maint_data and "orders" in maint_data:
-            match = next((o for o in maint_data["orders"] if "101" in o.get("equipment_tag", "")), None)
+            match = next((o for o in maint_data["orders"] if any(t in o.get("equipment_tag", "") for t in [subsystem, "101"])), None)
             if match:
                 past_order = f" Past SAP PM Order {match['order_number']}: {match['damage_code']} resolved via {match['corrective_actions_taken'][0]}."
-        
+
         return (
             f"Telemetry diagnostic completed for {subsystem}: Dual cartridge mechanical seal (API 682 Plan 53A) "
             f"barrier pressure differential is +20 PSI. Vibration FFT spectrum shows 2.4 mm/s RMS (ISO 10816 Zone B - Acceptable)."
@@ -138,8 +172,16 @@ async def execute_tool(
     elif tool_name == "restart_component":
         component_id = parameters.get("component_id", "P-101A")
         return (
-            f"[SUPERVISED RESTART EXECUTED] Motor breaker for {component_id} re-engaged under permit OISD-STD-240. "
+            f"[SUPERVISED RESTART EXECUTED - SIMULATED PROTOTYPE] Motor breaker for {component_id} re-engaged under permit OISD-STD-240. "
             f"Inrush current nominal at 48.2A, pump reached rated speed 2950 RPM. Discharge pressure established at 104.5 PSI."
+        )
+
+    elif tool_name == "operate_pump":
+        component_id = parameters.get("equipment_id") or parameters.get("component_id") or parameters.get("resource", "P-101A")
+        return (
+            f"[SIMULATED INDUSTRIAL ACTION - SIH FINALS PROTOTYPE] Motor starter energized for centrifugal pump {component_id}. "
+            f"Discharge pressure established at 104.5 PSI (Normal Range: 95.0 - 110.0 PSI). Suction valve interlock: OPEN. "
+            f"Vibration telemetry: 1.6 mm/s RMS (Nominal). Operational permit verified and logged to audit trail."
         )
 
     elif tool_name == "check_maintenance_order":
@@ -158,12 +200,16 @@ async def execute_tool(
         return f"SAP PM Order #{order_no} not found in current plant maintenance ledger."
 
     elif tool_name == "check_network":
-        segment = parameters.get("segment", "SCADA-VLAN-10")
+        segment = parameters.get("target_host") or parameters.get("segment", "SCADA-VLAN-10")
         return f"Industrial Ethernet segment {segment} is ONLINE. Gateway: 10.14.0.1, Round-trip latency: 1.8ms, Packet drop: 0%."
 
     elif tool_name == "restart_service":
         service_name = parameters.get("service_name", "modbus_telemetry_collector")
         return f"Industrial daemon '{service_name}' restarted cleanly under supervisor PID 1842."
+
+    elif tool_name == "check_interlock_status":
+        subsystem = parameters.get("subsystem", "P-101A Centrifugal Pump")
+        return f"Local tool 'check_interlock_status' executed successfully: Interlocks for {subsystem} are armed. Trip threshold: 450.0 PSI, Bearing temp threshold: 95.0 C."
 
     # Phase 3 Safe File and Document Tools
     elif tool_name == "file_list":
@@ -316,6 +362,40 @@ async def execute_tool(
         except Exception as e:
             return f"Error generating XLSX artifact: {str(e)}"
 
+    elif tool_name == "generate_csv":
+        import csv
+        from cognishift.core.artifact_generators import create_and_register_artifact
+        filename = parameters.get("filename", "data.csv")
+        title = parameters.get("title", "Operational Data Export")
+        headers = parameters.get("headers", [])
+        rows = parameters.get("rows", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        def _write_csv(path: Path) -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                if headers:
+                    writer.writerow(headers)
+                writer.writerows(rows)
+
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="csv",
+                generator_fn=_write_csv,
+                title=title,
+                description="Generated CSV data export",
+                run_id=run_id,
+            )
+            return (
+                f"Successfully generated and registered CSV artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating CSV artifact: {str(e)}"
+
     elif tool_name == "generate_pptx":
         from cognishift.core.artifact_generators import create_and_register_artifact, generate_pptx_presentation
         filename = parameters.get("filename", "briefing.pptx")
@@ -339,6 +419,92 @@ async def execute_tool(
             )
         except Exception as e:
             return f"Error generating PPTX artifact: {str(e)}"
+
+    elif tool_name == "generate_pdf":
+        from cognishift.core.artifact_generators import create_and_register_artifact, generate_pdf_document
+        filename = parameters.get("filename", "report.pdf")
+        title = parameters.get("title", "Plant Engineering Report")
+        sections = parameters.get("sections", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=filename,
+                artifact_type="pdf",
+                generator_fn=lambda p: generate_pdf_document(p, title, sections),
+                title=title,
+                description="Generated PDF Engineering Report",
+                run_id=run_id
+            )
+            return (
+                f"Successfully generated and registered PDF artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error generating PDF artifact: {str(e)}"
+
+    elif tool_name == "render_document_page":
+        from cognishift.core.artifact_generators import create_and_register_artifact, render_document_page_to_image
+        from cognishift.core.security import resolve_workspace_path, get_workspace_root
+        from cognishift.app.db.database import get_db
+        src_ref = str(parameters.get("source_path_or_id") or parameters.get("source_id") or "")
+        page_num = int(parameters.get("page_number", 1))
+        out_fname = parameters.get("output_filename", f"page_{page_num}.png")
+        img_fmt = parameters.get("format", "png").lower()
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        doc_path = None
+        ws_root = get_workspace_root(ws_id)
+        if src_ref.isdigit():
+            async with get_db() as db:
+                c = await db.execute("SELECT local_path FROM knowledge_sources WHERE id = ? AND workspace_id = ?", (int(src_ref), ws_id))
+                row = await c.fetchone()
+                if row and row["local_path"]:
+                    p = Path(row["local_path"])
+                    doc_path = p if p.is_absolute() else (ws_root / p)
+        if not doc_path:
+            # First check if src_ref matches an original_filename in knowledge_sources
+            async with get_db() as db:
+                c = await db.execute(
+                    "SELECT local_path FROM knowledge_sources WHERE workspace_id = ? AND original_filename = ? ORDER BY id DESC LIMIT 1",
+                    (ws_id, src_ref)
+                )
+                row = await c.fetchone()
+                if row and row["local_path"]:
+                    p = Path(row["local_path"])
+                    cand = p if p.is_absolute() else (ws_root / p)
+                    if cand.resolve().is_relative_to(ws_root) and cand.exists():
+                        doc_path = cand
+
+        if not doc_path:
+            # Resolve securely within workspace boundary
+            try:
+                doc_path = resolve_workspace_path(ws_id, src_ref, purpose="read")
+            except Exception:
+                try:
+                    doc_path = resolve_workspace_path(ws_id, f"documents/{src_ref}", purpose="read")
+                except Exception:
+                    doc_path = None
+
+        if not doc_path or not doc_path.exists():
+            return f"Error: Source document '{src_ref}' not found in workspace {ws_id}."
+
+        try:
+            artifact = await create_and_register_artifact(
+                workspace_id=ws_id,
+                filename=out_fname,
+                artifact_type=img_fmt,
+                generator_fn=lambda p: render_document_page_to_image(doc_path, p, page_num, img_fmt),
+                title=f"Rendered Page {page_num} of {doc_path.name}",
+                description=f"Rasterized page {page_num} from {doc_path.name} to {img_fmt.upper()}",
+                run_id=run_id
+            )
+            return (
+                f"Successfully rendered and registered image artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
+            )
+        except Exception as e:
+            return f"Error rendering document page: {str(e)}"
 
     elif tool_name == "execute_code":
         from cognishift.core.sandbox.schemas import CodeExecutionRequest, SandboxInputFile, SandboxStatus

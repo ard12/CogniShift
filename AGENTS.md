@@ -2,6 +2,8 @@
 
 This document outlines technical alignment between developer assistants working on CogniShift. Read this guide to understand system contracts, active boundaries, and development status.
 
+**Validated:** 2026-09-04 | **Non-frontend regression baseline:** 219 passed, 0 failed, 0 skipped
+
 ---
 
 ## 1. Operating Constraints
@@ -27,10 +29,11 @@ The repository follows a sequential phase architecture:
 | **Phase 3** | Local Model Provider (`OllamaProvider`) & Simulated Fallback | Complete |
 | **Phase 4** | Knowledge Pipeline (ChromaDB + FastEmbed) & Docker Code Sandbox | Complete (Verified in live Docker container) |
 | **Phase 5** | Multimodal Document Processing (Native PDF, RapidOCR, Moondream Vision) | Complete & Verified |
-| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Complete & Verified (196 tests passing) |
-| **Phase 7** | Flagship Industrial Demonstration Workflows | Planned (Awaiting Human Review) |
+| **Phase 6** | Network Sovereignty Enforcement & Egress Observation | Complete and verified |
+| **Phase 7** | Flagship Industrial Demonstration Workflows | Implemented and automated; final operator acceptance remains |
+| **Auth remediation** | Loopback-only ephemeral demo sessions and live credential reload | Complete and verified |
 
-Do NOT begin Phase 6 or Phase 7 implementation until explicitly authorized.
+Do not weaken network policy, credential hashing, workspace isolation, or dual Four-Eyes approval. Pytest persistence must remain isolated from live `data/` stores.
 
 ---
 

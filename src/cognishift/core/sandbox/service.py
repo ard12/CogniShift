@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from cognishift.app.db.database import get_db
+from cognishift.app.config import settings
 from cognishift.core.sandbox.schemas import (
     CodeExecutionRequest,
     CodeExecutionResult,
@@ -40,7 +41,15 @@ async def execute_sandbox_code(
     5. Guaranteed ephemeral cleanup in finally: block.
     """
     staging_dir: Optional[Path] = None
+    if not settings.sandbox_enabled:
+        raise SandboxUnavailableError("Sandbox execution is disabled by server policy.")
     execution_id = request.execution_id or str(uuid.uuid4())
+    request = request.model_copy(update={
+        "execution_id": execution_id, "workspace_id": workspace_id, "run_id": run_id,
+        "timeout_seconds": min(request.timeout_seconds, settings.sandbox_max_timeout),
+        "cpu_count": min(request.cpu_count, settings.sandbox_cpu_limit),
+        "memory_mb": min(request.memory_mb, settings.sandbox_memory_mb),
+    })
 
     async def log_event(event_type: str, message: str, structured_data: Dict[str, Any]):
         try:
@@ -58,7 +67,19 @@ async def execute_sandbox_code(
 
     try:
         # 1. Staging
-        staging_dir = stage_execution_environment(workspace_id, execution_id, request)
+        staging_res = stage_execution_environment(workspace_id, execution_id, request, return_manifest=True)
+        if isinstance(staging_res, tuple):
+            staging_dir, staging_manifest = staging_res
+        else:
+            staging_dir = staging_res
+            staging_manifest = None
+
+        if staging_manifest and staging_manifest.entries:
+            await log_event(
+                "input_integrity_manifest",
+                f"Verified {len(staging_manifest.entries)} staged input file(s) with 3-part SHA-256 provenance chain.",
+                staging_manifest.model_dump()
+            )
 
         await log_event(
             "sandbox_execution_started",
@@ -73,7 +94,16 @@ async def execute_sandbox_code(
 
         # 2. Execution
         backend = get_sandbox_backend()
-        result = await backend.execute(request, staging_dir)
+        try:
+            result = await backend.execute(request, staging_dir)
+        except SandboxUnavailableError as e:
+            if settings.cognishift_demo_mode:
+                logger.warning(f"Container runtime unavailable ({e}). Falling back to SimulatedSandboxBackend.")
+                from cognishift.core.sandbox.backend import SimulatedSandboxBackend
+                backend = SimulatedSandboxBackend()
+                result = await backend.execute(request, staging_dir)
+            else:
+                raise
 
         # 3. Output Validation & Promotion
         if result.status == SandboxStatus.SUCCESS and request.promote_outputs:

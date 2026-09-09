@@ -1,5 +1,6 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List, Any
+import json
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Optional, List, Any, Dict
 from datetime import datetime
 
 class WorkspaceCreate(BaseModel):
@@ -13,6 +14,7 @@ class WorkspaceResponse(BaseModel):
     description: Optional[str] = None
     operating_mode: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class AgentCreate(BaseModel):
@@ -21,9 +23,9 @@ class AgentCreate(BaseModel):
     description: Optional[str] = None
     system_instructions: Optional[str] = None
     model_name: str = 'llama3.2:3b'
-    allowed_tool_ids: List[int] = []
+    allowed_tool_ids: List[Any] = []
     approval_required: bool = False
-    knowledge_source_ids: List[int] = []
+    knowledge_source_ids: List[Any] = []
 
 class AgentResponse(BaseModel):
     id: int
@@ -33,10 +35,11 @@ class AgentResponse(BaseModel):
     system_instructions: Optional[str] = None
     model_name: str
     status: str
-    allowed_tool_ids: List[int]
+    allowed_tool_ids: List[Any] = []
     approval_required: bool
-    knowledge_source_ids: List[int]
+    knowledge_source_ids: List[Any] = []
     created_at: datetime
+    updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 class AgentUpdate(BaseModel):
@@ -79,6 +82,11 @@ class ToolDefinitionResponse(BaseModel):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+    timestamp: Optional[str] = None
+
 class RunCreate(BaseModel):
     workspace_id: int
     agent_id: int
@@ -86,6 +94,7 @@ class RunCreate(BaseModel):
     input_type: str = 'text'
     input_image_path: Optional[str] = None
     user_id: str = 'operator'
+    conversation_history: List[ChatMessage] = Field(default_factory=list)
 
 class RunResponse(BaseModel):
     id: int
@@ -104,7 +113,19 @@ class RunResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    routing_info: Optional[Dict[str, Any]] = None
+    structured_plan: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("routing_info", mode="before")
+    @classmethod
+    def parse_routing_info(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return None
+        return v
 
 class RunEventResponse(BaseModel):
     id: int
@@ -126,6 +147,9 @@ class ApprovalResponse(BaseModel):
     requested_at: datetime
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
+    reviewed_by_2: Optional[str] = None
+    reviewed_at_2: Optional[datetime] = None
+    required_approvals: int = 1
     model_config = ConfigDict(from_attributes=True)
 
 class AuditEventResponse(BaseModel):
@@ -179,6 +203,7 @@ class DocumentPageResponse(BaseModel):
     page_number: int
     extraction_method: str
     ocr_confidence: Optional[float] = None
+    text_content: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

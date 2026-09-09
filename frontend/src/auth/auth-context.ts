@@ -14,9 +14,12 @@ export interface AuthContextValue {
   sovereignty: SovereigntyStatus | null;
   /** Set when the stored/submitted token is rejected by the backend. */
   error: string | null;
+  deviceStatus: "trusted" | "unknown" | "not_verified";
   signIn: (rawToken: string) => Promise<boolean>;
+  signInDemo: (personaId: string) => Promise<boolean>;
   signOut: () => void;
   refreshSovereignty: () => Promise<void>;
+  retryVerification: () => Promise<boolean>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

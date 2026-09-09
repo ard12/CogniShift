@@ -12,13 +12,19 @@ def row_to_agent(row) -> dict:
     if 'allowed_tool_ids' in d and isinstance(d['allowed_tool_ids'], str):
         try:
             d['allowed_tool_ids'] = json.loads(d['allowed_tool_ids'])
-        except json.JSONDecodeError:
+        except Exception:
             d['allowed_tool_ids'] = []
+    if not isinstance(d.get('allowed_tool_ids'), list):
+        d['allowed_tool_ids'] = []
+
     if 'knowledge_source_ids' in d and isinstance(d['knowledge_source_ids'], str):
         try:
             d['knowledge_source_ids'] = json.loads(d['knowledge_source_ids'])
-        except json.JSONDecodeError:
+        except Exception:
             d['knowledge_source_ids'] = []
+    if not isinstance(d.get('knowledge_source_ids'), list):
+        d['knowledge_source_ids'] = []
+
     d['approval_required'] = bool(d.get('approval_required', 0))
     return d
 
@@ -28,6 +34,8 @@ async def create_agent(
     user: User = Depends(get_current_user)
 ):
     """Create a new agent definition with workspace authorization check."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required to create agents.")
     verify_workspace_access(agent.workspace_id, user)
     allowed_tools_json = json.dumps(agent.allowed_tool_ids)
     knowledge_sources_json = json.dumps(agent.knowledge_source_ids)
@@ -88,6 +96,8 @@ async def update_agent(
     user: User = Depends(get_current_user)
 ):
     """Update agent fields with workspace authorization check."""
+    if user.role != "administrator":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required to update agents.")
     async with get_db() as db:
         cursor = await db.execute('SELECT * FROM agent_definitions WHERE id = ?', (agent_id,))
         existing = await cursor.fetchone()

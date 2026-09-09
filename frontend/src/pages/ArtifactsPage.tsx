@@ -14,10 +14,12 @@ export function ArtifactsPage() {
   const { selectedWorkspaceId, selectedWorkspace } = useWorkspaces();
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [total, setTotal] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (!selectedWorkspaceId) {
@@ -45,6 +47,38 @@ export function ArtifactsPage() {
       cancelled = true;
     };
   }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceId || artifacts.length === 0) {
+      setPreviewUrls({});
+      return;
+    }
+
+    let cancelled = false;
+    const createdUrls: string[] = [];
+    const imageArtifacts = artifacts.filter((artifact) =>
+      ["png", "jpg", "jpeg"].includes(artifact.artifact_type.toLowerCase()),
+    );
+
+    void Promise.all(
+      imageArtifacts.map(async (artifact) => {
+        try {
+          const url = await artifactsApi.getBlobUrl(selectedWorkspaceId, artifact.id);
+          createdUrls.push(url);
+          if (!cancelled) {
+            setPreviewUrls((current) => ({ ...current, [artifact.id]: url }));
+          }
+        } catch {
+          // The list remains usable when a protected preview is unavailable.
+        }
+      }),
+    );
+
+    return () => {
+      cancelled = true;
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [artifacts, selectedWorkspaceId]);
 
   async function handleDownload(artifact: Artifact) {
     if (!selectedWorkspaceId) return;
@@ -82,6 +116,17 @@ export function ArtifactsPage() {
             meta={<span className="font-mono text-[10px] text-ink-3">{total}</span>}
           />
           <PanelBody className="p-0">
+            {artifacts.length > 0 && (
+              <div className="border-b border-surface-border bg-surface-2/30 p-2.5">
+                <input
+                  type="text"
+                  placeholder="Search deliverables by filename, title, or Run #…"
+                  className="input w-full text-xs font-mono"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            )}
             {loading ? (
               <LoadingState />
             ) : error ? (
@@ -94,31 +139,63 @@ export function ArtifactsPage() {
               />
             ) : (
               <ul className="divide-y divide-surface-border">
-                {artifacts.map((artifact) => (
-                  <li key={artifact.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink-1">
-                        {artifact.title || artifact.filename}
-                      </p>
-                      <p className="truncate font-mono text-[10px] text-ink-3">
-                        {titleCase(artifact.artifact_type)} · {formatBytes(artifact.file_size)} ·{" "}
-                        {formatDateTime(artifact.created_at)}
-                        {artifact.run_id ? ` · Run #${artifact.run_id}` : ""}
-                      </p>
-                      {artifact.description && (
-                        <p className="mt-0.5 truncate text-xs text-ink-3">{artifact.description}</p>
+                {artifacts
+                  .filter((a) => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase();
+                    return (
+                      a.filename.toLowerCase().includes(q) ||
+                      (a.title && a.title.toLowerCase().includes(q)) ||
+                      (a.description && a.description.toLowerCase().includes(q)) ||
+                      String(a.run_id).includes(q)
+                    );
+                  })
+                  .map((artifact) => (
+                    <li key={artifact.id} className="flex items-start gap-3 px-4 py-3 hover:bg-surface-2/30 transition">
+                      {previewUrls[artifact.id] && (
+                        <a
+                          href={previewUrls[artifact.id]}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="shrink-0 rounded border border-surface-border bg-surface-1 p-1"
+                          title={`Open preview of ${artifact.filename}`}
+                        >
+                          <img
+                            src={previewUrls[artifact.id]}
+                            alt={artifact.title || artifact.filename}
+                            className="h-24 w-36 object-contain"
+                          />
+                        </a>
                       )}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void handleDownload(artifact)}
-                      loading={downloadingId === artifact.id}
-                    >
-                      <IconDownload className="h-3.5 w-3.5" /> Download
-                    </Button>
-                  </li>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-ink-1">
+                            {artifact.title || artifact.filename}
+                          </p>
+                          <span className="font-mono text-[11px] text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                            {artifact.filename}
+                          </span>
+                        </div>
+                        <p className="truncate font-mono text-[10px] text-ink-3">
+                          {titleCase(artifact.artifact_type)} · {formatBytes(artifact.file_size)} ·{" "}
+                          {formatDateTime(artifact.created_at)}
+                          {artifact.run_id ? ` · Run #${artifact.run_id}` : ""}
+                        </p>
+                        {artifact.description && (
+                          <p className="mt-0.5 truncate text-xs text-ink-3">{artifact.description}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void handleDownload(artifact)}
+                        loading={downloadingId === artifact.id}
+                        title={`Download ${artifact.filename}`}
+                      >
+                        <IconDownload className="h-3.5 w-3.5" /> Download
+                      </Button>
+                    </li>
+                  ))}
               </ul>
             )}
           </PanelBody>

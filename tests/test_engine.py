@@ -4,6 +4,7 @@ import pytest
 import os
 import json
 from datetime import datetime
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 from cognishift.app.main import app
@@ -190,6 +191,35 @@ async def test_resume_after_approval():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [RuntimeError("actuator unavailable"), "Error: actuator unavailable"])
+async def test_approved_tool_failure_is_not_reported_as_success(failure):
+    from unittest.mock import AsyncMock, patch
+
+    run = await execute_agent_run(1, 1, "Emergency vent: emergency_pressure_relief on REACTOR-B", "test_operator")
+    assert run.status == "paused"
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE approval_requests SET status='approved', reviewed_by='supervisor_a', reviewed_by_2='supervisor_b' WHERE run_id=?",
+            (run.id,),
+        )
+        await db.commit()
+    mock = AsyncMock(side_effect=failure) if isinstance(failure, Exception) else AsyncMock(return_value=failure)
+    with patch("cognishift.core.engine.execute_tool", new=mock):
+        resumed = await resume_agent_run(run.id)
+    assert resumed.status == "failed"
+    assert "actuator unavailable" in resumed.error_message
+    assert resumed.completed_at is not None
+    async with get_db() as db:
+        cursor = await db.execute("SELECT structured_plan FROM agent_runs WHERE id=?", (run.id,))
+        plan = json.loads((await cursor.fetchone())["structured_plan"])
+        assert not any(s["status"] == "pending" for s in plan["steps"])
+        cursor = await db.execute("SELECT event_type FROM run_events WHERE run_id=?", (run.id,))
+        events = [row["event_type"] for row in await cursor.fetchall()]
+    assert "run_failed" in events
+    assert "completed" not in events
+
+
+@pytest.mark.asyncio
 async def test_resume_after_rejection():
     """Verify a paused run terminates safely when rejected by supervisor."""
     run_res = await execute_agent_run(
@@ -255,3 +285,190 @@ def test_runs_api_endpoints():
     events = events_res.json()
     assert len(events) >= 2
     assert events[0]["event_type"] == "run_started"
+
+
+@pytest.mark.asyncio
+async def test_plan_step_truthfulness_unexecuted_steps_marked_skipped():
+    """Verify that when a plan completes via FinalAnswer, unexecuted steps become 'skipped' and not 'completed'."""
+    from cognishift.core.planner import deserialize_plan
+    run_res = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="What is the operating envelope of CDU-1?",
+        user_id="audit_operator"
+    )
+    assert run_res.status == "completed"
+
+    async with get_db() as db:
+        cursor = await db.execute("SELECT structured_plan FROM agent_runs WHERE id = ?", (run_res.id,))
+        row = await cursor.fetchone()
+        assert row is not None
+        plan = deserialize_plan(row["structured_plan"])
+        assert plan is not None
+
+        # No step should remain pending
+        statuses = [s.status for s in plan.steps]
+        assert "pending" not in statuses, "No step should remain pending"
+        # If there are steps beyond the first that were not executed, they must be marked skipped
+        if len(plan.steps) > 1:
+            assert any(s.status == "skipped" for s in plan.steps)
+
+
+@pytest.mark.asyncio
+async def test_resume_post_synthesis_model_failure_recovers_durable_completed():
+    """Verify that a model failure during post-approval synthesis does not leave run stuck in 'resuming'."""
+    from unittest.mock import patch, AsyncMock
+    from cognishift.core.planner import deserialize_plan
+
+    run_res = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="Emergency test: emergency_pressure_relief on chamber UNIT-55",
+        user_id="test_operator"
+    )
+    assert run_res.status == "paused"
+
+    # Approve request in DB
+    async with get_db() as db:
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        await db.execute(
+            "UPDATE approval_requests SET status = 'approved', reviewed_by = 'supervisor_jane', reviewed_by_2 = 'supervisor_bob', reviewed_at = ? WHERE run_id = ?",
+            (now_str, run_res.id)
+        )
+        await db.commit()
+
+    # Simulate model failure during post-execution synthesis
+    mock_provider = AsyncMock()
+    mock_provider.generate_text.side_effect = RuntimeError("Ollama connection drop during post-synthesis")
+
+    with patch("cognishift.core.engine.get_provider", return_value=mock_provider):
+        resumed = await resume_agent_run(run_id=run_res.id)
+
+    assert resumed.status == "completed", "Run must complete durably despite model synthesis failure"
+    assert "EMERGENCY RELIEF EXECUTED" in resumed.result_text
+    assert "unavailable" in resumed.result_text.lower() or "operational note" in resumed.result_text.lower()
+
+    # Verify structured plan truthfulness: pending steps were marked skipped
+    async with get_db() as db:
+        cursor = await db.execute("SELECT status, structured_plan FROM agent_runs WHERE id = ?", (run_res.id,))
+        row = await cursor.fetchone()
+        assert row["status"] == "completed"
+        plan = deserialize_plan(row["structured_plan"])
+        assert plan is not None
+        assert not any(s.status == "pending" for s in plan.steps)
+
+
+@pytest.mark.asyncio
+async def test_workspace_artifact_grounding(tmp_path):
+    """Verify that queries mentioning workspace artifacts ingest artifact contents into LLM context."""
+    from cognishift.core.security import get_workspace_root
+    from unittest.mock import patch, AsyncMock
+    from cognishift.core.providers import ModelResponse
+
+    workspace_root = get_workspace_root(1)
+    test_gen_dir = workspace_root / "generated" / "test_run"
+    test_gen_dir.mkdir(parents=True, exist_ok=True)
+    test_csv = test_gen_dir / "sensor_test_readings.csv"
+    test_csv.write_text("sensor_id,value,status\nPT-999,550.0,HIGH_ALARM\n", encoding="utf-8")
+
+    async with get_db() as db:
+        await db.execute(
+            """INSERT OR REPLACE INTO workspace_artifacts 
+               (id, workspace_id, filename, relative_path, artifact_type, title, description, file_size, sha256_hash)
+               VALUES (9999, 1, 'sensor_test_readings.csv', 'generated/test_run/sensor_test_readings.csv', 'structured_data', 'Test CSV', 'Test Readings', 45, 'hash123')"""
+        )
+        await db.commit()
+
+    captured_context = []
+
+    mock_provider = AsyncMock()
+    async def fake_generate_text(prompt, system_prompt="", context="", model_name="", **kwargs):
+        captured_context.append(context)
+        return ModelResponse(
+            text='```json\n{"action": "final_answer", "content": "PT-999 sensor reading is at 550.0 PSI (HIGH_ALARM).", "citations": ["Workspace Artifact | sensor_test_readings.csv"]}\n```',
+            model_name="llama3.2:3b",
+            provider="test",
+            tokens_used=50,
+            is_simulated=False,
+            success=True
+        )
+    mock_provider.generate_text = fake_generate_text
+
+    with patch("cognishift.core.engine.get_provider", return_value=mock_provider):
+        run_res = await execute_agent_run(
+            workspace_id=1,
+            agent_id=1,
+            input_text="can you tell me about sensor_test_readings.csv",
+            user_id="operator_test"
+        )
+
+    assert run_res.status == "completed"
+    assert "Workspace Artifact | sensor_test_readings.csv" in run_res.sources_used
+    assert len(captured_context) > 0
+    assert "PT-999,550.0,HIGH_ALARM" in captured_context[0]
+
+
+@pytest.mark.asyncio
+async def test_retriever_distance_threshold():
+    """Verify that retriever suppresses chunks with embedding distance above threshold."""
+    from cognishift.core.retriever import retrieve_context, MAX_DISTANCE_THRESHOLD
+    assert MAX_DISTANCE_THRESHOLD in (0.75, 0.78)
+    mock_collection = MagicMock()
+    mock_collection.count.return_value = 1
+
+    # Case 1: Distance above threshold -> filtered out to empty string
+    mock_collection.query.return_value = {
+        "documents": [["Irrelevant SOP procedure chunk with more than twenty-five characters"]],
+        "metadatas": [[{"filename": "manual.pdf", "page": 1, "source_id": 1}]],
+        "distances": [[0.95]]
+    }
+    with patch("cognishift.core.retriever.chroma_client.get_collection", return_value=mock_collection), \
+         patch("cognishift.core.retriever.embedding_model.embed", return_value=[MagicMock(tolist=lambda: [0.1] * 384)]):
+        result = await retrieve_context(workspace_id=1, query="can you run python?")
+        assert result == ""
+
+    # Case 2: Distance within threshold -> included
+    mock_collection.query.return_value = {
+        "documents": [["Relevant SOP procedure chunk with more than twenty-five characters"]],
+        "metadatas": [[{"filename": "pump_manual.pdf", "page": 4, "source_id": 1}]],
+        "distances": [[0.35]]
+    }
+    with patch("cognishift.core.retriever.chroma_client.get_collection", return_value=mock_collection), \
+         patch("cognishift.core.retriever.embedding_model.embed", return_value=[MagicMock(tolist=lambda: [0.1] * 384)]):
+        result = await retrieve_context(workspace_id=1, query="pump SOP")
+        assert "Relevant SOP procedure chunk" in result
+
+
+@pytest.mark.asyncio
+async def test_multi_turn_history_forwarded():
+    """Verify that previous completed run turns are loaded into history for subsequent runs."""
+    # First turn
+    run1 = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="Hello, my name is Operator Alex",
+        user_id="test_operator_turn"
+    )
+    assert run1.status == "completed"
+
+    captured_history = []
+    from cognishift.core.simulated_provider import SimulatedProvider
+    original_generate = SimulatedProvider.generate_text
+
+    async def spy_generate_text(self, prompt, system_prompt="", context="", model_name=None, history=None):
+        nonlocal captured_history
+        captured_history = history
+        return await original_generate(self, prompt, system_prompt, context, model_name, history)
+
+    with patch.object(SimulatedProvider, "generate_text", spy_generate_text):
+        run2 = await execute_agent_run(
+            workspace_id=1,
+            agent_id=1,
+            input_text="What did I just tell you my name was?",
+            user_id="test_operator_turn"
+        )
+        assert run2.status == "completed"
+        assert captured_history is not None
+        assert len(captured_history) >= 1
+        assert any("Operator Alex" in h["content"] for h in captured_history)
+

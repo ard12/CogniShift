@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <title>CogniShift</title>
+ <meta name="description" content="Interactive architecture explainer for CogniShift sovereign agentic AI." />
+ 
+
+
+
+<style>
+/* CogniShift — a local systems field guide. No external assets. */
+:root{--bg:#101716;--panel:#17201e;--line:#33413b;--text:#eff0e9;--muted:#a6b2a9;--pink:#d6e7a3;--green:#91b89d;--cyan:#b8cec3;--amber:#d6e7a3;--radius:6px;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;line-height:1.5}button,input{font:inherit}button{cursor:pointer}button,a,input{ -webkit-tap-highlight-color:transparent}button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--pink);outline-offset:4px}button{transition:background .15s,border-color .15s}button:hover{filter:brightness(1.12)}.ambient{display:none}.shell{max-width:1640px;margin:auto;padding:0 36px}.nav{height:88px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:14px}.mark{width:38px;height:38px;display:grid;place-items:center;background:var(--pink);color:var(--bg)}.mark svg{width:26px;height:26px}.brand-name{font-size:22px;letter-spacing:-.8px;font-weight:650}.brand-sub{font-size:10px;color:var(--muted);letter-spacing:.16em;text-transform:uppercase}.nav-status{font:11px Consolas,monospace;color:var(--muted);display:flex;gap:10px;align-items:center}.status-dot{width:6px;height:6px;background:var(--pink)}
+.hero{display:grid;grid-template-columns:1.4fr 1fr;gap:80px;align-items:center;padding:68px 0 60px}.kicker,.tiny-label,.mini-label{font:10px Consolas,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.kicker{color:var(--pink)}.hero h1{font-size:clamp(42px,4.5vw,68px);font-weight:450;line-height:1.04;letter-spacing:-.05em;margin:20px 0 24px}.hero h1 span{color:var(--pink)}.hero-copy>p{font-size:16px;color:var(--muted);max-width:570px;line-height:1.65;margin:0}.hero-actions{display:flex;gap:10px;margin-top:28px;flex-wrap:wrap}.btn{padding:12px 20px;border-radius:4px;font-size:12px;font-weight:600;border:1px solid var(--line)}.btn.primary{background:var(--pink);color:#17201a;border-color:var(--pink)}.btn.ghost{background:transparent;color:var(--text)}.hero-facts{display:flex;gap:32px;margin-top:30px}.hero-facts div{display:grid;gap:3px}.hero-facts b{font:17px Consolas,monospace}.hero-facts span{color:var(--muted);font-size:11px}.hero-card{border-left:1px solid var(--line);padding-left:32px;max-width:470px}.mini-label{margin-bottom:18px}.principle{display:grid;grid-template-columns:30px 1fr;gap:15px;padding:17px 0;border-top:1px solid var(--line)}.principle>span{font:11px Consolas,monospace;color:var(--pink);padding-top:4px}.principle b{font-size:15px;font-weight:550}.principle p{font-size:12px;color:var(--muted);margin:5px 0 0;line-height:1.6}
+.explorer{display:grid;grid-template-columns:240px minmax(0,1fr) 292px;border:1px solid var(--line);border-radius:6px;overflow:hidden;scroll-margin-top:24px}.panel{min-width:0;background:var(--panel)}.side{padding:22px 16px;border-right:1px solid var(--line)}.detail{padding:22px 18px;border-left:1px solid var(--line);display:flex;flex-direction:column}.panel-title-row{display:flex;justify-content:space-between;gap:8px}.panel-title-row h2{font-size:16px;font-weight:500;margin:5px 0 0}.live-pill{display:none}.scenario-list{display:flex;flex-direction:column;gap:4px;margin:24px 0}.scenario{width:100%;display:grid;grid-template-columns:24px 1fr;gap:10px;padding:12px 10px;text-align:left;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--text)}.scenario:hover{background:#202d26}.scenario.active{border-color:#4b5d43;background:#283428}.scenario-icon{color:var(--muted);font:11px Consolas,monospace;padding-top:2px}.scenario.active .scenario-icon{color:var(--pink)}.scenario b{display:block;font-size:12px;font-weight:550}.scenario small{display:block;font-size:10px;line-height:1.5;color:var(--muted);margin-top:4px}.scenario-controls{display:grid;grid-template-columns:1fr 40px;gap:8px}.icon-btn{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:4px;font-size:21px}.prompt-demo{border-top:1px solid var(--line);margin-top:26px;padding-top:20px}.prompt-demo label{font-size:12px}.prompt-wrap{display:grid;grid-template-columns:minmax(0,1fr) 32px;margin-top:10px}.prompt-wrap input{min-width:0;width:100%;border:1px solid var(--line);border-radius:3px 0 0 3px;padding:11px 8px;background:var(--bg);color:var(--text);font-size:11px}.prompt-wrap button{background:var(--bg);color:var(--pink);border:1px solid var(--line);border-left:0;border-radius:0 3px 3px 0}.prompt-demo>small{display:block;font-size:10px;color:var(--muted);line-height:1.6;margin-top:10px}
+.tree-panel{background:#111a16}.tree-top{display:flex;justify-content:space-between;gap:12px;padding:22px;border-bottom:1px solid var(--line);min-height:106px}.tree-top h2{font-size:20px;font-weight:500;margin:5px 0}.tree-top p{font-size:11px;color:var(--muted);margin:0}.mode-switch{display:flex;align-self:flex-start;border:1px solid var(--line);border-radius:3px;overflow:hidden;flex-shrink:0}.mode-switch button{padding:7px 9px;border:0;background:transparent;color:var(--muted);font-size:10px}.mode-switch button.active{background:#303d30;color:var(--text)}.tree-stage{position:relative;padding:20px 12px 0;background-image:radial-gradient(#334137 0.7px,transparent 0.7px);background-size:20px 20px}#treeSvg{display:block;width:100%;height:auto;aspect-ratio:820/650;overflow:visible}.trunk,.trunk-core,#petalLayer{display:none}.root-label{fill:var(--muted);font:10px Consolas,monospace;text-anchor:middle;letter-spacing:1px}.edge{fill:none;stroke:#607468;stroke-width:1;opacity:.18;transition:opacity .2s,stroke .2s}.edge.preview{stroke:#9ba88d;stroke-width:1.5;opacity:.55}.edge.active{stroke:var(--pink);stroke-width:2.5;opacity:1}.node{cursor:pointer;opacity:.65}.node circle{fill:#17241c;stroke:#728476;stroke-width:1.5}.node text{fill:#d7ddd4;font:11px Consolas,monospace;text-anchor:middle;paint-order:stroke;stroke:#111a16;stroke-width:4px;stroke-linejoin:round;pointer-events:none}.node.preview,.node.reached,.node.current,.node.spotlight,.node:hover,.node:focus{opacity:1}.node.reached circle{fill:var(--green);stroke:var(--green)}.node.current circle,.node.spotlight circle,.node:hover circle,.node:focus circle{fill:var(--pink);stroke:var(--text);stroke-width:2}.node.current text,.node.spotlight text{fill:var(--pink)}.tree-callout{display:grid;grid-template-columns:35px 1fr;gap:13px;padding:18px 10px;border-top:1px solid var(--line);min-height:108px;background:#111a16}.callout-index{font:17px Consolas,monospace;color:var(--pink)}.tree-callout small{font:9px Consolas,monospace;letter-spacing:.1em;color:var(--muted)}.tree-callout b{display:block;font-size:13px;font-weight:500}.tree-callout p{font-size:11px;color:var(--muted);margin:4px 0;line-height:1.5}.tree-legend{display:flex;gap:15px;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--line);font-size:10px;color:var(--muted)}.legend-dot{display:inline-block;width:6px;height:6px;margin-right:6px;background:#728476}.legend-dot.active{background:var(--pink)}.legend-dot.done{background:var(--green)}
+.detail-card h2{font-size:23px;letter-spacing:-.03em;font-weight:500;margin:10px 0}.detail-card>p{font-size:12px;line-height:1.7;color:var(--muted);margin:0}.file-chip{font:10px/1.7 Consolas,monospace;overflow-wrap:anywhere;color:var(--cyan);border-left:2px solid var(--line);padding:8px 10px;margin-top:16px}.developer-extra{display:none;font-size:11px;color:var(--muted);line-height:1.7;margin-top:12px}.dev-mode .developer-extra{display:block}.timeline-head{display:flex;justify-content:space-between;align-items:end;border-top:1px solid var(--line);padding-top:20px;margin:24px 0 12px}.timeline-head b{font-size:12px;font-weight:500}#stepCounter{font:11px Consolas,monospace;color:var(--pink)}.timeline{position:relative;max-height:290px;overflow:auto;scrollbar-width:thin;scrollbar-color:#53634e transparent}.timeline-step{display:grid;grid-template-columns:23px 1fr;gap:9px;padding:10px 5px;border-left:1px solid var(--line);margin-left:5px}.timeline-num{font:10px Consolas,monospace;color:var(--muted);padding-top:3px}.timeline-step b{font-size:11px;font-weight:500;color:var(--muted)}.timeline-step span{display:block;font-size:10px;color:var(--muted);margin-top:3px;line-height:1.5}.timeline-step.active{background:#283428;border-color:var(--pink)}.timeline-step.active b,.timeline-step.active .timeline-num{color:var(--pink)}.timeline-step.done{border-color:var(--green)}.key-line{border-top:1px solid var(--line);padding-top:16px;margin-top:24px}.key-line p{font-size:11px;color:var(--muted);line-height:1.7;margin:8px 0}
+.story-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;margin:40px 0 64px}.story-card{display:grid;grid-template-columns:25px 1fr;gap:10px}.story-no{font:11px Consolas,monospace;color:var(--pink);padding-top:2px}.story-card h3{font-size:14px;font-weight:500;margin:8px 0}.story-card p{font-size:12px;color:var(--muted);line-height:1.6;margin:0}.system-section{border-top:1px solid var(--line);padding-top:28px}.section-heading{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:24px}.section-heading h2{font-size:30px;letter-spacing:-.03em;font-weight:450;margin:8px 0 0}.section-heading p{font-size:12px;color:var(--muted);margin:0}.system-grid{display:grid;grid-template-columns:repeat(4,1fr);border-left:1px solid var(--line);border-top:1px solid var(--line)}.system-card{padding:22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;min-width:0}.system-card:hover{background:#202b22}.system-card b{font-size:14px;font-weight:500}.system-card p{font-size:12px;color:var(--muted);margin:5px 0}.system-card code{display:block;font-size:10px;color:var(--cyan);overflow-wrap:anywhere;margin-top:16px}.closing{display:flex;justify-content:space-between;align-items:center;gap:30px;padding:48px 0;margin-top:30px;border-bottom:1px solid var(--line)}.closing h2{font-size:32px;font-weight:450;letter-spacing:-.035em;margin:8px 0}.closing p{font-size:13px;color:var(--muted);max-width:700px}.closing .btn{flex-shrink:0}footer{font:10px/1.8 Consolas,monospace;color:var(--muted);padding:22px 0 30px;max-width:1000px}
+@media(min-width:1450px){.explorer{grid-template-columns:260px minmax(0,1fr) 310px}.timeline{max-height:380px}}
+@media(max-width:1150px){.shell{padding:0 24px}.hero{gap:36px}.explorer{grid-template-columns:220px minmax(0,1fr)}.detail{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:16px 32px}.detail-card{grid-column:1;grid-row:1/3}.timeline-head{grid-column:2;margin:0;padding:0;border:0}.timeline{grid-column:2;max-height:220px}.key-line{grid-column:1/-1;margin-top:0}.story-grid{grid-template-columns:1fr 1fr}.system-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.shell{padding:0 18px}.nav{height:76px}.nav-status{font-size:9px}.hero{grid-template-columns:1fr;padding:40px 0;gap:36px}.hero-card{max-width:none;padding-left:20px}.hero h1{font-size:48px}.explorer{display:block}.side{border-right:0;border-bottom:1px solid var(--line)}.scenario-list{display:grid;grid-template-columns:1fr 1fr;margin:16px 0}.prompt-demo{margin-top:16px}.tree-top{padding:20px 16px}.tree-stage{padding:14px 4px 0}.detail{display:block}.timeline-head{margin-top:24px}.timeline{margin-top:12px}.key-line{margin-top:20px}.system-grid{grid-template-columns:1fr 1fr}.story-grid{gap:24px;margin:32px 0 44px}.section-heading{display:block}.section-heading p{margin-top:10px}.closing{display:block}.closing .btn{margin-top:16px}}
+@media(max-width:430px){.nav-status{max-width:90px}.hero h1{font-size:40px}.hero-facts{gap:20px}.hero-facts span{font-size:10px}.tree-top h2{font-size:17px}.tree-top{gap:8px}.mode-switch button{padding:7px}.system-grid,.story-grid{grid-template-columns:1fr}.tree-legend{gap:10px;padding:14px 10px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* Simple is a focused explanation; Details exposes the complete implementation. */
+body:not(.dev-mode) .file-chip,body:not(.dev-mode) .system-card code,
+body:not(.dev-mode) .legend-optional{display:none}
+body:not(.dev-mode) .node:not(.preview):not(.reached):not(.spotlight),
+body:not(.dev-mode) .edge:not(.preview):not(.active){visibility:hidden}
+.dev-mode .edge:not(.preview):not(.active){opacity:.32;stroke-dasharray:3 5}
+.mode-description{padding:10px 22px;margin:0;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<noscript>
+ <div style="position:fixed;inset:0;background:#080b10;color:#fff;display:grid;place-items:center;font-family:system-ui;z-index:99999">
+  <div style="max-width:520px;padding:24px;text-align:center">
+   <h2>CogniShift Explorer</h2>
+   <p>This interactive page needs JavaScript enabled.</p>
+  </div>
+ </div>
+</noscript>
+
+ <div class="ambient ambient-a"></div>
+ <div class="ambient ambient-b"></div>
+
+ <main class="shell">
+  <header class="nav">
+   <div class="brand">
+    <div class="mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M22 5H10L4 16l6 11h12M12 16h15m-5-5 5 5-5 5" stroke="currentColor" stroke-width="3" stroke-linejoin="miter"/></svg></div>
+    <div>
+     <div class="brand-name">CogniShift</div>
+     <div class="brand-sub">System Map</div>
+    </div>
+   </div>
+
+   <div class="nav-status">
+    <span class="status-dot"></span>
+    ARCHITECTURE / EXPLORER
+   </div>
+  </header>
+
+  <section class="hero">
+   <div class="hero-copy">
+    <div class="kicker">COGNISHIFT / SYSTEM FIELD GUIDE</div>
+    <h1>Intelligence, kept local.<br><span>Execution, kept in control.</span></h1>
+    <p>
+     CogniShift understands what the operator wants, activates only the systems
+     required for that task, and keeps execution, data, approvals and artifacts local.
+    </p>
+
+    <div class="hero-actions">
+     <button type="button" class="btn primary" id="startTour">Take the guided tour ↗</button>
+     <button type="button" class="btn ghost" id="jumpExplorer">Explore the architecture</button>
+    </div>
+
+    <div class="hero-facts">
+     <div><b>7</b><span>semantic intents</span></div>
+     <div><b>15</b><span>validated tool schemas</span></div>
+     <div><b>Local</b><span>Ollama + FastEmbed</span></div>
+    </div>
+   </div>
+
+   <div class="hero-card">
+    <div class="mini-label">DESIGN PRINCIPLES</div>
+    <div class="principle">
+     <span>01</span>
+     <div><b>LLM ≠ authority</b><p>The model reasons. Deterministic code controls tools, access and approvals.</p></div>
+    </div>
+    <div class="principle">
+     <span>02</span>
+     <div><b>Context only when needed</b><p>Conversation, RAG, artifacts and tools are separate paths instead of one giant prompt.</p></div>
+    </div>
+    <div class="principle">
+     <span>03</span>
+     <div><b>Real work, locally</b><p>Documents, code execution, artifacts, audit state and approvals stay inside the local workbench.</p></div>
+    </div>
+   </div>
+  </section>
+
+  <section class="explorer" id="explorer">
+   <aside class="side panel">
+    <div class="panel-title-row">
+     <div>
+      <div class="tiny-label">01 / REQUEST</div>
+      <h2>Choose a request</h2>
+     </div>
+     <span class="live-pill">SYSTEM MAP</span>
+    </div>
+
+    <div class="scenario-list">
+     <button type="button" class="scenario active" data-scenario="conversation">
+      <span class="scenario-icon">Q</span>
+      <span><b>Question</b><small>“What can you do?”</small></span>
+     </button>
+     <button type="button" class="scenario" data-scenario="knowledge">
+      <span class="scenario-icon">K</span>
+      <span><b>Knowledge</b><small>“What does our SOP say?”</small></span>
+     </button>
+     <button type="button" class="scenario" data-scenario="artifact">
+      <span class="scenario-icon">F</span>
+      <span><b>File</b><small>“Summarize Q4_budget.xlsx”</small></span>
+     </button>
+     <button type="button" class="scenario" data-scenario="scan">
+      <span class="scenario-icon">D</span>
+      <span><b>Scanned file</b><small>PDF OCR local knowledge</small></span>
+     </button>
+     <button type="button" class="scenario" data-scenario="python">
+      <span class="scenario-icon">P</span>
+      <span><b>Python</b><small>Model schema sandbox</small></span>
+     </button>
+     <button type="button" class="scenario" data-scenario="control">
+      <span class="scenario-icon">A</span>
+      <span><b>Protected action</b><small>Proposal Four-Eyes approval</small></span>
+     </button>
+    </div>
+
+    <div class="scenario-controls">
+     <button type="button" class="btn primary wide" id="playFlow">Run flow</button>
+     <button type="button" class="icon-btn" id="resetFlow" title="Reset" aria-label="Reset flow">↺</button>
+    </div>
+
+    <div class="prompt-demo">
+     <label for="promptInput">Try a sample prompt</label>
+     <div class="prompt-wrap">
+      <input id="promptInput" placeholder="e.g. Restart P-101A now" />
+      <button type="button" id="promptGo" aria-label="Run sample prompt">→</button>
+     </div>
+     <small>Visualizer only — this page does not execute plant actions.</small>
+    </div>
+   </aside>
+
+   <section class="tree-panel panel">
+    <div class="tree-top">
+     <div>
+      <div class="tiny-label">02 / EXECUTION PATH</div>
+      <h2 id="flowTitle">Question</h2>
+      <p id="flowSubtitle">Only needed parts run.</p>
+     </div>
+     <div class="mode-switch">
+      <button type="button" class="active" id="judgeView">Simple</button>
+      <button type="button" id="devView">Details</button>
+     </div>
+    </div>
+
+    <p class="mode-description" id="modeDescription" aria-live="polite">Simple · Selected workflow only, explained in plain language.</p>
+    <div class="tree-stage">
+     <svg id="treeSvg" viewBox="0 0 820 650" aria-label="Interactive CogniShift backend architecture map">
+      <defs>
+       <linearGradient id="trunkFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6d3b50"/>
+        <stop offset="100%" stop-color="#241821"/>
+       </linearGradient>
+       <filter id="pinkGlow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+       </filter>
+       <filter id="greenGlow">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+       </filter>
+      </defs>
+
+      <g id="petalLayer"></g>
+      <path class="trunk" d="M390 650 C394 607 401 572 405 529 C409 485 406 442 411 397 C416 351 416 309 409 269 L430 269 C440 312 438 355 433 401 C429 447 439 486 439 531 C439 574 450 610 458 650 Z"/>
+      <path class="trunk-core" d="M421 623 C414 563 428 515 422 465 C417 416 432 365 421 283"/>
+      <g id="edgeLayer"></g>
+      <g id="nodeLayer"></g>
+      <text x="424" y="633" class="root-label">OPERATOR REQUEST</text>
+     </svg>
+
+     <div class="tree-callout" id="treeCallout">
+      <span class="callout-index">01</span>
+      <div>
+       <small>READY</small>
+       <b>Choose a flow</b>
+       <p>Watch the request move through the system.</p>
+      </div>
+     </div>
+    </div>
+
+    <div class="tree-legend">
+     <span><i class="legend-dot active"></i>active path</span>
+     <span><i class="legend-dot done"></i>completed</span>
+     <span class="legend-optional"><i class="legend-dot optional"></i>available subsystem</span>
+    </div>
+   </section>
+
+   <aside class="detail panel">
+    <div class="detail-card">
+     <div class="tiny-label" id="detailKicker">03 / COMPONENT</div>
+     <h2 id="detailTitle">Engine</h2>
+     <p id="detailSimple">
+      The central coordinator that decides how the rest of CogniShift works together.
+     </p>
+     <div class="file-chip" id="detailFile">src/cognishift/core/engine.py</div>
+     <div class="developer-extra" id="detailDev">
+      execute_agent_run(...) orchestrates context, semantic routing, planning, retrieval,
+      model selection, structured actions, approvals and result persistence.
+     </div>
+    </div>
+
+    <div class="timeline-head">
+     <div>
+      <div class="tiny-label">STEPS</div>
+      <b id="timelineLabel">Waiting to play</b>
+     </div>
+     <span id="stepCounter">0 / 0</span>
+    </div>
+    <div class="timeline" id="timeline"></div>
+
+    <div class="key-line">
+     <div class="tiny-label">KEY IDEA</div>
+     <p id="judgeLine">
+      CogniShift understands the request first, then activates only the local systems needed to answer it.
+     </p>
+    </div>
+   </aside>
+  </section>
+
+  <section class="story-grid">
+   <article class="story-card">
+    <span class="story-no">01</span>
+    <div>
+     <div class="tiny-label">UNDERSTAND</div>
+     <h3>Meaning before machinery</h3>
+     <p>Semantic routing separates conversation, knowledge, files, code, control actions, navigation and complex agent work.</p>
+    </div>
+   </article>
+   <article class="story-card">
+    <span class="story-no">02</span>
+    <div>
+     <div class="tiny-label">GROUND</div>
+     <h3>Evidence, not imagination</h3>
+     <p>Workspace-scoped FastEmbed + ChromaDB retrieval can fail closed when internal evidence is missing.</p>
+    </div>
+   </article>
+   <article class="story-card">
+    <span class="story-no">03</span>
+    <div>
+     <div class="tiny-label">ACT</div>
+     <h3>Structured execution</h3>
+     <p>Tool calls are validated through Pydantic schemas before safe local tools, artifacts or the Docker sandbox can run.</p>
+    </div>
+   </article>
+   <article class="story-card">
+    <span class="story-no">04</span>
+    <div>
+     <div class="tiny-label">GOVERN</div>
+     <h3>Human control stays outside the model</h3>
+     <p>Sensitive simulated actions pause for deterministic Four-Eyes approval and are recorded in persistent audit state.</p>
+    </div>
+   </article>
+  </section>
+
+  <section class="system-section">
+   <div class="section-heading">
+    <div>
+     <div class="tiny-label">SYSTEM PARTS</div>
+     <h2>What each part does</h2>
+    </div>
+    <p>Click any card to inspect its role in the map.</p>
+   </div>
+   <div class="system-grid" id="systemGrid"></div>
+  </section>
+
+  <section class="closing">
+   <div>
+    <div class="tiny-label">WITHIN YOUR BOUNDARY</div>
+    <h2>Local AI with controlled execution.</h2>
+    <p>CogniShift is not “an LLM with a UI”; it is a sovereign orchestration layer around local models, local knowledge, validated tools and human-governed execution.</p>
+   </div>
+   <button type="button" class="btn primary" id="replayTour">Replay</button>
+  </section>
+
+  <footer>
+   Repository basis: <b>sitanshukr08/CogniShift</b> • main @ <code>8306932</code> • protected industrial actions shown here are synthetic simulation workflows • this page visualizes architecture and does not execute CogniShift.
+  </footer>
+ </main>
+
+ <script>
+
+const systems = {
+ ui:{x:420,y:588,label:"Browser",file:"src/cognishift/app/static/app.js",simple:"The operator starts from the local browser console.",dev:"The UI sends REST requests and renders backend run/events state rather than inventing execution progress."},
+ api:{x:420,y:520,label:"FastAPI",file:"src/cognishift/app/main.py + app/api/runs.py",simple:"FastAPI receives the request, authenticates it and hands it to the run pipeline.",dev:"main.py boots the application and routers. runs.py verifies workspace access and calls execute_agent_run(...)."},
+ auth:{x:310,y:460,label:"Auth",file:"src/cognishift/app/core/auth.py",simple:"Trusted backend identity decides who the user is and what workspace they may access.",dev:"get_current_user() derives identity from verified server-side credentials. verify_workspace_access() enforces workspace authorization."},
+ engine:{x:420,y:438,label:"Engine",file:"src/cognishift/core/engine.py",simple:"The central coordinator that decides how the rest of CogniShift works together.",dev:"execute_agent_run(...) orchestrates context, semantic routing, planning, retrieval, model routing, structured actions, approvals and result persistence."},
+ context:{x:290,y:360,label:"Context",file:"src/cognishift/core/conversation_context.py",simple:"Resolves phrases such as “that file”, “it”, or “which page” without dragging old topics into new requests.",dev:"ConversationContextResolver scans bounded history only when reference/anaphora triggers exist and can pin the latest completed knowledge source."},
+ pending:{x:145,y:308,label:"Pending",file:"src/cognishift/core/pending_tasks.py",simple:"Tracks unfinished work separately from ordinary conversation memory.",dev:"PendingTask has TTL, user/workspace binding, versioning and atomic CAS claim for single-winner continuation."},
+ semantic:{x:420,y:332,label:"Intent",file:"src/cognishift/core/semantic_router.py",simple:"Classifies what the user wants before expensive AI, retrieval or tools run.",dev:"Seven SemanticIntent classes: CONVERSATION, KNOWLEDGE_QUERY, ARTIFACT_INSPECTION, CODE_EXECUTION, CONTROL_ACTION, UI_NAVIGATION, COMPLEX_AGENT. Decisions can be RULE, SEMANTIC or ABSTAIN."},
+ planner:{x:545,y:286,label:"Planner",file:"src/cognishift/core/planner.py",simple:"Turns non-trivial work into a bounded sequence of visible steps.",dev:"AgentPlan and PlanStep persist structured progress. Intermediate StepObservation stays distinct from terminal FinalAnswer."},
+ retrieval:{x:235,y:245,label:"RAG",file:"src/cognishift/core/retriever.py",simple:"Searches authorized local knowledge only when the request needs evidence.",dev:"Local FastEmbed BAAI/bge-small-en-v1.5 + ChromaDB. Collections are workspace-scoped, active source versions are enforced and the default squared-L2 cutoff is 0.78."},
+ chroma:{x:100,y:172,label:"ChromaDB",file:"src/cognishift/core/retriever.py",simple:"Stores local document vectors used for semantic retrieval.",dev:"Persistent collection names are workspace-scoped. Empty or unauthorized retrieval returns empty context so organization-specific queries can fail closed."},
+ graph:{x:250,y:135,label:"Graph",file:"src/cognishift/core/graph_memory.py",simple:"Adds structured equipment relationships when topology context is useful.",dev:"SQLite graph_nodes and graph_edges provide workspace-scoped relationship traversal for equipment/sensors/safety links."},
+ db:{x:354,y:192,label:"SQLite",file:"src/cognishift/app/db/database.py",simple:"Stores the durable truth behind runs, approvals, artifacts, knowledge metadata and audit events.",dev:"SQLite runs in WAL mode. Tables include workspaces, knowledge_sources, agent_runs, run_events, approval_requests, workspace_artifacts, pending_tasks, document_pages and network_events."},
+ modelrouter:{x:458,y:232,label:"Model Router",file:"src/cognishift/core/model_router.py + model_registry.py",simple:"Chooses a local model that matches the task and the machine's hardware budget.",dev:"route_model() scores capability overlap, model quality, latency and VRAM feasibility. Registry includes Qwen 2.5 7B, Llama 3.2 3B, Moondream and additional configured candidates."},
+ ollama:{x:448,y:132,label:"Local Model",file:"src/cognishift/core/providers.py + ollama_provider.py",simple:"Runs text or vision inference through local Ollama.",dev:"ModelProvider is the abstraction. OllamaProvider uses the sovereign HTTP client and supports text generation plus local image analysis."},
+ schema:{x:585,y:226,label:"Schemas",file:"src/cognishift/core/tool_schemas.py",simple:"Before tools run, names and parameters must match authoritative Pydantic schemas.",dev:"15 tool schemas form the runtime source of truth. Risk classification is deterministic; bounded repair can bind one explicit user reference but must not invent a target."},
+ approval:{x:725,y:262,label:"4-Eyes",file:"src/cognishift/app/api/approvals.py",simple:"Sensitive simulated actions pause for independent human authorization.",dev:"Two-stage approval stores reviewed_by and reviewed_by_2. The requester cannot self-approve and the same identity cannot provide both stages."},
+ tools:{x:690,y:158,label:"Tools",file:"src/cognishift/core/tools.py",simple:"Executes validated local functions for files, artifacts, diagnostics and synthetic control actions.",dev:"execute_tool(...) dispatches validated calls. Workspace file operations go through security.py; industrial control actions are simulation-only."},
+ sandbox:{x:615,y:82,label:"Docker",file:"src/cognishift/core/sandbox/service.py + sandbox/backend.py",simple:"Generated Python runs inside an isolated container instead of on the host.",dev:"Sandbox lifecycle: controlled staging Docker/Podman backend output validation/promotion run-event logging guaranteed staging cleanup. Container network is disabled."},
+ artifact:{x:550,y:92,label:"Artifacts",file:"src/cognishift/core/artifact_generators.py",simple:"Creates real DOCX, XLSX and PPTX outputs and registers them in the workspace.",dev:"Artifacts are structurally validated/reopened, SHA-256 hashed for integrity checking, workspace-scoped and recorded in workspace_artifacts."},
+ docproc:{x:122,y:104,label:"Docs",file:"src/cognishift/core/document_processing/service.py",simple:"Converts uploaded documents into searchable, page-scoped local knowledge.",dev:"DocumentProcessingService creates processing generations, uses native extraction when possible, targeted OCR when needed, indexes local embeddings and retires old generations."},
+ ocr:{x:47,y:55,label:"RapidOCR",file:"src/cognishift/core/document_processing/ocr_provider.py",simple:"Reads text from scanned pages locally on CPU.",dev:"RapidOCR + ONNX runs offline. Confidence is preserved as uncertainty; low confidence is not automatically called handwriting."},
+ vision:{x:210,y:52,label:"Moondream",file:"src/cognishift/core/document_processing/vision_service.py",simple:"Uses a local vision model only when visual interpretation is actually needed.",dev:"VisionProcessingService calls the local ModelProvider with page/image limits and explicit requirement handling."},
+ provenance:{x:318,y:82,label:"Provenance",file:"src/cognishift/core/document_processing/provenance.py",simple:"Keeps source, page and extraction method attached to retrieved evidence.",dev:"Retrieved document text is wrapped as untrusted data with escaped delimiters and formatted grounded citations."},
+ network:{x:744,y:83,label:"Sovereignty",file:"src/cognishift/core/network/policy.py + network/guard.py",simple:"Application network policy permits configured local services and blocks unauthorized destinations.",dev:"Strict policy classifies destinations and guards HTTP before socket creation. Host/firewall/packet-observer evidence remains a separate verification layer."},
+ answer:{x:420,y:45,label:"Result",file:"src/cognishift/core/engine.py",simple:"Returns a truthful final answer, artifact result, paused state or failure state.",dev:"The engine persists result_text, structured_plan, routing_info and run events so the frontend can render backend-authoritative state."}
+};
+
+const edges = [
+ // Trusted request trunk
+ ["ui","api"],["api","auth"],["auth","engine"],["engine","context"],["context","semantic"],
+
+ // Conversation / local-model branch
+ ["semantic","modelrouter"],["modelrouter","ollama"],["ollama","answer"],
+
+ // Planning / grounded-knowledge branch
+ ["semantic","planner"],["planner","retrieval"],["retrieval","db"],["db","chroma"],["chroma","modelrouter"],
+ ["retrieval","graph"],
+
+ // Exact artifact-inspection branch
+ ["planner","db"],["db","modelrouter"],
+
+ // Multi-turn continuation branch
+ ["context","pending"],
+
+ // Structured tool / approval / execution branch
+ ["planner","modelrouter"],["ollama","schema"],["schema","approval"],["approval","tools"],
+ ["schema","tools"],["tools","sandbox"],["sandbox","artifact"],["artifact","db"],["tools","db"],["db","answer"],
+
+ // Document-ingestion branch: native extraction chooses OCR OR vision only when needed
+ ["auth","docproc"],["docproc","ocr"],["ocr","provenance"],["docproc","vision"],["vision","provenance"],
+ ["provenance","db"],["provenance","chroma"],["chroma","answer"],
+
+ // Sovereignty is a cross-cutting API/network-policy branch
+ ["api","network"]
+];
+
+const scenarios = {
+ conversation:{
+  title:"Question",subtitle:"Only needed parts run.",
+  keyIdea:"A normal question never needs RAG or tools: CogniShift authenticates, understands the intent, selects a local model and answers.",
+  path:["ui","api","auth","engine","context","semantic","modelrouter","ollama","answer"],
+  steps:[
+   ["Browser","Operator asks a normal question."],["FastAPI","The local run API receives it."],["Auth","Identity and workspace access are verified."],
+   ["Engine","A backend-authoritative run begins."],["Context","Checks whether recent context is actually needed."],
+   ["Intent","Classifies CONVERSATION."],["Model Router","Chooses a hardware-feasible local text model."],
+   ["Local Model","Ollama generates locally."],["Result","Answer and real run state return to the console."]
+  ]
+ },
+ knowledge:{
+  title:"Knowledge query",subtitle:"Uses local evidence when needed.",
+  keyIdea:"Organization-specific answers are grounded in authorized local evidence; if nothing relevant is found, CogniShift fails closed instead of inventing a policy.",
+  path:["ui","api","auth","engine","context","semantic","planner","retrieval","db","chroma","modelrouter","ollama","answer"],
+  steps:[
+   ["Browser","User asks what an internal policy or manual says."],["FastAPI","Request enters the local backend."],["Auth","Workspace access is checked."],
+   ["Engine","Creates a knowledge-query run."],["Context","Resolves references such as “that policy”."],["Intent","Classifies KNOWLEDGE_QUERY."],
+   ["Planner","Creates bounded retrieve reason answer steps."],["RAG","Searches only the agent-authorized workspace sources."],
+   ["SQLite","Confirms authoritative source IDs and active processing versions."],["ChromaDB","Relevant local vectors pass the calibrated distance filter."],
+   ["Model Router","Chooses the local reasoning model."],["Local Model","Synthesizes from supplied evidence."],
+   ["Result","Grounded answer with provenance, or deterministic no-source response."]
+  ]
+ },
+ artifact:{
+  title:"Inspect a workspace file",subtitle:"Uses the exact file.",
+  keyIdea:"When a filename is explicit, CogniShift resolves the real workspace object, reads actual content safely, then asks the model to analyze it.",
+  path:["ui","api","auth","engine","context","semantic","planner","db","modelrouter","ollama","answer"],
+  steps:[
+   ["Browser","User names Q4_budget.xlsx."],["FastAPI","Request reaches the local run API."],["Auth","Workspace authorization is verified."],
+   ["Engine","Starts artifact inspection."],["Context","Extracts or resolves the exact filename."],["Intent","Classifies ARTIFACT_INSPECTION."],
+   ["Planner","Resolve read analyze synthesize."],["SQLite","Artifact/source metadata anchors the real object."],
+   ["Model Router","Chooses a document-capable local model."],["Local Model","Analyzes actual file content."],["Result","Returns the truthful file summary."]
+  ]
+ },
+ scan:{
+  title:"Scanned file ingestion",subtitle:"Turns a scanned file into local searchable data.",
+  keyIdea:"A scanned PDF stays local: CogniShift validates it, uses native text when possible, RapidOCR when needed, preserves provenance, then indexes local embeddings.",
+  path:["ui","api","auth","docproc","ocr","provenance","db","chroma","answer"],
+  steps:[
+   ["Browser","Operator uploads a PDF or image."],["FastAPI","Knowledge endpoint receives it."],["Auth","Workspace ownership is checked."],
+   ["Docs","A new processing generation is created and pages are inspected."],["RapidOCR","Unreadable/scanned pages use local OCR; native text is kept when it is already readable."],
+   ["Provenance","Page, extraction-method and confidence metadata stay attached. Moondream remains an optional visual-analysis branch when required."],
+   ["SQLite","Page records and active processing version are stored."],["ChromaDB","Local embeddings are indexed by workspace."],
+   ["Result","The document becomes available to grounded local queries."]
+  ]
+ },
+ python:{
+  title:"Safe Python execution",subtitle:"The model suggests; the system controls execution.",
+  keyIdea:"The LLM never executes code on the host: its structured call is validated, then Python runs in the isolated Docker sandbox and only safe outputs are promoted.",
+  path:["ui","api","auth","engine","context","semantic","planner","modelrouter","ollama","schema","tools","sandbox","artifact","db","answer"],
+  steps:[
+   ["Browser","User explicitly asks to run Python."],["FastAPI","Request enters the local API."],["Auth","Identity/workspace are checked."],
+   ["Engine","Creates a bounded agent run."],["Context","Resolves referenced input files."],["Intent","Classifies CODE_EXECUTION."],
+   ["Planner","Builds a bounded code workflow."],["Model Router","Selects a coding-capable local model when hardware allows."],
+   ["Local Model","Produces a structured ToolCall."],["Schemas","Pydantic validates execute_code parameters."],
+   ["Tools","Dispatcher sends the validated request to sandbox service."],["Docker","Code runs in an isolated container with network disabled."],
+   ["Artifacts","Safe outputs are validated and registered."],["SQLite","Real stdout/status/events/timestamps are persisted."],
+   ["Result","The actual sandbox result returns to the user."]
+  ]
+ },
+ control:{
+  title:"Protected simulated action",subtitle:"A request is not approval.",
+  keyIdea:"Even after the model proposes a sensitive simulated action, deterministic schema, target and risk checks pause execution until independent Four-Eyes approval is complete.",
+  path:["ui","api","auth","engine","context","semantic","planner","modelrouter","ollama","schema","approval","tools","db","answer"],
+  steps:[
+   ["Browser","Operator requests a supported synthetic action."],["FastAPI","Request reaches the local run API."],["Auth","Trusted backend identity is established."],
+   ["Engine","Starts the protected-action flow."],["Context","Extracts the equipment target."],["Intent","Classifies CONTROL_ACTION."],
+   ["Planner","Creates bounded protected-action steps."],["Model Router","Chooses the local model."],
+   ["Local Model","Proposes a ToolCall; it does not authorize itself."],["Schemas","Tool name, parameters, target support and risk are validated."],
+   ["4-Eyes","Sensitive action pauses for independent authorized reviewers."],["Tools","Only after approval does the synthetic simulation tool run."],
+   ["SQLite","Run, approval and audit state are persisted."],["Result","The console shows the true final state."]
+  ]
+ }
+};
+
+const cardData = [
+ ["Engine","Central orchestration","engine.py","engine"],
+ ["Semantic Router","Understands user intent","semantic_router.py","semantic"],
+ ["Conversation Context","Resolves multi-turn references","conversation_context.py","context"],
+ ["Pending Tasks","Safe resumable work","pending_tasks.py","pending"],
+ ["Model Router","Capability + VRAM selection","model_router.py","modelrouter"],
+ ["Model Registry","Local model capability catalog","model_registry.py","modelrouter"],
+ ["Ollama Provider","Local text / vision inference","ollama_provider.py","ollama"],
+ ["Knowledge RAG","FastEmbed + ChromaDB","retriever.py","retrieval"],
+ ["Graph Memory","Plant topology relationships","graph_memory.py","graph"],
+ ["Document Processing","Native PDF / OCR / vision","document_processing/service.py","docproc"],
+ ["Tool Schemas","15 authoritative Pydantic contracts","tool_schemas.py","schema"],
+ ["Docker Sandbox","Isolated generated-code execution","sandbox/service.py","sandbox"],
+ ["Artifacts","DOCX / XLSX / PPTX + SHA-256","artifact_generators.py","artifact"],
+ ["Authentication","Server-side identity + workspace RBAC","app/core/auth.py","auth"],
+ ["Four-Eyes","Independent human authorization","app/api/approvals.py","approval"],
+ ["Sovereignty","Local network policy / guarded HTTP","network/policy.py","network"]
+];
+
+const simpleLabels = {
+ ui:"Your request",api:"Receive request",auth:"Check access",engine:"Coordinate",
+ context:"Use context",pending:"Unfinished work",semantic:"Understand intent",
+ planner:"Plan steps",retrieval:"Find evidence",chroma:"Search index",graph:"Relationships",
+ db:"Saved records",modelrouter:"Choose model",ollama:"Local AI",schema:"Validate action",
+ approval:"Human review",tools:"Run tools",sandbox:"Isolated code",artifact:"Output files",
+ docproc:"Read document",ocr:"Read scan",vision:"Understand image",provenance:"Track sources",
+ network:"Network policy",answer:"Return result"
+};
+let inspectedNode = "engine";
+function displayLabel(id){
+ return document.body.classList.contains("dev-mode") ? systems[id].label : simpleLabels[id];
+}
+function displayStep(sc,index){
+ return document.body.classList.contains("dev-mode") ? sc.steps[index] :
+  [simpleLabels[sc.path[index]],systems[sc.path[index]].simple];
+}
+function setView(details){
+ document.body.classList.toggle("dev-mode",details);
+ document.getElementById("judgeView").classList.toggle("active",!details);
+ document.getElementById("devView").classList.toggle("active",details);
+ document.getElementById("judgeView").setAttribute("aria-pressed",String(!details));
+ document.getElementById("devView").setAttribute("aria-pressed",String(details));
+ document.getElementById("modeDescription").textContent=details
+  ? "Details · Full architecture, technical steps, source paths and implementation notes. Dashed links show other available connections."
+  : "Simple · Selected workflow only, explained in plain language.";
+ nodeEls.forEach((el,id)=>{
+  el.querySelector("text").textContent=displayLabel(id);
+  el.setAttribute("aria-label",`${displayLabel(id)}: ${systems[id].simple}`);
+ });
+ inspect(inspectedNode);
+ renderTimeline(); updateCallout();
+}
+const edgeLayer = document.getElementById("edgeLayer");
+const nodeLayer = document.getElementById("nodeLayer");
+const petalLayer = document.getElementById("petalLayer");
+const NS = "http://www.w3.org/2000/svg";
+const edgeEls = new Map();
+const nodeEls = new Map();
+
+function branchPath(a,b){
+ const A=systems[a], B=systems[b];
+
+ // Draw the branch through the exact center of both nodes.
+ // Because edges render below nodes, the line continues underneath each node,
+ // removing all visible connector gaps at either endpoint.
+ const dy = Math.abs(B.y-A.y);
+ const bend = Math.max(22, Math.min(78, dy * 0.42));
+ const dir = B.y < A.y ? -1 : 1;
+
+ return `M ${A.x} ${A.y}
+     C ${A.x} ${A.y + dir*bend},
+      ${B.x} ${B.y - dir*bend},
+      ${B.x} ${B.y}`;
+}
+
+edges.forEach(([a,b])=>{
+ const p=document.createElementNS(NS,"path");
+ p.setAttribute("d",branchPath(a,b));
+ p.setAttribute("class","edge");
+ p.dataset.key=`${a}>${b}`;
+ edgeLayer.appendChild(p);
+ edgeEls.set(`${a}>${b}`,p);
+});
+
+Object.entries(systems).forEach(([id,n])=>{
+ const g=document.createElementNS(NS,"g");
+ g.setAttribute("class","node");
+ g.dataset.id=id;
+ g.setAttribute("tabindex","0");
+ g.setAttribute("role","button");
+ g.setAttribute("aria-label",`${n.label}: ${n.simple}`);
+
+ const c=document.createElementNS(NS,"circle");
+ c.setAttribute("cx",n.x); c.setAttribute("cy",n.y); c.setAttribute("r","9");
+
+ const t=document.createElementNS(NS,"text");
+ t.setAttribute("x",n.x); t.setAttribute("y",n.y-14);
+ t.textContent=n.label;
+
+ g.append(c,t);
+ g.addEventListener("click",()=>{cancelTour(); inspect(id,{spotlight:true});});
+ g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();cancelTour();inspect(id,{spotlight:true});}});
+ nodeLayer.appendChild(g);
+ nodeEls.set(id,g);
+});
+
+[
+ [104,62,3],[162,83,3.5],[222,54,2.8],[286,98,3.6],[345,48,2.8],
+ [497,54,3.4],[562,75,2.8],[638,49,3.8],[703,105,3.1],[752,69,2.7],
+ [83,210,2.8],[741,192,3.2]
+].forEach((p,i)=>{
+ const c=document.createElementNS(NS,"circle");
+ c.setAttribute("cx",p[0]); c.setAttribute("cy",p[1]); c.setAttribute("r",p[2]);
+ c.setAttribute("class","petal"); c.style.animationDelay=`${i*.35}s`;
+ petalLayer.appendChild(c);
+});
+
+let currentScenario="conversation";
+let currentStep=-1;
+let timer=null;
+let tourTimer=null;
+let tourGeneration=0;
+let tourActive=false;
+
+function cancelTour(){
+ clearInterval(timer); timer=null;
+ tourActive=false;
+ tourGeneration+=1;
+ if(tourTimer){ clearTimeout(tourTimer); tourTimer=null; }
+}
+
+function inspect(id,{spotlight=false}={}){
+ const s=systems[id];
+ if(!s) return;
+ inspectedNode=id;
+ document.getElementById("detailKicker").textContent="03 / COMPONENT";
+ document.getElementById("detailTitle").textContent=displayLabel(id);
+ document.getElementById("detailSimple").textContent=s.simple;
+ document.getElementById("detailFile").textContent=s.file;
+ document.getElementById("detailDev").textContent=s.dev;
+ if(spotlight){
+  applyPreview();
+  const el=nodeEls.get(id);
+  if(el) el.setAttribute("class","node preview spotlight");
+ }
+}
+
+function getEdge(a,b){
+ return edgeEls.get(`${a}>${b}`) || edgeEls.get(`${b}>${a}`) || null;
+}
+
+function clearVisual(){
+ nodeEls.forEach(el=>el.setAttribute("class","node"));
+ edgeEls.forEach(el=>el.setAttribute("class","edge"));
+}
+
+function applyPreview(){
+ clearVisual();
+ const sc=scenarios[currentScenario];
+ sc.path.forEach((id,i)=>{
+  const node=nodeEls.get(id);
+  if(node) node.setAttribute("class","node preview");
+  if(i>0){
+   const edge=getEdge(sc.path[i-1],id);
+   if(edge) edge.setAttribute("class","edge preview");
+  }
+ });
+}
+
+function renderTimeline(){
+ const sc=scenarios[currentScenario];
+ const box=document.getElementById("timeline");
+ box.innerHTML=sc.steps.map((_,i)=>{const step=displayStep(sc,i);return `
+  <div class="timeline-step ${i<currentStep?"done":""} ${i===currentStep?"active":""}">
+   <div class="timeline-num">${String(i+1).padStart(2,"0")}</div>
+   <div><b>${step[0]}</b><span>${step[1]}</span></div>
+  </div>
+ `;}).join("");
+ document.getElementById("stepCounter").textContent=`${Math.max(0,currentStep+1)} / ${sc.steps.length}`;
+ document.getElementById("timelineLabel").textContent=currentStep<0?"Ready to play":(currentStep===sc.steps.length-1?"Flow complete":"Flow running");
+ const active=box.querySelector(".active");
+ if(active && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  box.scrollTo({top:Math.max(0,active.offsetTop-box.offsetTop-8),behavior:"smooth"});
+ }
+}
+
+function updateCallout(){
+ const sc=scenarios[currentScenario];
+ const box=document.getElementById("treeCallout");
+ if(currentStep<0){
+  box.innerHTML=`<span class="callout-index">01</span><div><small>READY</small><b>Press “Run flow”</b><p>The selected backend branch is previewed. Playback turns it into a step-by-step trace.</p></div>`;
+  return;
+ }
+ const step=displayStep(sc,Math.min(currentStep,sc.steps.length-1));
+ box.innerHTML=`<span class="callout-index">${String(currentStep+1).padStart(2,"0")}</span><div><small>${currentStep===sc.steps.length-1?"COMPLETE":"RUNNING"}</small><b>${step[0]}</b><p>${step[1]}</p></div>`;
+}
+
+function activateThrough(index){
+ const sc=scenarios[currentScenario];
+ clearVisual();
+ for(let i=0;i<=index && i<sc.path.length;i++){
+  const id=sc.path[i];
+  const el=nodeEls.get(id);
+  if(el) el.setAttribute("class",`node reached ${i===index?"current":""}`);
+  if(i>0){
+   const e=getEdge(sc.path[i-1],id);
+   if(e) e.setAttribute("class","edge active");
+  }
+ }
+ // Keep the unexecuted remainder readable as a quiet preview.
+ for(let i=index+1;i<sc.path.length;i++){
+  const id=sc.path[i];
+  const el=nodeEls.get(id);
+  if(el) el.setAttribute("class","node preview");
+  if(i>0){
+   const e=getEdge(sc.path[i-1],id);
+   if(e && !e.classList.contains("active")) e.setAttribute("class","edge preview");
+  }
+ }
+ if(sc.path[index]) inspect(sc.path[index]);
+}
+
+function syncScenarioAria(){
+ document.querySelectorAll(".scenario").forEach(b=>{
+  const selected=b.dataset.scenario===currentScenario;
+  b.classList.toggle("active",selected);
+  b.setAttribute("aria-pressed",String(selected));
+ });
+}
+
+function setScenario(key,{fromTour=false}={}){
+ if(!scenarios[key]) return;
+ if(!fromTour) cancelTour();
+ clearInterval(timer); timer=null;
+ currentScenario=key; currentStep=-1;
+ syncScenarioAria();
+ document.getElementById("flowTitle").textContent=scenarios[key].title;
+ document.getElementById("flowSubtitle").textContent=scenarios[key].subtitle;
+ document.getElementById("judgeLine").textContent=scenarios[key].keyIdea;
+ applyPreview(); renderTimeline(); updateCallout(); inspect("engine");
+}
+
+function playFlow(done,{fromTour=false}={}){
+ if(!fromTour) cancelTour();
+ clearInterval(timer);
+ currentStep=-1;
+ applyPreview(); renderTimeline(); updateCallout();
+ const sc=scenarios[currentScenario];
+ const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const delay=reduced?30:470;
+ timer=setInterval(()=>{
+  currentStep++;
+  activateThrough(currentStep);
+  renderTimeline();
+  updateCallout();
+  if(currentStep>=sc.path.length-1){
+   clearInterval(timer); timer=null;
+   if(typeof done==="function") done();
+  }
+ },delay);
+}
+
+function inferScenario(text){
+ const s=text.toLowerCase();
+ if(/restart|relief|depressur|diagnostic|control action/.test(s)) return "control";
+ if(/python|execute code|run code|script/.test(s)) return "python";
+ if(/upload|scan|ocr|ingest/.test(s)) return "scan";
+ if(/\.(xlsx|xls|csv|docx|pptx|json|yaml|yml|txt|pdf)\b|summarize .*file/.test(s)) return "artifact";
+ if(/policy|manual|sop|procedure|what does our|which page/.test(s)) return "knowledge";
+ return "conversation";
+}
+
+function runPrompt(){
+ cancelTour();
+ const value=document.getElementById("promptInput").value.trim();
+ if(!value) return;
+ setScenario(inferScenario(value));
+ playFlow();
+}
+
+function startJudgeTour(){
+ cancelTour();
+ tourActive=true;
+ const generation=++tourGeneration;
+ document.getElementById("explorer").scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?"auto":"smooth",block:"start"});
+ const order=["conversation","knowledge","python","control"];
+ let i=0;
+ const next=()=>{
+  if(!tourActive || generation!==tourGeneration || i>=order.length){
+   tourActive=false;
+   return;
+  }
+  setScenario(order[i++],{fromTour:true});
+  tourTimer=setTimeout(()=>{
+   if(!tourActive || generation!==tourGeneration) return;
+   playFlow(()=>{
+    if(!tourActive || generation!==tourGeneration) return;
+    tourTimer=setTimeout(next,900);
+   },{fromTour:true});
+  },380);
+ };
+ tourTimer=setTimeout(next,650);
+}
+
+document.querySelectorAll(".scenario").forEach(b=>b.addEventListener("click",()=>setScenario(b.dataset.scenario)));
+document.getElementById("playFlow").addEventListener("click",()=>playFlow());
+document.getElementById("resetFlow").addEventListener("click",()=>{cancelTour();clearInterval(timer);timer=null;currentStep=-1;applyPreview();renderTimeline();updateCallout();inspect("engine")});
+document.getElementById("promptGo").addEventListener("click",runPrompt);
+document.getElementById("promptInput").addEventListener("keydown",e=>{if(e.key==="Enter") runPrompt()});
+document.getElementById("judgeView").addEventListener("click",()=>setView(false));
+document.getElementById("devView").addEventListener("click",()=>setView(true));
+document.getElementById("startTour").addEventListener("click",startJudgeTour);
+document.getElementById("replayTour").addEventListener("click",startJudgeTour);
+document.getElementById("jumpExplorer").addEventListener("click",()=>{cancelTour();document.getElementById("explorer").scrollIntoView({behavior:"smooth",block:"start"});});
+
+const grid=document.getElementById("systemGrid");
+cardData.forEach(([name,desc,file,id])=>{
+ const el=document.createElement("article");
+ el.className="system-card";
+ el.innerHTML=`<b>${name}</b><p>${desc}</p><code>${file}</code>`;
+ el.setAttribute("tabindex","0");
+ el.setAttribute("role","button");
+ const openCard=()=>{cancelTour();inspect(id,{spotlight:true});document.getElementById("explorer").scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?"auto":"smooth",block:"start"});};
+ el.addEventListener("click",openCard);
+ el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openCard();}});
+ grid.appendChild(el);
+});
+
+document.getElementById("judgeView").setAttribute("aria-pressed","true");
+document.getElementById("devView").setAttribute("aria-pressed","false");
+setScenario("conversation",{fromTour:true});
+setView(false);
+
+</script>
+</body>
+</html>

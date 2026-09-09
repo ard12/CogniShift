@@ -4,6 +4,7 @@ Phase 3 Implementation for CogniShift.
 Zero-cloud, 100% offline generation using python-docx, openpyxl, and python-pptx.
 """
 
+import asyncio
 import os
 import shutil
 import hashlib
@@ -47,6 +48,10 @@ MIME_TYPES = {
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
     "txt": "text/plain",
     "json": "application/json",
     "csv": "text/csv",
@@ -98,6 +103,16 @@ def validate_artifact_structure(file_path: Path, artifact_type: str) -> Artifact
         elif artifact_type == "pptx":
             prs = pptx.Presentation(str(file_path))
             _ = len(prs.slides)
+        elif artifact_type == "pdf":
+            import fitz
+            pdf_doc = fitz.open(str(file_path))
+            if len(pdf_doc) == 0:
+                raise ValueError("PDF document has 0 pages.")
+            pdf_doc.close()
+        elif artifact_type in ["png", "jpg", "jpeg"]:
+            from PIL import Image
+            with Image.open(str(file_path)) as im:
+                im.verify()
         elif artifact_type in ["txt", "json", "csv"]:
             with open(file_path, "r", encoding="utf-8") as f:
                 _ = f.read(100)
@@ -242,6 +257,227 @@ def generate_pptx_presentation(dest_path: Path, title: str, subtitle: Optional[s
     prs.save(str(dest_path))
 
 
+def generate_pdf_document(dest_path: Path, title: str, sections: List[Dict[str, Any]]) -> None:
+    """Generate professional formatted PDF engineering report using reportlab."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    doc = SimpleDocTemplate(
+        str(dest_path),
+        pagesize=letter,
+        rightMargin=40,
+        leftMargin=40,
+        topMargin=40,
+        bottomMargin=40
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        leading=22,
+        alignment=1,
+        textColor=colors.HexColor('#1F4E79'),
+        spaceAfter=6
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Italic'],
+        fontSize=9,
+        leading=12,
+        alignment=1,
+        textColor=colors.HexColor('#555555'),
+        spaceAfter=15
+    )
+    h1_style = ParagraphStyle(
+        'H1',
+        parent=styles['Heading2'],
+        fontSize=13,
+        leading=16,
+        textColor=colors.HexColor('#1F4E79'),
+        spaceBefore=10,
+        spaceAfter=6
+    )
+    body_style = ParagraphStyle(
+        'Body',
+        parent=styles['BodyText'],
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor('#222222'),
+        spaceAfter=4
+    )
+    cell_style = ParagraphStyle(
+        'Cell',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor('#222222')
+    )
+    header_cell_style = ParagraphStyle(
+        'HeaderCell',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=11,
+        fontName='Helvetica-Bold',
+        textColor=colors.white
+    )
+
+    story = [
+        Paragraph(title, title_style),
+        Paragraph("CogniShift Sovereign Plant Operations Workbench - Official Deliverable", subtitle_style),
+        Spacer(1, 10)
+    ]
+
+    def _clean_pdf_text(text: Any) -> str:
+        return str(text).replace("₹", "INR ").replace("€", "EUR ").replace("£", "GBP ")
+
+    for sec in sections:
+        heading = _clean_pdf_text(sec.get("heading", "Section"))
+        story.append(Paragraph(heading, h1_style))
+
+        for p_text in sec.get("paragraphs", []):
+            story.append(Paragraph(_clean_pdf_text(p_text), body_style))
+
+        table_data = sec.get("table")
+        if table_data and "headers" in table_data and "rows" in table_data:
+            headers = [Paragraph(_clean_pdf_text(h), header_cell_style) for h in table_data["headers"]]
+            t_rows = [headers]
+            for row in table_data["rows"]:
+                t_rows.append([Paragraph(_clean_pdf_text(cell), cell_style) for cell in row])
+
+            col_count = len(table_data["headers"])
+            col_width = (letter[0] - 80) / max(col_count, 1)
+            t = Table(t_rows, colWidths=[col_width] * col_count)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E79')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#D0D0D0')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
+            ]))
+            story.append(Spacer(1, 4))
+            story.append(t)
+            story.append(Spacer(1, 6))
+
+        story.append(Spacer(1, 6))
+
+    doc.build(story)
+
+
+def render_document_page_to_image(
+    doc_path: Path,
+    dest_image_path: Path,
+    page_number: int = 1,
+    image_format: str = "png",
+    dpi: int = 150
+) -> Path:
+    """Renders a single page of a PDF or spreadsheet document to a PNG or JPEG image file."""
+    if not doc_path.exists():
+        raise FileNotFoundError(f"Source document '{doc_path}' does not exist.")
+
+    dest_image_path.parent.mkdir(parents=True, exist_ok=True)
+    suffix = doc_path.suffix.lower()
+
+    if suffix in [".xlsx", ".xls"]:
+        import openpyxl
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        wb = openpyxl.load_workbook(str(doc_path), data_only=True)
+        try:
+            sheet_names = wb.sheetnames
+            if not sheet_names:
+                raise ValueError(f"Workbook '{doc_path.name}' contains no sheets.")
+            sheet_idx = max(0, min(page_number - 1, len(sheet_names) - 1))
+            sheet = wb[sheet_names[sheet_idx]]
+
+            raw_rows = list(sheet.iter_rows(values_only=True))
+            if not raw_rows:
+                raw_rows = [["(Empty Sheet)"]]
+
+            table_data = []
+            for r in raw_rows[:25]:
+                row_cells = [str(c) if c is not None else "" for c in r[:10]]
+                table_data.append(row_cells)
+
+            fig, ax = plt.subplots(figsize=(12, 7), dpi=dpi)
+            ax.axis("off")
+            ax.axis("tight")
+
+            headers = [str(h) for h in table_data[0]]
+            data_rows = table_data[1:] if len(table_data) > 1 else [[""] * len(headers)]
+
+            table = ax.table(cellText=data_rows, colLabels=headers, loc="center", cellLoc="center")
+            table.auto_set_font_size(False)
+            table.set_fontsize(9)
+            table.scale(1.2, 1.2)
+            ax.set_title(f"{doc_path.name} — Sheet: {sheet_names[sheet_idx]}", fontsize=12, pad=12, weight="bold")
+
+            plt.tight_layout()
+            save_fmt = "jpeg" if image_format.lower() in ["jpg", "jpeg"] else "png"
+            fig.savefig(str(dest_image_path), format=save_fmt, bbox_inches="tight")
+            plt.close(fig)
+            return dest_image_path
+        finally:
+            wb.close()
+
+    elif suffix == ".csv":
+        import pandas as pd
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        df = pd.read_csv(doc_path)
+        fig, ax = plt.subplots(figsize=(12, 7), dpi=dpi)
+        ax.axis("off")
+        ax.axis("tight")
+
+        headers = list(df.columns)[:10]
+        data_rows = [[str(c) if pd.notna(c) else "" for c in r] for r in df.head(25).values[:, :10]]
+
+        table = ax.table(cellText=data_rows, colLabels=headers, loc="center", cellLoc="center")
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1.2, 1.2)
+        ax.set_title(f"{doc_path.name} — Top 25 Rows", fontsize=12, pad=12, weight="bold")
+
+        plt.tight_layout()
+        save_fmt = "jpeg" if image_format.lower() in ["jpg", "jpeg"] else "png"
+        fig.savefig(str(dest_image_path), format=save_fmt, bbox_inches="tight")
+        plt.close(fig)
+        return dest_image_path
+
+    else:
+        import fitz
+        doc = fitz.open(str(doc_path))
+        try:
+            total_pages = len(doc)
+            if total_pages == 0:
+                raise ValueError(f"Document '{doc_path.name}' contains zero pages.")
+            target_idx = max(0, min(page_number - 1, total_pages - 1))
+            page = doc.load_page(target_idx)
+            zoom = dpi / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            if image_format.lower() in ["jpg", "jpeg"]:
+                pix.save(str(dest_image_path), output="jpeg")
+            else:
+                pix.save(str(dest_image_path), output="png")
+            return dest_image_path
+        finally:
+            doc.close()
+
+
 async def create_and_register_artifact(
     workspace_id: int,
     filename: str,
@@ -271,9 +507,9 @@ async def create_and_register_artifact(
     temp_path = temp_dir / temp_filename
 
     try:
-        generator_fn(temp_path)
+        await asyncio.to_thread(generator_fn, temp_path)
 
-        val_result = validate_artifact_structure(temp_path, artifact_type)
+        val_result = await asyncio.to_thread(validate_artifact_structure, temp_path, artifact_type)
         if not val_result.valid:
             raise RuntimeError(f"Structural artifact validation failed: {val_result.error_message}")
 
@@ -305,6 +541,27 @@ async def create_and_register_artifact(
                 )
                 row = await cursor.fetchone()
                 await db.commit()
+
+                if row and run_id:
+                    try:
+                        from cognishift.core.notifications import (
+                            collect_artifact_evidence,
+                            fire_and_forget_notification,
+                        )
+                        run_info = await (await db.execute("SELECT user_id FROM agent_runs WHERE id = ?", (run_id,))).fetchone()
+                        run_user = run_info["user_id"] if run_info else "operator"
+                        art_ev = collect_artifact_evidence(
+                            run_id=run_id,
+                            workspace_id=workspace_id,
+                            user_id=run_user,
+                            artifact_id=row["id"],
+                            artifact_name=filename,
+                            artifact_path=target_rel_path,
+                        )
+                        fire_and_forget_notification(art_ev)
+                    except Exception:
+                        pass
+
                 return dict(row)
         except Exception as db_err:
             if final_path.exists():
@@ -320,3 +577,135 @@ async def create_and_register_artifact(
                 temp_path.unlink()
             except Exception:
                 pass
+
+
+def generate_work_permit_docx(dest_path: Path, permit_data: Dict[str, Any]) -> None:
+    """Generate official DOCX temporary operational work permit."""
+    doc = docx.Document()
+    
+    title_p = doc.add_heading("COGNISHIFT SOVEREIGN INDUSTRIAL WORKBENCH", level=0)
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    sub_p = doc.add_paragraph()
+    run = sub_p.add_run("OFFICIAL TEMPORARY OPERATIONAL WORK PERMIT")
+    run.font.size = Pt(13)
+    run.font.bold = True
+    sub_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    disclaimer_p = doc.add_paragraph()
+    drun = disclaimer_p.add_run("[SIMULATED INDUSTRIAL ACTION - SIH FINALS PROTOTYPE]")
+    drun.font.size = Pt(10)
+    drun.font.bold = True
+    drun.font.italic = True
+    disclaimer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # Section 1: Permit Details Table
+    doc.add_heading("1. Authorization Parameters & Operational Scope", level=1)
+    
+    table_data = [
+        ["Permit Document Code", permit_data.get("permit_code", "N/A")],
+        ["Authorized User (Operator)", permit_data.get("user_id", "N/A")],
+        ["Target Asset / Equipment", permit_data.get("resource", "N/A")],
+        ["Permitted Operational Action", permit_data.get("action", "N/A")],
+        ["Maximum Permitted Uses", str(permit_data.get("max_uses", 1))],
+        ["Current Permit Status", permit_data.get("status", "ACTIVE")],
+        ["Valid Window (Start UTC)", permit_data.get("valid_from", "N/A")],
+        ["Valid Window (Expiry UTC)", permit_data.get("expires_at", "N/A")],
+        ["Device Identity Binding", permit_data.get("trusted_device_id") or "Enclave Default (Unbound)"],
+    ]
+
+    t1 = doc.add_table(rows=len(table_data), cols=2)
+    t1.style = "Table Grid"
+    for r_idx, (col1, col2) in enumerate(table_data):
+        c1 = t1.cell(r_idx, 0)
+        c2 = t1.cell(r_idx, 1)
+        c1.text = col1
+        c2.text = col2
+        for p in c1.paragraphs:
+            for r in p.runs:
+                r.font.bold = True
+
+    doc.add_paragraph()
+
+    # Section 2: Dual Supervisor Governance
+    doc.add_heading("2. Four-Eyes Governance Sign-offs", level=1)
+    doc.add_paragraph(
+        "In accordance with OISD-STD-240 and CogniShift sovereign governance, this permit requires two independent "
+        "authenticated supervisor approvals prior to operational execution:"
+    )
+
+    sup1 = permit_data.get("first_approver", "N/A")
+    sup1_at = permit_data.get("first_approved_at", "N/A")
+    sup2 = permit_data.get("second_approver", "N/A")
+    sup2_at = permit_data.get("second_approved_at", "N/A")
+
+    t2 = doc.add_table(rows=3, cols=3)
+    t2.style = "Table Grid"
+    headers = ["Approval Stage", "Authenticated Supervisor", "Verification Timestamp"]
+    for c_idx, h in enumerate(headers):
+        cell = t2.cell(0, c_idx)
+        cell.text = h
+        for p in cell.paragraphs:
+            for r in p.runs:
+                r.font.bold = True
+    
+    t2.cell(1, 0).text = "Supervisor Approval 1"
+    t2.cell(1, 1).text = f"{sup1} (Authenticated)"
+    t2.cell(1, 2).text = str(sup1_at)
+
+    t2.cell(2, 0).text = "Supervisor Approval 2"
+    t2.cell(2, 1).text = f"{sup2} (Authenticated)"
+    t2.cell(2, 2).text = str(sup2_at)
+
+    doc.add_paragraph()
+
+    # Section 3: Mandatory Safety Interlocks
+    doc.add_heading("3. Mandatory Safety Interlocks & Audit Requirements", level=1)
+    doc.add_paragraph(
+        "• Suction and discharge isolation valves must be in verified positions prior to energization.\n"
+        "• High pressure trip threshold: 450.0 PSI (MAWP 500.0 PSI). Temperature trip: 95.0 C.\n"
+        "• Single-use permit: this authorization is atomically consumed upon first execution.\n"
+        "• Subsequent execution attempts with this permit code will be intercepted and rejected with 403 AUTHORIZATION_CONSUMED."
+    )
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(dest_path))
+
+
+async def generate_and_register_permit_artifact(
+    workspace_id: int,
+    permit_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Generate and register the official work permit DOCX artifact."""
+    permit_code = permit_data.get("permit_code", "PERMIT")
+    filename = f"Work_Permit_{permit_code}.docx"
+    title = f"Operational Work Permit: {permit_code}"
+    description = (
+        f"Official temporary work permit authorizing {permit_data.get('user_id')} "
+        f"for action '{permit_data.get('action')}' on asset '{permit_data.get('resource')}'. "
+        f"Verified by two independent authenticated supervisor approvals."
+    )
+
+    def _gen(dest_path: Path):
+        generate_work_permit_docx(dest_path, permit_data)
+
+    artifact_record = await create_and_register_artifact(
+        workspace_id=workspace_id,
+        filename=filename,
+        artifact_type="docx",
+        title=title,
+        description=description,
+        generator_fn=_gen,
+        metadata={
+            "permit_code": permit_code,
+            "user_id": permit_data.get("user_id"),
+            "resource": permit_data.get("resource"),
+            "action": permit_data.get("action"),
+            "status": permit_data.get("status"),
+            "simulation": True,
+        },
+    )
+    return artifact_record
+

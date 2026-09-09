@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { AppearanceMenu } from "@/components/AppearanceMenu";
 import { MotionEffects } from "@/components/MotionEffects";
+
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBeacon } from "@/components/StatusBeacon";
 import { WorkspacePicker } from "@/components/WorkspacePicker";
@@ -32,7 +33,7 @@ export function AppShell() {
 
   const sovereigntyTone = sovereignty?.sovereignty_enforced ? "success" : "warning";
   const sovereigntyLabel = sovereignty?.sovereignty_enforced
-    ? "AIRGAP ISOLATED"
+    ? "SOVEREIGN POLICY ACTIVE"
     : sovereignty
     ? "PUBLIC EGRESS ALLOWED"
     : "SOVEREIGNTY UNKNOWN";
@@ -41,6 +42,7 @@ export function AppShell() {
     <div className="flex h-screen overflow-hidden bg-transparent text-ink-1">
       {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-surface-border bg-surface-2/80 backdrop-blur-md lg:flex">
+
         <Brand />
         <Sidebar />
       </aside>

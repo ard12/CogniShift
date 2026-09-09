@@ -1,9 +1,45 @@
-"""Hardware-Aware Dynamic Model Router for CogniShift."""
+import time
+import os
 import re
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 from cognishift.core.model_registry import list_models, ModelDefinition
+
+
+class LocalModelInventoryUnavailableError(Exception):
+    """Raised when local Ollama model inventory cannot be verified and no valid cache exists."""
+    pass
+
+
+_VERIFIED_INVENTORY_CACHE: Optional[List[str]] = None
+_VERIFIED_INVENTORY_TIMESTAMP: float = 0.0
+_INVENTORY_CACHE_TTL_SECONDS: float = 300.0
+
+
+def update_verified_inventory_cache(exact_tags: List[str], verified_at: Optional[float] = None) -> None:
+    """Updates the verified local model inventory cache with exact tags and current timestamp."""
+    global _VERIFIED_INVENTORY_CACHE, _VERIFIED_INVENTORY_TIMESTAMP
+    _VERIFIED_INVENTORY_CACHE = [str(t).strip() for t in exact_tags if str(t).strip()]
+    _VERIFIED_INVENTORY_TIMESTAMP = verified_at if verified_at is not None else time.monotonic()
+
+
+def get_verified_inventory_cache() -> Optional[List[str]]:
+    """Returns the cached model inventory if still within the 300-second TTL."""
+    global _VERIFIED_INVENTORY_CACHE, _VERIFIED_INVENTORY_TIMESTAMP
+    if _VERIFIED_INVENTORY_CACHE is None:
+        return None
+    age = time.monotonic() - _VERIFIED_INVENTORY_TIMESTAMP
+    if age > _INVENTORY_CACHE_TTL_SECONDS:
+        return None
+    return list(_VERIFIED_INVENTORY_CACHE)
+
+
+def clear_verified_inventory_cache() -> None:
+    """Clears the verified local model inventory cache (used in testing)."""
+    global _VERIFIED_INVENTORY_CACHE, _VERIFIED_INVENTORY_TIMESTAMP
+    _VERIFIED_INVENTORY_CACHE = None
+    _VERIFIED_INVENTORY_TIMESTAMP = 0.0
 
 
 class TaskClassification(BaseModel):
@@ -50,8 +86,17 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.95
         )
 
+    # Detect conversational or informational inquiries about artifacts, data, or files
+    is_inquiry = any(p in text for p in [
+        "tell me about", "what is", "explain", "describe", "what's in", 
+        "summary of", "can you check", "analyze the file", "summarize",
+        "how does", "what does", "overview", "details of"
+    ])
+
     # 2. Autonomous Coding & Debugging Tasks
-    if any(w in text for w in ["python", "script", "program", "code", "csv", "dataframe", "debug", "compile", "execute"]):
+    # Active coding requests involve writing, modifying, debugging, or compiling code/scripts
+    coding_triggers = ["python", "script", "program", "code", "dataframe", "debug", "compile", "execute"]
+    if not is_inquiry and any(w in text for w in coding_triggers):
         return TaskClassification(
             task_type="coding",
             required_capabilities=["coding", "structured_data"],
@@ -59,8 +104,27 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.92
         )
 
-    # 3. Document Analysis & Technical Manual Interpretation
-    if any(w in text for w in ["sop", "manual", "inspection report", "oisd", "standard", "procedure", "guideline"]):
+    # 3. Heavy Reasoning, Root Cause Analysis (RCA) & Complex Incident Diagnostics
+    heavy_reasoning_triggers = [
+        "root cause", "rca", "failure investigation", "investigate failure",
+        "incident investigation", "hazop", "hazard analysis", "deep reasoning",
+        "chain of thought", "step-by-step reasoning", "cascading failure",
+        "complex diagnosis", "troubleshoot complex", "why did it fail", "why did the system trip"
+    ]
+    if any(trigger in text for trigger in heavy_reasoning_triggers):
+        return TaskClassification(
+            task_type="heavy_reasoning",
+            required_capabilities=["heavy_reasoning", "reasoning"],
+            requires_vision=False,
+            confidence=0.95
+        )
+
+    # 4. Document Analysis & Technical Manual / Artifact Interpretation
+    if any(w in text for w in [
+        "sop", "manual", "inspection report", "oisd", "standard", "procedure", 
+        "guideline", ".csv", ".pdf", ".txt", ".json", ".yaml", ".log", "report", 
+        "document", "artifact", "file", "readings", "csv"
+    ]):
         return TaskClassification(
             task_type="document_analysis",
             required_capabilities=["document_analysis", "reasoning"],
@@ -68,7 +132,7 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
             confidence=0.88
         )
 
-    # 4. Default: General Industrial Reasoning
+    # 5. Default: General Industrial Reasoning
     return TaskClassification(
         task_type="general_reasoning",
         required_capabilities=["reasoning"],
@@ -80,49 +144,104 @@ def classify_task(prompt: str, has_image: bool = False) -> TaskClassification:
 def route_model(
     task: TaskClassification,
     available_vram_mb: int = 6000,
-    preferred_model: Optional[str] = None
+    preferred_model: Optional[str] = None,
+    installed_models: Optional[List[str]] = None,
+    require_verified_inventory: bool = False
 ) -> RoutingDecision:
     """
     Hardware-aware model selection algorithm.
-    Filters candidate models by VRAM feasibility and scores capability match.
+    Filters candidate models by local installation availability, VRAM feasibility, and scores capability match.
     """
+    from cognishift.app.config import settings
+
+    if installed_models is None:
+        if require_verified_inventory:
+            cached = get_verified_inventory_cache()
+            if cached is not None:
+                installed_models = cached
+            elif settings.operating_mode != "simulated" and not os.environ.get("PYTEST_CURRENT_TEST"):
+                raise LocalModelInventoryUnavailableError(
+                    "Local model inventory is unavailable: Ollama /api/tags failed or not queried, "
+                    "and no verified cache within 300s TTL exists."
+                )
+
     candidates = list_models(enabled_only=True)
     evaluations: Dict[str, RoutingCandidateEvaluation] = {}
     
+    # Exact tag matching helper
+    def _is_installed(mid: str) -> bool:
+        if installed_models is None:
+            return True
+        mid_clean = mid.strip().lower()
+        inst_clean = [m.strip().lower() for m in installed_models]
+        if mid_clean in inst_clean:
+            return True
+        if ":" not in mid_clean and f"{mid_clean}:latest" in inst_clean:
+            return True
+        if mid_clean.endswith(":latest") and mid_clean[:-7] in inst_clean:
+            return True
+        return False
+
     best_candidate: Optional[ModelDefinition] = None
     highest_score = -1.0
     
     for model in candidates:
+        # Local Installation Availability check (strict exact tag matching)
+        is_installed = _is_installed(model.model_identifier)
+
         # VRAM Feasibility
         is_vram_feasible = model.vram_requirement_mb <= available_vram_mb
         
-        # Vision constraint
-        has_vision_capability = True
-        if task.requires_vision and not model.supports_images:
-            has_vision_capability = False
-            
+        # Vision constraint:
+        if task.requires_vision:
+            has_vision_capability = model.supports_images or "vision" in model.capabilities
+        else:
+            has_vision_capability = True
+
         # Capability overlap calculation
         required_set = set(task.required_capabilities)
         model_set = set(model.capabilities)
         overlap = len(required_set.intersection(model_set))
-        cap_ratio = overlap / len(required_set) if required_set else 0.5
-        
+        cap_ratio = overlap / max(1, len(required_set))
+
+        # Specialist bonus for dedicated domain specialists
+        specialist_bonus = 0.0
+        m_id_lower = model.model_identifier.lower()
+        if task.task_type == "coding":
+            if "coder" in m_id_lower:
+                specialist_bonus = 0.25
+        elif task.task_type == "heavy_reasoning":
+            if "deepseek" in m_id_lower or "r1" in m_id_lower:
+                specialist_bonus = 0.25
+        elif task.task_type == "vision_inspection":
+            if "moondream" in m_id_lower:
+                specialist_bonus = 0.25
+
+        # Preference bonus if user or agent specified preferred model (tie-breaker only, cannot override specialist)
+        pref_bonus = 0.005 if (preferred_model and model.model_identifier == preferred_model) else 0.0
+
         # Composite score
         composite_score = (
             cap_ratio * 0.70 +
             model.quality_score * 0.20 +
-            model.latency_score * 0.10
+            model.latency_score * 0.10 +
+            specialist_bonus +
+            pref_bonus
         )
-        
-        eligible = is_vram_feasible and has_vision_capability and (overlap > 0 or not task.requires_vision)
-        
+
+        # Candidate must have >0 capability overlap to be normally eligible
+        has_capability_overlap = (overlap > 0)
+        eligible = is_installed and is_vram_feasible and has_vision_capability and has_capability_overlap
+
         rationale = "Eligible candidate"
-        if not is_vram_feasible:
+        if not is_installed:
+            rationale = "Excluded (Model not installed on local sovereign runtime)"
+        elif not is_vram_feasible:
             rationale = f"Infeasible (Requires {model.vram_requirement_mb}MB, VRAM budget is {available_vram_mb}MB)"
         elif not has_vision_capability:
-            rationale = "Excluded (Task requires vision modality, model is text-only)"
-        elif overlap == 0:
-            rationale = "Low suitability (0 matching capabilities)"
+            rationale = "Excluded (Task requires vision capability, model lacks vision)"
+        elif not has_capability_overlap:
+            rationale = "Excluded (Zero overlap with required capabilities)"
         else:
             rationale = f"Capability match: {overlap}/{len(required_set)} ({composite_score:.2f})"
             
@@ -143,12 +262,15 @@ def route_model(
 
     # Fallback to general model if no candidate matched
     if not best_candidate:
-        best_candidate = candidates[0] if candidates else ModelDefinition(
+        installed_candidates = [
+            m for m in candidates if _is_installed(m.model_identifier)
+        ] if candidates else []
+        best_candidate = installed_candidates[0] if installed_candidates else (candidates[0] if candidates else ModelDefinition(
             id="llama3.2:3b",
             name="llama3.2:3b",
             display_name="Fallback Model",
             model_identifier="llama3.2:3b"
-        )
+        ))
         selection_reason = "Fallback model selected (No optimal candidate satisfied all constraints)"
     else:
         selection_reason = f"Highest capability match ({highest_score:.2f}) among hardware-feasible local models"

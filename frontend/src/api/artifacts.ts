@@ -1,6 +1,6 @@
-import { apiFetch, ApiError } from "./clients";
-import { getStoredToken } from "@/lib/token-storage";
+import { apiFetch, buildUrl, authHeader, ApiError } from "./clients";
 import type { Artifact, ArtifactListResponse } from "@/types";
+import { getDeviceSession } from "@/lib/device-identity";
 
 const PATHS = {
   list: (workspaceId: number) => `/api/v1/workspaces/${workspaceId}/artifacts`,
@@ -20,14 +20,16 @@ export const artifactsApi = {
   /**
    * Triggers a browser download of the artifact. The download endpoint is a
    * plain authenticated GET returning a file stream, so we fetch it with the
-   * bearer token attached and hand the browser a blob URL rather than
-   * navigating directly (a raw <a href> would not carry the Authorization
-   * header) or parsing the response as JSON.
+   * bearer token and trusted-device proof attached, then hand the browser a
+   * blob URL. A raw navigation cannot carry either required custom header.
    */
   async download(workspaceId: number, artifactId: number, filename: string): Promise<void> {
-    const token = getStoredToken();
-    const res = await fetch(PATHS.download(workspaceId, artifactId), {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    const deviceSession = getDeviceSession();
+    const res = await fetch(buildUrl(PATHS.download(workspaceId, artifactId)), {
+      headers: {
+        ...authHeader(),
+        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+      },
     });
     if (!res.ok) {
       let detail: unknown;
@@ -46,6 +48,25 @@ export const artifactsApi = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
+
+  /**
+   * Fetches an artifact blob with bearer and device authentication and returns
+   * a temporary object URL that can be used as an <img src> or iframe source.
+   */
+  async getBlobUrl(workspaceId: number, artifactId: number): Promise<string> {
+    const deviceSession = getDeviceSession();
+    const res = await fetch(buildUrl(PATHS.download(workspaceId, artifactId)), {
+      headers: {
+        ...authHeader(),
+        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+      },
+    });
+    if (!res.ok) {
+      throw new ApiError(`Failed to fetch artifact blob (${res.status})`, res.status);
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
   },
 };

@@ -1,0 +1,43 @@
+MANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL)
+STANDARD OPERATING PROCEDURE: K-101 CENTRIFUGAL RECYCLE GAS COMPRESSOR
+DOCUMENT ID: SOP-MRPL-K101-REV-04 | CLASSIFICATION: RESTRICTED / PLANT OPERATIONS
+
+1. EQUIPMENT DESCRIPTION & OPERATIONAL ENVELOPE:
+Compressor K-101 is a multi-stage centrifugal recycle gas compressor driven by a 4,200 kW, 6.6 kV electric motor (M-101).
+Service: Recycle Gas (High Pressure Hydrogen-rich gas).
+Normal Suction Pressure: 30.0 to 35.0 bar(g) (Nominal: 32.5 bar).
+Normal Discharge Pressure: 64.0 to 70.0 bar(g) (Nominal: 68.2 bar).
+Maximum Working Pressure: 78.0 bar(g).
+Normal Operating Speed: 10,800 to 11,400 RPM (Design: 11,200 RPM).
+Radial Vibration Limit: Normal 1.2-2.8 mm/s RMS, Warning > 3.5 mm/s, Trip > 4.5 mm/s.
+Bearing Temperature DE (TT-204): Normal 72.0-88.0 °C, Warning > 90.0 °C, Trip > 95.0 °C.
+Lube Oil Supply Pressure (PT-108): 4.6-5.4 bar(g), Trip < 3.2 bar(g).
+Dry Gas Seal Differential (PDIT-101): Normal 3.8-4.8 bar delta, Trip < 2.8 bar delta.
+
+2. PRE-STARTUP VERIFICATION & PERMITTING:
+- Ensure auxiliary lube oil pump is running and lube oil temperature is between 38°C and 45°C.
+- Confirm seal gas differential pressure (PDIT-101) exceeds 3.5 bar delta across all seals.
+- Confirm motor-operated suction isolation valve MOV-101 is in remote-auto mode, fully stroked, and confirmed OPEN.
+- Verify cooling water flow is verified at nominal 120 m3/h.
+- Confirm all 14 safety trip channels report HEALTHY on the ESD-101 Safety Instrumented System.
+
+3. FOUR-EYES AUTHORIZATION & HIGH-RISK ACTIONS:
+In compliance with SIH-26117 air-gapped industrial governance, any modification of operating parameters,
+service restart, or emergency bypass of compressor K-101 requires strict Human-in-the-Loop (HITL)
+Dual Supervisor Authorization (Four-Eyes Principle).
+Tool 'restart_service' for K-101 or M-101 is classified as service_interrupting.
+Automated execution is strictly prevented; the permit must be signed by two independent credentialed supervisors
+(e.g., Vicky S. and Jane D.) before execution.
+
+4. EMERGENCY TRIP & FLARE VENTING:
+In the event of uncontrolled vibration (> 4.5 mm/s RMS) or loss of seal gas differential (< 2.8 bar delta):
+1. Breaker 52-K101 opens in under 40 milliseconds, cutting 6.6 kV feed to drive motor M-101.
+2. Suction isolation valve MOV-101 closes immediately with a stroke time under 6.0 seconds.
+3. Fast-acting depressurization valve XV-101 actuates to vent compressor gas to the Flare-Header.
+4. Emergency nitrogen sweep valve XV-105 opens to dilute hydrocarbon concentrations below LEL.
+
+5. TROUBLESHOOTING MATRIX:
+- Vibration excursion on DE (> 3.8 mm/s): Liquid carryover into 1st stage impeller. Check KO drum LT-104.
+- Bearing temp DE rising (> 90.0 °C): Lube oil cooler fouled or low flow. Switch filter basket, increase cooling water.
+- Seal gas DP dropping (< 3.2 bar delta): Primary vent restriction or booster failure. Verify N2 backup manifold.
+- MOV-101 fails to reach closed state: Torque limit trip or mechanical obstruction. Engage manual handwheel declutch.

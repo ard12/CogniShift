@@ -26,7 +26,7 @@ def extract_native_page(doc: pymupdf.Document, page_number: int) -> Tuple[str, i
     page = doc[page_idx]
     
     try:
-        text = page.get_text("text") or ""
+        text = page.get_text("text", sort=True) or ""
         images = page.get_images()
         image_count = len(images) if images else 0
         return text, image_count

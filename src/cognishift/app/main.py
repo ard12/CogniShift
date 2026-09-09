@@ -8,7 +8,7 @@ import logging
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse, Response
 from cognishift.app.config import settings, PROJECT_ROOT
 from cognishift.core.network.client import get_sovereign_async_client
 from cognishift import __version__
@@ -137,13 +137,12 @@ app.add_middleware(
         "http://127.0.0.1:8000",
         "https://localhost:8443",
         "https://127.0.0.1:8443",
-        "https://10.10.182.228:8443",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?",
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -211,6 +210,20 @@ if vite_dist_dir.exists() and (vite_dist_dir / "index.html").exists():
     @app.get("/")
     async def root_spa():
         return FileResponse(str(vite_dist_dir / "index.html"))
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def favicon_svg():
+        favicon = vite_dist_dir / "favicon.svg"
+        if favicon.exists():
+            return FileResponse(str(favicon), media_type="image/svg+xml")
+        return Response(status_code=404)
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon_ico():
+        favicon = vite_dist_dir / "favicon.svg"
+        if favicon.exists():
+            return FileResponse(str(favicon), media_type="image/svg+xml")
+        return Response(status_code=404)
 
 elif legacy_static_dir.exists() and (legacy_static_dir / "index.html").exists():
     app.mount("/static", StaticFiles(directory=str(legacy_static_dir)), name="static")

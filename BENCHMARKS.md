@@ -1,6 +1,11 @@
 # CogniShift: System Benchmark & Verification Report
 
+> [!NOTE]
+> **Benchmarking Notice:** Real-data benchmarking is paused until after SIH demo workflow validation. No benchmark results are currently claimed. The measurements below reflect synthetic development fixture execution.
+
 Technical benchmark results and empirical validation of the local on-premise workbench.
+
+**Validation refresh:** 2026-09-04. Current non-frontend regression result: 219 passed, 0 failed, 0 skipped. Test persistence is isolated from live demo data.
 
 **Test Environment:**
 * Operating System: Windows 11
@@ -93,7 +98,7 @@ Evaluated via the Phase 6 test suite (`tests/test_phase6_*.py`):
 | **Observer Workflow Check** | Active Ollama inference & embedding generation | Pass | 0 unauthorized connections |
 | **Frontend Static Scan** | Inspection of index.html & static CSS | Pass | 0 external CDN links |
 
-Total Repository Automated Tests: **196 passed**, 0 failed, 0 skipped.
+Total Non-Frontend Automated Tests: **219 passed**, 0 failed, 0 skipped. The complete local working tree, including frontend-only checks, has 226 passing tests.
 
 ---
 
@@ -117,4 +122,4 @@ Measured via static analysis and test suite execution:
 * **Simulated Plant Environment:** SCADA telemetry streams and SAP PM maintenance orders are synthetic test datasets, not live plant systems.
 * **Handwriting:** Handwritten notes are parsed on a best-effort basis. Where OCR confidence is low, uncertainty is preserved.
 * **Model Size:** Local inference uses compact open-weight models (3B parameter LLM, 1.86B parameter VLM) to run on consumer-grade hardware. Complex reasoning can require prompt guidance.
-* **Network Boundaries:** Phase 6 network policy and sovereignty enforcement is complete and verified with 196 tests passing.
+* **Network Boundaries:** Network policy and sovereignty enforcement are complete and verified within the 219-test non-frontend regression suite.

@@ -140,6 +140,22 @@ export interface Run {
   started_at: IsoDateTime;
   completed_at?: IsoDateTime | null;
   error_message?: string | null;
+  routing_info?: Record<string, unknown> | null;
+  structured_plan?: string | null;
+}
+
+export interface PlanStep {
+  index: number;
+  title: string;
+  description?: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  duration_ms?: number;
+}
+
+export interface StructuredPlan {
+  goal?: string;
+  intent?: string;
+  steps: PlanStep[];
 }
 
 export interface RunEvent {
@@ -157,6 +173,21 @@ export interface RunCreateRequest {
   input_text?: string;
   input_type?: string;
   input_image_path?: string | null;
+  conversation_history?: Array<{ role: string; content: string; timestamp?: string }>;
+}
+
+export interface RunFlowStage {
+  key: string;
+  label: string;
+  value: string;
+  detail?: string | null;
+  status: "complete" | "warning" | "unavailable";
+}
+
+export interface RunStatusSummary {
+  run_id: ID;
+  run_status: string;
+  stages: RunFlowStage[];
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +206,10 @@ export interface Approval {
   risk_level?: string | null;
   requested_at: IsoDateTime;
   reviewed_by?: string | null;
+  reviewed_by_2?: string | null;
   reviewed_at?: IsoDateTime | null;
+  reviewed_at_2?: string | null;
+  required_approvals?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,4 +300,23 @@ export interface NetworkEventsResponse {
   limit: number;
   offset: number;
   events: NetworkEvent[];
+}
+
+export interface SecurityDatum {
+  status: string;
+  label: string;
+  evidence?: string | null;
+}
+
+export interface SecurityStatus {
+  identity: SecurityDatum;
+  device: SecurityDatum;
+  workspace: SecurityDatum;
+  local_ai: SecurityDatum;
+  external_internet: SecurityDatum;
+  network_interface?: SecurityDatum;
+  docker_sandbox?: SecurityDatum;
+  sensitive_tools: SecurityDatum;
+  audit_logging: SecurityDatum;
+  trusted_device_enforcement: boolean;
 }

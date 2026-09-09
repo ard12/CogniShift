@@ -53,6 +53,23 @@ def ensure_simulated_mode(monkeypatch):
     monkeypatch.setattr(settings, "operating_mode", "simulated")
 
 
+@pytest.fixture(autouse=True)
+async def initialize_isolated_sandbox_database():
+    """Provide the minimum relational context without relying on live seed data."""
+    await init_db()
+    async with get_db() as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Sandbox Test', 'Isolated pytest workspace')"
+        )
+        await db.execute(
+            "INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name) VALUES (1, 1, 'Default Sandbox Agent')"
+        )
+        await db.execute(
+            "INSERT OR IGNORE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (10, 1, 1, 'completed', 'test_operator')"
+        )
+        await db.commit()
+
+
 # -----------------------------------------------------------------------------
 # 1. STRICT SCHEMA BOUNDS TESTS
 # -----------------------------------------------------------------------------
@@ -230,6 +247,29 @@ async def test_output_validation_rejects_executable_scripts(tmp_path):
     assert len(promoted_ids) == 1
 
 
+@pytest.mark.asyncio
+async def test_output_validation_enforces_aggregate_cap(tmp_path, monkeypatch):
+    from cognishift.app.config import settings
+    out_dir = tmp_path / "output"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(settings, "sandbox_max_output_aggregate_bytes", 100)
+
+    (out_dir / "file1.txt").write_text("A" * 60, encoding="utf-8")
+    (out_dir / "file2.txt").write_text("B" * 60, encoding="utf-8")
+
+    promoted_names, promoted_ids = await validate_and_promote_outputs(
+        workspace_id=1,
+        run_id=10,
+        execution_id="sbx_agg_cap",
+        output_dir=out_dir
+    )
+
+    assert len(promoted_names) == 1
+    assert len(promoted_ids) == 1
+    assert ("file1.txt" in promoted_names) ^ ("file2.txt" in promoted_names)
+
+
 # -----------------------------------------------------------------------------
 # 5. FAIL-CLOSED WHEN CONTAINER RUNTIME IS UNAVAILABLE
 # -----------------------------------------------------------------------------
@@ -292,6 +332,11 @@ async def test_execute_code_pauses_when_agent_requires_approval():
     await init_db()
     async with get_db() as db:
         await db.execute("""
+            INSERT OR REPLACE INTO tool_definitions
+            (id, name, description, risk_level, requires_approval, implementation_key)
+            VALUES (15, 'execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 0, 'execute_code')
+        """)
+        await db.execute("""
             INSERT OR REPLACE INTO agent_definitions 
             (id, workspace_id, name, model_name, allowed_tool_ids, approval_required, knowledge_source_ids)
             VALUES (96, 1, 'Supervised Coding Agent', 'llama3.2:3b', '[15]', 1, '[]')
@@ -325,6 +370,11 @@ async def test_execute_code_pauses_when_agent_requires_approval():
 async def test_coding_agent_retry_loop_bounded():
     await init_db()
     async with get_db() as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO tool_definitions
+            (id, name, description, risk_level, requires_approval, implementation_key)
+            VALUES (15, 'execute_code', 'Execute Python Code in Isolated Sandbox', 'sensitive', 0, 'execute_code')
+        """)
         await db.execute("""
             INSERT OR REPLACE INTO agent_definitions 
             (id, workspace_id, name, model_name, allowed_tool_ids, approval_required, knowledge_source_ids)

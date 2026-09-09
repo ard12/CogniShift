@@ -460,14 +460,15 @@ export function OperatorPage() {
     const dispatchPromise = (async () => {
       let inputImagePath: string | null = null;
       let attachedSourceName: string | null = null;
-      if (currentImageFile) {
+      const imageFile = currentImageFile;
+      if (imageFile) {
         setDispatchStage("Ingesting attached file through the knowledge pipeline…");
-        const source = await knowledgeApi.upload(currentImageFile, currentWorkspaceId);
-        const isImage = currentImageFile.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(currentImageFile.name);
+        const source = await knowledgeApi.upload(imageFile, currentWorkspaceId);
+        const isImage = imageFile.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(imageFile.name);
         if (isImage) {
           inputImagePath = source.local_path ?? null;
         } else {
-          attachedSourceName = source.original_filename ?? source.name ?? currentImageFile.name;
+          attachedSourceName = source.original_filename ?? source.name ?? imageFile.name;
         }
       }
 

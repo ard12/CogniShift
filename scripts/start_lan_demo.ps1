@@ -28,7 +28,7 @@ if ($occupied) {
     Write-Host "PROCESS:      $procName" -ForegroundColor Yellow
     Write-Host "COMMAND LINE: $cmdLine" -ForegroundColor Gray
 
-    if ($cmdLine -notlike "*cognishift.app.main:app*") {
+    if ($cmdLine -notlike "*cognishift.app.main:app*" -and $cmdLine -notlike "*run_tls_server*") {
         Write-Error "Port $port is in use by an unrecognized process. Terminate it manually."
         exit 1
     }

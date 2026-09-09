@@ -301,6 +301,14 @@ _SPA_CLIENT_ROUTES = {
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_history_fallback(full_path: str):
+    if vite_dist_dir.exists():
+        try:
+            candidate = (vite_dist_dir / full_path).resolve()
+            if candidate.is_file() and str(candidate).startswith(str(vite_dist_dir.resolve())):
+                return FileResponse(str(candidate))
+        except (ValueError, OSError):
+            pass
+
     first_segment = full_path.strip("/").split("/", 1)[0]
     if (
         vite_dist_dir.exists()
@@ -309,3 +317,4 @@ async def spa_history_fallback(full_path: str):
     ):
         return FileResponse(str(vite_dist_dir / "index.html"))
     raise HTTPException(status_code=404, detail="Not Found")
+

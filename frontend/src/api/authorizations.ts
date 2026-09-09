@@ -75,7 +75,7 @@ export const authorizationsApi = {
   create: (payload: CreatePermitPayload) =>
     apiFetch<TemporaryPermit>("/api/v1/authorizations", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: payload as unknown as Record<string, unknown>,
     }),
   list: (workspaceId?: number, statusFilter?: string) =>
     apiFetch<{ permits: TemporaryPermit[]; total: number }>("/api/v1/authorizations", {
@@ -91,16 +91,16 @@ export const authorizationsApi = {
   adminOverride: (permitId: number, justification: string) =>
     apiFetch<TemporaryPermit>(`/api/v1/authorizations/${permitId}/admin-override`, {
       method: "POST",
-      body: JSON.stringify({ justification }),
+      body: { justification },
     }),
   revoke: (permitId: number, reason?: string) =>
     apiFetch<TemporaryPermit>(`/api/v1/authorizations/${permitId}/revoke`, {
       method: "POST",
-      body: JSON.stringify({ reason }),
+      body: { reason },
     }),
   execute: (payload: ExecutePermitPayload) =>
     apiFetch<ExecutionResult>("/api/v1/authorizations/execute", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: payload as unknown as Record<string, unknown>,
     }),
 };

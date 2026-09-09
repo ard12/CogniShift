@@ -62,6 +62,16 @@ async function parseErrorBody(res: Response): Promise<{ message: string; detail?
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const { message, detail } = await parseErrorBody(res);
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent("cognishift:auth-unauthorized"));
+    } else if (
+      res.status === 403 &&
+      typeof detail === "object" &&
+      detail !== null &&
+      (detail as Record<string, unknown>).code === "UNKNOWN_DEVICE"
+    ) {
+      window.dispatchEvent(new CustomEvent("cognishift:auth-device-unverified", { detail }));
+    }
     throw new ApiError(message, res.status, detail);
   }
   if (res.status === 204) {
@@ -83,7 +93,7 @@ export interface RequestOptions {
   token?: string;
 }
 
-function buildUrl(path: string, query?: RequestOptions["query"]): string {
+export function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const url = new URL(BASE_URL + path, window.location.origin);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -97,12 +107,14 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
   return BASE_URL ? url.toString() : url.pathname + url.search;
 }
 
-function authHeader(token?: string): Record<string, string> {
+export function authHeader(token?: string): Record<string, string> {
   const effective = token ?? getStoredToken();
   const deviceSession = getDeviceSession();
+  const deviceId = typeof window !== "undefined" ? window.localStorage.getItem("cognishift_device_id") : null;
   return {
     ...(effective ? { Authorization: `Bearer ${effective}` } : {}),
     ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
+    ...(deviceId ? { "X-Device-ID": deviceId } : {}),
   };
 }
 

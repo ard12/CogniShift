@@ -255,7 +255,7 @@ async def retrieve_context(
         # Discard trivial or garbled fragments with insufficient substance (< 25 characters)
         if not doc or len(doc.strip()) < 25:
             continue
-        if dist is not None and dist > max_dist and dist <= 2.0:
+        if dist is not None and dist > max_dist:
             logger.info(f"Retriever discarded distant chunk: distance={dist:.4f} > {max_dist:.4f}")
             continue
 

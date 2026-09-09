@@ -74,16 +74,17 @@ class PendingTask(BaseModel):
 
 
 AFFIRMATION_PATTERNS = [
-    r"^\s*(?:yes|yea|yeah|yep|ok|okay|sure)\s*$",
-    r"\b(?:yes|yea|yeah|yep|ok|okay)\s+(?:do\s+it|go\s+ahead|proceed|run\s+it|generate\s+it|execute\s+it)\b",
+    r"^\s*(?:yes|yea|yeah|yep|ok|okay|sure|confirm|approved|authorized)\s*$",
+    r"\b(?:yes|yea|yeah|yep|ok|okay|sure|confirm)\s+(?:do\s+it|go\s+ahead|proceed|run\s+it|generate\s+it|execute\s+it)\b",
     r"\b(?:do\s+it|go\s+ahead|okay\s+go\s+ahead|proceed|do\s+that|run\s+it|generate\s+it|execute\s+it|please\s+proceed)\b",
-    r"\b(?:yea\s+do\s+it|yes\s+do\s+it|yes\s+please)\b"
+    r"\b(?:yea\s+do\s+it|yes\s+do\s+it|yes\s+please|confirm\s+and\s+execute|confirmed|approved)\b",
+    r"\b(?:no\s+problem|no\s+worries|no\s+issue|no\s+objection)\s*(?:,|\.|$|\s+(?:do\s+it|go\s+ahead|proceed|run\s+it|generate\s+it|execute\s+it|please\s+proceed))\b",
 ]
 
 CANCELLATION_PATTERNS = [
-    r"^\s*(?:cancel|stop|abort|never\s*mind|no)\s*$",
+    r"^\s*(?:cancel|stop|abort|never\s*mind|no|negative)\s*$",
     r"\b(?:don'?t\s+do\s+it|do\s+not\s+do\s+it|cancel\s+that|never\s*mind|just\s+explain\s+it\s+instead|do\s+not\s+execute|abort\s+it|stop\s+(?:the\s+)?task|stop\s+it)\b",
-    r"^\s*no\b"
+    r"^\s*no\b(?!\s+(?:problem|worries|issue|objection))\s*(?:,|\.|$|\s+(?:dont|don't|do\s+not|stop|cancel|abort|way|thanks|thank\s+you|never|negative))",
 ]
 
 

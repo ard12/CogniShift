@@ -82,10 +82,15 @@ def render_visualization(spec: VisualizationSpec, output_path: Path) -> Path:
                 linewidth=0.5
             )
 
-        ax.set_xticks(x_indices)
-        x_labels = [str(x) for x in x_vals]
-        rotation = 28 if (len(x_labels) > 6 or any(len(str(lbl)) > 8 for lbl in x_labels)) else 0
-        ax.set_xticklabels(x_labels, rotation=rotation, ha="right" if rotation else "center", fontsize=9, fontweight="medium")
+        if len(x_indices) > 15:
+            tick_indices = _tick_positions(len(x_indices))
+            ax.set_xticks(tick_indices)
+            ax.set_xticklabels([str(x_vals[i]) for i in tick_indices], rotation=35, ha="right", fontsize=8)
+        else:
+            ax.set_xticks(x_indices)
+            x_labels = [str(x) for x in x_vals]
+            rotation = 28 if (len(x_labels) > 6 or any(len(str(lbl)) > 8 for lbl in x_labels)) else 0
+            ax.set_xticklabels(x_labels, rotation=rotation, ha="right" if rotation else "center", fontsize=9, fontweight="medium")
         ax.grid(axis="y", linestyle=":", alpha=0.6, color="#BBBBBB")
 
     elif chart_type == ChartType.LINE:
@@ -133,18 +138,24 @@ def render_visualization(spec: VisualizationSpec, output_path: Path) -> Path:
         ax.grid(True, linestyle=":", alpha=0.6, color="#BBBBBB")
 
     elif chart_type == ChartType.PIE:
-        first_series_name = list(series_dict.keys())[0] if series_dict else "Data"
-        values = series_dict[first_series_name][:len(x_vals)]
-        labels = [str(x) for x in x_vals[:len(values)]]
-        ax.pie(
-            values,
-            labels=labels,
-            autopct="%1.1f%%",
-            startangle=140,
-            colors=[PALETTE[i % len(PALETTE)] for i in range(len(values))],
-            textprops={"fontsize": 9}
-        )
-        ax.axis("equal")
+        if not series_dict or not x_vals:
+            ax.text(0.5, 0.5, "No numeric series available for pie chart", ha="center", va="center")
+        else:
+            first_series_name = list(series_dict.keys())[0]
+            raw_values = series_dict[first_series_name][:len(x_vals)]
+            values = [max(0.0, float(v)) for v in raw_values]
+            if sum(values) <= 0:
+                values = [1.0] * len(values) if values else [1.0]
+            labels = [str(x) for x in x_vals[:len(values)]]
+            ax.pie(
+                values,
+                labels=labels,
+                autopct="%1.1f%%",
+                startangle=140,
+                colors=[PALETTE[i % len(PALETTE)] for i in range(len(values))],
+                textprops={"fontsize": 9}
+            )
+            ax.axis("equal")
 
     # Titles and labels
     ax.set_title(spec.title, fontsize=12, fontweight="bold", pad=14, color="#111111")

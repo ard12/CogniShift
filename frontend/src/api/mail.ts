@@ -1,6 +1,4 @@
-import { apiFetch, apiUpload, ApiError } from "./clients";
-import { getStoredToken } from "@/lib/token-storage";
-import { getDeviceSession } from "@/lib/device-identity";
+import { apiFetch, apiUpload, buildUrl, authHeader, ApiError } from "./clients";
 
 export interface MailAttachment {
   id: number;
@@ -130,13 +128,8 @@ export const mailApi = {
   downloadAttachmentUrl: (alertId: number, attachmentId: number) =>
     `/api/v1/mail/${alertId}/attachments/${attachmentId}`,
   async downloadAttachment(alertId: number, attachmentId: number, filename: string): Promise<void> {
-    const token = getStoredToken();
-    const deviceSession = getDeviceSession();
-    const res = await fetch(`/api/v1/mail/${alertId}/attachments/${attachmentId}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
-      },
+    const res = await fetch(buildUrl(`/api/v1/mail/${alertId}/attachments/${attachmentId}`), {
+      headers: authHeader(),
     });
     if (!res.ok) {
       let detail: unknown;
@@ -155,7 +148,7 @@ export const mailApi = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
   draftAssist: (intent: string, context?: string, tone?: string) =>
     apiFetch<DraftAssistResponse>("/api/v1/mail/draft/assist", {

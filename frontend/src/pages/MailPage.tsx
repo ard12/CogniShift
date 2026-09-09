@@ -7,6 +7,7 @@ import {
   type MailRecipient,
   type MailAttachment,
 } from "@/api/mail";
+import { buildUrl } from "@/api/clients";
 import { securityApi } from "@/api/security";
 import { authorizationsApi, type ExecutionResult } from "@/api/authorizations";
 import { useAuth } from "@/auth/useAuth";
@@ -97,20 +98,26 @@ export function MailPage() {
         setCurrentUserId(res.user_id);
         setFetchError(null);
       } catch (err) {
-        console.warn("mailApi.list failed, falling back to securityApi.mailbox:", err);
-        const mb = await securityApi.mailbox(100, 0);
-        setMessages(mb.alerts as unknown as MailMessageMetadata[]);
-        setUnreadCount(mb.unread_count);
-        setTotalCount(mb.total_count);
-        setFetchError(null);
+        if (role === "administrator") {
+          console.warn("mailApi.list failed, falling back to securityApi.mailbox:", err);
+          const mb = await securityApi.mailbox(100, 0);
+          setMessages(mb.alerts as unknown as MailMessageMetadata[]);
+          setUnreadCount(mb.unread_count);
+          setTotalCount(mb.total_count);
+          setFetchError(null);
+        } else {
+          throw err;
+        }
       }
       try {
         setSmtpHealth(await mailApi.smtpHealth());
       } catch {
-        try {
-          setSmtpHealth(await securityApi.smtpHealth());
-        } catch {
-          // Ignore SMTP health poll fail
+        if (role === "administrator") {
+          try {
+            setSmtpHealth(await securityApi.smtpHealth());
+          } catch {
+            // Ignore SMTP health poll fail
+          }
         }
       }
     } catch (err) {
@@ -129,45 +136,57 @@ export function MailPage() {
     return () => clearInterval(interval);
   }, [fetchMail]);
 
-  // Real-Time Server-Sent Events (SSE) Stream with Disconnect Safety
+  // Real-Time Server-Sent Events (SSE) Stream with Disconnect Safety and Auto-Reconnect
   useEffect(() => {
     let active = true;
+    let retryTimeout: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
 
     async function streamEvents() {
-      try {
-        const token = getStoredToken();
-        const deviceSession = getDeviceSession();
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        if (deviceSession) headers["X-Device-Session"] = deviceSession;
+      while (active) {
+        try {
+          const token = getStoredToken();
+          const deviceSession = getDeviceSession();
+          const deviceId = typeof window !== "undefined" ? window.localStorage.getItem("cognishift_device_id") : null;
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          if (deviceSession) headers["X-Device-Session"] = deviceSession;
+          if (deviceId) headers["X-Device-ID"] = deviceId;
 
-        const response = await fetch("/api/v1/mail/events", {
-          headers,
-          signal: controller.signal,
-        });
+          const response = await fetch(buildUrl("/api/v1/mail/events"), {
+            headers,
+            signal: controller.signal,
+          });
 
-        if (!response.ok || !response.body) return;
+          if (!response.ok || !response.body) {
+            await new Promise((resolve) => {
+              retryTimeout = setTimeout(resolve, 5000);
+            });
+            continue;
+          }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
 
-        while (active) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split("\n\n");
-          buffer = parts.pop() ?? "";
-          for (const part of parts) {
-            if (part.includes("event: new_mail")) {
-              void fetchMail();
+          while (active) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop() ?? "";
+            for (const part of parts) {
+              if (part.includes("event: new_mail")) {
+                void fetchMail();
+              }
             }
           }
-        }
-      } catch (err: unknown) {
-        if (active && (!(err instanceof Error) || err.name !== "AbortError")) {
-          // Short polling fallback handles connection retries
+        } catch (err: unknown) {
+          if (active && (!(err instanceof Error) || err.name !== "AbortError")) {
+            await new Promise((resolve) => {
+              retryTimeout = setTimeout(resolve, 5000);
+            });
+          }
         }
       }
     }
@@ -177,6 +196,7 @@ export function MailPage() {
     return () => {
       active = false;
       controller.abort();
+      if (retryTimeout) clearTimeout(retryTimeout);
     };
   }, [fetchMail]);
 

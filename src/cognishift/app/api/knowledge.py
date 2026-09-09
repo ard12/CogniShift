@@ -234,16 +234,19 @@ async def upload_document(
                     })
                     ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
 
-            if ext == ".xlsx":
-                wb = openpyxl.load_workbook(file_path, data_only=True)
-                for sheet_idx, sname in enumerate(wb.sheetnames):
-                    ws = wb[sname]
-                    raw_rows = list(ws.iter_rows(values_only=True))
-                    _process_sheet_rows(sname, raw_rows, sheet_idx)
-            else:
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                    raw_rows = list(csv.reader(f))
-                _process_sheet_rows("CSV_Data", raw_rows, 0)
+            def _parse_spreadsheet():
+                if ext == ".xlsx":
+                    wb = openpyxl.load_workbook(file_path, data_only=True)
+                    for sheet_idx, sname in enumerate(wb.sheetnames):
+                        ws = wb[sname]
+                        raw_rows = list(ws.iter_rows(values_only=True))
+                        _process_sheet_rows(sname, raw_rows, sheet_idx)
+                else:
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                        raw_rows = list(csv.reader(f))
+                    _process_sheet_rows("CSV_Data", raw_rows, 0)
+
+            await asyncio.to_thread(_parse_spreadsheet)
 
             def _embed_and_upsert():
                 if chunks:
@@ -286,10 +289,11 @@ async def upload_document(
                 updated_row = await cursor.fetchone()
                 return KnowledgeSourceResponse.model_validate(dict(updated_row))
         except Exception as e:
+            logger.error(f"Failed to process spreadsheet {source_id}: {e}", exc_info=True)
             async with get_db() as db:
                 await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
                 await db.commit()
-            raise HTTPException(status_code=500, detail=f"Failed to process spreadsheet: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to process spreadsheet. Internal processing error.")
 
     # 6. Native PDF, OCR, or Vision
     try:
@@ -326,7 +330,8 @@ async def upload_document(
             updated_row = await cursor.fetchone()
             return KnowledgeSourceResponse.model_validate(dict(updated_row))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        logger.error(f"Failed to process document {source_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to process document. Internal processing error.")
 
 @router.get("", response_model=List[KnowledgeSourceResponse])
 async def list_knowledge_sources(

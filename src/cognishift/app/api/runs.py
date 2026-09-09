@@ -1,6 +1,7 @@
 import json
+import logging
 from fastapi import APIRouter, HTTPException, Query, Depends, Request, status
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import RunCreate, RunResponse, RunEventResponse
@@ -8,7 +9,19 @@ from cognishift.app.core.auth import get_current_user, verify_workspace_access, 
 from cognishift.core.engine import execute_agent_run, resume_agent_run
 from cognishift.core.network.guard import get_active_network_policy
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1/runs", tags=["Runs"])
+
+
+def _safe_json_loads(val: Optional[str]) -> Dict[str, Any]:
+    if not val:
+        return {}
+    try:
+        data = json.loads(val)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def _format_run_response(row: Any) -> RunResponse:
@@ -55,7 +68,8 @@ async def create_run(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Engine execution error: {str(e)}")
+        logger.error(f"Engine execution error for run: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred while executing the agent run. Please review system audit logs.")
 
 
 @router.get("", response_model=List[RunResponse])
@@ -145,15 +159,15 @@ async def get_run_status_summary(run_id: int, request: Request, user: User = Dep
     stages = []
     classified = by_type.get("task_classified", [])
     if classified:
-        data = json.loads(classified[-1]["structured_data"] or "{}")
+        data = _safe_json_loads(classified[-1]["structured_data"])
         stages.append({"key": "task", "label": "Task Detected", "value": str(data.get("task_type", "unknown")).replace("_", " ").title(), "status": "complete"})
     selected = by_type.get("model_selected", [])
     if selected:
-        data = json.loads(selected[-1]["structured_data"] or "{}")
+        data = _safe_json_loads(selected[-1]["structured_data"])
         vision = by_type.get("vision_completed", [])
         specialist = None
         if vision:
-            specialist = json.loads(vision[-1]["structured_data"] or "{}").get("model")
+            specialist = _safe_json_loads(vision[-1]["structured_data"]).get("model")
         model_value = specialist or data.get("selected_model") or run["model_name"] or "Unavailable"
         detail = data.get("reason")
         if specialist and run["model_name"] and run["model_name"] != specialist:
@@ -205,4 +219,5 @@ async def resume_run(
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to resume run: {str(e)}")
+        logger.error(f"Failed to resume run {run_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred while resuming the agent run. Please review system audit logs.")

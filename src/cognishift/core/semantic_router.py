@@ -760,7 +760,7 @@ class SemanticIntentRouter:
         should_abstain = (top_score < self.confidence_threshold) or (margin < self.margin_threshold)
 
         if top_intent == SemanticIntent.CONTROL_ACTION:
-            ctrl_margin = self.margin_threshold if is_supported_control else self.control_margin_threshold
+            ctrl_margin = self.control_margin_threshold
             if top_score < self.control_confidence_threshold or margin < ctrl_margin:
                 should_abstain = True
 
@@ -952,10 +952,11 @@ class SemanticIntentRouter:
     def _is_negated_action(self, text: str) -> bool:
         """Detects explicit negations directing the agent NOT to take action."""
         cleaned = re.sub(r"^(?:please\s+|hey\s+|operator(?:\s+directive)?[:\s]+)+", "", text.strip())
-        negation_openers = ["do not ", "don't ", "dont ", "don’t ", "never ", "nevermind", "cancel "]
-        if any(cleaned.startswith(no) for no in negation_openers):
+        if cleaned in ("cancel", "nevermind", "stop", "abort", "cancel that", "never mind"):
             return True
-        if re.search(r"\b(?:do\s+not|don['’]?t|never|cancel)\s+(?:restart|trip|relief|vent|depressurize|run\s+diagnostic|shutdown)", text):
+        if re.search(r"\b(?:do\s+not|don['’]?t|never|cancel|stop)\s+(?:restart|trip|relief|vent|depressurize|run\s+diagnostic|shutdown|execute|proceed|actuate|operate)\b", text):
+            return True
+        if re.search(r"^(?:do\s+not|don['’]?t|never)\s+(?:touch|modify|change|trigger)\b", cleaned):
             return True
         return False
 
@@ -964,6 +965,9 @@ class SemanticIntentRouter:
         modal_openers = ["can you", "could you", "would you", "will you", "should we", "should i"]
         has_modal = any(text.startswith(mo) for mo in modal_openers)
         if not has_modal:
+            return False
+
+        if any(w in text for w in ["explain", "why", "describe", "tell me about", "what is", "how does", "what are"]):
             return False
 
         general_capabilities = [

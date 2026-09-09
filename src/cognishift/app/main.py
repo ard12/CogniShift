@@ -4,10 +4,11 @@ import sys
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any
 import httpx
-from fastapi import FastAPI, Request, HTTPException
+import logging
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from cognishift.app.config import settings, PROJECT_ROOT
 from cognishift.core.network.client import get_sovereign_async_client
 from cognishift import __version__
@@ -50,6 +51,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+logger = logging.getLogger(__name__)
 
 # Create data directories on startup
 def create_directories():
@@ -156,10 +158,12 @@ async def add_security_headers(request: Request, call_next):
         "script-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
         # Artifact previews are fetched with authenticated headers and exposed
-        # to <img> elements through same-page object URLs.
+        # to <img> and <iframe> elements through same-page object URLs.
         "img-src 'self' data: blob:; "
         "font-src 'self'; "
         "connect-src 'self'; "
+        "frame-src 'self' blob: data:; "
+        "object-src 'self' blob:; "
         "frame-ancestors 'none';"
     )
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -168,6 +172,15 @@ async def add_security_headers(request: Request, call_next):
     if request.url.path.startswith(("/static", "/assets")) or request.url.path == "/":
         response.headers["Cache-Control"] = "no-cache, must-revalidate"
     return response
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled system error processing {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "An internal system error occurred. Please contact the system administrator."},
+    )
 
 
 from cognishift.app.api import workspaces, agents, knowledge, runs, approvals, artifacts, sovereignty, sandbox, auth, audit, security_dashboard, authorizations, mail

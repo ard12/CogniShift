@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -7,6 +8,8 @@ from cognishift.app.db.database import get_db
 from cognishift.app.db.models import ApprovalResponse
 from cognishift.app.core.auth import get_current_user, verify_four_eyes_approval, verify_workspace_access, User
 from cognishift.core.engine import resume_agent_run
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/approvals", tags=["Approvals"])
 
@@ -206,11 +209,17 @@ async def approve_request(
 
 
     if should_resume_early:
-        await resume_agent_run(run_id)
+        try:
+            await resume_agent_run(run_id)
+        except Exception as e:
+            logger.error(f"Failed to resume agent run {run_id} after early approval: {e}", exc_info=True)
         return ApprovalResponse.model_validate(approval)
 
     # Trigger engine resumption when fully approved
-    await resume_agent_run(run_id)
+    try:
+        await resume_agent_run(run_id)
+    except Exception as e:
+        logger.error(f"Failed to resume agent run {run_id} after approval: {e}", exc_info=True)
     
     return ApprovalResponse.model_validate(dict(updated_row))
 
@@ -254,7 +263,10 @@ async def reject_request(
         await db.commit()
 
     # Trigger engine resumption
-    await resume_agent_run(run_id)
+    try:
+        await resume_agent_run(run_id)
+    except Exception as e:
+        logger.error(f"Failed to resume agent run {run_id} after rejection: {e}", exc_info=True)
     
     return ApprovalResponse.model_validate(dict(updated_row))
 

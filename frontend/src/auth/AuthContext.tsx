@@ -13,7 +13,6 @@ import { getStoredToken, setStoredToken } from "../lib/token-storage";
 import type { SovereigntyStatus } from "@/types";
 import { AuthContext, type AuthContextValue } from "./auth-context";
 
-const DEMO_SESSION_KEY = "cognishift_demo_session";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
@@ -47,7 +46,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(candidate);
       setCandidateToken(null);
       setStoredToken(candidate);
-      localStorage.removeItem(DEMO_SESSION_KEY);
       return true;
     } catch (err) {
       if (err instanceof ApiError && err.status === 403 && typeof err.detail === "object" && err.detail && (err.detail as {code?: string}).code === "UNKNOWN_DEVICE") {
@@ -67,7 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
       setDeviceSession(null);
       setStoredToken(null);
-      localStorage.removeItem(DEMO_SESSION_KEY);
       return false;
     } finally {
       setVerifying(false);
@@ -110,7 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError("Enter a credential token.");
         return false;
       }
-      localStorage.removeItem(DEMO_SESSION_KEY);
       return verify(trimmed);
     },
     [verify]
@@ -122,9 +118,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     setStoredToken(null);
     setDeviceSession(null);
-    localStorage.removeItem(DEMO_SESSION_KEY);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("cognishift.selected_workspace_id");
+      for (let i = window.sessionStorage.length - 1; i >= 0; i--) {
+        const key = window.sessionStorage.key(i);
+        if (key && key.startsWith("cognishift_")) {
+          window.sessionStorage.removeItem(key);
+        }
+      }
+    }
     setDeviceStatus("not_verified");
   }, []);
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      signOut();
+    };
+    const handleDeviceUnverified = () => {
+      setDeviceStatus("unknown");
+      setError("⚠ Unknown Device\nSession Expired or Revoked\nDevice Re-verification Required");
+    };
+    window.addEventListener("cognishift:auth-unauthorized", handleUnauthorized);
+    window.addEventListener("cognishift:auth-device-unverified", handleDeviceUnverified);
+    return () => {
+      window.removeEventListener("cognishift:auth-unauthorized", handleUnauthorized);
+      window.removeEventListener("cognishift:auth-device-unverified", handleDeviceUnverified);
+    };
+  }, [signOut]);
 
   const refreshSovereignty = useCallback(async () => {
     if (!token) return;

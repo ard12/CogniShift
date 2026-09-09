@@ -346,6 +346,7 @@ async def _call_local_slm_for_summary(
         )
 
     try:
+        from cognishift.core.network.client import get_sovereign_async_client
         url = f"{settings.ollama_base_url.rstrip('/')}/api/generate"
         payload = {
             "model": settings.model_name or "qwen2.5:7b",
@@ -353,7 +354,7 @@ async def _call_local_slm_for_summary(
             "stream": False,
             "options": {"temperature": 0.1, "num_predict": 90},
         }
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+        async with get_sovereign_async_client(timeout=timeout_seconds, component="notifications") as client:
             resp = await client.post(url, json=payload)
             if resp.status_code == 200:
                 text = resp.json().get("response", "").strip()

@@ -4,6 +4,7 @@ Phase 3 Implementation for CogniShift.
 Zero-cloud, 100% offline generation using python-docx, openpyxl, and python-pptx.
 """
 
+import asyncio
 import os
 import shutil
 import hashlib
@@ -506,9 +507,9 @@ async def create_and_register_artifact(
     temp_path = temp_dir / temp_filename
 
     try:
-        generator_fn(temp_path)
+        await asyncio.to_thread(generator_fn, temp_path)
 
-        val_result = validate_artifact_structure(temp_path, artifact_type)
+        val_result = await asyncio.to_thread(validate_artifact_structure, temp_path, artifact_type)
         if not val_result.valid:
             raise RuntimeError(f"Structural artifact validation failed: {val_result.error_message}")
 

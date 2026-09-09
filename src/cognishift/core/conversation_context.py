@@ -136,6 +136,7 @@ def get_latest_ingested_document(workspace_id: int) -> Optional[Dict[str, Any]]:
     db_path = settings.database_path
     if not db_path.exists():
         return None
+    conn = None
     try:
         uri_path = f"file:{db_path.resolve().as_posix()}?mode=ro"
         conn = sqlite3.connect(uri_path, uri=True, timeout=5.0)
@@ -150,13 +151,15 @@ def get_latest_ingested_document(workspace_id: int) -> Optional[Dict[str, Any]]:
             (workspace_id,)
         )
         row = cursor.fetchone()
-        conn.close()
         if not row:
             return None
         return dict(row)
     except Exception as e:
         logger.warning(f"Error querying latest ingested document: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
 
 
 async def resolve_target_document_for_query(
@@ -331,6 +334,7 @@ def resolve_target_document_for_query_sync(
     if not db_path.exists():
         return None
 
+    conn = None
     try:
         uri_path = f"file:{db_path.resolve().as_posix()}?mode=ro"
         conn = sqlite3.connect(uri_path, uri=True, timeout=5.0)
@@ -345,10 +349,12 @@ def resolve_target_document_for_query_sync(
             (workspace_id,)
         )
         rows = [dict(r) for r in cursor.fetchall()]
-        conn.close()
     except Exception as e:
         logger.warning(f"Error fetching knowledge sources for sync resolution: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
 
     if not rows:
         return None
@@ -823,7 +829,7 @@ class ConversationContextResolver:
                     topic = f"Equipment inquiry: {resolved_equipment[0]}"
 
             # Look for page / manual citations
-            found_citations = re.findall(r'\[(.*?\|\s*Page\s*\d+)\]', content)
+            found_citations = re.findall(r'\[(.*?\|\s*Page\s*\d+(?:\s*\|.*?)?)\]', content)
             if found_citations and not prior_citations:
                 prior_citations = list(dict.fromkeys(found_citations))
 

@@ -403,6 +403,12 @@ TOOL_RISK_LEVELS = {
     **HIGH_RISK_TOOLS,
     "execute_code": "sensitive",
 
+    "check_pressure": "read_only",
+    "check_temperature": "read_only",
+    "check_network": "read_only",
+    "file_list": "read_only",
+    "file_read": "read_only",
+
     "file_write": "low_risk",
     "directory_create": "low_risk",
     "generate_docx": "low_risk",
@@ -424,7 +430,10 @@ SUPPORTED_SIMULATED_TARGETS = {
     "TK-01": "Atmospheric Crude Storage Tank",
     "Flare-Header": "High-Pressure Acid Gas Flare Header",
     "PT-101": "Discharge Header Pressure Transmitter",
-    "TT-204": "Outboard Journal Bearing Thermocouple"
+    "TT-204": "Outboard Journal Bearing Thermocouple",
+    "K-101": "Centrifugal Recycle Gas Compressor",
+    "M-101": "Induction Drive Motor (6.6 kV)",
+    "MOV-101": "Motor-Operated Isolation Valve",
 }
 
 
@@ -617,12 +626,17 @@ def bounded_repair_tool_parameters(
 
     # Handle emergency_pressure_relief missing chamber_id
     elif tool_name == "emergency_pressure_relief":
-        has_chamber = any(params.get(k) for k in ["chamber_id", "chamber", "equipment_id"])
+        has_chamber = any(params.get(k) for k in ["chamber_id", "chamber", "equipment_id", "component_id"])
         if not has_chamber:
             eq_ids = getattr(references, "equipment_ids", []) or []
             if len(eq_ids) == 1:
                 params["chamber_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
+        elif "chamber_id" not in params:
+            for k in ["chamber", "equipment_id", "component_id"]:
+                if k in params:
+                    params["chamber_id"] = params.pop(k)
+                    break
 
     # Handle run_diagnostic missing equipment_id
     elif tool_name == "run_diagnostic":

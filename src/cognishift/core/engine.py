@@ -764,7 +764,7 @@ async def _resolve_knowledge_and_page_context(
             if not p_ss.is_absolute():
                 p_ss = ws_root / p_ss
             if p_ss.exists() and p_ss.suffix.lower() in [".xlsx", ".xls", ".csv"]:
-                ss_insights = extract_document_insights(p_ss, query_hint=clean_input)
+                ss_insights = await asyncio.to_thread(extract_document_insights, p_ss, query_hint=clean_input)
                 if ss_insights.get("structured_text"):
                     trace_parts = [
                         f"[{active_doc_for_page['name']} | Structured Spreadsheet Table]",
@@ -918,7 +918,8 @@ async def execute_agent_run(
         # --- ROUTER 1: SEMANTIC INTENT CLASSIFICATION ---
         if settings.semantic_router_enabled:
             sem_router = get_semantic_router()
-            routing_res = sem_router.route(
+            routing_res = await asyncio.to_thread(
+                sem_router.route,
                 clean_input,
                 resolved_context=resolved_context,
                 active_pending_task=active_pending_task
@@ -1405,10 +1406,11 @@ async def execute_agent_run(
                             )
                             from cognishift.core.document_processing.ocr_provider import get_ocr_provider
 
-                            ocr_result = await get_ocr_provider().extract(preprocess_image_for_ocr(img_bytes))
+                            ocr_preprocessed = await asyncio.to_thread(preprocess_image_for_ocr, img_bytes)
+                            ocr_result = await get_ocr_provider().extract(ocr_preprocessed)
                             ocr_evidence = (ocr_result.raw_text or ocr_result.text or "").strip()[:3000]
                             ocr_confidence = ocr_result.confidence
-                            vision_bytes = prepare_image_for_vision(img_bytes)
+                            vision_bytes = await asyncio.to_thread(prepare_image_for_vision, img_bytes)
                             await log_event(
                                 db, run_id, "ocr_completed",
                                 f"Local OCR extracted image text ({len(ocr_evidence)} chars)",
@@ -1798,11 +1800,11 @@ async def execute_agent_run(
                                     anomaly_report = None
                                     if is_anomaly_query:
                                         try:
-                                            anomaly_report = detect_dataframe_anomalies(art_path)
+                                            anomaly_report = await asyncio.to_thread(detect_dataframe_anomalies, art_path)
                                         except Exception as a_err:
                                             logger.warning(f"Anomaly detection error: {a_err}")
 
-                                    insights = extract_document_insights(art_path, query_hint=clean_input)
+                                    insights = await asyncio.to_thread(extract_document_insights, art_path, query_hint=clean_input)
                                     if goal_contract and "revenue_previous" in goal_contract.required_fields and insights:
                                         populate_goal_contract_from_insights(goal_contract, insights)
                                     content_blocks = []
@@ -2589,7 +2591,7 @@ async def execute_agent_run(
                                     target_doc_path = cand.resolve()
                                     break
 
-                    insights = extract_document_insights(target_doc_path, query_hint=clean_input) if target_doc_path else {}
+                    insights = await asyncio.to_thread(extract_document_insights, target_doc_path, query_hint=clean_input) if target_doc_path else {}
                     if goal_contract and "revenue_previous" in goal_contract.required_fields and insights:
                         populate_goal_contract_from_insights(goal_contract, insights)
 
@@ -3434,12 +3436,18 @@ print("Analysis script finished with returncode 0.")
                         val_result.requires_approval or
                         tool_def.get("requires_approval", 0) or
                         (resolved_tool in HIGH_RISK_TOOLS) or
-                        (agent.get("approval_required", 0) and tool_def.get("risk_level") in ["sensitive", "service_interrupting"] and not is_readonly_chart_or_viz)
+                        (tool_def.get("risk_level") in ["sensitive", "service_interrupting"] and not is_readonly_chart_or_viz) or
+                        (agent.get("approval_required", 0) and tool_def.get("risk_level") in ["sensitive", "service_interrupting"])
                     )
 
                     if requires_approval:
                         # High-risk simulated action: PAUSE FOR FOUR-EYES DUAL SUPERVISOR APPROVAL
-                        req_approvals = 2 if (tool_def.get("risk_level") in ["sensitive", "service_interrupting"] or resolved_tool in ["restart_component", "emergency_pressure_relief"]) else 1
+                        is_dual = (
+                            tool_def.get("risk_level") in ["sensitive", "service_interrupting"]
+                            or resolved_tool in HIGH_RISK_TOOLS
+                            or resolved_tool in ["restart_component", "emergency_pressure_relief", "restart_service"]
+                        )
+                        req_approvals = 2 if is_dual else 1
                         cursor = await db.execute(
                             """INSERT INTO approval_requests
                                (run_id, tool_id, status, request_reason, parameters, risk_level, required_approvals)

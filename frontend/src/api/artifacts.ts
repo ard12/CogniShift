@@ -1,6 +1,4 @@
-import { apiFetch, ApiError } from "./clients";
-import { getStoredToken } from "@/lib/token-storage";
-import { getDeviceSession } from "@/lib/device-identity";
+import { apiFetch, buildUrl, authHeader, ApiError } from "./clients";
 import type { Artifact, ArtifactListResponse } from "@/types";
 
 const PATHS = {
@@ -25,13 +23,8 @@ export const artifactsApi = {
    * blob URL. A raw navigation cannot carry either required custom header.
    */
   async download(workspaceId: number, artifactId: number, filename: string): Promise<void> {
-    const token = getStoredToken();
-    const deviceSession = getDeviceSession();
-    const res = await fetch(PATHS.download(workspaceId, artifactId), {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
-      },
+    const res = await fetch(buildUrl(PATHS.download(workspaceId, artifactId)), {
+      headers: authHeader(),
     });
     if (!res.ok) {
       let detail: unknown;
@@ -50,7 +43,7 @@ export const artifactsApi = {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 
   /**
@@ -58,13 +51,8 @@ export const artifactsApi = {
    * a temporary object URL that can be used as an <img src> or iframe source.
    */
   async getBlobUrl(workspaceId: number, artifactId: number): Promise<string> {
-    const token = getStoredToken();
-    const deviceSession = getDeviceSession();
-    const res = await fetch(PATHS.download(workspaceId, artifactId), {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(deviceSession ? { "X-Device-Session": deviceSession } : {}),
-      },
+    const res = await fetch(buildUrl(PATHS.download(workspaceId, artifactId)), {
+      headers: authHeader(),
     });
     if (!res.ok) {
       throw new ApiError(`Failed to fetch artifact blob (${res.status})`, res.status);

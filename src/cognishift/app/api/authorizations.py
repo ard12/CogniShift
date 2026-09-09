@@ -179,6 +179,11 @@ async def approve_permit(
     user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Execute supervisor Four-Eyes approval stage (Stage 1 or Stage 2)."""
+    async with get_db() as db:
+        row = await (await db.execute("SELECT workspace_id FROM temporary_authorizations WHERE id = ?", (permit_id,))).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Authorization permit not found.")
+        verify_workspace_access(row["workspace_id"], user)
     return await approve_authorization_stage(
         permit_id=permit_id,
         approver_id=user.user_id,
@@ -193,6 +198,11 @@ async def override_permit(
     user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Explicit administrator override for authorization permit."""
+    async with get_db() as db:
+        row = await (await db.execute("SELECT workspace_id FROM temporary_authorizations WHERE id = ?", (permit_id,))).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Authorization permit not found.")
+        verify_workspace_access(row["workspace_id"], user)
     return await admin_override_authorization(
         permit_id=permit_id,
         admin_id=user.user_id,
@@ -208,6 +218,11 @@ async def revoke_permit(
     user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Revoke an active or pending authorization permit."""
+    async with get_db() as db:
+        row = await (await db.execute("SELECT workspace_id FROM temporary_authorizations WHERE id = ?", (permit_id,))).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Authorization permit not found.")
+        verify_workspace_access(row["workspace_id"], user)
     return await revoke_authorization(
         permit_id=permit_id,
         caller_id=user.user_id,
@@ -228,11 +243,13 @@ async def execute_permit(
     Adheres strictly to atomic CAS concurrency enforcement:
     First simultaneous execution consumes permit; second execution fails with 403 AUTHORIZATION_CONSUMED.
     """
+    caller_device_id = x_device_id or getattr(request.state, "device_id", None)
     return await execute_authorized_action_atomic(
         permit_code=payload.permit_code.strip(),
         caller_user_id=user.user_id,
         action=payload.action.strip(),
         resource=payload.resource.strip(),
-        caller_device_id=x_device_id,
+        caller_device_id=caller_device_id,
         parameters=payload.parameters,
     )
+

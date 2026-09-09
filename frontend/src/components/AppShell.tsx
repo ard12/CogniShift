@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
+import { AppearanceMenu } from "@/components/AppearanceMenu";
+import { MotionEffects } from "@/components/MotionEffects";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBeacon } from "@/components/StatusBeacon";
 import { WorkspacePicker } from "@/components/WorkspacePicker";
@@ -25,6 +27,8 @@ function Brand() {
 export function AppShell() {
   const { role, sovereignty, signOut } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   const sovereigntyTone = sovereignty?.sovereignty_enforced ? "success" : "warning";
   const sovereigntyLabel = sovereignty?.sovereignty_enforced
@@ -34,9 +38,9 @@ export function AppShell() {
     : "SOVEREIGNTY UNKNOWN";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-1 text-ink-1">
+    <div className="flex h-screen overflow-hidden bg-transparent text-ink-1">
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-surface-border bg-surface-2 lg:flex">
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-surface-border bg-surface-2/80 backdrop-blur-md lg:flex">
         <Brand />
         <Sidebar />
       </aside>
@@ -45,7 +49,7 @@ export function AppShell() {
       {mobileNavOpen && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div className="absolute inset-0 bg-black/70" onClick={() => setMobileNavOpen(false)} />
-          <aside className="relative z-10 flex w-64 flex-col border-r border-surface-border bg-surface-2">
+          <aside className="relative z-10 flex w-64 flex-col border-r border-surface-border bg-surface-2/90 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <Brand />
               <button
@@ -63,8 +67,15 @@ export function AppShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top status bar */}
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-surface-border bg-surface-2 px-3 sm:px-4">
+        {/* Top status bar — sticky + slightly shrinks on scroll to save space */}
+        <header
+          className={cn(
+            "sticky top-0 z-30 flex shrink-0 items-center gap-3 border-b border-surface-border backdrop-blur-md px-3 transition-[height,box-shadow,background-color] duration-300 sm:px-4",
+            scrolled
+              ? "h-11 bg-surface-2/90 shadow-lg shadow-black/20"
+              : "h-14 bg-surface-2/80"
+          )}
+        >
           <button
             type="button"
             className="rounded p-1.5 text-ink-2 hover:bg-surface-3 lg:hidden"
@@ -92,6 +103,7 @@ export function AppShell() {
           </div>
 
           <div className="flex items-center gap-2 pl-2">
+            <AppearanceMenu />
             {role && (
               <span className="hidden rounded border border-surface-border bg-surface-3 px-2 py-1 font-mono text-[10px] uppercase tracking-wide text-ink-2 sm:inline">
                 {role}
@@ -104,11 +116,16 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto p-4 sm:p-6"
+          onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
+        >
           <div className="mx-auto flex max-w-[1600px] flex-col gap-6">
             <Outlet />
           </div>
         </main>
+        <MotionEffects />
       </div>
     </div>
   );

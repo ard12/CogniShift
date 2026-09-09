@@ -1,9 +1,24 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap");
+
+/* =========================================================================
+   CogniShift theme system
+   -------------------------------------------------------------------------
+   The @theme block below defines the DEFAULT ("normal") palette and is what
+   Tailwind uses to generate the utility classes (bg-surface-1, text-ink-2,
+   text-brand, border-surface-border, …). Because every utility compiles to
+   `var(--color-*)`, we can switch the entire look at runtime simply by
+   overriding those same variables under html[data-theme="…"] selectors.
+
+   Three modes are provided:
+     • normal — the original industrial console (unchanged design)
+     • dark   — deep navy / blue, vibrant accents
+     • light  — soft, airy, aesthetic light palette
+   No layout classes and no component markup depend on any of this — only the
+   color values change.
+   ========================================================================= */
 
 @theme {
-  /* CogniShift industrial palette — dark, technical, restrained. Cyan is
-     the operational accent (matches the existing static console at
-     src/cognishift/app/static/), amber/emerald/rose carry status meaning. */
   --color-brand: #06b6d4;
   --color-brand-strong: #0891b2;
 
@@ -28,6 +43,81 @@
   --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
+/* ------- NORMAL (default / original industrial console) ------- */
+html[data-theme="normal"] {
+  color-scheme: dark;
+  --color-brand: #06b6d4;
+  --color-brand-strong: #0891b2;
+
+  --color-surface-0: #05070a;
+  --color-surface-1: #0a0d12;
+  --color-surface-2: #0e131a;
+  --color-surface-3: #171d27;
+
+  --color-surface-border: #232b38;
+  --color-surface-border-strong: #384355;
+
+  --color-ink-1: #e6ebf1;
+  --color-ink-2: #8b98ab;
+  --color-ink-3: #5b6678;
+
+  --color-status-info: #22d3ee;
+  --color-status-success: #34d399;
+  --color-status-warning: #fbbf24;
+  --color-status-error: #f87171;
+  --color-status-knowledge: #818cf8;
+}
+
+/* ------- DARK (navy / deep blue, vibrant) ------- */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-brand: #5b93ff;
+  --color-brand-strong: #3f78f0;
+
+  --color-surface-0: #050b1a;
+  --color-surface-1: #091326;
+  --color-surface-2: #0f1d3a;
+  --color-surface-3: #17294c;
+
+  --color-surface-border: #243b66;
+  --color-surface-border-strong: #37548c;
+
+  --color-ink-1: #eef4ff;
+  --color-ink-2: #a7bbe0;
+  --color-ink-3: #6a80ab;
+
+  --color-status-info: #4cc9f0;
+  --color-status-success: #4ade80;
+  --color-status-warning: #ffcf5c;
+  --color-status-error: #ff7a92;
+  --color-status-knowledge: #a5b4fc;
+}
+
+/* ------- LIGHT (soft, aesthetic) ------- */
+html[data-theme="light"] {
+  color-scheme: light;
+  --color-brand: #3f6ff0;
+  --color-brand-strong: #2b57d6;
+
+  --color-surface-0: #ffffff;
+  --color-surface-1: #f3f5fb;
+  --color-surface-2: #ffffff;
+  --color-surface-3: #eef1f9;
+
+  --color-surface-border: #dee3f0;
+  --color-surface-border-strong: #c3cbe0;
+
+  --color-ink-1: #1a2338;
+  --color-ink-2: #56607a;
+  --color-ink-3: #8b95ac;
+
+  --color-status-info: #0ea5e9;
+  --color-status-success: #10b981;
+  --color-status-warning: #d98a04;
+  --color-status-error: #e11d48;
+  --color-status-knowledge: #6366f1;
+}
+
 @layer base {
   * {
     border-color: var(--color-surface-border);
@@ -35,11 +125,33 @@
 
   html {
     color-scheme: dark;
+    /* --ui-scale is controlled by the appearance menu (zoom in / out). */
+    font-size: calc(16px * var(--ui-scale, 1.06));
+    /* --ui-font is controlled by the appearance menu (font picker). */
+    font-family: var(--ui-font, "Inter", system-ui, -apple-system, sans-serif);
+    transition: color 300ms ease, background-color 300ms ease;
+  }
+
+  /* ---- Font families (chosen in the appearance menu) ---- */
+  html[data-font="inter"] {
+    --ui-font: "Inter", system-ui, -apple-system, sans-serif;
+  }
+  html[data-font="sora"] {
+    --ui-font: "Sora", system-ui, -apple-system, sans-serif;
+  }
+  html[data-font="serif"] {
+    --ui-font: Georgia, "Times New Roman", "Noto Serif", serif;
+  }
+  html[data-font="system"] {
+    --ui-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
 
   body {
     background-color: var(--color-surface-1);
     color: var(--color-ink-1);
+    font-size: 1rem;
+    line-height: 1.55;
+    transition: color 300ms ease, background-color 300ms ease;
   }
 
   ::selection {
@@ -63,21 +175,143 @@
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-surface-1);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
     background: var(--color-surface-border);
-    border-radius: 3px;
+    border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-surface-border-strong);
+  }
+}
+
+/* =========================================================================
+   Decorative background layer (choose in the appearance menu).
+   A single fixed element sits behind the app; the pattern is selected via
+   html[data-bg="…"]. All colors are theme-aware via var()/color-mix so the
+   background adapts automatically to normal / dark / light.
+   ========================================================================= */
+.app-bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background-color: var(--color-surface-1);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transition: background-color 400ms ease, opacity 400ms ease;
+}
+
+html[data-bg="plain"] .app-bg-layer {
+  background-image: none;
+}
+
+html[data-bg="bubbles"] .app-bg-layer {
+  background-image:
+    radial-gradient(circle at 18% 28%, color-mix(in srgb, var(--color-brand) 16%, transparent), transparent 22%),
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--color-status-knowledge) 14%, transparent), transparent 24%),
+    radial-gradient(circle at 68% 74%, color-mix(in srgb, var(--color-status-info) 12%, transparent), transparent 26%),
+    radial-gradient(circle at 32% 84%, color-mix(in srgb, var(--color-brand) 12%, transparent), transparent 24%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-status-knowledge) 8%, transparent), transparent 30%);
+}
+
+html[data-bg="mesh"] .app-bg-layer {
+  background-image:
+    radial-gradient(at 0% 0%, color-mix(in srgb, var(--color-brand) 20%, transparent), transparent 42%),
+    radial-gradient(at 100% 0%, color-mix(in srgb, var(--color-status-knowledge) 18%, transparent), transparent 42%),
+    radial-gradient(at 100% 100%, color-mix(in srgb, var(--color-status-info) 16%, transparent), transparent 42%),
+    radial-gradient(at 0% 100%, color-mix(in srgb, var(--color-brand) 14%, transparent), transparent 42%);
+}
+
+html[data-bg="grid"] .app-bg-layer {
+  background-image:
+    radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--color-brand) 10%, transparent), transparent),
+    linear-gradient(color-mix(in srgb, var(--color-surface-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-surface-border) 55%, transparent) 1px, transparent 1px);
+  background-size: 100% 100%, 46px 46px, 46px 46px;
+  background-repeat: no-repeat, repeat, repeat;
+}
+
+html[data-bg="glow"] .app-bg-layer {
+  background-image:
+    radial-gradient(58% 58% at 22% 16%, color-mix(in srgb, var(--color-brand) 18%, transparent), transparent),
+    radial-gradient(52% 52% at 84% 88%, color-mix(in srgb, var(--color-status-knowledge) 16%, transparent), transparent);
+}
+
+/* Faint circuit / data-stream photo, tinted to the active theme so it stays
+   subtle and never fights the panels for legibility. */
+html[data-bg="image"] .app-bg-layer {
+  background-image:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-surface-1) 82%, transparent),
+      color-mix(in srgb, var(--color-surface-1) 90%, transparent)
+    ),
+    url("/circuit-bg.png");
+  background-size: cover, cover;
+  background-position: center, center;
+}
+
+html[data-theme="light"][data-bg="image"] .app-bg-layer {
+  background-image:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-surface-1) 86%, transparent),
+      color-mix(in srgb, var(--color-surface-1) 93%, transparent)
+    ),
+    url("/circuit-bg.png");
+}
+
+/* =========================================================================
+   Petal transition — plays when the user switches themes.
+   ========================================================================= */
+.petal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.petal {
+  position: absolute;
+  top: -12vh;
+  border-radius: 100% 0 100% 0;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation-name: petal-fall;
+  animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1);
+  animation-fill-mode: forwards;
+  box-shadow: 0 2px 8px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+@keyframes petal-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  55% {
+    transform: translate3d(calc(var(--drift) * 0.5), 55vh, 0) rotate(calc(var(--spin) * 0.5))
+      scale(1);
+  }
+  88% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(var(--drift), 116vh, 0) rotate(var(--spin)) scale(0.9);
+    opacity: 0;
   }
 }
 
@@ -95,18 +329,33 @@
 
 @layer components {
   .panel {
-    background-color: var(--color-surface-2);
+    /* Frosted glass: the chosen background reads softly through every panel
+       on every page, while staying opaque enough to keep text crisp.
+       A faint theme-aware gradient gives each mode its own depth. */
+    background-image:
+      linear-gradient(
+        150deg,
+        color-mix(in srgb, var(--color-surface-2) 90%, transparent),
+        color-mix(in srgb, var(--color-surface-3) 82%, transparent) 55%,
+        color-mix(in srgb, var(--color-brand) 7%, var(--color-surface-2))
+      );
+    backdrop-filter: blur(10px) saturate(1.08);
+    -webkit-backdrop-filter: blur(10px) saturate(1.08);
     border: 1px solid var(--color-surface-border);
-    border-radius: 0.5rem;
+    border-radius: 0.85rem;
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--color-ink-1) 6%, transparent) inset;
+    transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
   }
 
   .panel-hover {
-    transition-property: border-color;
-    transition-duration: 150ms;
+    transition-property: border-color, box-shadow, transform;
+    transition-duration: 200ms;
   }
 
   .panel-hover:hover {
     border-color: var(--color-surface-border-strong);
+    box-shadow: 0 10px 30px -18px color-mix(in srgb, var(--color-brand) 55%, transparent);
+    transform: translateY(-1px);
   }
 
   .btn {
@@ -114,13 +363,22 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.25rem;
+    border-radius: 0.6rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
     padding: 0.5rem 0.875rem;
-    transition-property: color, background-color, border-color;
-    transition-duration: 150ms;
+    transition-property: color, background-color, border-color, box-shadow, transform;
+    transition-duration: 180ms;
+    transition-timing-function: ease;
+  }
+
+  .btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn:active {
+    transform: translateY(0);
   }
 
   .btn:disabled {
@@ -129,12 +387,44 @@
   }
 
   .btn-primary {
-    background-color: var(--color-brand);
+    position: relative;
+    overflow: hidden;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-brand) 92%, white),
+      var(--color-brand) 45%,
+      var(--color-brand-strong)
+    );
     color: var(--color-surface-0);
+    box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--color-brand) 70%, transparent);
+  }
+
+  /* Shine sweep for primary actions. */
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      120deg,
+      transparent 30%,
+      color-mix(in srgb, white 45%, transparent) 50%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    transition: transform 650ms ease;
+  }
+
+  .btn-primary:hover::after,
+  .btn-primary:focus-visible::after {
+    transform: translateX(120%);
   }
 
   .btn-primary:hover {
-    background-color: var(--color-brand-strong);
+    box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--color-brand) 85%, transparent);
+  }
+
+  .btn-primary:active {
+    box-shadow: 0 3px 10px -6px color-mix(in srgb, var(--color-brand) 70%, transparent);
   }
 
   .btn-secondary {
@@ -144,7 +434,8 @@
   }
 
   .btn-secondary:hover {
-    border-color: var(--color-surface-border-strong);
+    border-color: var(--color-brand);
+    box-shadow: 0 6px 18px -12px color-mix(in srgb, var(--color-brand) 70%, transparent);
   }
 
   .btn-ghost {
@@ -162,12 +453,13 @@
   }
 
   .btn-danger:hover {
-    opacity: 0.9;
+    opacity: 0.92;
+    box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--color-status-error) 75%, transparent);
   }
 
   .input {
     width: 100%;
-    border-radius: 0.25rem;
+    border-radius: 0.6rem;
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-surface-border);
     padding: 0.5rem 0.75rem;
@@ -175,7 +467,7 @@
     line-height: 1.25rem;
     color: var(--color-ink-1);
     outline: none;
-    transition-property: border-color;
+    transition-property: border-color, box-shadow;
     transition-duration: 150ms;
   }
 
@@ -185,11 +477,12 @@
 
   .input:focus {
     border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
   }
 
   .textarea {
     width: 100%;
-    border-radius: 0.25rem;
+    border-radius: 0.6rem;
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-surface-border);
     padding: 0.5rem 0.75rem;
@@ -198,6 +491,8 @@
     color: var(--color-ink-1);
     outline: none;
     resize: none;
+    transition-property: border-color, box-shadow;
+    transition-duration: 150ms;
   }
 
   .textarea::placeholder {
@@ -206,6 +501,7 @@
 
   .textarea:focus {
     border-color: var(--color-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
   }
 
   .label {
@@ -222,12 +518,311 @@
   .kbd {
     display: inline-flex;
     align-items: center;
-    border-radius: 0.25rem;
+    border-radius: 0.35rem;
     background-color: var(--color-surface-3);
     border: 1px solid var(--color-surface-border);
     color: var(--color-ink-2);
     font-size: 0.6875rem;
     padding: 0.0625rem 0.375rem;
     font-family: var(--font-mono);
+  }
+
+  /* Subtle gradient sheen + glow shared by every Badge, tone-aware via
+     currentColor so it matches info / success / warning / danger. */
+  .badge-shine {
+    position: relative;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, currentColor 16%, transparent),
+      color-mix(in srgb, currentColor 4%, transparent)
+    );
+    box-shadow: 0 0 10px -4px color-mix(in srgb, currentColor 55%, transparent);
+  }
+
+  /* =======================================================================
+     Appearance menu — rendered through a portal to <body> so it always
+     floats ABOVE every page card (the header's backdrop-blur used to trap
+     it behind the content). Gradient + shine make the selected mode pop.
+     ======================================================================= */
+  .appearance-trigger {
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-surface-3) 92%, transparent),
+      color-mix(in srgb, var(--color-brand) 12%, var(--color-surface-3))
+    );
+    box-shadow: 0 2px 10px -8px color-mix(in srgb, var(--color-brand) 70%, transparent);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, color 180ms ease;
+  }
+
+  .appearance-trigger:hover {
+    border-color: var(--color-brand);
+    box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--color-brand) 75%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .appearance-panel {
+    /* Sits above everything else on the page. */
+    z-index: 2000;
+    background-image: linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--color-surface-3) 97%, transparent),
+      color-mix(in srgb, var(--color-surface-2) 96%, transparent) 60%,
+      color-mix(in srgb, var(--color-brand) 10%, var(--color-surface-3))
+    );
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow:
+      0 24px 60px -20px color-mix(in srgb, black 80%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--color-brand) 20%, transparent),
+      0 1px 0 color-mix(in srgb, var(--color-ink-1) 10%, transparent) inset;
+    animation: appearance-in 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  @keyframes appearance-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .appearance-chip {
+    border: 1px solid color-mix(in srgb, var(--color-brand) 70%, transparent);
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-brand) 22%, transparent),
+      color-mix(in srgb, var(--color-brand) 8%, transparent)
+    );
+    box-shadow: 0 0 12px -4px color-mix(in srgb, var(--color-brand) 60%, transparent);
+  }
+
+  /* Base look for every selectable option (theme / background / font / zoom). */
+  .appearance-option {
+    position: relative;
+    overflow: hidden;
+    border-color: var(--color-surface-border);
+    background-image: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--color-surface-2) 90%, transparent),
+      color-mix(in srgb, var(--color-surface-3) 85%, transparent)
+    );
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 160ms ease, color 180ms ease;
+  }
+
+  .appearance-option:hover {
+    border-color: var(--color-brand);
+    box-shadow: 0 6px 16px -12px color-mix(in srgb, var(--color-brand) 80%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .appearance-option:active {
+    transform: translateY(0);
+  }
+
+  /* Selected state — gradient fill, glow ring and a shine sweep. */
+  .appearance-option.is-active {
+    color: var(--color-ink-1);
+    border-color: transparent;
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-brand) 45%, var(--color-surface-3)),
+      color-mix(in srgb, var(--color-brand) 22%, var(--color-surface-2))
+    );
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-brand) 75%, transparent),
+      0 8px 22px -10px color-mix(in srgb, var(--color-brand) 85%, transparent);
+  }
+
+  .appearance-option.is-active::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      120deg,
+      transparent 35%,
+      color-mix(in srgb, white 35%, transparent) 50%,
+      transparent 65%
+    );
+    transform: translateX(-120%);
+    animation: appearance-shine 900ms ease 40ms;
+  }
+
+  @keyframes appearance-shine {
+    to {
+      transform: translateX(120%);
+    }
+  }
+}
+/* =========================================================================
+   UI/UX ENHANCEMENT LAYER
+   -------------------------------------------------------------------------
+   Purely presentational effects layered on top of the existing design
+   system. No layout, spacing, font-size or color-token is changed, so every
+   page (Dashboard, Knowledge, Workspaces, Operator, …) keeps its exact
+   structure and position. Everything here is theme-aware via var()/color-mix
+   and honours prefers-reduced-motion (handled by the global rule above).
+   ========================================================================= */
+
+/* 1 — "Light from the top": a fixed sheet that brightens the top of the
+   viewport and gradually deepens toward the bottom, on every theme. It sits
+   behind all page content, so panels read a touch brighter near the top. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -9;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, white 10%, transparent) 0%,
+    transparent 34%,
+    color-mix(in srgb, black 26%, transparent) 100%
+  );
+  transition: opacity 400ms ease;
+}
+
+/* Light mode — the top light is brand-tinted and a soft multi-colored mesh
+   replaces any flat wash for gentle background accents. */
+html[data-theme="light"] body::before {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, white 60%, transparent) 0%,
+    transparent 30%,
+    color-mix(in srgb, var(--color-brand) 10%, transparent) 100%
+  );
+}
+
+html[data-theme="light"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -9;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 42% at 12% 6%, color-mix(in srgb, var(--color-brand) 24%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 88% 10%, color-mix(in srgb, var(--color-status-knowledge) 22%, transparent), transparent 70%),
+    radial-gradient(46% 46% at 82% 92%, color-mix(in srgb, var(--color-status-info) 18%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 8% 90%, color-mix(in srgb, var(--color-status-success) 14%, transparent), transparent 70%);
+  opacity: 0.85;
+}
+
+/* 2 — Glassmorphism, strengthened for the default "normal" mode: more
+   translucency + a deeper blur so the chosen background reads through as a
+   proper frosted-glass surface, while text stays crisp. */
+html[data-theme="normal"] .panel {
+  background-image: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--color-surface-2) 66%, transparent),
+    color-mix(in srgb, var(--color-surface-3) 58%, transparent) 55%,
+    color-mix(in srgb, var(--color-brand) 10%, transparent)
+  );
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+/* 3 — Soft glowing focus feedback on inputs, textareas and selects
+   (Select renders a native <select class="input">, so it is covered too). */
+.input:focus,
+.textarea:focus,
+.input:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--color-brand);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-brand) 24%, transparent),
+    0 0 22px -2px color-mix(in srgb, var(--color-brand) 45%, transparent);
+  animation: input-glow 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes input-glow {
+  from {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--color-brand) 20%, transparent),
+      0 0 14px -4px color-mix(in srgb, var(--color-brand) 35%, transparent);
+  }
+  to {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--color-brand) 30%, transparent),
+      0 0 26px 0 color-mix(in srgb, var(--color-brand) 55%, transparent);
+  }
+}
+
+/* 4 + 6 — Interactive 3D tilt and scroll-triggered reveal share one
+   transform so they never fight. MotionEffects toggles the classes and sets
+   the custom properties; CSS composes them into a single transform. */
+.panel.tilt {
+  transform: perspective(1000px)
+    translateY(var(--reveal-ty, 0px))
+    rotateX(var(--tilt-rx, 0deg))
+    rotateY(var(--tilt-ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 300ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 260ms ease, border-color 200ms ease, opacity 620ms ease;
+  will-change: transform;
+}
+
+.panel.tilt.is-tilting {
+  transition: transform 90ms ease-out, box-shadow 200ms ease;
+  border-color: var(--color-surface-border-strong);
+  box-shadow:
+    0 22px 48px -24px color-mix(in srgb, var(--color-brand) 60%, transparent),
+    0 1px 0 color-mix(in srgb, var(--color-ink-1) 8%, transparent) inset;
+}
+
+/* Scroll reveal — hidden until observed, then eased into place. When a panel
+   is not tilt-enabled (touch devices) the fade alone still applies. */
+.panel.reveal {
+  opacity: 0;
+  --reveal-ty: 16px;
+}
+.panel.reveal:not(.tilt) {
+  transform: translateY(16px);
+  transition: opacity 620ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    transform 620ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.panel.reveal.reveal-in {
+  opacity: 1;
+  --reveal-ty: 0px;
+  transform: none;
+}
+.panel.tilt.reveal.reveal-in {
+  transform: perspective(1000px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg));
+}
+
+/* 5 — Uniform lift + glow across every button variant on hover. The base
+   translateY lift is defined above; this only adds a smooth glow/brightness. */
+.btn:hover {
+  filter: brightness(1.04);
+}
+.btn-secondary:hover,
+.btn-ghost:hover {
+  box-shadow: 0 8px 20px -12px color-mix(in srgb, var(--color-brand) 70%, transparent);
+}
+
+/* 7 — Skeleton loaders: placeholder shapes with a theme-aware shimmer. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--color-surface-3) 85%, transparent);
+  border-radius: 0.5rem;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-ink-1) 10%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
   }
 }

@@ -13,7 +13,7 @@ export function AuthGatePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-1 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <span className="text-2xl text-brand" aria-hidden="true">

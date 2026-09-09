@@ -20,7 +20,7 @@ function AuthenticatedApp() {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-1 text-sm text-ink-3">
+      <div className="flex min-h-screen items-center justify-center bg-transparent text-sm text-ink-3">
         Connecting to CogniShift…
       </div>
     );

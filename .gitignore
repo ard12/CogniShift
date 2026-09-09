@@ -27,4 +27,4 @@ frontend/dist/
 .pytest-tmp*
 *.ppt
 *.pptx
-demo/
+/demo/

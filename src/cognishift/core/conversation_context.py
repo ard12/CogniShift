@@ -27,7 +27,7 @@ EQUIPMENT_REGEX = re.compile(
 )
 
 LATEST_DOC_REGEX = re.compile(
-    r'\b(?:latest\s+(?:ingested\s+)?(?:document|file|pdf|manual)|newest\s+(?:ingested\s+)?(?:document|file|pdf|manual))\b',
+    r'\b(?:(?:latest|newest|last|recently|newly|just)\s+(?:ingested|uploaded|added)?\s*(?:document|file|pdf|manual|source|data|spreadsheet|image|report)|(?:just|recently|newly)\s+(?:ingested|uploaded|added)\b)',
     re.IGNORECASE
 )
 
@@ -162,6 +162,130 @@ def get_latest_ingested_document(workspace_id: int) -> Optional[Dict[str, Any]]:
             conn.close()
 
 
+def _resolve_target_document_from_rows(
+    rows: List[Dict[str, Any]],
+    query: str
+) -> Optional[Dict[str, Any]]:
+    """Core matching logic for resolving target knowledge sources from candidates."""
+    if not rows:
+        return None
+
+    q_lower = (query or "").lower().strip()
+    if not q_lower:
+        return None
+
+    # If query explicitly specifies 'latest document', 'newest', 'just ingested', etc.
+    is_explicit_latest = bool(LATEST_DOC_REGEX.search(q_lower))
+
+    # 0. Strict Explicit Filename Matching
+    explicit_files = [f.lower().strip() for f in FILE_REGEX.findall(query or "")]
+    if explicit_files:
+        for ef in explicit_files:
+            for r in rows:
+                name = (r.get("name") or "").lower().strip()
+                orig_name = (r.get("original_filename") or "").lower().strip()
+                if _explicit_filename_matches_source(ef, name) or _explicit_filename_matches_source(ef, orig_name):
+                    return r
+        # Explicit filename specified in query, but not found among completed knowledge sources.
+        # Fail closed: Do NOT allow fuzzy / stem matching of a different file!
+        return None
+
+    # 1. Exact filename or stem match in query
+    for r in rows:
+        name = (r.get("name") or "").lower()
+        orig_name = (r.get("original_filename") or "").lower()
+        stem = Path(name).stem.lower()
+        if (name and name in q_lower) or (orig_name and orig_name in q_lower):
+            return r
+        if stem and len(stem) > 5 and stem in q_lower:
+            return r
+
+    query_equip = EQUIPMENT_REGEX.findall(query or "")
+    query_equip_lower = [e.lower() for e in query_equip]
+
+    wants_spreadsheet = any(w in q_lower for w in ["excel", "xlsx", "xls", "csv", "spreadsheet", "spreadsheets", "sheets", "workbook"])
+    wants_image = any(w in q_lower for w in ["image", "photo", "png", "jpg", "jpeg", "schematic", "p&id", "pid", "diagram", "gauge", "meter", "dial"])
+    wants_pdf = any(w in q_lower for w in ["pdf", "manual", "sop", "standard", "policy", "document"])
+
+    # If explicit latest with modality constraint or equipment target:
+    if is_explicit_latest:
+        if wants_spreadsheet:
+            for r in rows:
+                if (r.get("source_type") or "").lower() == "spreadsheet" or (r.get("name") or "").lower().endswith((".xlsx", ".xls", ".csv")):
+                    return r
+        elif wants_image:
+            for r in rows:
+                if (r.get("source_type") or "").lower() == "image" or (r.get("name") or "").lower().endswith((".png", ".jpg", ".jpeg")):
+                    return r
+        elif wants_pdf:
+            for r in rows:
+                if (r.get("source_type") or "").lower() == "pdf" or (r.get("name") or "").lower().endswith(".pdf"):
+                    return r
+        elif query_equip_lower:
+            for r in rows:
+                n = (r.get("name") or "").lower()
+                o = (r.get("original_filename") or "").lower()
+                if any(eq in n or eq in o for eq in query_equip_lower):
+                    return r
+        return rows[0]
+
+    # Domain keywords for semantic matching
+    domain_keywords = [
+        "financial", "history", "audit", "revenue", "ebitda", "pat", "cagr", "p&l", "profit",
+        "pid", "schematic", "cdu", "hydrocracker", "manifold",
+        "pump", "p-101", "p-101a", "compressor", "k-101", "sop", "maintenance", "inspection", "report",
+        "procedure", "recycle", "valve", "trip", "emergency", "envelope", "vibration", "temperature",
+        "motor", "gauge", "meter", "dial", "photo",
+        "handwritten", "note", "shift", "handover",
+        "oisd", "prv", "relief", "pressure",
+        "scada", "telemetry", "readings", "sap", "work order"
+    ]
+
+    scored_candidates = []
+    for r in rows:
+        name = (r.get("name") or "").lower()
+        orig_name = (r.get("original_filename") or "").lower()
+        stype = (r.get("source_type") or "").lower()
+        ext = Path(name).suffix.lower()
+        score = 0
+
+        # Equipment tag matching (+100 for match, -50 for mismatch)
+        if query_equip_lower:
+            if any(eq in name or eq in orig_name for eq in query_equip_lower):
+                score += 100
+            else:
+                score -= 50
+
+        # Modality alignment
+        if wants_spreadsheet:
+            if stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
+                score += 50
+            elif stype == "image" or ext in (".png", ".jpg", ".jpeg"):
+                score -= 60
+        elif wants_image:
+            if stype == "image" or ext in (".png", ".jpg", ".jpeg"):
+                score += 50
+            elif stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
+                score -= 40
+        elif wants_pdf:
+            if stype == "pdf" or ext == ".pdf":
+                score += 30
+
+        # Domain keyword matching
+        for kw in domain_keywords:
+            if kw in q_lower and (kw in name or kw in orig_name):
+                score += 35
+
+        scored_candidates.append((score, r))
+
+    scored_candidates.sort(key=lambda x: x[0], reverse=True)
+
+    if scored_candidates and scored_candidates[0][0] > 0:
+        return scored_candidates[0][1]
+
+    return None
+
+
 async def resolve_target_document_for_query(
     workspace_id: int,
     query: str,
@@ -199,105 +323,7 @@ async def resolve_target_document_for_query(
         logger.warning(f"Error fetching knowledge sources for resolution: {e}")
         return None
 
-    if not rows:
-        return None
-
-    q_lower = (query or "").lower().strip()
-
-    # If query explicitly specifies 'latest document' or 'newest', return the most recent doc
-    is_explicit_latest = bool(LATEST_DOC_REGEX.search(q_lower))
-
-    # 0. Strict Explicit Filename Matching
-    # If query mentions an explicit filename (e.g. foo.xlsx), require exact equality.
-    # Never allow a non-revision file (e.g. ..._48H.xlsx) to satisfy a request for ..._48H_REV_B.xlsx via stem matching.
-    explicit_files = [f.lower().strip() for f in FILE_REGEX.findall(query or "")]
-    if explicit_files:
-        for ef in explicit_files:
-            for r in rows:
-                name = (r.get("name") or "").lower().strip()
-                orig_name = (r.get("original_filename") or "").lower().strip()
-                if _explicit_filename_matches_source(ef, name) or _explicit_filename_matches_source(ef, orig_name):
-                    return r
-        # Explicit filename specified in query, but not found among completed knowledge sources.
-        # Fail closed: Do NOT allow fuzzy / stem matching of a different file!
-        return None
-
-    # 1. Exact filename or stem match in query
-    for r in rows:
-        name = (r.get("name") or "").lower()
-        orig_name = (r.get("original_filename") or "").lower()
-        stem = Path(name).stem.lower()
-        if (name and name in q_lower) or (orig_name and orig_name in q_lower):
-            return r
-        if stem and len(stem) > 5 and stem in q_lower:
-            return r
-
-    wants_spreadsheet = any(w in q_lower for w in ["excel", "xlsx", "xls", "csv", "spreadsheet", "spreadsheets", "sheets", "workbook"])
-    wants_image = any(w in q_lower for w in ["image", "photo", "png", "jpg", "jpeg", "schematic", "p&id", "pid", "diagram", "gauge", "meter", "dial"])
-    wants_pdf = any(w in q_lower for w in ["pdf", "manual", "sop", "standard", "policy"])
-
-    # If explicit latest with modality constraint:
-    if is_explicit_latest:
-        if wants_spreadsheet:
-            for r in rows:
-                if (r.get("source_type") or "").lower() == "spreadsheet" or (r.get("name") or "").lower().endswith((".xlsx", ".xls", ".csv")):
-                    return r
-        elif wants_image:
-            for r in rows:
-                if (r.get("source_type") or "").lower() == "image" or (r.get("name") or "").lower().endswith((".png", ".jpg", ".jpeg")):
-                    return r
-        elif wants_pdf:
-            for r in rows:
-                if (r.get("source_type") or "").lower() == "pdf" or (r.get("name") or "").lower().endswith(".pdf"):
-                    return r
-        return rows[0]
-
-    # Domain keywords for semantic matching
-    domain_keywords = [
-        "financial", "history", "audit", "revenue", "ebitda", "pat", "cagr", "p&l", "profit",
-        "pid", "schematic", "cdu", "hydrocracker", "manifold",
-        "pump", "p-101", "p-101a", "sop", "maintenance", "inspection",
-        "gauge", "meter", "dial", "photo",
-        "handwritten", "note", "shift", "handover",
-        "oisd", "prv", "relief", "pressure",
-        "scada", "telemetry", "readings", "sap", "work order"
-    ]
-
-    scored_candidates = []
-    for r in rows:
-        name = (r.get("name") or "").lower()
-        stype = (r.get("source_type") or "").lower()
-        ext = Path(name).suffix.lower()
-        score = 0
-
-        # Modality alignment
-        if wants_spreadsheet:
-            if stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
-                score += 50
-            elif stype == "image" or ext in (".png", ".jpg", ".jpeg"):
-                score -= 60
-        elif wants_image:
-            if stype == "image" or ext in (".png", ".jpg", ".jpeg"):
-                score += 50
-            elif stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
-                score -= 40
-        elif wants_pdf:
-            if stype == "pdf" or ext == ".pdf":
-                score += 30
-
-        # Domain keyword matching
-        for kw in domain_keywords:
-            if kw in q_lower and kw in name:
-                score += 35
-
-        scored_candidates.append((score, r))
-
-    scored_candidates.sort(key=lambda x: x[0], reverse=True)
-
-    if scored_candidates and scored_candidates[0][0] > 0:
-        return scored_candidates[0][1]
-
-    return None
+    return _resolve_target_document_from_rows(rows, query)
 
 
 def extract_requested_page(text: str) -> Optional[int]:
@@ -356,85 +382,7 @@ def resolve_target_document_for_query_sync(
         if conn:
             conn.close()
 
-    if not rows:
-        return None
-
-    q_lower = (query or "").lower().strip()
-
-    # 0. Strict Explicit Filename Matching
-    # If query mentions an explicit filename (e.g. foo.xlsx), require exact equality.
-    # Never allow a non-revision file (e.g. ..._48H.xlsx) to satisfy a request for ..._48H_REV_B.xlsx via stem matching.
-    explicit_files = [f.lower().strip() for f in FILE_REGEX.findall(query or "")]
-    if explicit_files:
-        for ef in explicit_files:
-            for r in rows:
-                name = (r.get("name") or "").lower().strip()
-                orig_name = (r.get("original_filename") or "").lower().strip()
-                if _explicit_filename_matches_source(ef, name) or _explicit_filename_matches_source(ef, orig_name):
-                    return r
-        # Explicit filename specified in query, but not found among completed knowledge sources.
-        # Fail closed: Do NOT allow fuzzy / stem matching of a different file!
-        return None
-
-    # 1. Exact filename or stem match in query
-    for r in rows:
-        name = (r.get("name") or "").lower()
-        orig_name = (r.get("original_filename") or "").lower()
-        stem = Path(name).stem.lower()
-        if (name and name in q_lower) or (orig_name and orig_name in q_lower):
-            return r
-        if stem and len(stem) > 5 and stem in q_lower:
-            return r
-
-    wants_spreadsheet = any(w in q_lower for w in ["excel", "xlsx", "xls", "csv", "spreadsheet", "spreadsheets", "sheets", "workbook"])
-    wants_image = any(w in q_lower for w in ["image", "photo", "png", "jpg", "jpeg", "schematic", "p&id", "pid", "diagram", "gauge", "meter", "dial"])
-    wants_pdf = any(w in q_lower for w in ["pdf", "manual", "sop", "standard", "policy"])
-
-    domain_keywords = [
-        "financial", "history", "audit", "revenue", "ebitda", "pat", "cagr", "p&l", "profit",
-        "pid", "schematic", "cdu", "hydrocracker", "manifold",
-        "pump", "p-101", "p-101a", "sop", "maintenance", "inspection", "report",
-        "gauge", "meter", "dial", "photo",
-        "handwritten", "note", "shift", "handover",
-        "oisd", "prv", "relief", "pressure",
-        "scada", "telemetry", "readings", "sap", "work order"
-    ]
-
-    scored_candidates = []
-    for r in rows:
-        name = (r.get("name") or "").lower()
-        stype = (r.get("source_type") or "").lower()
-        ext = Path(name).suffix.lower()
-        score = 0
-
-        # Modality alignment
-        if wants_spreadsheet:
-            if stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
-                score += 50
-            elif stype == "image" or ext in (".png", ".jpg", ".jpeg"):
-                score -= 60
-        elif wants_image:
-            if stype == "image" or ext in (".png", ".jpg", ".jpeg"):
-                score += 50
-            elif stype == "spreadsheet" or ext in (".xlsx", ".xls", ".csv"):
-                score -= 40
-        elif wants_pdf:
-            if stype == "pdf" or ext == ".pdf":
-                score += 30
-
-        # Domain keyword matching
-        for kw in domain_keywords:
-            if kw in q_lower and kw in name:
-                score += 35
-
-        scored_candidates.append((score, r))
-
-    scored_candidates.sort(key=lambda x: x[0], reverse=True)
-
-    if scored_candidates and scored_candidates[0][0] > 0:
-        return scored_candidates[0][1]
-
-    return None
+    return _resolve_target_document_from_rows(rows, query)
 
 
 @dataclass
@@ -734,8 +682,19 @@ class ConversationContextResolver:
                 latest_doc = get_latest_ingested_document(workspace_id)
             if latest_doc:
                 pinned_source = latest_doc
-                if latest_doc.get("name") and latest_doc["name"] not in explicit_files:
-                    explicit_files.append(latest_doc["name"])
+                doc_name = latest_doc.get("name") or latest_doc.get("original_filename")
+                if doc_name and doc_name not in explicit_files:
+                    explicit_files.append(doc_name)
+            # Authoritative latest document inquiry belongs exclusively to current turn; return immediately
+            return ResolvedContext(
+                files=list(dict.fromkeys(explicit_files)),
+                equipment_ids=list(dict.fromkeys(explicit_equipment)),
+                has_anaphora=has_anaphora,
+                pinned_source=pinned_source,
+                is_affirmation=is_affirmation,
+                is_cancellation=is_cancellation,
+                requested_page=requested_page
+            )
 
         # If current turn has its own explicit file and not an affirmation/cancellation, return immediately
         if explicit_files and not (is_affirmation or is_cancellation):
@@ -748,6 +707,24 @@ class ConversationContextResolver:
                 is_cancellation=is_cancellation,
                 requested_page=requested_page
             )
+
+        # If current turn has no explicit file extension, check if current turn directly resolves to a document in Knowledge Vault
+        if not explicit_files and not (is_affirmation or is_cancellation) and workspace_id:
+            curr_doc = resolve_target_document_for_query_sync(workspace_id, text)
+            if curr_doc:
+                pinned_source = curr_doc
+                doc_name = curr_doc.get("name") or curr_doc.get("original_filename")
+                if doc_name:
+                    explicit_files.append(doc_name)
+                return ResolvedContext(
+                    files=list(dict.fromkeys(explicit_files)),
+                    equipment_ids=list(dict.fromkeys(explicit_equipment)),
+                    has_anaphora=has_anaphora,
+                    pinned_source=pinned_source,
+                    is_affirmation=is_affirmation,
+                    is_cancellation=is_cancellation,
+                    requested_page=requested_page
+                )
 
         if not text or not conversation_history:
             return ResolvedContext(
@@ -810,6 +787,20 @@ class ConversationContextResolver:
                 matched_doc = resolve_target_document_for_query_sync(workspace_id, content)
                 if matched_doc and matched_doc.get("name"):
                     found_files = [matched_doc["name"]]
+                    if pinned_source is None:
+                        pinned_source = matched_doc
+
+            # Equipment Consistency Guard:
+            # If current turn specified explicit equipment (e.g. 'K-101'), NEVER inherit historical files
+            # that reference a conflicting equipment tag (e.g. 'PT-101')!
+            if explicit_equipment and found_files:
+                equip_in_msg = EQUIPMENT_REGEX.findall(content)
+                equip_in_files = [eq for f in found_files for eq in EQUIPMENT_REGEX.findall(f)]
+                all_hist_equip = list(dict.fromkeys(equip_in_msg + equip_in_files))
+                if all_hist_equip and not any(eq in explicit_equipment for eq in all_hist_equip):
+                    found_files = []
+                    if pinned_source and pinned_source.get("name") and any(eq in pinned_source["name"] for eq in all_hist_equip):
+                        pinned_source = None
                     if pinned_source is None:
                         pinned_source = matched_doc
 

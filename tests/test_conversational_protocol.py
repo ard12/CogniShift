@@ -205,3 +205,74 @@ async def test_chat_failure_no_retrieval_does_not_manufacture_citations():
     assert run_res.status == "completed"
     assert "No relevant local operational manual" in run_res.result_text
     assert run_res.sources_used == "None (No matching manual found)"
+
+
+# -----------------------------------------------------------------------------
+# 5. LATEST INGESTED DOCUMENT & EQUIPMENT-TARGETED RESOLUTION (Regression Guards)
+# -----------------------------------------------------------------------------
+@pytest.fixture
+async def seed_test_knowledge_assets():
+    """Seed test knowledge assets into isolated test database within workspace 1 root."""
+    from cognishift.core.security import get_workspace_root
+    ws_root = get_workspace_root(1)
+    upload_dir = ws_root / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    pdf_file = upload_dir / "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 dummy SOP for K-101 Compressor Emergency Trip")
+    img_file = upload_dir / "gauge_compressor_discharge_pt101.png"
+    img_file.write_bytes(b"\x89PNG dummy PT-101 gauge image")
+
+    async with get_db() as db:
+        await db.execute("""
+            INSERT INTO knowledge_sources (id, workspace_id, name, original_filename, local_path, source_type, processing_status, created_at)
+            VALUES (9001, 1, 'gauge_compressor_discharge_pt101.png', 'gauge_compressor_discharge_pt101.png', ?, 'image', 'completed', '2026-09-09 01:21:39')
+            ON CONFLICT(id) DO UPDATE SET processing_status = 'completed', local_path = excluded.local_path
+        """, (str(img_file),))
+        await db.execute("""
+            INSERT INTO knowledge_sources (id, workspace_id, name, original_filename, local_path, source_type, processing_status, created_at)
+            VALUES (9002, 1, 'K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf', 'K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf', ?, 'pdf', 'completed', '2026-09-09 01:23:08')
+            ON CONFLICT(id) DO UPDATE SET processing_status = 'completed', local_path = excluded.local_path
+        """, (str(pdf_file),))
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_user_query_just_ingested_document_resolves_latest_technical_doc_without_history_pollution(seed_test_knowledge_assets):
+    """Verify 'I just ingested a document, explain me what it is about' targets latest doc, not stale image."""
+    stale_history = [
+        {"role": "user", "content": "can you explain me what is happening in this photo?"},
+        {"role": "assistant", "content": "The image depicts a pressure gauge (PT-101) [Knowledge Source | gauge_compressor_discharge_pt101.png]"}
+    ]
+    run_res = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="I just ingested a document, explain me what it is about",
+        user_id="operator_sam",
+        conversation_history=stale_history
+    )
+
+    assert run_res.status == "completed"
+    assert "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf" in (run_res.sources_used or "")
+    assert "gauge_compressor_discharge_pt101.png" not in (run_res.sources_used or "")
+
+
+@pytest.mark.asyncio
+async def test_user_query_explicit_equipment_tag_resolves_equipment_sop_without_history_pollution(seed_test_knowledge_assets):
+    """Verify 'explain me the document about K-101 in depth' targets K-101 SOP, rejecting PT-101 gauge history."""
+    stale_history = [
+        {"role": "user", "content": "can you explain me what is happening in this photo?"},
+        {"role": "assistant", "content": "The image depicts a pressure gauge (PT-101) [Knowledge Source | gauge_compressor_discharge_pt101.png]"}
+    ]
+    run_res = await execute_agent_run(
+        workspace_id=1,
+        agent_id=1,
+        input_text="explain me the document about K-101 in depth",
+        user_id="operator_sam",
+        conversation_history=stale_history
+    )
+
+    assert run_res.status == "completed"
+    assert "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf" in (run_res.sources_used or "")
+    assert "gauge_compressor_discharge_pt101.png" not in (run_res.sources_used or "")
+
+

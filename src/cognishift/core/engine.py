@@ -608,6 +608,8 @@ async def _resolve_knowledge_and_page_context(
     for phrase in [
         "inspection file", "inspection report", "the inspection", "that inspection",
         "maintenance sop", "pump sop", "the sop", "that sop",
+        "k-101 sop", "k-101 document", "k-101 manual", "compressor sop", "compressor document", "compressor manual",
+        "emergency trip", "trip procedure", "operating procedure",
         "financial history", "financial spreadsheet", "that spreadsheet", "the spreadsheet", "financial file", "financial workbook"
     ]:
         if phrase in lower_input:
@@ -900,7 +902,16 @@ async def execute_agent_run(
 
         # Early Authoritative Target Document Resolution
         target_doc = None
-        if active_pending_task and getattr(active_pending_task, "source_references", None) and active_pending_task.source_references.get("pinned_source"):
+        direct_doc = await resolve_target_document_for_query(workspace_id, clean_input, db=db)
+        if direct_doc:
+            target_doc = direct_doc
+            if resolved_context:
+                d_name = direct_doc.get("name") or direct_doc.get("original_filename")
+                if d_name:
+                    resolved_context.files = [d_name]
+                resolved_context.pinned_source = direct_doc
+                resolved_context.source_turn = None
+        elif active_pending_task and getattr(active_pending_task, "source_references", None) and active_pending_task.source_references.get("pinned_source"):
             target_doc = active_pending_task.source_references["pinned_source"]
         elif resolved_context and resolved_context.pinned_source:
             target_doc = resolved_context.pinned_source
@@ -912,8 +923,6 @@ async def execute_agent_run(
             r_f = await c_f.fetchone()
             if r_f:
                 target_doc = dict(r_f)
-        if not target_doc:
-            target_doc = await resolve_target_document_for_query(workspace_id, clean_input, db=db)
 
         # --- ROUTER 1: SEMANTIC INTENT CLASSIFICATION ---
         if settings.semantic_router_enabled:
@@ -1531,21 +1540,25 @@ async def execute_agent_run(
 
                 # Search knowledge_sources first for authoritative documents uploaded in Knowledge Vault
                 cursor_sources = await db.execute(
-                    "SELECT id, name, original_filename, local_path, source_type FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' ORDER BY id DESC LIMIT 30",
+                    "SELECT id, name, original_filename, local_path, source_type FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' ORDER BY id DESC LIMIT 100",
                     (workspace_id,)
                 )
-                source_rows = await cursor_sources.fetchall()
+                source_rows = list(await cursor_sources.fetchall())
 
                 # Search workspace_artifacts second for generated files
                 cursor_artifacts = await db.execute(
-                    "SELECT id, filename, relative_path, file_size, artifact_type, title, description FROM workspace_artifacts WHERE workspace_id = ? ORDER BY id DESC LIMIT 30",
+                    "SELECT id, filename, relative_path, file_size, artifact_type, title, description FROM workspace_artifacts WHERE workspace_id = ? ORDER BY id DESC LIMIT 50",
                     (workspace_id,)
                 )
                 art_rows = await cursor_artifacts.fetchall()
 
                 matching_artifacts = []
                 lower_input = clean_input.lower()
-                target_doc = await resolve_target_document_for_query(workspace_id, clean_input)
+                if not target_doc:
+                    if resolved_context and resolved_context.pinned_source:
+                        target_doc = resolved_context.pinned_source
+                    else:
+                        target_doc = await resolve_target_document_for_query(workspace_id, clean_input, db=db)
 
                 target_files = []
                 if resolved_context and resolved_context.files:
@@ -1558,6 +1571,17 @@ async def execute_agent_run(
                 for ef in explicit_files:
                     if ef not in target_files:
                         target_files.append(ef)
+
+                if target_files:
+                    tf_ph = ",".join("?" for _ in target_files)
+                    c_tf = await db.execute(
+                        f"SELECT id, name, original_filename, local_path, source_type FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name IN ({tf_ph}) OR original_filename IN ({tf_ph}))",
+                        (workspace_id, *target_files, *target_files)
+                    )
+                    existing_sids = {r["id"] for r in source_rows}
+                    for r_tf in await c_tf.fetchall():
+                        if r_tf["id"] not in existing_sids:
+                            source_rows.append(r_tf)
 
                 GENERIC_STEMS = {"report", "reading", "readings", "file", "document", "artifact", "data", "sheet", "table", "summary", "test", "plan", "output", "input", "result", "results", "status", "logs", "log", "pdf"}
                 ref_files = [f.lower() for f in target_files]

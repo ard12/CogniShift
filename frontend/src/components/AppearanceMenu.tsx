@@ -72,7 +72,7 @@ export function AppearanceMenu() {
 
   useEffect(() => {
     if (!open) return;
-    function onPointerDown(event: MouseEvent) {
+    function onPointerDown(event: MouseEvent | TouchEvent) {
       const target = event.target as Node;
       if (
         rootRef.current && !rootRef.current.contains(target) &&
@@ -85,9 +85,11 @@ export function AppearanceMenu() {
       if (event.key === "Escape") setOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);

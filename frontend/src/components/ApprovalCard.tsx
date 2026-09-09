@@ -68,9 +68,9 @@ export function ApprovalCard({
 
       <div className="flex gap-2 pt-1">
         <Button
-          variant="primary"
+          variant="success"
           size="sm"
-          className="flex-1 bg-status-success! text-surface-0! hover:bg-status-success/90!"
+          className="flex-1"
           onClick={() => handle("approve")}
           loading={pending === "approve"}
           disabled={pending !== null}

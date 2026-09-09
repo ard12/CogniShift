@@ -840,10 +840,9 @@ export function MailPage() {
                     ) : (
                       <Button
                         size="sm"
-                        variant="primary"
+                        variant="success"
                         disabled={isExecutingPermit}
                         onClick={() => setShowConfirmModal(true)}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
                       >
                         <IconPlay className="h-3.5 w-3.5 mr-1" />
                         Execute Authorized Action (Simulated)
@@ -1058,10 +1057,9 @@ export function MailPage() {
                 Cancel
               </Button>
               <Button
-                variant="primary"
+                variant="success"
                 onClick={handleExecutePermit}
                 disabled={isExecutingPermit}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
               >
                 {isExecutingPermit ? "Executing..." : "Execute & Consume Permit"}
               </Button>

@@ -41,8 +41,7 @@ export function AppShell() {
   return (
     <div className="flex h-screen overflow-hidden bg-transparent text-ink-1">
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-surface-border bg-surface-2/80 backdrop-blur-md lg:flex">
-
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-surface-border bg-surface-2 lg:flex">
         <Brand />
         <Sidebar />
       </aside>
@@ -51,7 +50,7 @@ export function AppShell() {
       {mobileNavOpen && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div className="absolute inset-0 bg-black/70" onClick={() => setMobileNavOpen(false)} />
-          <aside className="relative z-10 flex w-64 flex-col border-r border-surface-border bg-surface-2/90 backdrop-blur-md">
+          <aside className="relative z-10 flex w-64 flex-col border-r border-surface-border bg-surface-2">
             <div className="flex items-center justify-between">
               <Brand />
               <button
@@ -69,13 +68,11 @@ export function AppShell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top status bar — sticky + slightly shrinks on scroll to save space */}
+        {/* Top status bar — stationary and aligned with sidebar divider */}
         <header
           className={cn(
-            "sticky top-0 z-30 flex shrink-0 items-center gap-3 border-b border-surface-border backdrop-blur-md px-3 transition-[height,box-shadow,background-color] duration-300 sm:px-4",
-            scrolled
-              ? "h-11 bg-surface-2/90 shadow-lg shadow-black/20"
-              : "h-14 bg-surface-2/80"
+            "flex h-14 shrink-0 items-center gap-3 border-b border-surface-border bg-surface-2/95 backdrop-blur-md px-3 sm:px-4 transition-shadow duration-200",
+            scrolled && "shadow-md shadow-black/10"
           )}
         >
           <button

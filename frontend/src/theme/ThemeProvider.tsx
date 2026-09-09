@@ -121,22 +121,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setTheme = useCallback((next: ThemeMode) => {
-    setThemeState((current) => {
-      if (next === current) return current;
-
-      const prefersReduced = window.matchMedia?.(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-
-      if (prefersReduced) {
-        return next;
-      }
-
+    setThemeState(next);
+    const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!prefersReduced) {
       setPetalsActive(true);
-      timers.current.push(window.setTimeout(() => setThemeState(next), 650));
-      timers.current.push(window.setTimeout(() => setPetalsActive(false), 2600));
-      return current;
-    });
+      timers.current.push(window.setTimeout(() => setPetalsActive(false), 2000));
+    }
   }, []);
 
   const setBackground = useCallback((next: BackgroundKind) => {

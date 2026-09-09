@@ -47,6 +47,7 @@ html[data-theme="normal"] {
   color-scheme: dark;
   --color-brand: #06b6d4;
   --color-brand-strong: #0891b2;
+  --color-brand-ink: #05070a;
 
   --color-surface-0: #05070a;
   --color-surface-1: #0a0d12;
@@ -62,8 +63,10 @@ html[data-theme="normal"] {
 
   --color-status-info: #22d3ee;
   --color-status-success: #34d399;
+  --color-status-success-ink: #05070a;
   --color-status-warning: #fbbf24;
   --color-status-error: #f87171;
+  --color-status-error-ink: #05070a;
   --color-status-knowledge: #818cf8;
 }
 
@@ -72,6 +75,7 @@ html[data-theme="dark"] {
   color-scheme: dark;
   --color-brand: #5b93ff;
   --color-brand-strong: #3f78f0;
+  --color-brand-ink: #ffffff;
 
   --color-surface-0: #050b1a;
   --color-surface-1: #091326;
@@ -87,8 +91,10 @@ html[data-theme="dark"] {
 
   --color-status-info: #4cc9f0;
   --color-status-success: #4ade80;
+  --color-status-success-ink: #050b1a;
   --color-status-warning: #ffcf5c;
   --color-status-error: #ff7a92;
+  --color-status-error-ink: #ffffff;
   --color-status-knowledge: #a5b4fc;
 }
 
@@ -97,6 +103,7 @@ html[data-theme="light"] {
   color-scheme: light;
   --color-brand: #3f6ff0;
   --color-brand-strong: #2b57d6;
+  --color-brand-ink: #ffffff;
 
   --color-surface-0: #ffffff;
   --color-surface-1: #f3f5fb;
@@ -112,8 +119,10 @@ html[data-theme="light"] {
 
   --color-status-info: #0ea5e9;
   --color-status-success: #10b981;
+  --color-status-success-ink: #ffffff;
   --color-status-warning: #d98a04;
   --color-status-error: #e11d48;
+  --color-status-error-ink: #ffffff;
   --color-status-knowledge: #6366f1;
 }
 
@@ -125,7 +134,7 @@ html[data-theme="light"] {
   html {
     color-scheme: dark;
     /* --ui-scale is controlled by the appearance menu (zoom in / out). */
-    font-size: calc(16px * var(--ui-scale, 1.06));
+    font-size: calc(16px * var(--ui-scale, 1.0));
     /* --ui-font is controlled by the appearance menu (font picker). */
     font-family: var(--ui-font, "Inter", system-ui, -apple-system, sans-serif);
     transition: color 300ms ease, background-color 300ms ease;
@@ -328,22 +337,11 @@ html[data-theme="light"][data-bg="image"] .app-bg-layer {
 
 @layer components {
   .panel {
-    /* Frosted glass: the chosen background reads softly through every panel
-       on every page, while staying opaque enough to keep text crisp.
-       A faint theme-aware gradient gives each mode its own depth. */
-    background-image:
-      linear-gradient(
-        150deg,
-        color-mix(in srgb, var(--color-surface-2) 90%, transparent),
-        color-mix(in srgb, var(--color-surface-3) 82%, transparent) 55%,
-        color-mix(in srgb, var(--color-brand) 7%, var(--color-surface-2))
-      );
-    backdrop-filter: blur(10px) saturate(1.08);
-    -webkit-backdrop-filter: blur(10px) saturate(1.08);
+    background-color: var(--color-surface-2);
     border: 1px solid var(--color-surface-border);
-    border-radius: 0.85rem;
-    box-shadow: 0 1px 0 color-mix(in srgb, var(--color-ink-1) 6%, transparent) inset;
-    transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2), 0 1px 0 color-mix(in srgb, var(--color-ink-1) 6%, transparent) inset;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
   }
 
   .panel-hover {
@@ -362,18 +360,18 @@ html[data-theme="light"][data-bg="image"] .app-bg-layer {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0.6rem;
+    border-radius: 0.5rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 500;
     padding: 0.5rem 0.875rem;
-    transition-property: color, background-color, border-color, box-shadow, transform;
-    transition-duration: 180ms;
+    transition-property: color, background-color, border-color, box-shadow, filter;
+    transition-duration: 150ms;
     transition-timing-function: ease;
   }
 
   .btn:hover {
-    transform: translateY(-1px);
+    filter: brightness(1.06);
   }
 
   .btn:active {
@@ -386,44 +384,29 @@ html[data-theme="light"][data-bg="image"] .app-bg-layer {
   }
 
   .btn-primary {
-    position: relative;
-    overflow: hidden;
-    background-image: linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--color-brand) 92%, white),
-      var(--color-brand) 45%,
-      var(--color-brand-strong)
-    );
-    color: var(--color-surface-0);
-    box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--color-brand) 70%, transparent);
-  }
-
-  /* Shine sweep for primary actions. */
-  .btn-primary::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      120deg,
-      transparent 30%,
-      color-mix(in srgb, white 45%, transparent) 50%,
-      transparent 70%
-    );
-    transform: translateX(-120%);
-    transition: transform 650ms ease;
-  }
-
-  .btn-primary:hover::after,
-  .btn-primary:focus-visible::after {
-    transform: translateX(120%);
+    background-color: var(--color-brand);
+    color: var(--color-brand-ink, #ffffff);
+    box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--color-brand) 50%, transparent);
   }
 
   .btn-primary:hover {
-    box-shadow: 0 10px 26px -8px color-mix(in srgb, var(--color-brand) 85%, transparent);
+    background-color: var(--color-brand-strong);
+    box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--color-brand) 65%, transparent);
   }
 
   .btn-primary:active {
-    box-shadow: 0 3px 10px -6px color-mix(in srgb, var(--color-brand) 70%, transparent);
+    box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--color-brand) 60%, transparent);
+  }
+
+  .btn-success {
+    background-color: var(--color-status-success);
+    color: var(--color-status-success-ink, #05070a);
+    box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--color-status-success) 50%, transparent);
+  }
+
+  .btn-success:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--color-status-success) 65%, transparent);
   }
 
   .btn-secondary {
@@ -448,12 +431,13 @@ html[data-theme="light"][data-bg="image"] .app-bg-layer {
 
   .btn-danger {
     background-color: var(--color-status-error);
-    color: var(--color-surface-0);
+    color: var(--color-status-error-ink, #ffffff);
+    box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--color-status-error) 50%, transparent);
   }
 
   .btn-danger:hover {
-    opacity: 0.92;
-    box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--color-status-error) 75%, transparent);
+    filter: brightness(1.08);
+    box-shadow: 0 6px 18px -4px color-mix(in srgb, var(--color-status-error) 65%, transparent);
   }
 
   .input {
@@ -701,103 +685,39 @@ html[data-theme="light"] body::after {
   z-index: -9;
   pointer-events: none;
   background:
-    radial-gradient(42% 42% at 12% 6%, color-mix(in srgb, var(--color-brand) 24%, transparent), transparent 70%),
-    radial-gradient(40% 40% at 88% 10%, color-mix(in srgb, var(--color-status-knowledge) 22%, transparent), transparent 70%),
-    radial-gradient(46% 46% at 82% 92%, color-mix(in srgb, var(--color-status-info) 18%, transparent), transparent 70%),
-    radial-gradient(40% 40% at 8% 90%, color-mix(in srgb, var(--color-status-success) 14%, transparent), transparent 70%);
-  opacity: 0.85;
+    radial-gradient(42% 42% at 12% 6%, color-mix(in srgb, var(--color-brand) 16%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 88% 10%, color-mix(in srgb, var(--color-status-knowledge) 14%, transparent), transparent 70%),
+    radial-gradient(46% 46% at 82% 92%, color-mix(in srgb, var(--color-status-info) 12%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 8% 90%, color-mix(in srgb, var(--color-status-success) 10%, transparent), transparent 70%);
+  opacity: 0.3;
 }
 
-/* 2 — Glassmorphism, strengthened for the default "normal" mode: more
-   translucency + a deeper blur so the chosen background reads through as a
-   proper frosted-glass surface, while text stays crisp. */
-html[data-theme="normal"] .panel {
-  background-image: linear-gradient(
-    150deg,
-    color-mix(in srgb, var(--color-surface-2) 66%, transparent),
-    color-mix(in srgb, var(--color-surface-3) 58%, transparent) 55%,
-    color-mix(in srgb, var(--color-brand) 10%, transparent)
-  );
-  backdrop-filter: blur(18px) saturate(1.2);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-}
-
-/* 3 — Soft glowing focus feedback on inputs, textareas and selects
-   (Select renders a native <select class="input">, so it is covered too). */
+/* 2 — Static focus feedback on inputs and textareas (clean, non-distracting) */
 .input:focus,
 .textarea:focus,
 .input:focus-visible,
 .textarea:focus-visible {
   border-color: var(--color-brand);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--color-brand) 24%, transparent),
-    0 0 22px -2px color-mix(in srgb, var(--color-brand) 45%, transparent);
-  animation: input-glow 1.8s ease-in-out infinite alternate;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
 }
 
-@keyframes input-glow {
-  from {
-    box-shadow:
-      0 0 0 3px color-mix(in srgb, var(--color-brand) 20%, transparent),
-      0 0 14px -4px color-mix(in srgb, var(--color-brand) 35%, transparent);
-  }
-  to {
-    box-shadow:
-      0 0 0 3px color-mix(in srgb, var(--color-brand) 30%, transparent),
-      0 0 26px 0 color-mix(in srgb, var(--color-brand) 55%, transparent);
-  }
-}
-
-/* 4 + 6 — Interactive 3D tilt and scroll-triggered reveal share one
-   transform so they never fight. MotionEffects toggles the classes and sets
-   the custom properties; CSS composes them into a single transform. */
-.panel.tilt {
-  transform: perspective(1000px)
-    translateY(var(--reveal-ty, 0px))
-    rotateX(var(--tilt-rx, 0deg))
-    rotateY(var(--tilt-ry, 0deg));
-  transform-style: preserve-3d;
-  transition: transform 300ms cubic-bezier(0.2, 0.7, 0.3, 1),
-    box-shadow 260ms ease, border-color 200ms ease, opacity 620ms ease;
-  will-change: transform;
-}
-
-.panel.tilt.is-tilting {
-  transition: transform 90ms ease-out, box-shadow 200ms ease;
-  border-color: var(--color-surface-border-strong);
-  box-shadow:
-    0 22px 48px -24px color-mix(in srgb, var(--color-brand) 60%, transparent),
-    0 1px 0 color-mix(in srgb, var(--color-ink-1) 8%, transparent) inset;
-}
-
-/* Scroll reveal — hidden until observed, then eased into place. When a panel
-   is not tilt-enabled (touch devices) the fade alone still applies. */
+/* 3 — Ensure panels remain visible and stable immediately upon render */
 .panel.reveal {
-  opacity: 0;
-  --reveal-ty: 16px;
-}
-.panel.reveal:not(.tilt) {
-  transform: translateY(16px);
-  transition: opacity 620ms cubic-bezier(0.2, 0.7, 0.3, 1),
-    transform 620ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-.panel.reveal.reveal-in {
   opacity: 1;
-  --reveal-ty: 0px;
   transform: none;
 }
-.panel.tilt.reveal.reveal-in {
-  transform: perspective(1000px) rotateX(var(--tilt-rx, 0deg)) rotateY(var(--tilt-ry, 0deg));
+.panel.reveal-in {
+  opacity: 1;
+  transform: none;
 }
 
-/* 5 — Uniform lift + glow across every button variant on hover. The base
-   translateY lift is defined above; this only adds a smooth glow/brightness. */
+/* 4 — Uniform lift across buttons on hover */
 .btn:hover {
-  filter: brightness(1.04);
+  filter: brightness(1.06);
 }
 .btn-secondary:hover,
 .btn-ghost:hover {
-  box-shadow: 0 8px 20px -12px color-mix(in srgb, var(--color-brand) 70%, transparent);
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--color-brand) 50%, transparent);
 }
 
 /* 7 — Skeleton loaders: placeholder shapes with a theme-aware shimmer. */

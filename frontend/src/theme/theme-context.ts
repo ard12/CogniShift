@@ -29,7 +29,7 @@ export const FONTS: { id: FontKind; label: string }[] = [
 export const SCALE_MIN = 0.85;
 export const SCALE_MAX = 1.4;
 export const SCALE_STEP = 0.05;
-export const SCALE_DEFAULT = 1.06;
+export const SCALE_DEFAULT = 1.0;
 
 export interface ThemeContextValue {
   theme: ThemeMode;

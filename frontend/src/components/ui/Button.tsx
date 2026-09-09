@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { IconLoader } from "./Icon";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "success";
 type Size = "sm" | "md";
 
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> {

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { AppearanceMenu } from "@/components/AppearanceMenu";
 import { Button } from "@/components/ui/Button";
 import { InlineError } from "@/components/ui/States";
 
@@ -13,7 +14,10 @@ export function AuthGatePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-transparent px-4">
+      <div className="absolute right-4 top-4 z-20">
+        <AppearanceMenu />
+      </div>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <span className="text-2xl text-brand" aria-hidden="true">

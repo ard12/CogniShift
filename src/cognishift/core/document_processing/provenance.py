@@ -100,8 +100,15 @@ class PageAwareChunker:
 
 def format_grounded_citation(metadata: Dict[str, Any]) -> str:
     """Formats human-facing citation string with document, page, and extraction method."""
-    filename = metadata.get("filename", "Document")
-    page = metadata.get("page", 1)
+    filename = (
+        metadata.get("filename")
+        or metadata.get("document")
+        or metadata.get("document_name")
+        or metadata.get("original_filename")
+        or metadata.get("name")
+        or "Document"
+    )
+    page = metadata.get("page") or metadata.get("page_number") or 1
     method = metadata.get("extraction_method", "native").upper()
     return f"[{filename} | Page {page} | {method}]"
 
@@ -113,8 +120,17 @@ def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
     Escapes both metadata attributes and body text to prevent XML delimiter breakout.
     Defense-in-depth data demarcation only; deterministic authorization is enforced separately.
     """
-    src = html.escape(str(metadata.get("filename", "unknown")), quote=True)
-    page = html.escape(str(metadata.get("page", 1)), quote=True)
+    raw_fname = (
+        metadata.get("filename")
+        or metadata.get("document")
+        or metadata.get("document_name")
+        or metadata.get("original_filename")
+        or metadata.get("name")
+        or "unknown"
+    )
+    src = html.escape(str(raw_fname), quote=True)
+    page_val = metadata.get("page") or metadata.get("page_number") or 1
+    page = html.escape(str(page_val), quote=True)
     method = html.escape(str(metadata.get("extraction_method", "native")), quote=True)
     safe_text = html.escape(text, quote=False)
     return f'<document_context source="{src}" page="{page}" method="{method}">\n{safe_text}\n</document_context>'
@@ -210,9 +226,16 @@ def reconcile_citations_against_evidence(
     exact_map: Dict[Tuple[str, int], Dict[str, Any]] = {}
     file_to_chunks: Dict[str, List[Dict[str, Any]]] = {}
     for meta in retrieved_evidence:
-        fname = meta.get("filename") or meta.get("name") or "Document"
+        fname = (
+            meta.get("filename")
+            or meta.get("document")
+            or meta.get("document_name")
+            or meta.get("original_filename")
+            or meta.get("name")
+            or "Document"
+        )
         fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
-        page = int(meta.get("page", 1))
+        page = int(meta.get("page") or meta.get("page_number") or 1)
         method = str(meta.get("extraction_method", "native")).upper()
         key = (fname_clean.lower(), page)
         canonical = f"[{fname_clean} | Page {page} | {method}]"
@@ -267,9 +290,16 @@ def reconcile_citations_against_evidence(
     # 3. Fallback to retrieved evidence if model omitted citations
     if not verified and fallback_to_evidence_if_empty:
         for meta in retrieved_evidence:
-            fname = meta.get("filename") or meta.get("name") or "Document"
+            fname = (
+                meta.get("filename")
+                or meta.get("document")
+                or meta.get("document_name")
+                or meta.get("original_filename")
+                or meta.get("name")
+                or "Document"
+            )
             fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
-            page = int(meta.get("page", 1))
+            page = int(meta.get("page") or meta.get("page_number") or 1)
             method = str(meta.get("extraction_method", "native")).upper()
             canonical = f"[{fname_clean} | Page {page} | {method}]"
             key = (fname_clean.lower(), page)
@@ -285,4 +315,74 @@ def reconcile_citations_against_evidence(
 
     sources_used = ", ".join(c["citation_str"] for c in verified) if verified else "None (No matching manual found)"
     return verified, sources_used
+
+
+def reconcile_citations_in_text(
+    text: str,
+    verified_citations: List[Dict[str, Any]],
+    retrieved_evidence: Optional[List[Dict[str, Any]]] = None
+) -> str:
+    """
+    Rewrites any hallucinated or malformed bracketed citations inside text
+    to authoritative retrieved filenames and page numbers.
+    The model is never permitted to dictate page numbers.
+    """
+    if not text:
+        return text
+
+    # Build reference lookup from verified citations and retrieved evidence
+    ref_map: Dict[str, Dict[str, Any]] = {}
+    if verified_citations:
+        for c in verified_citations:
+            ref_map[c["filename"].lower()] = c
+    if retrieved_evidence:
+        for meta in retrieved_evidence:
+            fname = (
+                meta.get("filename")
+                or meta.get("document")
+                or meta.get("document_name")
+                or meta.get("original_filename")
+                or meta.get("name")
+                or ""
+            )
+            if fname:
+                fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
+                if fname_clean.lower() not in ref_map:
+                    p = int(meta.get("page") or meta.get("page_number") or 1)
+                    ref_map[fname_clean.lower()] = {
+                        "filename": fname_clean,
+                        "page": p,
+                        "method": str(meta.get("extraction_method", "native")).upper()
+                    }
+
+    def _replace_cite(match: re.Match) -> str:
+        raw = match.group(1).strip()
+        parts = [p.strip() for p in re.split(r"\s*[|;,]\s*", raw) if p.strip()]
+        if not parts:
+            return match.group(0)
+        cand_fname = parts[0]
+        cand_clean = Path(cand_fname).name if ("/" in cand_fname or "\\" in cand_fname) else cand_fname
+
+        # Lookup in ref_map
+        matched_info = None
+        if cand_clean.lower() in ref_map:
+            matched_info = ref_map[cand_clean.lower()]
+        else:
+            for k, info in ref_map.items():
+                if cand_clean.lower() in k or k in cand_clean.lower():
+                    matched_info = info
+                    break
+
+        if matched_info:
+            p = matched_info["page"]
+            m = matched_info.get("method")
+            if m:
+                return f"[{matched_info['filename']} | Page {p} | {m}]"
+            return f"[{matched_info['filename']} | Page {p}]"
+
+        return match.group(0)
+
+    pattern = r"\[([^\]]+?(?:\.pdf|\.csv|\.xlsx|\.png|\.jpg|\.txt)[^\]]*?)\]"
+    return re.sub(pattern, _replace_cite, text, flags=re.IGNORECASE)
+
 

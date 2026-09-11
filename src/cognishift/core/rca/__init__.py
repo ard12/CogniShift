@@ -2,6 +2,7 @@
 from cognishift.core.rca.schemas import (
     EvidenceRole,
     RCAStatus,
+    PrimaryCauseCode,
     RCAEvidenceItem,
     RCAEvidenceBundle,
     ChannelExecutionHealth,
@@ -25,10 +26,16 @@ from cognishift.core.rca.evidence_acquisition import (
 from cognishift.core.rca.evidence_validation import (
     RCAEvidenceValidator,
 )
+from cognishift.core.rca.evaluation import (
+    MetricStatus,
+    evaluate_threshold,
+    score_status_strict,
+)
 
 __all__ = [
     "EvidenceRole",
     "RCAStatus",
+    "PrimaryCauseCode",
     "RCAEvidenceItem",
     "RCAEvidenceBundle",
     "ChannelExecutionHealth",
@@ -43,4 +50,7 @@ __all__ = [
     "EQUIPMENT_SENSOR_REGISTRY",
     "RCAEvidenceAcquirer",
     "RCAEvidenceValidator",
+    "MetricStatus",
+    "evaluate_threshold",
+    "score_status_strict",
 ]

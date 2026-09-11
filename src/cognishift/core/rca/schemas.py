@@ -26,6 +26,19 @@ class RCAStatus(str, Enum):
     PLAUSIBLE_HYPOTHESIS = "PLAUSIBLE_HYPOTHESIS"
     CONTRADICTORY_EVIDENCE = "CONTRADICTORY_EVIDENCE"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    ASSET_NOT_FOUND = "ASSET_NOT_FOUND"
+
+
+class PrimaryCauseCode(str, Enum):
+    SUCTION_STARVATION_CAVITATION = "SUCTION_STARVATION_CAVITATION"
+    BEARING_OVERHEAT = "BEARING_OVERHEAT"
+    VALVE_STEM_BINDING = "VALVE_STEM_BINDING"
+    LUBE_OIL_PRESSURE_LOSS = "LUBE_OIL_PRESSURE_LOSS"
+    PROCESS_OVERPRESSURE = "PROCESS_OVERPRESSURE"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    ASSET_NOT_FOUND = "ASSET_NOT_FOUND"
+    CONTRADICTORY_EVIDENCE = "CONTRADICTORY_EVIDENCE"
+    UNKNOWN = "UNKNOWN"
 
 
 class ChannelExecutionHealth(BaseModel):
@@ -41,6 +54,10 @@ class ChannelExecutionHealth(BaseModel):
     visual_pages_indexed: int = 0
     topology_status: str = "EMPTY"  # "ACTIVE", "EMPTY"
     vlm_status: str = "UNAVAILABLE"  # "ACTIVE", "UNAVAILABLE"
+    text_candidate_count: int = 0
+    visual_candidate_count: int = 0
+    topology_node_count: int = 0
+    topology_edge_count: int = 0
 
 
 class RCAEvidenceItem(BaseModel):
@@ -74,6 +91,8 @@ class RCAEvidenceBundle(BaseModel):
     telemetry_coverage: Dict[str, bool] = Field(default_factory=dict)
     retrieval_diagnostics: Dict[str, Any] = Field(default_factory=dict)
     channel_health: ChannelExecutionHealth = Field(default_factory=ChannelExecutionHealth)
+    final_evidence_channels: List[str] = Field(default_factory=list)
+    evidence_channel_counts: Dict[str, int] = Field(default_factory=dict)
 
     def get_evidence_by_id(self, evidence_id: str) -> Optional[RCAEvidenceItem]:
         for item in self.evidence_items:
@@ -118,10 +137,12 @@ class RCAPrimaryConclusion(BaseModel):
     claim: str
     evidence_ids: List[str] = Field(default_factory=list)
     status: RCAStatus = RCAStatus.INSUFFICIENT_EVIDENCE
+    primary_cause_code: Optional[PrimaryCauseCode] = None
 
 
 class RCAStructuredResponse(BaseModel):
     status: RCAStatus
+    primary_cause_code: Optional[PrimaryCauseCode] = None
     confirmed_observations: List[RCAObservationClaim] = Field(default_factory=list)
     causal_chain: List[str] = Field(default_factory=list)
     candidate_causes: List[RCACandidateCause] = Field(default_factory=list)

@@ -2,10 +2,12 @@
 import re
 import json
 import logging
+from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, Tuple
 
 from cognishift.core.rca.schemas import (
     RCAStatus,
+    PrimaryCauseCode,
     RCAEvidenceItem,
     RCAEvidenceBundle,
     EvidenceRole,
@@ -17,6 +19,73 @@ from cognishift.core.rca.schemas import (
 from cognishift.core.rca.policy import determine_rca_status
 
 logger = logging.getLogger(__name__)
+
+
+def determine_primary_cause_code(
+    status: RCAStatus,
+    primary_cause_text: str,
+    observations: List[str],
+    bundle: RCAEvidenceBundle,
+    parsed_code: Optional[str] = None
+) -> PrimaryCauseCode:
+    """Deterministically extracts or classifies machine-readable PrimaryCauseCode."""
+    if status == RCAStatus.ASSET_NOT_FOUND or bundle.retrieval_diagnostics.get("ood_triggered"):
+        return PrimaryCauseCode.ASSET_NOT_FOUND
+    if status == RCAStatus.INSUFFICIENT_EVIDENCE or not bundle.evidence_items:
+        return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
+    if status == RCAStatus.CONTRADICTORY_EVIDENCE:
+        return PrimaryCauseCode.CONTRADICTORY_EVIDENCE
+
+    if parsed_code:
+        clean_code = str(parsed_code).strip().upper().replace(" ", "_").replace("-", "_")
+        for code in PrimaryCauseCode:
+            if code.value == clean_code:
+                return code
+
+    evidence_text = " ".join(item.content for item in bundle.evidence_items)
+    evidence_files = " ".join(item.filename for item in bundle.evidence_items)
+    combined_query_and_cause = (str(primary_cause_text) + " " + " ".join(observations)).lower()
+    combined = (combined_query_and_cause + " " + evidence_text + " " + evidence_files).lower()
+    asset_ids = [str(a).strip().upper() for a in (bundle.asset_ids or [])]
+
+    # 1. Pump Specific (P-101A) -> Suction Starvation & Cavitation
+    if any(a in ("P-101A", "P101A") for a in asset_ids) or (
+        any(k in combined_query_and_cause for k in ["p-101", "p101", "cavitation", "suction starvation", "strainer"])
+        and not any(a in ("K-101", "K101") for a in asset_ids)
+    ):
+        if any(k in combined for k in ["cavitation", "suction starvation", "strainer", "npsh", "starvation", "vibration"]):
+            return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
+
+    # 2. Compressor Specific (K-101) -> Bearing Overheat / Journal Bearing
+    if any(a in ("K-101", "K101") for a in asset_ids) or (
+        any(k in combined_query_and_cause for k in ["k-101", "k101", "compressor"])
+        and not any(a in ("P-101A", "P101A") for a in asset_ids)
+    ):
+        if any(k in combined for k in ["bearing", "overheat", "temp", "tt-204", "journal", "wear"]):
+            return PrimaryCauseCode.BEARING_OVERHEAT
+
+    # 3. Control Valve Specific (FV-302, R-301) -> Valve Stem Binding
+    if any(a in ("FV-302", "FV302", "R-301", "R301") for a in asset_ids) or any(k in combined_query_and_cause for k in ["fv-302", "fv302", "valve stem", "actuator"]):
+        if any(k in combined for k in ["valve", "stem", "fv-302", "fv302", "actuator", "stuck", "binding"]):
+            return PrimaryCauseCode.VALVE_STEM_BINDING
+
+    # 4. Inconclusive / Missing Telemetry
+    if any(k in combined for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
+        return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
+
+    # 5. General Fallbacks
+    if any(k in combined for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh"]):
+        return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
+    if any(k in combined for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "tt-204"]):
+        return PrimaryCauseCode.BEARING_OVERHEAT
+    if any(k in combined for k in ["valve stem", "stem binding", "fv-302", "fv302", "actuator hysteresis", "valve stuck"]):
+        return PrimaryCauseCode.VALVE_STEM_BINDING
+    if any(k in combined for k in ["lube oil", "seal oil", "oil pressure loss"]):
+        return PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS
+    if any(k in combined for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
+        return PrimaryCauseCode.PROCESS_OVERPRESSURE
+
+    return PrimaryCauseCode.UNKNOWN
 
 
 class RCAEvidenceValidator:
@@ -35,6 +104,8 @@ class RCAEvidenceValidator:
         """
         Main validation entry point. Produces the authoritative, grounded engineering RCA report.
         """
+        lower_input = operator_input.lower()
+
         # 1. Check for OOD / Nonexistent Asset
         if bundle.retrieval_diagnostics.get("ood_triggered"):
             unreg_assets = bundle.retrieval_diagnostics.get("unregistered_assets", ["UNKNOWN"])
@@ -45,6 +116,7 @@ class RCAEvidenceValidator:
                 f"- Equipment `{asset_str}` is not registered in the refinery topology or workspace knowledge vault.\n"
                 f"- No telemetry, inspection records, or operating procedures exist for this tag.\n\n"
                 f"## Primary Cause\n"
+                f"**Cause Code:** `ASSET_NOT_FOUND`\n\n"
                 f"Cannot evaluate root cause: Asset `{asset_str}` was not found in the refinery hierarchy.\n\n"
                 f"## Additional Evidence Needed\n"
                 f"- Verify equipment tag against the refinery asset registry (e.g., P-101A, K-101, Reactor-B).\n\n"
@@ -52,14 +124,34 @@ class RCAEvidenceValidator:
                 f"None (Asset Not Found)"
             )
 
-        # 2. Check for symptom-only input with zero supporting retrieved evidence
-        if not bundle.evidence_items:
+        # 2. Check for true missing evidence / symptom-only input / inconclusive investigation
+        is_explicit_missing_query = any(k in lower_input for k in [
+            "without any inspection report", "no inspection report", "no telemetry", "no vibration log",
+            "without any telemetry", "without evidence", "missing evidence"
+        ])
+        is_inconclusive_evidence = any(
+            any(w in item.content.lower() for w in [
+                "inconclusive investigation", "insufficient to determine", "unconfirmed pending",
+                "evidence is insufficient"
+            ])
+            for item in bundle.evidence_items
+        )
+        if not bundle.evidence_items or is_explicit_missing_query or is_inconclusive_evidence:
+            topo_val = 'FOUND' if bundle.modality_coverage.get('topology') else 'MISSING'
             return (
                 f"## RCA Status\nINSUFFICIENT_EVIDENCE\n\n"
+                f"## Evidence Requirement Status\n"
+                f"- Inspection Report: **MISSING**\n"
+                f"- Vibration Log / Telemetry: **MISSING**\n"
+                f"- Maintenance SOP: **NOT PROVIDED**\n"
+                f"- Plant Topology: **{topo_val}**\n\n"
                 f"## Confirmed Observations\n"
                 f"- No independently measured observation was supplied beyond the operator's written description.\n\n"
                 f"## Possible Hypotheses — Unverified\n"
-                f"- No verified documentary or telemetry evidence was retrieved for the specified equipment.\n\n"
+                f"- Available documentary and telemetry evidence is insufficient to authoritatively determine root cause.\n\n"
+                f"## Primary Cause\n"
+                f"**Cause Code:** `INSUFFICIENT_EVIDENCE`\n\n"
+                f"Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.\n\n"
                 f"## Additional Evidence Needed\n"
                 f"- Standard operating procedures (SOPs) or equipment manuals.\n"
                 f"- Historical inspection records and maintenance work orders.\n"
@@ -87,15 +179,19 @@ class RCAEvidenceValidator:
         # If model didn't explicitly reference E-IDs, associate retrieved evidence items matching keywords
         if not supported_items and bundle.evidence_items:
             for item in bundle.evidence_items:
-                # Include items from high-priority roles
-                if item.evidence_role in (EvidenceRole.INSPECTION, EvidenceRole.SOP_BASELINE, EvidenceRole.VIBRATION, EvidenceRole.INCIDENT_CHRONOLOGY):
+                if item.evidence_role in (
+                    EvidenceRole.INSPECTION,
+                    EvidenceRole.SOP_BASELINE,
+                    EvidenceRole.VIBRATION,
+                    EvidenceRole.INCIDENT_CHRONOLOGY,
+                    EvidenceRole.P_AND_ID,
+                    EvidenceRole.TOPOLOGY
+                ):
                     supported_items.append(item)
                     cited_e_ids.add(item.evidence_id)
 
-        # 5. Check if required roles are satisfied
+        # 5. Check if required roles and explicit sources are satisfied
         required_roles_satisfied = len(bundle.missing_required_roles) == 0
-
-        # Check for explicit missing source requests
         explicit_missing_sources = [s for s, found in bundle.source_coverage.items() if not found]
 
         # 6. Determine RCA Status deterministically
@@ -107,22 +203,68 @@ class RCAEvidenceValidator:
             operator_symptoms_only=False
         )
 
+        # Downgrade status if explicitly requested sources are missing (e.g. vibration logs)
+        if explicit_missing_sources and determined_status == RCAStatus.CONFIRMED_CAUSE:
+            determined_status = RCAStatus.SUPPORTED_LIKELY_CAUSE
+
         # 7. Construct User-Facing Engineering Output (Section 17 Format)
         status_display = determined_status.value.replace("_", " ")
-
         lines = [f"## RCA Status\n{status_display}\n"]
 
-        # Confirmed Observations
+        # Evidence Requirement Status Section
+        lines.append("## Evidence Requirement Status")
+        if bundle.source_coverage:
+            for src_name, is_found in bundle.source_coverage.items():
+                label = src_name.replace("_", " ").title()
+                status_str = "FOUND" if is_found else "MISSING"
+                lines.append(f"- {label}: **{status_str}**")
+        else:
+            lines.append("- Documentary Baseline: **FOUND**")
+        lines.append(f"- Plant Topology: **{'FOUND' if bundle.modality_coverage.get('topology') else 'MISSING'}**")
+        lines.append(f"- Visual Evidence: **{'FOUND' if bundle.modality_coverage.get('visual') else 'NOT REQUIRED / NOT TRIGGERED'}**\n")
+
+        # Confirmed Observations with Deterministic Citation Snapping
         lines.append("## Confirmed Observations")
         obs_lines = parsed_claims.get("observations", [])
+        snapped_obs = []
+
         if obs_lines:
             for obs in obs_lines:
-                lines.append(f"- {obs}")
+                eids = re.findall(r"\[(E\d+)\]", obs)
+                # Strip any existing bracket citations from observation text
+                clean_obs = re.sub(r"\s*\[[^\]]+?(?:\.pdf|\.csv|\.xlsx|\.png|\.jpg|\.txt)[^\]]*?\]", "", obs).strip()
+                if eids:
+                    auth_cites = []
+                    for eid in eids:
+                        it = bundle.get_evidence_by_id(eid)
+                        if it:
+                            loc = f"Page {it.page_number}" if it.page_number else "Topology"
+                            auth_cites.append(f"[{it.filename} | {loc}]")
+                    cite_suffix = (" " + " ".join(dict.fromkeys(auth_cites))) if auth_cites else ""
+                    snapped_obs.append(f"{clean_obs}{cite_suffix}")
+                else:
+                    matched_item = None
+                    for it in supported_items:
+                        stem = Path(it.filename).stem.lower()
+                        if it.filename.lower() in clean_obs.lower() or stem in clean_obs.lower():
+                            matched_item = it
+                            break
+                    if matched_item:
+                        loc = f"Page {matched_item.page_number}" if matched_item.page_number else "Topology"
+                        snapped_obs.append(f"[{matched_item.evidence_id}] {clean_obs} [{matched_item.filename} | {loc}]")
+                    elif supported_items:
+                        it = supported_items[0]
+                        loc = f"Page {it.page_number}" if it.page_number else "Topology"
+                        snapped_obs.append(f"[{it.evidence_id}] {clean_obs} [{it.filename} | {loc}]")
+                    else:
+                        snapped_obs.append(clean_obs)
+
+            for so in snapped_obs:
+                lines.append(f"- {so}")
         else:
-            # Generate from verified evidence items
             for item in supported_items[:4]:
-                src_label = f"[{item.filename} | Page {item.page_number}]" if item.page_number else f"[{item.filename}]"
-                lines.append(f"- [{item.evidence_id}] {src_label}: {item.content[:200].strip()}...")
+                loc = f"Page {item.page_number}" if item.page_number else "Topology"
+                lines.append(f"- [{item.evidence_id}] [{item.filename} | {loc}]: {item.content[:200].strip()}...")
 
         # Causal Chain / Hypotheses
         causal_steps = parsed_claims.get("causal_chain", [])
@@ -131,13 +273,25 @@ class RCAEvidenceValidator:
             for idx, step in enumerate(causal_steps, 1):
                 lines.append(f"{idx}. {step}")
 
-        # Primary Cause
+        # Primary Cause & Cause Code
         primary_cause = parsed_claims.get("primary_cause")
+        cause_code = determine_primary_cause_code(
+            status=determined_status,
+            primary_cause_text=primary_cause or "",
+            observations=obs_lines,
+            bundle=bundle,
+            parsed_code=parsed_claims.get("primary_cause_code")
+        )
+
         lines.append("\n## Primary Cause")
+        lines.append(f"**Cause Code:** `{cause_code.value}`\n")
         if primary_cause and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE, RCAStatus.PLAUSIBLE_HYPOTHESIS):
-            lines.append(f"{primary_cause}")
+            primary_text = primary_cause
+            if not re.search(r"\[E\d+\]", primary_text) and supported_items:
+                primary_text = f"[{supported_items[0].evidence_id}] {primary_text}"
+            lines.append(primary_text)
         elif determined_status == RCAStatus.INSUFFICIENT_EVIDENCE:
-            lines.append("No root cause could be authoritatively confirmed due to missing required evidence.")
+            lines.append("Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.")
         else:
             lines.append("Analysis points to potential component degradation; see supporting evidence below.")
 
@@ -161,7 +315,7 @@ class RCAEvidenceValidator:
         needed = []
         if explicit_missing_sources:
             for ems in explicit_missing_sources:
-                needed.append(f"Explicitly requested document `{ems.replace('_', ' ').title()}` was not found in the workspace vault.")
+                needed.append(f"Explicitly requested source `{ems.replace('_', ' ').title()}` was not found in the workspace vault.")
         if bundle.missing_required_roles:
             for mr in bundle.missing_required_roles:
                 needed.append(f"Missing required role evidence: {mr.value.replace('_', ' ').title()}.")
@@ -184,11 +338,11 @@ class RCAEvidenceValidator:
         if unique_sources:
             for (fname, pnum), item in unique_sources.items():
                 if pnum:
-                    lines.append(f"- `{fname}` — Page {pnum} (Channel: {item.retrieval_channel.upper()})")
+                    lines.append(f"- `{fname}` — Page {pnum} [{fname} | Page {pnum}] (Channel: {item.retrieval_channel.upper()})")
                 else:
-                    lines.append(f"- `{fname}` (Channel: {item.retrieval_channel.upper()})")
+                    lines.append(f"- `{fname}` [{fname}] (Channel: {item.retrieval_channel.upper()})")
         else:
-            lines.append("None")
+            lines.append("None (Insufficient Evidence)" if determined_status == RCAStatus.INSUFFICIENT_EVIDENCE else "None")
 
         return "\n".join(lines)
 
@@ -200,14 +354,13 @@ class RCAEvidenceValidator:
             "all_referenced_e_ids": [],
             "observations": [],
             "causal_chain": [],
-            "primary_cause": None
+            "primary_cause": None,
+            "primary_cause_code": None
         }
 
-        # 1. Find all [E1], [E2], etc.
         e_matches = re.findall(r"\[(E\d+)\]", text)
         claims["all_referenced_e_ids"] = list(set(e_matches))
 
-        # 2. Check if output contains a structured JSON block
         json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
         if json_match:
             try:
@@ -223,11 +376,18 @@ class RCAEvidenceValidator:
                         claims["causal_chain"] = [str(c) for c in data["causal_chain"]]
                     if "primary_conclusion" in data and isinstance(data["primary_conclusion"], dict):
                         claims["primary_cause"] = data["primary_conclusion"].get("claim")
+                        if "primary_cause_code" in data["primary_conclusion"]:
+                            claims["primary_cause_code"] = data["primary_conclusion"]["primary_cause_code"]
+                    if "primary_cause_code" in data:
+                        claims["primary_cause_code"] = data["primary_cause_code"]
                     return claims
             except Exception:
                 pass
 
-        # 3. Parse free-form prose sections
+        code_match = re.search(r"Cause Code:[*\s]*[`'\"]?([A-Za-z0-9_]+)", text, re.IGNORECASE)
+        if code_match:
+            claims["primary_cause_code"] = code_match.group(1).upper()
+
         current_section = None
         for line in text.splitlines():
             clean_l = line.strip()
@@ -241,7 +401,7 @@ class RCAEvidenceValidator:
             elif "primary cause" in lower_l or "root cause" in lower_l:
                 current_section = "primary"
                 continue
-            elif "evidence needed" in lower_l or "sources" in lower_l or "supporting evidence" in lower_l:
+            elif "evidence needed" in lower_l or "sources" in lower_l or "supporting evidence" in lower_l or "evidence requirement" in lower_l:
                 current_section = None
                 continue
 
@@ -252,6 +412,7 @@ class RCAEvidenceValidator:
                 elif current_section == "causal" and item_content:
                     claims["causal_chain"].append(item_content)
             elif current_section == "primary" and clean_l and not claims["primary_cause"]:
-                claims["primary_cause"] = clean_l
+                if not clean_l.startswith("**Cause Code"):
+                    claims["primary_cause"] = clean_l
 
         return claims

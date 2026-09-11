@@ -70,6 +70,10 @@ def determine_rca_status(
             return RCAStatus.CONFIRMED_CAUSE
         return RCAStatus.SUPPORTED_LIKELY_CAUSE
 
+    # If multiple independent sources corroborate
+    if len(distinct_sources) >= 2:
+        return RCAStatus.SUPPORTED_LIKELY_CAUSE
+
     if len(supporting_items) >= 1:
         return RCAStatus.PLAUSIBLE_HYPOTHESIS
 

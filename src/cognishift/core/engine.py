@@ -4074,9 +4074,8 @@ print("Analysis script finished with returncode 0.")
 
             # Deterministic Citation & Provenance Reconciliation Gate:
             # Cross-reference model citations and answer text against authoritative retrieved chunks.
-            # Snaps hallucinated page numbers and sets sources_used to verified citations only.
             if retrieved_evidence_catalog and run_final_status == "completed":
-                from cognishift.core.document_processing.provenance import reconcile_citations_against_evidence
+                from cognishift.core.document_processing.provenance import reconcile_citations_against_evidence, reconcile_citations_in_text
                 verified_cites, reconciled_sources = reconcile_citations_against_evidence(
                     text=final_text,
                     model_citations=final_answer_citations,
@@ -4085,6 +4084,7 @@ print("Analysis script finished with returncode 0.")
                 )
                 if verified_cites:
                     sources_used = reconciled_sources
+                    final_text = reconcile_citations_in_text(final_text, verified_cites, retrieved_evidence_catalog)
                     if graph_context and "Plant Topology Graph" not in sources_used:
                         sources_used += " + Plant Topology Graph"
                     if vision_analysis and "Local VLM Inspection" not in sources_used:

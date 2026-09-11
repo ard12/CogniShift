@@ -162,6 +162,14 @@ class TextRetriever:
             # Similarity score derived from squared L2 distance (bounded 0..1 for unit vectors)
             sim_score = max(0.0, 1.0 - (dist / 2.0))
             page_num = meta.get("page") or meta.get("page_number") or 1
+            fname = (
+                meta.get("filename")
+                or meta.get("document")
+                or meta.get("document_name")
+                or meta.get("original_filename")
+                or meta.get("name")
+                or ""
+            )
             ranked_items.append({
                 "doc": doc,
                 "meta": meta,
@@ -169,7 +177,7 @@ class TextRetriever:
                 "score": sim_score,
                 "page": int(page_num),
                 "source_id": meta.get("source_id"),
-                "filename": meta.get("filename") or meta.get("document_name") or ""
+                "filename": fname
             })
 
         formatted_context = ""

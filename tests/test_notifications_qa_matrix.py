@@ -183,19 +183,17 @@ async def test_citation_validation_all_classes():
     assert [c.citation_index for c in validated_list] == [1, 2, 3, 4, 5, 6]
 
 
-def test_smtp_socket_bound_strictly_to_loopback():
+@pytest.mark.asyncio
+async def test_smtp_socket_bound_strictly_to_loopback():
     """Verify via OS socket that port 1025 accepts connections on 127.0.0.1 and presents sovereign banner."""
-    s_local = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s_local.settimeout(2.0)
-    connected_local = False
+    await start_local_smtp_server(host="127.0.0.1", port=1025)
+    reader, writer = await asyncio.open_connection("127.0.0.1", 1025)
     try:
-        s_local.connect(("127.0.0.1", 1025))
-        banner = s_local.recv(1024)
+        banner = await asyncio.wait_for(reader.readline(), timeout=2.0)
         assert b"CogniShift" in banner and b"SMTP" in banner
-        connected_local = True
     finally:
-        s_local.close()
-    assert connected_local is True
+        writer.close()
+        await writer.wait_closed()
 
 
 @pytest.mark.asyncio

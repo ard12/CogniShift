@@ -58,56 +58,86 @@ async def resolve_sensor_for_equipment(
     equipment_id: str,
     measurement_type: str,
     location_hint: Optional[str] = None,
-    db: Optional[Any] = None
-) -> Optional[str]:
+    db: Optional[Any] = None,
+    return_source: bool = False
+) -> Any:
     """
     Authoritative resolution of equipment (e.g. K-101, P-101A) to valid sensor IDs.
     Does NOT blindly convert equipment IDs into sensor IDs.
     
+    Resolution Priority:
+      1. Workspace topology / asset graph (graph_nodes and graph_edges) -> 'TOPOLOGY'
+      2. Authoritative local plant registry (EQUIPMENT_SENSOR_REGISTRY) -> 'PLANT_REGISTRY'
+      3. Prototype static mapping fallback -> 'STATIC_PROTOTYPE'
+    
     Returns:
-        sensor_id (str) if an unambiguous sensor is resolved.
+        sensor_id (str) if an unambiguous sensor is resolved (or (sensor_id, source) if return_source=True).
         None if zero sensors exist or if multiple exist without a clarifying location hint.
     """
     if not equipment_id:
-        return None
+        return (None, "NONE") if return_source else None
 
     clean_eq = equipment_id.strip().upper()
     clean_meas = measurement_type.strip().lower()
     clean_loc = (location_hint or "").strip().lower()
+    resolution_source = "NONE"
+    resolved_sensor = None
 
-    # 1. Check authoritative registry
+    # 1. Priority 1: Query Workspace Knowledge Graph (Topology Authority)
+    try:
+        if db is None:
+            async with get_db() as conn:
+                graph_sensor = await _query_graph_sensors(conn, workspace_id, clean_eq, clean_meas, clean_loc)
+        else:
+            graph_sensor = await _query_graph_sensors(db, workspace_id, clean_eq, clean_meas, clean_loc)
+        
+        if graph_sensor:
+            resolved_sensor = graph_sensor
+            resolution_source = "TOPOLOGY"
+            logger.info(f"Resolved sensor for {clean_eq} ({clean_meas}): {resolved_sensor} [Source: TOPOLOGY]")
+            return (resolved_sensor, resolution_source) if return_source else resolved_sensor
+    except Exception as e:
+        logger.warning(f"Error querying graph sensors for {clean_eq}: {e}")
+
+    # 2. Priority 2: Authoritative Local Plant Registry
     if clean_eq in EQUIPMENT_SENSOR_REGISTRY:
         meas_map = EQUIPMENT_SENSOR_REGISTRY[clean_eq]
         sensors = meas_map.get(clean_meas, [])
         if len(sensors) == 1:
-            return sensors[0]["sensor_id"]
+            resolved_sensor = sensors[0]["sensor_id"]
+            resolution_source = "PLANT_REGISTRY"
         elif len(sensors) > 1:
             if clean_loc:
                 for s in sensors:
                     if clean_loc in s["location"] or clean_loc in s["description"].lower():
-                        return s["sensor_id"]
+                        resolved_sensor = s["sensor_id"]
+                        resolution_source = "PLANT_REGISTRY"
+                        break
                     if clean_loc in ("de", "drive end", "outboard") and s["location"] == "drive_end":
-                        return s["sensor_id"]
+                        resolved_sensor = s["sensor_id"]
+                        resolution_source = "PLANT_REGISTRY"
+                        break
                     if clean_loc in ("nde", "non drive end", "inboard") and s["location"] == "non_drive_end":
-                        return s["sensor_id"]
+                        resolved_sensor = s["sensor_id"]
+                        resolution_source = "PLANT_REGISTRY"
+                        break
                     if clean_loc in ("suction", "inlet") and s["location"] == "suction":
-                        return s["sensor_id"]
+                        resolved_sensor = s["sensor_id"]
+                        resolution_source = "PLANT_REGISTRY"
+                        break
                     if clean_loc in ("discharge", "outlet") and s["location"] == "discharge":
-                        return s["sensor_id"]
-            # Ambiguous: multiple sensors exist but no matching location hint
-            return None
+                        resolved_sensor = s["sensor_id"]
+                        resolution_source = "PLANT_REGISTRY"
+                        break
+            if resolved_sensor is None:
+                logger.info(f"Ambiguous sensors for {clean_eq} ({clean_meas}) in registry without matching location hint")
 
-    # 2. Check workspace knowledge graph (graph_nodes and graph_edges)
-    try:
-        query_db = db
-        if query_db is None:
-            async with get_db() as conn:
-                return await _query_graph_sensors(conn, workspace_id, clean_eq, clean_meas, clean_loc)
-        else:
-            return await _query_graph_sensors(query_db, workspace_id, clean_eq, clean_meas, clean_loc)
-    except Exception as e:
-        logger.warning(f"Error querying graph sensors for {clean_eq}: {e}")
-        return None
+    if resolved_sensor:
+        logger.info(f"Resolved sensor for {clean_eq} ({clean_meas}): {resolved_sensor} [Source: {resolution_source}]")
+        return (resolved_sensor, resolution_source) if return_source else resolved_sensor
+
+    logger.warning(f"Unable to resolve sensor for {clean_eq} ({clean_meas}) across topology and registry [Source: NONE]")
+    return (None, "NONE") if return_source else None
 
 
 async def _query_graph_sensors(

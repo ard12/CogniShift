@@ -99,22 +99,32 @@ class RCAEvidenceAcquirer:
         the simulated registry, or in workspace knowledge documents.
         """
         clean_asset = asset_id.strip().upper()
+        clean_no_dash = clean_asset.replace("-", "").replace("_", "")
         # Check canonical simulated registry
-        if clean_asset in SUPPORTED_SIMULATED_TARGETS or resolve_equipment_alias(clean_asset) in SUPPORTED_SIMULATED_TARGETS:
+        if (
+            clean_asset in SUPPORTED_SIMULATED_TARGETS
+            or clean_no_dash in SUPPORTED_SIMULATED_TARGETS
+            or resolve_equipment_alias(clean_asset) in SUPPORTED_SIMULATED_TARGETS
+            or resolve_equipment_alias(clean_no_dash) in SUPPORTED_SIMULATED_TARGETS
+        ):
             return True
 
         # Check workspace graph nodes
         cursor = await db.execute(
-            "SELECT id FROM graph_nodes WHERE workspace_id = ? AND UPPER(name) = ?",
-            (workspace_id, clean_asset)
+            "SELECT id FROM graph_nodes WHERE workspace_id = ? AND (UPPER(name) = ? OR UPPER(REPLACE(name, '-', '')) = ?)",
+            (workspace_id, clean_asset, clean_no_dash)
         )
         if await cursor.fetchone():
             return True
 
         # Check knowledge sources in workspace
         cursor = await db.execute(
-            "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND UPPER(name) LIKE ?",
-            (workspace_id, f"%{clean_asset}%")
+            """SELECT id FROM knowledge_sources 
+               WHERE workspace_id = ? AND (
+                   UPPER(name) LIKE ? OR UPPER(original_filename) LIKE ?
+                   OR UPPER(name) LIKE ? OR UPPER(original_filename) LIKE ?
+               )""",
+            (workspace_id, f"%{clean_asset}%", f"%{clean_asset}%", f"%{clean_no_dash}%", f"%{clean_no_dash}%")
         )
         if await cursor.fetchone():
             return True
@@ -143,7 +153,6 @@ class RCAEvidenceAcquirer:
             failed_channels=[]
         )
 
-        source_coverage: Dict[str, bool] = {}
         modality_coverage: Dict[str, bool] = {
             "text": False,
             "visual": False,
@@ -156,6 +165,7 @@ class RCAEvidenceAcquirer:
 
         async def _run_acquisition(conn: Any) -> RCAEvidenceBundle:
             nonlocal e_counter
+            source_coverage: Dict[str, bool] = {}
 
             # 1. OOD Asset Verification
             unregistered_assets = []
@@ -208,15 +218,37 @@ class RCAEvidenceAcquirer:
                 )
                 channel_health.executed_channels.append("text")
                 channel_health.text_status = "ACTIVE"
+                channel_health.text_candidate_count = len(text_ranked) if text_ranked else 0
                 if text_ranked:
                     modality_coverage["text"] = True
                     for tr in text_ranked[:8]:
                         doc_text = tr.get("doc", "").strip()
                         if not doc_text:
                             continue
-                        filename = tr.get("filename") or tr.get("meta", {}).get("filename", "Document.pdf")
-                        page_num = tr.get("page") or tr.get("meta", {}).get("page", 1)
-                        sid = tr.get("source_id")
+                        meta_item = tr.get("meta") or {}
+                        filename = (
+                            tr.get("filename")
+                            or meta_item.get("filename")
+                            or meta_item.get("document")
+                            or meta_item.get("document_name")
+                            or meta_item.get("original_filename")
+                            or meta_item.get("name")
+                        )
+                        page_num = tr.get("page") or meta_item.get("page") or meta_item.get("page_number") or 1
+                        sid = tr.get("source_id") or meta_item.get("source_id")
+
+                        if not filename or filename == "Document.pdf":
+                            if sid:
+                                cursor_f = await conn.execute(
+                                    "SELECT original_filename, name FROM knowledge_sources WHERE id = ?", (sid,)
+                                )
+                                s_row = await cursor_f.fetchone()
+                                if s_row:
+                                    filename = s_row["original_filename"] or s_row["name"] or "Document.pdf"
+                                else:
+                                    filename = "Document.pdf"
+                            else:
+                                filename = "Document.pdf"
 
                         # Assign role
                         role = self._classify_evidence_role(doc_text, filename)
@@ -229,7 +261,7 @@ class RCAEvidenceAcquirer:
                                 source_id=sid,
                                 filename=filename,
                                 page_number=int(page_num) if page_num else 1,
-                                processing_version=tr.get("meta", {}).get("processing_version", "v1"),
+                                processing_version=meta_item.get("processing_version", "v1"),
                                 retrieval_channel="text",
                                 evidence_role=role,
                                 content=doc_text[:600],
@@ -251,6 +283,7 @@ class RCAEvidenceAcquirer:
                     top_k=5,
                     allowed_source_ids=allowed_source_ids
                 )
+                channel_health.visual_candidate_count = len(vis_results) if vis_results else 0
                 if self.visual_retriever._custom_provider or getattr(settings, "colpali_enabled", True):
                     channel_health.executed_channels.append("visual")
                     channel_health.visual_status = "ACTIVE"
@@ -300,6 +333,13 @@ class RCAEvidenceAcquirer:
             # 5. Plant Topology Graph Retrieval (max_hops = 2)
             try:
                 topo_ctx = await query_graph_context(workspace_id, query, max_hops=2)
+                cur_n = await conn.execute("SELECT COUNT(*) as c FROM graph_nodes WHERE workspace_id = ?", (workspace_id,))
+                n_row = await cur_n.fetchone()
+                channel_health.topology_node_count = n_row["c"] if n_row else 0
+                cur_e = await conn.execute("SELECT COUNT(*) as c FROM graph_edges WHERE workspace_id = ?", (workspace_id,))
+                e_row = await cur_e.fetchone()
+                channel_health.topology_edge_count = e_row["c"] if e_row else 0
+
                 if topo_ctx and topo_ctx.strip():
                     channel_health.executed_channels.append("topology")
                     channel_health.topology_status = "ACTIVE"
@@ -326,11 +366,42 @@ class RCAEvidenceAcquirer:
                 channel_health.failed_channels.append("topology")
                 channel_health.topology_status = "ERROR"
 
-            # 6. Check required roles satisfaction
+            # 6. Evaluate requested source coverage
+            source_coverage = {}
+            for req_src in explicit_sources:
+                found = False
+                for item in evidence_items:
+                    fn_lower = item.filename.lower()
+                    if req_src == "inspection_report" and any(k in fn_lower for k in ["inspection", "nde", "ndt"]):
+                        found = True
+                        break
+                    elif req_src == "maintenance_sop" and any(k in fn_lower for k in ["sop", "procedure", "maintenance", "manual"]):
+                        found = True
+                        break
+                    elif req_src == "vibration_log" and any(k in fn_lower for k in ["vibration", "spectral", "fft", "telemetry"]):
+                        found = True
+                        break
+                    elif req_src == "hazop_audit" and any(k in fn_lower for k in ["hazop", "risk"]):
+                        found = True
+                        break
+                    elif req_src == "p_and_id" and any(k in fn_lower for k in ["p&id", "pid", "schematic"]):
+                        found = True
+                        break
+                source_coverage[req_src] = found
+
+            # 7. Final evidence channels & channel counts
+            final_channels = set()
+            channel_counts = {}
+            for item in evidence_items:
+                ch = item.retrieval_channel.upper()
+                final_channels.add(ch)
+                channel_counts[ch] = channel_counts.get(ch, 0) + 1
+
+            # 8. Check required roles satisfaction
             found_roles = {item.evidence_role for item in evidence_items}
             missing_roles = [r for r in required_roles if r not in found_roles]
 
-            # 7. Check channel degradation
+            # 9. Check channel degradation
             if getattr(settings, "hybrid_retrieval_enabled", True) and "visual" not in channel_health.executed_channels:
                 channel_health.hybrid_status = "DEGRADED"
                 if not channel_health.degradation_reason:
@@ -347,10 +418,17 @@ class RCAEvidenceAcquirer:
                 source_coverage=source_coverage,
                 modality_coverage=modality_coverage,
                 telemetry_coverage=telemetry_coverage,
+                final_evidence_channels=sorted(final_channels),
+                evidence_channel_counts=channel_counts,
                 retrieval_diagnostics={
                     "total_items": len(evidence_items),
                     "assets": assets,
-                    "explicit_sources": explicit_sources
+                    "explicit_sources": explicit_sources,
+                    "missing_explicit_sources": [s for s, f in source_coverage.items() if not f],
+                    "text_candidate_count": channel_health.text_candidate_count,
+                    "visual_candidate_count": channel_health.visual_candidate_count,
+                    "topology_node_count": channel_health.topology_node_count,
+                    "topology_edge_count": channel_health.topology_edge_count
                 },
                 channel_health=channel_health
             )

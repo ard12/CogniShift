@@ -93,11 +93,11 @@ AgentAction = Union[ToolCallProposal, FinalAnswer, ClarificationRequest, StepObs
 # 3. PER-TOOL PYDANTIC ARGUMENT SCHEMAS (Strict Bound & Regex Checked)
 # -----------------------------------------------------------------------------
 class CheckPressureArgs(BaseModel):
-    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor", "sensor_name", "equipment_id"))
+    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor", "sensor_name", "sensor_tag", "tag", "instrument_tag", "equipment_id"))
 
 
 class CheckTemperatureArgs(BaseModel):
-    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor", "sensor_name", "equipment_id"))
+    sensor_id: EquipmentIdentifier = Field(..., validation_alias=AliasChoices("sensor_id", "sensor", "sensor_name", "sensor_tag", "tag", "instrument_tag", "bearing_number", "bearing", "equipment_id"))
 
 
 class RunDiagnosticArgs(BaseModel):
@@ -466,6 +466,7 @@ def resolve_equipment_alias(target_id: str) -> str:
             cleaned = cleaned[len(prefix):].strip()
     cleaned = re.sub(r'([A-Za-z0-9]+)\s*-\s*([0-9]+)\s*([A-Za-z])\b', r'\1-\2\3', cleaned)
     cleaned = re.sub(r'([A-Za-z0-9]+)\s*-\s*([0-9]+)\b', r'\1-\2', cleaned)
+    cleaned = re.sub(r'\s+', '_', cleaned)
     resolved = EQUIPMENT_ALIASES.get(cleaned, cleaned)
     return CANONICAL_TARGETS.get(resolved.upper(), resolved)
 
@@ -590,6 +591,37 @@ def bounded_repair_tool_parameters(
         elif "entrypoint" not in params:
             params["entrypoint"] = "main.py"
 
+    # Parameter alias normalization (runs unconditionally)
+    if tool_name == "restart_component":
+        if "component_id" not in params:
+            for k in ["component_name", "component", "equipment_id"]:
+                if k in params:
+                    params["component_id"] = str(params.pop(k))
+                    break
+        if not params.get("reason"):
+            params["reason"] = "Operational restart requested by plant operator"
+
+    elif tool_name in ("check_pressure", "check_temperature"):
+        if "sensor_id" not in params:
+            for k in ["sensor", "sensor_name", "sensor_tag", "tag", "instrument_tag", "bearing_number", "bearing", "equipment_id"]:
+                if k in params:
+                    params["sensor_id"] = str(params.pop(k))
+                    break
+
+    elif tool_name == "emergency_pressure_relief":
+        if "chamber_id" not in params:
+            for k in ["chamber", "equipment_id", "component_id"]:
+                if k in params:
+                    params["chamber_id"] = str(params.pop(k))
+                    break
+
+    elif tool_name == "run_diagnostic":
+        if "equipment_id" not in params:
+            for k in ["equipment", "component_id"]:
+                if k in params:
+                    params["equipment_id"] = str(params.pop(k))
+                    break
+
     for eq_key in ("sensor_id", "equipment_id", "component_id", "chamber_id", "subsystem"):
         if eq_key in params and isinstance(params[eq_key], str):
             raw_val = params[eq_key].strip().rstrip(".")
@@ -601,49 +633,20 @@ def bounded_repair_tool_parameters(
             fp = fp[2:]
         params["file_path"] = fp
 
-    if references is None:
-        return params, None
-
-    # Handle restart_component missing component_id
-    if tool_name == "restart_component":
-        has_comp = any(params.get(k) for k in ["component_id", "component_name", "component", "equipment_id"])
-        if not has_comp:
-            eq_ids = getattr(references, "equipment_ids", []) or []
-            if len(eq_ids) == 1:
+    # Resolve from explicit user references if still missing
+    if references is not None:
+        eq_ids = getattr(references, "equipment_ids", []) or []
+        if len(eq_ids) == 1:
+            if tool_name == "restart_component" and "component_id" not in params:
                 params["component_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
-        if not params.get("reason"):
-            params["reason"] = "Operational restart requested by plant operator"
-
-    # Handle check_pressure / check_temperature missing sensor_id
-    elif tool_name in ("check_pressure", "check_temperature"):
-        has_sensor = any(params.get(k) for k in ["sensor_id", "sensor", "sensor_name", "equipment_id"])
-        if not has_sensor:
-            eq_ids = getattr(references, "equipment_ids", []) or []
-            if len(eq_ids) == 1:
+            elif tool_name in ("check_pressure", "check_temperature") and "sensor_id" not in params:
                 params["sensor_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
-
-    # Handle emergency_pressure_relief missing chamber_id
-    elif tool_name == "emergency_pressure_relief":
-        has_chamber = any(params.get(k) for k in ["chamber_id", "chamber", "equipment_id", "component_id"])
-        if not has_chamber:
-            eq_ids = getattr(references, "equipment_ids", []) or []
-            if len(eq_ids) == 1:
+            elif tool_name == "emergency_pressure_relief" and "chamber_id" not in params:
                 params["chamber_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
-        elif "chamber_id" not in params:
-            for k in ["chamber", "equipment_id", "component_id"]:
-                if k in params:
-                    params["chamber_id"] = params.pop(k)
-                    break
-
-    # Handle run_diagnostic missing equipment_id
-    elif tool_name == "run_diagnostic":
-        has_eq = any(params.get(k) for k in ["equipment_id", "equipment", "component_id"])
-        if not has_eq:
-            eq_ids = getattr(references, "equipment_ids", []) or []
-            if len(eq_ids) == 1:
+            elif tool_name == "run_diagnostic" and "equipment_id" not in params:
                 params["equipment_id"] = eq_ids[0]
                 arg_source = "USER_REFERENCE"
 
@@ -776,86 +779,96 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
             candidate_json = brace_match.group(1)
 
     if candidate_json:
-        # Pre-clean backticks used by SLM as quotation delimiters for string values
-        candidate_json_clean = re.sub(r':\s*`([\s\S]*?)`', lambda m: ': ' + json.dumps(m.group(1)), candidate_json)
+        data = None
         try:
-            data = json.loads(candidate_json_clean)
-            if isinstance(data, dict):
-                action = str(data.get("action") or data.get("type") or "").strip().lower()
-                if action == "final_answer":
-                    content = data.get("content") if data.get("content") is not None else data.get("answer", "")
-                    if not content and strict:
-                        return None
-                    if isinstance(content, (dict, list)):
-                        content = _render_structured_final_content(content)
-                    return FinalAnswer(
-                        action="final_answer",
-                        content=str(content),
-                        citations=data.get("citations", [])
-                    )
-                elif action in ("step_observation", "observation"):
-                    content = data.get("content") if data.get("content") is not None else data.get("observation", "")
-                    return StepObservation(
-                        action="step_observation",
-                        content=str(content)
-                    )
-                elif action == "clarification_request":
-                    question = data.get("question") if data.get("question") is not None else data.get("content", "")
-                    return ClarificationRequest(
-                        action="clarification_request",
-                        question=str(question)
-                    )
+            data = json.loads(candidate_json)
+        except Exception:
+            # Pre-clean backticks used by SLM as quotation delimiters for string values only when direct parse fails
+            candidate_json_clean = re.sub(r':\s*`([\s\S]*?)`', lambda m: ': ' + json.dumps(m.group(1)), candidate_json)
+            try:
+                data = json.loads(candidate_json_clean)
+            except Exception:
+                data = None
 
-                # Tool call detection: explicit action="tool_call"/"tool",
-                # or presence of "tool"/"tool_name"/"function" keys
-                tool_candidate = (
-                    data.get("tool_name")
-                    or data.get("tool")
-                    or (data.get("function", {}).get("name") if isinstance(data.get("function"), dict) else None)
-                    or (data.get("name") if action in ("tool_call", "tool", "") else None)
+        if isinstance(data, dict):
+            action = str(data.get("action") or data.get("type") or "").strip().lower()
+            if action == "final_answer":
+                content = data.get("content") if data.get("content") is not None else data.get("answer", "")
+                if not content and strict:
+                    return None
+                if isinstance(content, (dict, list)):
+                    content = _render_structured_final_content(content)
+                raw_citations = data.get("citations") or data.get("citation") or []
+                if isinstance(raw_citations, str):
+                    raw_citations = [raw_citations]
+                return FinalAnswer(
+                    action="final_answer",
+                    content=str(content),
+                    citations=raw_citations
+                )
+            elif action in ("step_observation", "observation"):
+                content = data.get("content") if data.get("content") is not None else data.get("observation", "")
+                return StepObservation(
+                    action="step_observation",
+                    content=str(content)
+                )
+            elif action == "clarification_request":
+                question = data.get("question") if data.get("question") is not None else data.get("content", "")
+                return ClarificationRequest(
+                    action="clarification_request",
+                    question=str(question)
                 )
 
-                if tool_candidate:
-                    tool_name = str(tool_candidate).strip()
-                    if tool_name:
-                        raw_params = (
-                            data.get("parameters")
-                            or data.get("arguments")
-                            or (data.get("function", {}).get("arguments") if isinstance(data.get("function"), dict) else None)
-                            or {}
-                        )
-                        if isinstance(raw_params, str):
-                            try:
-                                raw_params = json.loads(raw_params)
-                            except Exception:
-                                raw_params = {}
-                        if not isinstance(raw_params, dict):
+            # Tool call detection: explicit action="tool_call"/"tool",
+            # or presence of "tool"/"tool_name"/"function" keys
+            tool_candidate = (
+                data.get("tool_name")
+                or data.get("tool")
+                or (data.get("function", {}).get("name") if isinstance(data.get("function"), dict) else None)
+                or (data.get("name") if action in ("tool_call", "tool", "") else None)
+            )
+
+            if tool_candidate:
+                tool_name = str(tool_candidate).strip()
+                if tool_name:
+                    raw_params = (
+                        data.get("parameters")
+                        or data.get("arguments")
+                        or (data.get("function", {}).get("arguments") if isinstance(data.get("function"), dict) else None)
+                        or {}
+                    )
+                    if isinstance(raw_params, str):
+                        try:
+                            raw_params = json.loads(raw_params)
+                        except Exception:
                             raw_params = {}
+                    if not isinstance(raw_params, dict):
+                        raw_params = {}
 
-                        # Safeguard: if model wrapped natural explanatory text inside execute_code
-                        if tool_name == "execute_code":
-                            code_str = str(raw_params.get("code") or raw_params.get("script") or "").strip()
-                            python_keywords = ["import ", "def ", "class ", "print(", "=", "return ", "for ", "while ", "try:", "if "]
-                            if len(code_str) > 20 and not any(kw in code_str for kw in python_keywords):
-                                citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", code_str)))
-                                return FinalAnswer(action="final_answer", content=code_str, citations=citations)
+                    # Safeguard: if model wrapped natural explanatory text inside execute_code
+                    if tool_name == "execute_code":
+                        code_str = str(raw_params.get("code") or raw_params.get("script") or "").strip()
+                        python_keywords = ["import ", "def ", "class ", "print(", "=", "return ", "for ", "while ", "try:", "if "]
+                        if len(code_str) > 20 and not any(kw in code_str for kw in python_keywords):
+                            citations = list(set(re.findall(r"\[([^\]\n]+?\|\s*Page\s*\d+)(?:\s*\|.*?)?\]", code_str)))
+                            return FinalAnswer(action="final_answer", content=code_str, citations=citations)
 
-                        reason = data.get("reason") or "Autonomous plan execution"
-                        return ToolCallProposal(
-                            action="tool_call",
-                            tool_name=tool_name,
-                            parameters=raw_params,
-                            reason=reason
-                        )
-                if strict:
-                    return None
-        except Exception:
+                    reason = data.get("reason") or "Autonomous plan execution"
+                    return ToolCallProposal(
+                        action="tool_call",
+                        tool_name=tool_name,
+                        parameters=raw_params,
+                        reason=reason
+                    )
+            if strict:
+                return None
+        else:
             # Resilient fallback for SLM outputs with unescaped internal quotes inside JSON strings
             try:
                 action_m = re.search(r'"(?:action|type)"\s*:\s*"final_answer"', candidate_json, re.IGNORECASE)
                 if action_m:
-                    content_m = re.search(r'"(?:content|answer)"\s*:\s*"(.*?)(?:"\s*,\s*"(?:citations|action|type)"|"\s*\})', candidate_json, re.DOTALL)
-                    citations_m = re.search(r'"citations"\s*:\s*\[(.*?)\]', candidate_json, re.DOTALL)
+                    content_m = re.search(r'"(?:content|answer)"\s*:\s*"(.*?)(?:"\s*,\s*"(?:citations?|action|type)"|"\s*\})', candidate_json, re.DOTALL)
+                    citations_m = re.search(r'"citations?"\s*:\s*\[(.*?)\]', candidate_json, re.DOTALL)
                     citations = []
                     if citations_m:
                         citations = [c.strip().strip('"').strip("'") for c in citations_m.group(1).split(",") if c.strip().strip('"').strip("'")]
@@ -874,6 +887,8 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                             action="step_observation",
                             content=content_m.group(1)
                         )
+            except Exception:
+                pass
                 
                 tool_m = re.search(r'"(?:tool_name|tool)"\s*:\s*"([^"]+)"', candidate_json)
                 if tool_m:

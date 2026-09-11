@@ -11,11 +11,11 @@ import hashlib
 import logging
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple, Union
 from pydantic import BaseModel
 
 import docx
-from docx.shared import Pt
+from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 import openpyxl
@@ -172,6 +172,28 @@ def generate_docx_document(dest_path: Path, title: str, sections: List[Dict[str,
                 for col_idx, val in enumerate(r_data):
                     if col_idx < len(headers):
                         table.cell(row_idx + 1, col_idx).text = str(val)
+
+        # Embed images / figures if present in section
+        for img_info in sec.get("images", []):
+            img_path = None
+            caption = ""
+            if isinstance(img_info, (str, Path)):
+                img_path = Path(img_info)
+            elif isinstance(img_info, dict):
+                img_path = Path(img_info.get("path", "")) if img_info.get("path") else None
+                caption = img_info.get("caption", "")
+
+            if img_path and img_path.exists():
+                try:
+                    doc.add_picture(str(img_path), width=Inches(5.5))
+                    if caption:
+                        cap_p = doc.add_paragraph()
+                        cap_run = cap_p.add_run(f"Figure: {caption}")
+                        cap_run.font.size = Pt(8.5)
+                        cap_run.font.italic = True
+                        cap_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                except Exception as img_err:
+                    logger.warning(f"Failed embedding picture {img_path} in DOCX: {img_err}")
 
         doc.add_paragraph()
 
@@ -366,7 +388,41 @@ def generate_pdf_document(dest_path: Path, title: str, sections: List[Dict[str, 
             ]))
             story.append(Spacer(1, 4))
             story.append(t)
-            story.append(Spacer(1, 6))
+        # Embed images / figures if present in section
+        for img_info in sec.get("images", []):
+            img_path = None
+            caption = ""
+            if isinstance(img_info, (str, Path)):
+                img_path = Path(img_info)
+            elif isinstance(img_info, dict):
+                img_path = Path(img_info.get("path", "")) if img_info.get("path") else None
+                caption = img_info.get("caption", "")
+
+            if img_path and img_path.exists():
+                try:
+                    from reportlab.platypus import Image as RLImage
+                    from PIL import Image as PILImage
+                    with PILImage.open(str(img_path)) as pil_im:
+                        w, h = pil_im.size
+                    max_w = letter[0] - 80
+                    max_h = 300
+                    ratio = min(max_w / max(w, 1), max_h / max(h, 1), 1.0)
+                    story.append(Spacer(1, 6))
+                    story.append(RLImage(str(img_path), width=w * ratio, height=h * ratio))
+                    if caption:
+                        fig_cap_style = ParagraphStyle(
+                            'FigCap',
+                            parent=styles['Italic'],
+                            fontSize=8,
+                            leading=10,
+                            alignment=1,
+                            textColor=colors.HexColor('#555555')
+                        )
+                        story.append(Spacer(1, 3))
+                        story.append(Paragraph(f"Figure: {_clean_pdf_text(caption)}", fig_cap_style))
+                    story.append(Spacer(1, 6))
+                except Exception as img_err:
+                    logger.warning(f"Failed embedding image {img_path} in PDF: {img_err}")
 
         story.append(Spacer(1, 6))
 
@@ -478,6 +534,76 @@ def render_document_page_to_image(
             doc.close()
 
 
+async def resolve_image_for_embedding(
+    workspace_id: int,
+    image_ref: Any
+) -> Tuple[Optional[Path], Optional[str], Optional[int]]:
+    """
+    Safely resolves an image reference (artifact ID, dict with artifact_id/path, or relative path)
+    within the workspace boundary.
+    Verifies:
+    1. Workspace ownership.
+    2. File exists and SHA-256 matches.
+    3. Artifact type is image/png/jpeg.
+    4. Rejects directory traversal / arbitrary absolute paths outside workspace.
+    Returns: (resolved_path, caption, artifact_id)
+    """
+    artifact_id: Optional[int] = None
+    caption: str = ""
+    candidate_path: Optional[str] = None
+
+    if isinstance(image_ref, int):
+        artifact_id = image_ref
+    elif isinstance(image_ref, str) and image_ref.strip().isdigit():
+        artifact_id = int(image_ref.strip())
+    elif isinstance(image_ref, dict):
+        if "artifact_id" in image_ref:
+            try:
+                artifact_id = int(image_ref["artifact_id"])
+            except (ValueError, TypeError):
+                pass
+        caption = image_ref.get("caption", "")
+        candidate_path = image_ref.get("path")
+    elif isinstance(image_ref, (str, Path)):
+        candidate_path = str(image_ref)
+
+    if artifact_id is not None:
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT id, workspace_id, relative_path, artifact_type, title, sha256_hash FROM workspace_artifacts WHERE id = ?",
+                (artifact_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                logger.warning(f"Artifact ID {artifact_id} not found.")
+                return None, None, None
+            if row["workspace_id"] != workspace_id:
+                raise SecurityError(f"Cross-workspace artifact access forbidden: artifact {artifact_id} does not belong to workspace {workspace_id}")
+            if row["artifact_type"].lower() not in ["png", "jpg", "jpeg", "image"]:
+                logger.warning(f"Artifact ID {artifact_id} is not an image ({row['artifact_type']}).")
+                return None, None, None
+
+            safe_path = resolve_workspace_path(workspace_id, row["relative_path"], purpose="read")
+            if not safe_path.exists():
+                return None, None, None
+            # Verify SHA
+            if row["sha256_hash"] and compute_sha256(safe_path) != row["sha256_hash"]:
+                logger.warning(f"SHA mismatch on artifact ID {artifact_id}")
+                return None, None, None
+            return safe_path, caption or row["title"] or "Visualization", artifact_id
+
+    if candidate_path:
+        try:
+            safe_path = resolve_workspace_path(workspace_id, candidate_path, purpose="read")
+            if safe_path.exists():
+                return safe_path, caption, None
+        except Exception as e:
+            logger.warning(f"Invalid image path reference '{candidate_path}': {e}")
+            return None, None, None
+
+    return None, None, None
+
+
 async def create_and_register_artifact(
     workspace_id: int,
     filename: str,
@@ -561,6 +687,29 @@ async def create_and_register_artifact(
                         fire_and_forget_notification(art_ev)
                     except Exception:
                         pass
+
+                if row and metadata and metadata.get("embedded_visualization_artifact_ids"):
+                    doc_id = row["id"]
+                    for img_art_id in metadata["embedded_visualization_artifact_ids"]:
+                        try:
+                            c_img = await db.execute(
+                                "SELECT metadata FROM workspace_artifacts WHERE id = ? AND workspace_id = ?",
+                                (img_art_id, workspace_id)
+                            )
+                            img_row = await c_img.fetchone()
+                            if img_row:
+                                img_meta = json.loads(img_row["metadata"]) if img_row["metadata"] else {}
+                                embedded_in = img_meta.get("embedded_in_artifact_ids", [])
+                                if doc_id not in embedded_in:
+                                    embedded_in.append(doc_id)
+                                    img_meta["embedded_in_artifact_ids"] = embedded_in
+                                    await db.execute(
+                                        "UPDATE workspace_artifacts SET metadata = ? WHERE id = ?",
+                                        (json.dumps(img_meta), img_art_id)
+                                    )
+                        except Exception as meta_err:
+                            logger.warning(f"Failed updating backlink metadata on artifact {img_art_id}: {meta_err}")
+                    await db.commit()
 
                 return dict(row)
         except Exception as db_err:

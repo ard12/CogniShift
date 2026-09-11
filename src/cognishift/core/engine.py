@@ -3384,8 +3384,72 @@ print("Analysis script finished with returncode 0.")
                             tool_out = "Visualization deliverables confirmed and registered in workspace artifacts."
                             current_step.tool_name = "confirm_deliverables"
                             doc_params = {"status": "confirmed", "type": "visualization"}
+                        elif target_fmt == "pdf":
+                            report_filename = f"{stem_name}.pdf" if custom_title else (f"Audit_{stem_name}.pdf" if "audit" in lower_input else f"Report_{stem_name}.pdf")
+                            c_charts = await db.execute(
+                                "SELECT id, filename, relative_path, title FROM workspace_artifacts WHERE run_id = ? AND artifact_type IN ('png', 'image') ORDER BY id DESC LIMIT 1",
+                                (run_id,)
+                            )
+                            chart_row = await c_charts.fetchone()
+                            if chart_row and chosen_sections:
+                                target_sec = chosen_sections[1] if len(chosen_sections) > 1 else chosen_sections[0]
+                                if "images" not in target_sec:
+                                    target_sec["images"] = []
+                                target_sec["images"].append({
+                                    "artifact_id": chart_row["id"],
+                                    "caption": chart_row["title"] or f"Telemetry Visualization ({chart_row['filename']})"
+                                })
+
+                            doc_params = {
+                                "filename": report_filename,
+                                "title": display_title,
+                                "sections": chosen_sections
+                            }
+                            tool_out = await execute_tool("generate_pdf", doc_params, workspace_id=workspace_id, run_id=run_id)
+                            current_step.tool_name = "generate_pdf"
+                        elif target_fmt == "both":
+                            c_charts = await db.execute(
+                                "SELECT id, filename, relative_path, title FROM workspace_artifacts WHERE run_id = ? AND artifact_type IN ('png', 'image') ORDER BY id DESC LIMIT 1",
+                                (run_id,)
+                            )
+                            chart_row = await c_charts.fetchone()
+                            if chart_row and chosen_sections:
+                                target_sec = chosen_sections[1] if len(chosen_sections) > 1 else chosen_sections[0]
+                                if "images" not in target_sec:
+                                    target_sec["images"] = []
+                                target_sec["images"].append({
+                                    "artifact_id": chart_row["id"],
+                                    "caption": chart_row["title"] or f"Telemetry Visualization ({chart_row['filename']})"
+                                })
+
+                            docx_filename = f"{stem_name}.docx" if custom_title else (f"Audit_{stem_name}.docx" if "audit" in lower_input else f"Report_{stem_name}.docx")
+                            pdf_filename = f"{stem_name}.pdf" if custom_title else (f"Audit_{stem_name}.pdf" if "audit" in lower_input else f"Report_{stem_name}.pdf")
+
+                            doc_params_docx = {"filename": docx_filename, "title": display_title, "sections": chosen_sections}
+                            tool_out_docx = await execute_tool("generate_docx", doc_params_docx, workspace_id=workspace_id, run_id=run_id)
+
+                            doc_params_pdf = {"filename": pdf_filename, "title": display_title, "sections": chosen_sections}
+                            tool_out_pdf = await execute_tool("generate_pdf", doc_params_pdf, workspace_id=workspace_id, run_id=run_id)
+
+                            tool_out = f"{tool_out_docx}\n{tool_out_pdf}"
+                            current_step.tool_name = "generate_docx_and_pdf"
+                            doc_params = {"docx": doc_params_docx, "pdf": doc_params_pdf}
                         else:
                             report_filename = f"{stem_name}.docx" if custom_title else (f"Audit_{stem_name}.docx" if "audit" in lower_input else f"Report_{stem_name}.docx")
+                            c_charts = await db.execute(
+                                "SELECT id, filename, relative_path, title FROM workspace_artifacts WHERE run_id = ? AND artifact_type IN ('png', 'image') ORDER BY id DESC LIMIT 1",
+                                (run_id,)
+                            )
+                            chart_row = await c_charts.fetchone()
+                            if chart_row and chosen_sections:
+                                target_sec = chosen_sections[1] if len(chosen_sections) > 1 else chosen_sections[0]
+                                if "images" not in target_sec:
+                                    target_sec["images"] = []
+                                target_sec["images"].append({
+                                    "artifact_id": chart_row["id"],
+                                    "caption": chart_row["title"] or f"Telemetry Visualization ({chart_row['filename']})"
+                                })
+
                             doc_params = {
                                 "filename": report_filename,
                                 "title": display_title,

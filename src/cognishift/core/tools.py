@@ -323,20 +323,42 @@ async def execute_tool(
             return f"Error creating directory '{directory_path}': {str(e)}"
 
     elif tool_name == "generate_docx":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_docx_document
+        from cognishift.core.artifact_generators import (
+            create_and_register_artifact,
+            generate_docx_document,
+            resolve_image_for_embedding
+        )
         filename = parameters.get("filename", "report.docx")
         title = parameters.get("title", "Plant Engineering Report")
         sections = parameters.get("sections", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        embedded_artifact_ids = []
+        for sec in sections:
+            resolved_images = []
+            for img_item in sec.get("images", []):
+                img_p, img_cap, art_id = await resolve_image_for_embedding(ws_id, img_item)
+                if img_p:
+                    resolved_images.append({"path": str(img_p), "caption": img_cap})
+                    if art_id:
+                        embedded_artifact_ids.append(art_id)
+            if resolved_images:
+                sec["images"] = resolved_images
+
+        art_meta = {}
+        if embedded_artifact_ids:
+            art_meta["embedded_visualization_artifact_ids"] = list(dict.fromkeys(embedded_artifact_ids))
+
         try:
             artifact = await create_and_register_artifact(
                 workspace_id=ws_id,
                 filename=filename,
                 artifact_type="docx",
-                generator_fn=lambda p: generate_docx_document(p, title, sections),
+                generator_fn=lambda p: generate_docx_document(p, title, sections, workspace_id=ws_id),
                 title=title,
                 description="Generated DOCX Engineering Report",
-                run_id=run_id
+                run_id=run_id,
+                metadata=art_meta
             )
             return (
                 f"Successfully generated and registered DOCX artifact #{artifact['id']}: '{artifact['relative_path']}' "
@@ -427,20 +449,42 @@ async def execute_tool(
             return f"Error generating PPTX artifact: {str(e)}"
 
     elif tool_name == "generate_pdf":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_pdf_document
+        from cognishift.core.artifact_generators import (
+            create_and_register_artifact,
+            generate_pdf_document,
+            resolve_image_for_embedding
+        )
         filename = parameters.get("filename", "report.pdf")
         title = parameters.get("title", "Plant Engineering Report")
         sections = parameters.get("sections", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        embedded_artifact_ids = []
+        for sec in sections:
+            resolved_images = []
+            for img_item in sec.get("images", []):
+                img_p, img_cap, art_id = await resolve_image_for_embedding(ws_id, img_item)
+                if img_p:
+                    resolved_images.append({"path": str(img_p), "caption": img_cap})
+                    if art_id:
+                        embedded_artifact_ids.append(art_id)
+            if resolved_images:
+                sec["images"] = resolved_images
+
+        art_meta = {}
+        if embedded_artifact_ids:
+            art_meta["embedded_visualization_artifact_ids"] = list(dict.fromkeys(embedded_artifact_ids))
+
         try:
             artifact = await create_and_register_artifact(
                 workspace_id=ws_id,
                 filename=filename,
                 artifact_type="pdf",
-                generator_fn=lambda p: generate_pdf_document(p, title, sections),
+                generator_fn=lambda p: generate_pdf_document(p, title, sections, workspace_id=ws_id),
                 title=title,
                 description="Generated PDF Engineering Report",
-                run_id=run_id
+                run_id=run_id,
+                metadata=art_meta
             )
             return (
                 f"Successfully generated and registered PDF artifact #{artifact['id']}: '{artifact['relative_path']}' "

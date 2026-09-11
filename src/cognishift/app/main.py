@@ -306,7 +306,7 @@ async def list_models():
 # API, documentation, asset, and unknown file-like paths continue to fail closed.
 _SPA_CLIENT_ROUTES = {
     "dashboard", "operator", "workspaces", "agents", "knowledge",
-    "runs", "approvals", "artifacts", "security", "system", "mailbox",
+    "runs", "approvals", "artifacts", "security", "system", "mailbox", "app",
 }
 
 

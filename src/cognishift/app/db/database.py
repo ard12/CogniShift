@@ -343,6 +343,28 @@ async def init_db() -> None:
             )
         ''')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_doc_pages_source ON document_pages(source_id, processing_version)")
+
+        # Phase 8 Hybrid Multimodal Visual Index Metadata Ledger
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS document_page_visual_index (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                source_id INTEGER NOT NULL REFERENCES knowledge_sources(id) ON DELETE CASCADE,
+                processing_version TEXT NOT NULL,
+                page_number INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                checksum TEXT NOT NULL,
+                dpi INTEGER NOT NULL DEFAULT 150,
+                width INTEGER,
+                height INTEGER,
+                vector_file_path TEXT NOT NULL,
+                token_count INTEGER NOT NULL DEFAULT 0,
+                vector_dim INTEGER NOT NULL DEFAULT 128,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(workspace_id, source_id, processing_version, page_number)
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_dpvi_ws_src_ver ON document_page_visual_index(workspace_id, source_id, processing_version)")
         
         # Phase 6 Bounded Network Audit Ledger
         await db.execute('''

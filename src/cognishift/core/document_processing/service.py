@@ -48,11 +48,15 @@ class DocumentProcessingService:
     def __init__(
         self,
         ocr_provider: Optional[OCRProvider] = None,
-        vision_service: Optional[VisionProcessingService] = None
+        vision_service: Optional[VisionProcessingService] = None,
+        visual_embedding_provider: Optional[Any] = None,
+        allow_simulation: bool = False
     ):
         self.ocr_provider = ocr_provider or get_ocr_provider()
         self.vision_service = vision_service or VisionProcessingService()
         self.chunker = PageAwareChunker()
+        self._custom_visual_provider = visual_embedding_provider
+        self.allow_simulation = allow_simulation
 
     async def process_document(
         self,
@@ -245,7 +249,45 @@ class DocumentProcessingService:
                         ids=b_ids
                     )
 
-            # 5. Success! Atomically activate new generation
+            # 4b. ColPali Visual Page Indexing (All-or-Nothing Requirement before activation)
+            visual_pages_indexed = 0
+            from cognishift.core.visual_rag.embedding_provider import get_visual_embedding_provider
+            visual_provider = self._custom_visual_provider or get_visual_embedding_provider(allow_simulation=self.allow_simulation)
+            if visual_provider is not None and inspection.document_type == DocumentType.PDF:
+                import hashlib
+                from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+                from cognishift.core.visual_rag.schemas import PageVectorMetadata
+
+                v_store = get_visual_vector_store()
+                v_doc = pymupdf.open(str(file_path))
+                try:
+                    dpi = getattr(settings, "colpali_raster_dpi", 150)
+                    for page_num in range(1, len(v_doc) + 1):
+                        p_bytes = await asyncio.to_thread(render_page_to_png_bytes, v_doc, page_num, dpi=dpi)
+                        chk = hashlib.sha256(p_bytes).hexdigest()
+                        vecs = await asyncio.to_thread(visual_provider.embed_page, p_bytes)
+                        meta = PageVectorMetadata(
+                            workspace_id=workspace_id,
+                            source_id=source_id,
+                            processing_version=version,
+                            page_number=page_num,
+                            filename=doc_filename,
+                            checksum=chk,
+                            dpi=dpi
+                        )
+                        await v_store.upsert_page(
+                            workspace_id=workspace_id,
+                            source_id=source_id,
+                            processing_version=version,
+                            page_number=page_num,
+                            vectors=vecs,
+                            metadata=meta
+                        )
+                        visual_pages_indexed += 1
+                finally:
+                    v_doc.close()
+
+            # 5. Success! Atomically activate new generation (ALL indexes succeeded)
             await activate_processing_generation(workspace_id, source_id, version)
 
             # Update chunk count on knowledge source
@@ -256,7 +298,7 @@ class DocumentProcessingService:
                 )
                 await db.commit()
 
-            # 6. Retire old generation chunks safely
+            # 6. Retire old generation chunks safely across text and visual stores
             await retire_and_purge_old_generations(workspace_id, source_id, active_version=version)
 
             return {
@@ -267,6 +309,7 @@ class DocumentProcessingService:
                 "native_pages": native_count,
                 "ocr_pages": ocr_count,
                 "vision_pages": vision_count,
+                "visual_pages": visual_pages_indexed,
                 "chunk_count": len(chunks)
             }
 

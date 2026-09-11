@@ -92,6 +92,20 @@ class Settings(BaseSettings):
     semantic_router_max_history_turns: int = 8
     semantic_retrieval_max_distance: float = 0.78  # Squared L2 distance threshold on unit vectors (~0.61 cosine similarity)
 
+    # Phase 8 Hybrid Multimodal RAG with ColPali Configuration
+    colpali_enabled: bool = False
+    colpali_model_path: Path = PROJECT_ROOT / "data" / "models" / "colpali"
+    colpali_device: str = "cpu"
+    colpali_raster_dpi: int = 150
+    visual_index_backend: str = "local"  # 'local' or 'qdrant'
+    visual_index_path: Path = PROJECT_ROOT / "data" / "visual_index"
+    hybrid_retrieval_enabled: bool = True
+    hybrid_rrf_k: int = 60
+    visual_retrieval_top_k: int = 3
+    visual_vlm_max_pages: int = 2
+    visual_verification_enabled: bool = True
+    visual_page_cache_size: int = 50
+
     model_config = SettingsConfigDict(env_file=str(PROJECT_ROOT / ".env"), env_file_encoding="utf-8", extra="ignore")
 
 Settings.PROJECT_ROOT = property(lambda self: self.project_root)
@@ -100,7 +114,8 @@ settings = Settings()
 
 
 # Ensure all paths are absolute relative to project root if they were loaded as relative from .env
-for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir', 'auth_store_path', 'static_dir', 'fastembed_cache_dir']:
+for field in ['data_dir', 'database_path', 'chroma_path', 'upload_dir', 'auth_store_path', 'static_dir', 'fastembed_cache_dir', 'colpali_model_path', 'visual_index_path']:
     path_val = getattr(settings, field)
     if not path_val.is_absolute():
         setattr(settings, field, PROJECT_ROOT / path_val)
+

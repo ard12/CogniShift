@@ -1216,8 +1216,11 @@ async def execute_agent_run(
         # --- ROUTER 2: HARDWARE-AWARE MODEL ROUTING ---
         has_img = bool(input_image_path and Path(input_image_path).exists())
         conf_val = routing_res.confidence if routing_res.confidence is not None else 0.90
-        if has_img:
-            task_info = classify_task(clean_input, has_image=True)
+        task_classified = classify_task(clean_input, has_image=has_img)
+        if task_classified.task_type == "heavy_reasoning":
+            task_info = task_classified
+        elif has_img:
+            task_info = task_classified
         elif routing_res.intent == SemanticIntent.CONVERSATION:
             task_info = TaskClassification(
                 task_type="conversational",
@@ -1240,7 +1243,7 @@ async def execute_agent_run(
                 confidence=conf_val
             )
         else:
-            task_info = classify_task(clean_input, has_image=False)
+            task_info = task_classified
 
         await log_event(db, run_id, "task_classified", f"Classified task as '{task_info.task_type}'", task_info.model_dump())
 
@@ -1574,8 +1577,17 @@ async def execute_agent_run(
                     f"Inspection Telemetry: {vision_analysis}"
                 )
 
+            is_rca_mode = any(k in clean_input.lower() for k in [
+                "rca", "root cause", "failure investigation", "investigate failure",
+                "incident investigation", "why did it fail", "why did the system trip",
+                "troubleshoot", "investigate"
+            ])
             is_cross_inspection = any(w in clean_input.lower() for w in ["compare", "sop", "manual", "procedure", "against", "cross-reference", "correlat"])
-            strict_visual_scope = bool(input_image_path) and not is_cross_inspection
+            strict_visual_scope = bool(input_image_path) and not is_cross_inspection and not is_rca_mode
+
+            # RCA Accuracy Mode Guarantee: independently force full multi-channel retrieval (text + visual + topology)
+            # Semantic router error must never suppress an evidence channel in RCA mode.
+            effective_intent = SemanticIntent.KNOWLEDGE_QUERY if is_rca_mode and routing_res.intent in [SemanticIntent.CONVERSATION, SemanticIntent.ARTIFACT_INSPECTION] else routing_res.intent
 
             if strict_visual_scope:
                 sources_used = f"Visual Artifact | {Path(input_image_path).name}"
@@ -1598,7 +1610,7 @@ async def execute_agent_run(
                             s.status = "completed"
                             s.observation = f"Visual telemetry isolated ({Path(input_image_path).name})"
 
-            elif routing_res.intent == SemanticIntent.CONVERSATION:
+            elif effective_intent == SemanticIntent.CONVERSATION:
                 # Anti-Pollution Policy: Zero ChromaDB, Zero Plant Graph, Zero Artifacts
                 sources_used = "None (Direct Conversation)"
                 await log_event(
@@ -1607,7 +1619,7 @@ async def execute_agent_run(
                     {"intent": routing_res.intent.value}
                 )
 
-            elif routing_res.intent == SemanticIntent.ARTIFACT_INSPECTION:
+            elif effective_intent == SemanticIntent.ARTIFACT_INSPECTION:
                 # Targeted Artifact Resolution ONLY: Zero ChromaDB, Zero Plant Graph
                 ws_root = get_workspace_root(workspace_id).resolve()
 
@@ -2074,7 +2086,7 @@ async def execute_agent_run(
                         })
 
                 has_tag = any(p in retrieval_query.upper() for p in ["P-", "V-", "T-", "HEX-", "MOV-", "PT-", "TT-"])
-                if has_tag:
+                if has_tag or is_rca_mode:
                     graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
                 citations = list(dict.fromkeys(re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", context_str))) if context_str else []

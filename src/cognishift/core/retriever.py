@@ -147,6 +147,19 @@ async def retrieve_context_with_metadata(
     if allowed_source_ids is not None and len(allowed_source_ids) == 0:
         return "", []
 
+    if getattr(settings, "hybrid_retrieval_enabled", True):
+        try:
+            from cognishift.core.retrieval.hybrid_retriever import get_hybrid_retriever
+            return await get_hybrid_retriever().retrieve(
+                workspace_id=workspace_id,
+                query=query,
+                top_k=top_k,
+                allowed_source_ids=allowed_source_ids,
+                distance_threshold=distance_threshold
+            )
+        except Exception as he:
+            logger.warning(f"Hybrid retrieval encountered error, falling back to direct Chroma RAG: {he}")
+
     collection_name = f"workspace_{workspace_id}"
     try:
         collection = chroma_client.get_collection(name=collection_name)

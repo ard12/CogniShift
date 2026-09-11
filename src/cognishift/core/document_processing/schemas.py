@@ -28,6 +28,9 @@ class DocumentType(str, Enum):
     PDF = "pdf"
     PNG = "png"
     JPEG = "jpeg"
+    DOCX = "docx"
+    XLSX = "xlsx"
+    CSV = "csv"
     UNSUPPORTED = "unsupported"
 
 

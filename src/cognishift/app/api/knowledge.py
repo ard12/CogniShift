@@ -28,15 +28,15 @@ async def upload_document(
     # 1. Validate file extension (case-insensitive)
     filename = file.filename or "document.pdf"
     ext = Path(filename).suffix.lower()
-    if ext == ".xls":
+    if ext in [".xls", ".doc"]:
         raise HTTPException(
             status_code=400,
-            detail="Legacy .xls format is unsupported. Please convert your spreadsheet to modern .xlsx or .csv format."
+            detail="Legacy .doc/.xls format is unsupported. Please convert your file to modern .docx/.xlsx or .pdf format."
         )
-    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv"]:
+    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv", ".docx"]:
         raise HTTPException(
             status_code=400,
-            detail="Supported formats: PDF (.pdf), PNG (.png), JPEG (.jpg/.jpeg), Excel (.xlsx), and CSV (.csv)."
+            detail="Supported formats: PDF (.pdf), Word (.docx), Excel (.xlsx), CSV (.csv), PNG (.png), and JPEG (.jpg/.jpeg)."
         )
 
     # 2. Validate workspace existence BEFORE saving to disk
@@ -75,7 +75,7 @@ async def upload_document(
     checksum = hasher.hexdigest()
 
     # 4. Insert record into database as 'processing'
-    source_type = "spreadsheet" if ext in [".xlsx", ".xls", ".csv"] else ("pdf" if ext == ".pdf" else "image")
+    source_type = "docx" if ext == ".docx" else ("spreadsheet" if ext in [".xlsx", ".xls", ".csv"] else ("pdf" if ext == ".pdf" else "image"))
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO knowledge_sources 
@@ -257,6 +257,39 @@ async def upload_document(
 
             await asyncio.to_thread(_embed_and_upsert)
 
+            # Optional visual tile indexing for XLSX
+            if ext == ".xlsx":
+                try:
+                    from cognishift.core.visual_rag.embedding_provider import get_visual_embedding_provider
+                    from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+                    from cognishift.core.visual_rag.schemas import PageVectorMetadata
+                    from cognishift.core.document_processing.office_renderer import extract_xlsx_structured_content
+
+                    v_prov = get_visual_embedding_provider(allow_simulation=True)
+                    if v_prov:
+                        _, tiles = await asyncio.to_thread(extract_xlsx_structured_content, file_path)
+                        v_store = get_visual_vector_store()
+                        for tile_bytes, tile_meta in tiles:
+                            p_num = tile_meta.get("page", 1)
+                            chk = hashlib.sha256(tile_bytes).hexdigest()
+                            vecs = await asyncio.to_thread(v_prov.embed_page, tile_bytes)
+                            v_meta = PageVectorMetadata(
+                                workspace_id=workspace_id,
+                                source_id=source_id,
+                                processing_version="v1",
+                                page_number=p_num,
+                                filename=safe_basename,
+                                checksum=chk,
+                                image_width=1100,
+                                image_height=750,
+                                is_diagram_likely=False,
+                                contains_tables_likely=True,
+                                token_count=len(vecs) if hasattr(vecs, "__len__") else 128
+                            )
+                            await v_store.upsert_page_vectors(v_meta, vecs)
+                except Exception as ve:
+                    logger.warning(f"Optional XLSX visual indexing skipped: {ve}")
+
             async with get_db() as db:
                 # Save page/sheet records in document_pages table for direct page retrieval
                 for idx, chunk_text in enumerate(chunks, start=1):
@@ -294,6 +327,78 @@ async def upload_document(
                 await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
                 await db.commit()
             raise HTTPException(status_code=500, detail="Failed to process spreadsheet. Internal processing error.")
+
+    elif ext == ".docx":
+        # DOCX Ingestion: Extract structured sections, headings, and tables
+        try:
+            from cognishift.core.retriever import chroma_client, embedding_model
+            from cognishift.core.document_processing.office_renderer import extract_docx_structured_content
+
+            docx_chunks_data = await asyncio.to_thread(extract_docx_structured_content, file_path)
+            chunks = []
+            metadatas = []
+            ids = []
+
+            for idx, item in enumerate(docx_chunks_data, start=1):
+                chunk_text = item["text"]
+                chunks.append(chunk_text)
+                metadatas.append({
+                    "source_id": int(source_id),
+                    "filename": safe_basename,
+                    "document_name": safe_basename,
+                    "section_heading": item.get("section_heading", "General"),
+                    "page": int(item.get("page", idx)),
+                    "checksum": checksum,
+                    "workspace_id": int(workspace_id),
+                    "extraction_method": "document",
+                    "processing_version": "v1"
+                })
+                ids.append(f"src_{source_id}_docx_chunk_{idx}")
+
+            if chunks:
+                def _embed_and_upsert_docx():
+                    gen = embedding_model.embed(chunks)
+                    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in gen]
+                    col = chroma_client.get_or_create_collection(f"workspace_{workspace_id}")
+                    col.upsert(documents=chunks, embeddings=embs, metadatas=metadatas, ids=ids)
+
+                await asyncio.to_thread(_embed_and_upsert_docx)
+
+            async with get_db() as db:
+                for idx, c_text in enumerate(chunks, start=1):
+                    await db.execute(
+                        """INSERT INTO document_pages (source_id, workspace_id, processing_version, page_number, text_content, extraction_method)
+                           VALUES (?, ?, 'v1', ?, ?, 'document')""",
+                        (source_id, workspace_id, idx, c_text)
+                    )
+                await db.execute(
+                    "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ?, active_processing_version = 'v1' WHERE id = ?",
+                    (len(chunks), source_id)
+                )
+                c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+                for ag in await c_agents.fetchall():
+                    try:
+                        curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                        if not isinstance(curr_ids, list):
+                            curr_ids = []
+                    except Exception:
+                        curr_ids = []
+                    if source_id not in curr_ids:
+                        curr_ids.append(source_id)
+                        await db.execute(
+                            "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                            (json.dumps(curr_ids), ag["id"])
+                        )
+                await db.commit()
+                cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
+                updated_row = await cursor.fetchone()
+                return KnowledgeSourceResponse.model_validate(dict(updated_row))
+        except Exception as e:
+            logger.error(f"Failed to process DOCX {source_id}: {e}", exc_info=True)
+            async with get_db() as db:
+                await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
+                await db.commit()
+            raise HTTPException(status_code=500, detail="Failed to process DOCX document. Internal processing error.")
 
     # 6. Native PDF, OCR, or Vision
     try:

@@ -105,6 +105,14 @@ async def purge_knowledge_source(workspace_id: int, source_id: int) -> bool:
         return True
 
     await asyncio.to_thread(_delete_and_verify)
+
+    # Also purge visual vectors if present
+    try:
+        from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+        await get_visual_vector_store().purge_source(workspace_id, source_id)
+    except Exception:
+        pass
+
     return True
 
 

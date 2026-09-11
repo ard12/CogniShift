@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     # Phase 8 Hybrid Multimodal RAG with ColPali Configuration
     colpali_enabled: bool = False
     colpali_model_path: Path = PROJECT_ROOT / "data" / "models" / "colpali"
-    colpali_device: str = "cpu"
+    colpali_device: str = "cuda"
     colpali_raster_dpi: int = 150
     visual_index_backend: str = "local"  # 'local' or 'qdrant'
     visual_index_path: Path = PROJECT_ROOT / "data" / "visual_index"

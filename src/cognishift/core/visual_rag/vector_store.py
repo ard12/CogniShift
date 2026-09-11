@@ -109,7 +109,11 @@ class LocalMultiVectorStore(VisualVectorStore):
     Zero-cloud-dependency, pure Python/NumPy + SQLite multi-vector store.
     Stores page token arrays in workspace-isolated directories and persists
     metadata in SQLite document_page_visual_index.
+    Features an in-memory page vector cache to accelerate repeated multi-page scans.
     """
+
+    def __init__(self):
+        self._vector_cache: Dict[str, np.ndarray] = {}
 
     def _get_vector_dir(self, workspace_id: int, source_id: int, version: str) -> Path:
         ws_root = get_workspace_root(workspace_id)
@@ -133,6 +137,12 @@ class LocalMultiVectorStore(VisualVectorStore):
         # Save numpy array off-thread
         arr = np.asarray(vectors, dtype=np.float32)
         await asyncio.to_thread(np.save, str(target_path), arr)
+
+        # Cache pre-normalized vectors in memory
+        target_str = str(target_path)
+        d_norm = np.linalg.norm(arr, axis=-1, keepdims=True)
+        normed = np.where(d_norm > 1e-9, arr / d_norm, 0.0)
+        self._vector_cache[target_str] = normed
 
         token_count = arr.shape[0] if arr.ndim >= 1 else 1
         dim = arr.shape[1] if arr.ndim >= 2 else arr.shape[0]
@@ -168,13 +178,17 @@ class LocalMultiVectorStore(VisualVectorStore):
         allowed_source_ids: Optional[List[int]] = None,
         version_map: Optional[Dict[int, str]] = None
     ) -> List[VisualSearchResult]:
+        """
+        Executes late-interaction MaxSim query scoped strictly to workspace_id.
+        Applies version_map filtering to enforce active processing versions.
+        """
         if allowed_source_ids is not None and len(allowed_source_ids) == 0:
             return []
 
         async with get_db() as db:
             query_sql = """
-                SELECT id, workspace_id, source_id, processing_version, page_number,
-                       filename, checksum, dpi, width, height, vector_file_path, token_count, vector_dim
+                SELECT workspace_id, source_id, processing_version, page_number,
+                       filename, vector_file_path, token_count, checksum, dpi, width, height
                 FROM document_page_visual_index
                 WHERE workspace_id = ?
             """
@@ -206,35 +220,57 @@ class LocalMultiVectorStore(VisualVectorStore):
 
         # Compute MaxSim score for each candidate page
         def _score_candidates() -> List[VisualSearchResult]:
+            # Normalize query once for all candidates
+            q = np.asarray(query_vectors, dtype=np.float32)
+            if q.ndim == 1:
+                q = q[np.newaxis, :]
+            q_norm = np.linalg.norm(q, axis=-1, keepdims=True)
+            q_normed = np.where(q_norm > 1e-9, q / q_norm, 0.0)
+
             scored: List[VisualSearchResult] = []
             for r in candidate_rows:
-                v_path = Path(r["vector_file_path"])
-                if not v_path.exists():
-                    continue
-                try:
-                    doc_tokens = np.load(str(v_path))
-                    score = compute_maxsim(query_vectors, doc_tokens)
-                    scored.append(
-                        VisualSearchResult(
-                            workspace_id=r["workspace_id"],
-                            source_id=r["source_id"],
-                            processing_version=r["processing_version"],
-                            page_number=r["page_number"],
-                            filename=r["filename"],
-                            score=score,
-                            token_count=r["token_count"],
-                            metadata={
-                                "checksum": r["checksum"],
-                                "dpi": r["dpi"],
-                                "width": r["width"],
-                                "height": r["height"],
-                                "vector_file_path": str(v_path)
-                            }
-                        )
+                v_path_str = r["vector_file_path"]
+                if v_path_str in self._vector_cache:
+                    doc_tokens = self._vector_cache[v_path_str]
+                else:
+                    v_path = Path(v_path_str)
+                    if not v_path.exists():
+                        continue
+                    try:
+                        raw_tokens = np.load(str(v_path))
+                        d = np.asarray(raw_tokens, dtype=np.float32)
+                        if d.ndim == 1:
+                            d = d[np.newaxis, :]
+                        d_norm = np.linalg.norm(d, axis=-1, keepdims=True)
+                        doc_tokens = np.where(d_norm > 1e-9, d / d_norm, 0.0)
+                        if len(self._vector_cache) < 2000:
+                            self._vector_cache[v_path_str] = doc_tokens
+                    except Exception as e:
+                        logger.warning(f"Error reading vector file {v_path}: {e}")
+                        continue
+
+                sim_matrix = np.matmul(q_normed, doc_tokens.T)
+                max_per_query = np.max(sim_matrix, axis=1)
+                score = float(np.sum(max_per_query))
+
+                scored.append(
+                    VisualSearchResult(
+                        workspace_id=r["workspace_id"],
+                        source_id=r["source_id"],
+                        processing_version=r["processing_version"],
+                        page_number=r["page_number"],
+                        filename=r["filename"],
+                        score=score,
+                        token_count=r["token_count"],
+                        metadata={
+                            "checksum": r["checksum"],
+                            "dpi": r["dpi"],
+                            "width": r["width"],
+                            "height": r["height"],
+                            "vector_file_path": v_path_str
+                        }
                     )
-                except Exception as e:
-                    logger.warning(f"Error reading vector file {v_path}: {e}")
-                    continue
+                )
 
             # Sort descending by MaxSim score
             scored.sort(key=lambda item: item.score, reverse=True)
@@ -243,6 +279,7 @@ class LocalMultiVectorStore(VisualVectorStore):
         return await asyncio.to_thread(_score_candidates)
 
     async def purge_source(self, workspace_id: int, source_id: int) -> None:
+        self._vector_cache.clear()
         async with get_db() as db:
             cursor = await db.execute(
                 "SELECT vector_file_path FROM document_page_visual_index WHERE workspace_id = ? AND source_id = ?",
@@ -264,6 +301,7 @@ class LocalMultiVectorStore(VisualVectorStore):
                     shutil.rmtree(child, ignore_errors=True)
 
     async def purge_old_generations(self, workspace_id: int, source_id: int, active_version: str) -> None:
+        self._vector_cache.clear()
         async with get_db() as db:
             cursor = await db.execute(
                 """SELECT vector_file_path FROM document_page_visual_index
@@ -287,6 +325,7 @@ class LocalMultiVectorStore(VisualVectorStore):
                     shutil.rmtree(child, ignore_errors=True)
 
     async def purge_workspace(self, workspace_id: int) -> None:
+        self._vector_cache.clear()
         async with get_db() as db:
             await db.execute("DELETE FROM document_page_visual_index WHERE workspace_id = ?", (workspace_id,))
             await db.commit()

@@ -57,6 +57,8 @@ class ColPaliLocalProvider(VisualEmbeddingProvider):
         self._processor = None
         self._model_name: str = "Qdrant/colmodernvbert"
         self._initialized = False
+        self._query_cache: Dict[str, np.ndarray] = {}
+        self.enable_query_cache: bool = True
 
     @property
     def model_name(self) -> str:
@@ -86,13 +88,38 @@ class ColPaliLocalProvider(VisualEmbeddingProvider):
                 f"Ensure offline weights are placed in {settings.colpali_model_path}."
             )
 
-        # Check for ONNX model first (high-performance CPU / DirectML)
+        # Check for ONNX model first (high-performance GPU / CPU)
+        # Register CUDA and cuDNN 9 paths if present on Windows
+        cuda_dirs = [
+            Path(r"C:\Program Files\NVIDIA\CUDNN\v9.22\bin\12.9\x64"),
+            Path(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin"),
+        ]
+        for cd in cuda_dirs:
+            if cd.exists():
+                try:
+                    os.add_dll_directory(str(cd))
+                except Exception:
+                    pass
+                if str(cd) not in os.environ.get("PATH", ""):
+                    os.environ["PATH"] = f"{str(cd)};{os.environ.get('PATH', '')}"
+
         onnx_cache_candidates = [
             self.model_path,
             Path("data/models/colpali"),
             Path("data/models/fastembed"),
             Path("data/models"),
         ]
+
+        import onnxruntime as ort
+        available_providers = ort.get_available_providers()
+        if self.device in ("cuda", "gpu") or ("CUDAExecutionProvider" in available_providers and self.device != "cpu"):
+            cuda_opts = {
+                "device_id": 0,
+                "arena_extend_strategy": "kNextPowerOfTwo",
+            }
+            providers = [("CUDAExecutionProvider", cuda_opts), "CPUExecutionProvider"]
+        else:
+            providers = ["CPUExecutionProvider"]
 
         for cache_dir in onnx_cache_candidates:
             if not cache_dir.exists():
@@ -105,12 +132,14 @@ class ColPaliLocalProvider(VisualEmbeddingProvider):
                         "Qdrant/colmodernvbert",
                         cache_dir=str(effective_cache),
                         local_files_only=True,
-                        threads=4
+                        providers=providers,
                     )
                     self._backend = "onnx_fastembed"
-                    self._model_name = "Qdrant/colmodernvbert (ONNX Late-Interaction)"
+                    has_cuda = any((p == "CUDAExecutionProvider" or (isinstance(p, tuple) and p[0] == "CUDAExecutionProvider")) for p in providers)
+                    active_prov = "CUDA" if has_cuda and "CUDAExecutionProvider" in available_providers else "CPU"
+                    self._model_name = f"Qdrant/colmodernvbert (ONNX Late-Interaction on {active_prov})"
                     self._initialized = True
-                    logger.info(f"ColPali/ColModernVBERT local ONNX model loaded offline from {effective_cache}")
+                    logger.info(f"ColPali/ColModernVBERT local ONNX model loaded offline on {active_prov} from {effective_cache}")
                     return
                 except Exception as e:
                     logger.debug(f"Failed loading ONNX model from {cache_dir}: {e}")
@@ -167,19 +196,38 @@ class ColPaliLocalProvider(VisualEmbeddingProvider):
             arr = image_embeddings[0].cpu().to(torch.float32).numpy()
             return arr
 
-    def embed_query(self, query: str) -> np.ndarray:
-        self._ensure_loaded()
-        if self._backend == "onnx_fastembed":
-            vecs = list(self._model.embed_text([query]))[0]
-            return np.asarray(vecs, dtype=np.float32)
+    def clear_query_cache(self):
+        """Clears the in-memory query embedding cache."""
+        self._query_cache.clear()
 
-        import torch
-        with torch.no_grad():
-            batch_queries = self._processor.process_queries([query]).to(self.device)
-            query_embeddings = self._model(**batch_queries)
-            # query_embeddings shape: (1, Q, D)
-            arr = query_embeddings[0].cpu().to(torch.float32).numpy()
-            return arr
+    def embed_query(self, query: str, use_cache: Optional[bool] = None) -> np.ndarray:
+        self._ensure_loaded()
+        should_cache = self.enable_query_cache if use_cache is None else use_cache
+        if should_cache and query in self._query_cache:
+            return self._query_cache[query]
+
+        if self._backend == "onnx_fastembed":
+            mod = self._model.model
+            encoded = mod.tokenize([query])
+            input_ids = np.array([e.ids for e in encoded], dtype=np.int64)
+            attention_mask = np.array([e.attention_mask for e in encoded], dtype=np.int64)
+            # Use 1 dummy image instead of seq_length dummy images (avoids massive VRAM waste)
+            pix = np.zeros((1, 1, 3, mod.image_size, mod.image_size), dtype=np.float32)
+            onnx_input = {"input_ids": input_ids, "attention_mask": attention_mask, "pixel_values": pix}
+            model_output = mod.model.run(mod.ONNX_OUTPUT_NAMES, onnx_input)
+            from fastembed.late_interaction_multimodal.onnx_multimodal_model import OnnxOutputContext
+            ctx = OnnxOutputContext(model_output=model_output[0], attention_mask=attention_mask, input_ids=input_ids)
+            arr = np.asarray(list(mod._post_process_onnx_text_output(ctx))[0], dtype=np.float32)
+        else:
+            import torch
+            with torch.no_grad():
+                batch_queries = self._processor.process_queries([query]).to(self.device)
+                query_embeddings = self._model(**batch_queries)
+                arr = query_embeddings[0].cpu().to(torch.float32).numpy()
+
+        if should_cache:
+            self._query_cache[query] = arr
+        return arr
 
 
 class SimulatedVisualEmbeddingProvider(VisualEmbeddingProvider):

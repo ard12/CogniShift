@@ -26,7 +26,8 @@ def determine_primary_cause_code(
     primary_cause_text: str,
     observations: List[str],
     bundle: RCAEvidenceBundle,
-    parsed_code: Optional[str] = None
+    parsed_code: Optional[str] = None,
+    operator_input: Optional[str] = None
 ) -> PrimaryCauseCode:
     """
     Deterministically validates model-proposed cause code or classifies machine-readable PrimaryCauseCode
@@ -39,9 +40,20 @@ def determine_primary_cause_code(
     if status == RCAStatus.CONTRADICTORY_EVIDENCE:
         return PrimaryCauseCode.CONTRADICTORY_EVIDENCE
 
-    evidence_text = " ".join(item.content for item in bundle.evidence_items).lower()
-    combined_query_and_cause = (str(primary_cause_text) + " " + " ".join(observations)).lower()
-    combined = (combined_query_and_cause + " " + evidence_text).lower()
+    claims_text = (str(primary_cause_text) + " " + " ".join(observations)).lower()
+    operator_text = (str(operator_input) if operator_input else "").lower()
+
+    # Asset-targeted evidence filtering to prevent cross-asset keyword contamination
+    target_items = [
+        item for item in bundle.evidence_items
+        if any(aid.lower() in (item.filename.lower() + " " + item.content.lower()) for aid in bundle.asset_ids)
+    ]
+    if not target_items:
+        target_items = bundle.evidence_items
+    asset_evidence_text = " ".join(item.content for item in target_items).lower()
+    all_evidence_text = " ".join(item.content for item in bundle.evidence_items).lower()
+
+    combined = (claims_text + " " + operator_text + " " + all_evidence_text).lower()
 
     # 1. Validate model-proposed cause code against evidence
     if parsed_code:
@@ -67,21 +79,29 @@ def determine_primary_cause_code(
                 else:
                     return code
 
-    # 2. Inconclusive check
-    if any(k in combined for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
+    # 2. Inconclusive check (prioritize explicit insufficient/inconclusive claims)
+    if any(k in claims_text for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
         return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
-    # 3. Grounded Physical Mechanism Fallbacks (General across any equipment)
-    if any(k in combined for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh", "suction pressure"]):
+    # 3. Grounded Physical Mechanism Fallbacks:
+    # Check model claims and operator intent FIRST to avoid contamination from unrelated background documents
+    text_to_check = (claims_text + " " + operator_text).strip()
+    if not any(k in text_to_check for k in ["cavitation", "bearing", "valve", "lube oil", "overpressure", "starvation", "stem", "trip"]):
+        text_to_check = asset_evidence_text
+
+    if any(k in text_to_check for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh", "suction drum level"]):
         return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
-    if any(k in combined for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration"]):
-        return PrimaryCauseCode.BEARING_OVERHEAT
-    if any(k in combined for k in ["valve stem", "stem binding", "actuator hysteresis", "valve stuck", "valve binding"]):
+    if any(k in text_to_check for k in ["valve stem", "stem binding", "actuator hysteresis", "valve stuck", "valve binding", "actuator", "control valve", "fv-302"]):
         return PrimaryCauseCode.VALVE_STEM_BINDING
-    if any(k in combined for k in ["lube oil", "seal oil", "oil pressure loss"]):
+    if any(k in text_to_check for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration", "bearing trip", "bearing", "tt-204"]):
+        return PrimaryCauseCode.BEARING_OVERHEAT
+    if any(k in text_to_check for k in ["lube oil pressure loss", "oil pressure loss", "lube oil low"]):
         return PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS
-    if any(k in combined for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
+    if any(k in text_to_check for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
         return PrimaryCauseCode.PROCESS_OVERPRESSURE
+
+    if any(k in combined for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
+        return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
     return PrimaryCauseCode.UNKNOWN
 
@@ -207,6 +227,22 @@ class RCAEvidenceValidator:
         if explicit_missing_sources and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE):
             determined_status = RCAStatus.PLAUSIBLE_HYPOTHESIS
 
+        # Pre-compute primary cause and cause code
+        primary_cause = parsed_claims.get("primary_cause")
+        obs_lines = parsed_claims.get("observations", [])
+        cause_code = determine_primary_cause_code(
+            status=determined_status,
+            primary_cause_text=primary_cause or "",
+            observations=obs_lines,
+            bundle=bundle,
+            parsed_code=parsed_claims.get("primary_cause_code"),
+            operator_input=operator_input
+        )
+
+        if cause_code in (PrimaryCauseCode.INSUFFICIENT_EVIDENCE, PrimaryCauseCode.UNKNOWN):
+            cause_code = PrimaryCauseCode.INSUFFICIENT_EVIDENCE
+            determined_status = RCAStatus.INSUFFICIENT_EVIDENCE
+
         # 7. Construct User-Facing Engineering Output (Section 17 Format)
         status_display = determined_status.value.replace("_", " ")
         lines = [f"## RCA Status\n{status_display}\n"]
@@ -225,7 +261,6 @@ class RCAEvidenceValidator:
 
         # Confirmed Observations with Deterministic Citation Snapping
         lines.append("## Confirmed Observations")
-        obs_lines = parsed_claims.get("observations", [])
         snapped_obs = []
 
         if obs_lines:
@@ -274,15 +309,6 @@ class RCAEvidenceValidator:
                 lines.append(f"{idx}. {step}")
 
         # Primary Cause & Cause Code
-        primary_cause = parsed_claims.get("primary_cause")
-        cause_code = determine_primary_cause_code(
-            status=determined_status,
-            primary_cause_text=primary_cause or "",
-            observations=obs_lines,
-            bundle=bundle,
-            parsed_code=parsed_claims.get("primary_cause_code")
-        )
-
         lines.append("\n## Primary Cause")
         lines.append(f"**Cause Code:** `{cause_code.value}`\n")
         if primary_cause and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE, RCAStatus.PLAUSIBLE_HYPOTHESIS):

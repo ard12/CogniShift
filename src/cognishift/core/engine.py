@@ -665,42 +665,50 @@ async def _resolve_knowledge_and_page_context(
         or (" and " in lower_input and any(doc_word in lower_input for doc_word in ["manual", "sop", "report", "file", "document", "drawing", "schematic"]))
     )
 
-    if target_doc and colloquial_match and not is_cross_doc:
-        # PIN the single matching document and suppress unrelated knowledge sources
-        allowed_source_ids = [int(target_doc["id"])]
-        active_doc_for_page = target_doc
-    elif target_doc and int(target_doc["id"]) not in allowed_source_ids:
-        allowed_source_ids.append(int(target_doc["id"]))
-        if run_id is not None:
-            await log_event(
-                db, run_id, "document_reference_resolved",
-                f"Colloquial reference '{colloquial_match}' resolved to {target_doc['name']}",
-                {
-                    "user_reference": colloquial_match,
-                    "resolved_filename": target_doc["name"],
-                    "confidence": 1.0,
-                    "strict_single_source": True
-                }
-            )
+    if raw_ks_ids:
+        # Agent has a strict sovereign knowledge source allowlist! Never breach it with unallowed sources!
+        if target_doc and int(target_doc["id"]) in allowed_source_ids:
+            if colloquial_match and not is_cross_doc:
+                allowed_source_ids = [int(target_doc["id"])]
+                active_doc_for_page = target_doc
     else:
-        if target_doc and target_doc.get("id"):
-            td_id = int(target_doc["id"])
-            if td_id not in allowed_source_ids:
-                allowed_source_ids.append(td_id)
+        # Agent has unrestricted workspace access; allow colloquial resolution and dynamic doc discovery
+        if target_doc and colloquial_match and not is_cross_doc:
+            # PIN the single matching document and suppress unrelated knowledge sources
+            allowed_source_ids = [int(target_doc["id"])]
+            active_doc_for_page = target_doc
+        elif target_doc and int(target_doc["id"]) not in allowed_source_ids:
+            allowed_source_ids.append(int(target_doc["id"]))
+            if run_id is not None:
+                await log_event(
+                    db, run_id, "document_reference_resolved",
+                    f"Colloquial reference '{colloquial_match}' resolved to {target_doc['name']}",
+                    {
+                        "user_reference": colloquial_match,
+                        "resolved_filename": target_doc["name"],
+                        "confidence": 1.0,
+                        "strict_single_source": True
+                    }
+                )
+        else:
+            if target_doc and target_doc.get("id"):
+                td_id = int(target_doc["id"])
+                if td_id not in allowed_source_ids:
+                    allowed_source_ids.append(td_id)
 
-        if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
-            ps_id = int(resolved_context.pinned_source["id"])
-            if ps_id not in allowed_source_ids:
-                allowed_source_ids.append(ps_id)
+            if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
+                ps_id = int(resolved_context.pinned_source["id"])
+                if ps_id not in allowed_source_ids:
+                    allowed_source_ids.append(ps_id)
 
-        for rf in (resolved_context.files if resolved_context else []):
-            c_rf = await db.execute(
-                "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
-                (workspace_id, rf, rf)
-            )
-            for r_rf in await c_rf.fetchall():
-                if r_rf["id"] not in allowed_source_ids:
-                    allowed_source_ids.append(r_rf["id"])
+            for rf in (resolved_context.files if resolved_context else []):
+                c_rf = await db.execute(
+                    "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
+                    (workspace_id, rf, rf)
+                )
+                for r_rf in await c_rf.fetchall():
+                    if r_rf["id"] not in allowed_source_ids:
+                        allowed_source_ids.append(r_rf["id"])
 
     # Follow-up source logging
     if resolved_context and resolved_context.files and not re.findall(r'\b([a-zA-Z0-9_\-\.]+\.(?:xlsx|xls|csv|pdf))\b', clean_input, re.IGNORECASE):
@@ -3682,6 +3690,11 @@ print("Analysis script finished with returncode 0.")
                     logger.warning(
                         f"Step #{current_step.id} is the final synthesis step; "
                         f"intercepted unauthorized tool call proposal '{action.tool_name}' and converted to final_answer."
+                    )
+                    await log_event(
+                        db, run_id, "final_step_tool_interception",
+                        f"Intercepted unauthorized tool call proposal '{action.tool_name}' on final step #{current_step.id}",
+                        {"step_id": current_step.id, "tool_name": action.tool_name}
                     )
                     synth_content = getattr(action, "reason", None) or f"Synthesized findings based on available documentary evidence regarding {action.tool_name}."
                     action = FinalAnswer(

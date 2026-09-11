@@ -242,3 +242,11 @@ def test_enforce_rca_evidence_boundaries_preserves_verified_citations():
     assert "[MRPL_Pump_Operations_Manual.pdf | Page 14 | NATIVE]" in rca_result
     assert "Confirmed Observations" in rca_result
 
+
+def test_engine_retriever_functions_available():
+    """Verify that both retrieve_context and retrieve_context_with_metadata are accessible in engine."""
+    import cognishift.core.engine as engine_mod
+    assert hasattr(engine_mod, "retrieve_context")
+    assert hasattr(engine_mod, "retrieve_context_with_metadata")
+    assert callable(engine_mod.retrieve_context_with_metadata)
+

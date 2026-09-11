@@ -21,7 +21,7 @@ from fastapi import HTTPException, status
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
 from cognishift.app.db.models import RunResponse, RunEventResponse
-from cognishift.core.retriever import retrieve_context
+from cognishift.core.retriever import retrieve_context, retrieve_context_with_metadata
 from cognishift.core.graph_memory import query_graph_context
 from cognishift.core.security import resolve_workspace_path, get_workspace_root
 from cognishift.core.tools import execute_tool

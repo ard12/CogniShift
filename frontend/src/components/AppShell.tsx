@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { AppearanceMenu } from "@/components/AppearanceMenu";
 import { MotionEffects } from "@/components/MotionEffects";
@@ -13,7 +13,11 @@ import { cn } from "@/lib/cn";
 
 function Brand() {
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-surface-border px-4">
+    <Link
+      to="/"
+      className="flex h-14 shrink-0 items-center gap-2 border-b border-surface-border px-4 transition hover:bg-surface-3/50"
+      title="View Product Overview"
+    >
       <span className="text-lg text-brand" aria-hidden="true">
         ⬡
       </span>
@@ -21,7 +25,7 @@ function Brand() {
       <span className="ml-auto rounded border border-surface-border bg-surface-3 px-1.5 py-0.5 font-mono text-[9px] font-medium text-ink-3">
         SIH26117
       </span>
-    </div>
+    </Link>
   );
 }
 

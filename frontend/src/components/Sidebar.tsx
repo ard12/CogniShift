@@ -13,43 +13,120 @@ import {
   IconShieldCheck,
   IconTerminal,
 } from "@/components/ui/Icon";
+import type { UserRole } from "@/types";
 
-const NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: IconGauge, roles: ["operator","supervisor","administrator"] },
-  { to: "/operator", label: "Operator", icon: IconTerminal, roles: ["operator","supervisor","administrator"] },
-  { to: "/workspaces", label: "Workspaces", icon: IconLayers, roles: ["supervisor","administrator"] },
-  { to: "/agents", label: "Agents", icon: IconBot, roles: ["administrator"] },
-  { to: "/knowledge", label: "Knowledge", icon: IconBook, roles: ["supervisor","administrator"] },
-  { to: "/runs", label: "Runs", icon: IconPlayCircle, roles: ["operator","supervisor","administrator"] },
-  { to: "/approvals", label: "Approvals", icon: IconShieldCheck, roles: ["supervisor","administrator"] },
-  { to: "/mailbox", label: "Mailbox", icon: IconMail, roles: ["operator","supervisor","administrator"] },
-  { to: "/artifacts", label: "Artifacts", icon: IconArchive, roles: ["operator","supervisor","administrator"] },
-  { to: "/security", label: "Security", icon: IconShieldCheck, roles: ["operator","supervisor","administrator"] },
-  { to: "/system", label: "System", icon: IconCpu, roles: ["administrator"] },
+interface NavGroup {
+  title: string;
+  items: {
+    to: string;
+    label: string;
+    icon: typeof IconGauge;
+    roles: UserRole[];
+    badge?: string;
+  }[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    title: "OPERATE",
+    items: [
+      { to: "/app/operator", label: "Operator", icon: IconTerminal, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/app/runs", label: "Runs & Traces", icon: IconPlayCircle, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/app/dashboard", label: "Plant Overview", icon: IconGauge, roles: ["operator", "supervisor", "administrator"] },
+    ],
+  },
+  {
+    title: "INTELLIGENCE",
+    items: [
+      { to: "/app/knowledge", label: "Knowledge Vault", icon: IconBook, roles: ["supervisor", "administrator"] },
+      { to: "/app/agents", label: "Sovereign Agents", icon: IconBot, roles: ["administrator"] },
+    ],
+  },
+  {
+    title: "COMMUNICATION",
+    items: [
+      { to: "/app/mailbox", label: "Operations Mail", icon: IconMail, roles: ["operator", "supervisor", "administrator"] },
+    ],
+  },
+  {
+    title: "OUTPUT",
+    items: [
+      { to: "/app/artifacts", label: "Artifacts & Exports", icon: IconArchive, roles: ["operator", "supervisor", "administrator"] },
+    ],
+  },
+  {
+    title: "GOVERNANCE",
+    items: [
+      { to: "/app/approvals", label: "Approvals & Gates", icon: IconShieldCheck, roles: ["supervisor", "administrator"] },
+      { to: "/app/security", label: "Sovereign Security", icon: IconShieldCheck, roles: ["operator", "supervisor", "administrator"] },
+    ],
+  },
+  {
+    title: "SYSTEM",
+    items: [
+      { to: "/app/workspaces", label: "Workspaces", icon: IconLayers, roles: ["supervisor", "administrator"] },
+      { to: "/app/system", label: "System & Nodes", icon: IconCpu, roles: ["administrator"] },
+    ],
+  },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role } = useAuth();
+
   return (
-    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Primary">
-      {NAV_ITEMS.filter((item) => role && item.roles.includes(role)).map(({ to, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-2.5 rounded px-3 py-2 text-xs font-mono font-medium uppercase tracking-wide transition-colors",
-              isActive
-                ? "bg-brand/10 text-brand"
-                : "text-ink-2 hover:bg-surface-3 hover:text-ink-1"
-            )
-          }
-        >
-          <Icon className="h-4 w-4 shrink-0" />
-          {label}
-        </NavLink>
-      ))}
+    <nav className="flex flex-1 flex-col gap-3 overflow-y-auto p-2" aria-label="Primary">
+      {NAV_GROUPS.map((group) => {
+        const visibleItems = group.items.filter(
+          (item) => role && item.roles.includes(role as UserRole)
+        );
+        if (visibleItems.length === 0) return null;
+
+        return (
+          <div key={group.title} className="flex flex-col gap-0.5">
+            <div className="px-2.5 pt-1.5 pb-1 text-[9px] font-mono font-semibold tracking-wider text-ink-3/80 uppercase select-none">
+              {group.title}
+            </div>
+            {visibleItems.map(({ to, label, icon: Icon, badge }) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    "group relative flex items-center justify-between rounded px-2.5 py-1.5 text-xs font-mono font-medium tracking-wide transition-colors",
+                    isActive
+                      ? "bg-brand/10 text-brand font-semibold shadow-xs"
+                      : "text-ink-2 hover:bg-surface-3 hover:text-ink-1"
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-2.5">
+                      {isActive && (
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-brand" />
+                      )}
+                      <Icon
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 transition-colors",
+                          isActive ? "text-brand" : "text-ink-3 group-hover:text-ink-1"
+                        )}
+                      />
+                      <span>{label}</span>
+                    </div>
+                    {badge && (
+                      <span className="rounded bg-brand/15 px-1 py-0.2 font-mono text-[9px] text-brand">
+                        {badge}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        );
+      })}
     </nav>
   );
 }
+

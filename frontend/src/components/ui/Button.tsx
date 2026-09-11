@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { IconLoader } from "./Icon";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "success";
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "lg";
 
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> {
   variant?: Variant;
@@ -16,6 +16,7 @@ interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "cla
 const SIZE_CLASSES: Record<Size, string> = {
   sm: "text-xs px-2.5 py-1",
   md: "text-sm px-3.5 py-2",
+  lg: "text-sm px-5 py-2.5",
 };
 
 export function Button({

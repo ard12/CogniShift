@@ -757,7 +757,11 @@ export function OperatorPage() {
               </div>
             </div>
 
-            <RequestFlow summary={statusSummary} />
+            <RequestFlow
+              summary={statusSummary}
+              isExecuting={isExecuting}
+              activeStage={dispatchStage}
+            />
 
             {/* 1. Primary Operational Synthesis / Result with Markdown & Section 17 RCA cards */}
             {run?.result_text && (

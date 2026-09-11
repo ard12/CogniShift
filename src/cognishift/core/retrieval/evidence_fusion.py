@@ -15,7 +15,12 @@ RCA_PATTERN = re.compile(
 )
 
 VISUAL_LAYOUT_PATTERN = re.compile(
-    r"\b(p&id|pid|diagram|schematic|blueprint|flowchart|piping|drawing|table|chart|curve|plot|graph|look\s*at\s*page|figure|nameplate)\b",
+    r"\b(p&id|pid|diagram|schematic|blueprint|flowchart|piping|drawing|curve|plot|graph|look\s*at\s*page|figure|nameplate|assembly|cross\s*section|nozzle)\b",
+    re.IGNORECASE
+)
+
+TABLE_PATTERN = re.compile(
+    r"\b(table|grid|column|datasheet|specification|tube\s*id|setpoint|thickness\s*log|inspection\s*sheet|checklist)\b",
     re.IGNORECASE
 )
 
@@ -39,15 +44,34 @@ class QueryIntentWeighting:
         if VISUAL_LAYOUT_PATTERN.search(clean_q):
             return "visual", 0.3, 0.7
 
+        # Dense table intent
+        if TABLE_PATTERN.search(clean_q):
+            return "table", 0.4, 0.6
+
         # Default text-dominant intent
         return "text", 0.8, 0.2
 
 
 class EvidenceFusion:
-    """Fuses multi-channel candidate pages using Reciprocal Rank Fusion (RRF)."""
+    """
+    Fuses multi-channel candidate pages using confidence-aware Reciprocal Rank Fusion (RRF).
+    Guarantees that high-confidence text matches are not perturbed by visual noise,
+    while elevating visual candidates when queries target layout, tables, or diagrams.
+    """
 
-    def __init__(self, rrf_k: Optional[int] = None):
-        self.rrf_k = rrf_k or getattr(settings, "hybrid_rrf_k", 60)
+    def __init__(
+        self,
+        rrf_k: Optional[int] = None,
+        mode: str = "confidence_gated",
+        weight_text_override: Optional[float] = None,
+        weight_visual_override: Optional[float] = None,
+        missing_penalty: bool = False
+    ):
+        self.rrf_k = rrf_k or getattr(settings, "hybrid_rrf_k", 10)
+        self.mode = mode
+        self.weight_text_override = weight_text_override
+        self.weight_visual_override = weight_visual_override
+        self.missing_penalty = missing_penalty
 
     def fuse(
         self,
@@ -58,7 +82,9 @@ class EvidenceFusion:
         """
         Fuses ranked text chunks and ColPali visual candidate pages into a unified ranking.
         """
-        intent_type, w_text, w_vis = QueryIntentWeighting.determine_weights(query)
+        intent_type, default_w_text, default_w_vis = QueryIntentWeighting.determine_weights(query)
+        w_text = self.weight_text_override if self.weight_text_override is not None else default_w_text
+        w_vis = self.weight_visual_override if self.weight_visual_override is not None else default_w_vis
 
         # 1. Group text chunks by (source_id, page_number)
         text_pages: Dict[Tuple[int, int], Dict[str, Any]] = {}
@@ -66,6 +92,7 @@ class EvidenceFusion:
             sid = item.get("source_id")
             p_num = item.get("page", 1)
             key = (sid, p_num)
+            score_val = item.get("score", 0.0) # Cosine distance
             if key not in text_pages:
                 text_pages[key] = {
                     "source_id": sid,
@@ -73,13 +100,14 @@ class EvidenceFusion:
                     "filename": item.get("filename", ""),
                     "processing_version": item.get("meta", {}).get("processing_version", "v1"),
                     "snippets": [item.get("doc", "")],
-                    "best_score": item.get("score", 0.0),
+                    "best_score": score_val,
                     "best_rank": rank_idx
                 }
             else:
                 text_pages[key]["snippets"].append(item.get("doc", ""))
-                if item.get("score", 0.0) > text_pages[key]["best_score"]:
-                    text_pages[key]["best_score"] = item.get("score", 0.0)
+                # In Chroma, smaller distance is better
+                if score_val < text_pages[key]["best_score"]:
+                    text_pages[key]["best_score"] = score_val
                     text_pages[key]["best_rank"] = min(text_pages[key]["best_rank"], rank_idx)
 
         # 2. Map visual results
@@ -92,7 +120,7 @@ class EvidenceFusion:
                 "page_number": vr.page_number,
                 "filename": vr.filename,
                 "processing_version": vr.processing_version,
-                "score": vr.score,
+                "score": vr.score, # MaxSim score
                 "rank": rank_idx
             }
 
@@ -113,14 +141,41 @@ class EvidenceFusion:
             f_name = (v_data["filename"] if v_data else "") or (t_data["filename"] if t_data else "")
             p_ver = (v_data["processing_version"] if v_data else "") or (t_data["processing_version"] if t_data else "v1")
 
-            t_rank = t_data["best_rank"] if t_data else penalty_text_rank
-            v_rank = v_data["rank"] if v_data else penalty_vis_rank
-
             t_score = t_data["best_score"] if t_data else None
             v_score = v_data["score"] if v_data else None
 
-            # Reciprocal Rank Fusion formula
-            rrf_score = (w_text / (self.rrf_k + t_rank)) + (w_vis / (self.rrf_k + v_rank))
+            # Calculate confidence signals
+            # Text distance: 0.0 is exact match, 0.78 is threshold
+            c_text = 0.0
+            if t_score is not None:
+                c_text = max(0.0, 1.0 - (float(t_score) / 0.78))
+
+            # Visual MaxSim: > 10 is very strong, 3-8 moderate
+            c_vis = 0.0
+            if v_score is not None:
+                c_vis = min(1.0, max(0.0, (float(v_score) - 2.0) / 10.0))
+
+            # Determine rank scores
+            if self.missing_penalty:
+                t_rank = t_data["best_rank"] if t_data else penalty_text_rank
+                v_rank = v_data["rank"] if v_data else penalty_vis_rank
+                score_text = w_text / (self.rrf_k + t_rank)
+                score_vis = w_vis / (self.rrf_k + v_rank)
+            else:
+                # True standard RRF: 0 contribution if not retrieved in channel
+                score_text = (w_text / (self.rrf_k + t_data["best_rank"])) if t_data else 0.0
+                score_vis = (w_vis / (self.rrf_k + v_data["rank"])) if v_data else 0.0
+
+            # Confidence-gated modulation
+            if self.mode == "confidence_gated":
+                # If text match is very confident (distance <= 0.22, c_text >= 0.72) and query is not visual, boost text
+                if c_text >= 0.70 and intent_type in ["text", "rca"]:
+                    score_text *= (1.0 + 1.5 * c_text)
+                # If query is visual/table or text match is weak, boost visual
+                if intent_type in ["visual", "table"] or c_text < 0.35:
+                    score_vis *= (1.0 + 1.5 * c_vis)
+
+            rrf_score = score_text + score_vis
 
             # Channel attribution
             if t_data and v_data:

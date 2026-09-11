@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     visual_index_backend: str = "local"  # 'local' or 'qdrant'
     visual_index_path: Path = PROJECT_ROOT / "data" / "visual_index"
     hybrid_retrieval_enabled: bool = True
-    hybrid_rrf_k: int = 60
+    hybrid_rrf_k: int = 10
     visual_retrieval_top_k: int = 3
     visual_vlm_max_pages: int = 2
     visual_verification_enabled: bool = True

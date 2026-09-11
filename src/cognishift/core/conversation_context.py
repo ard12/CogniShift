@@ -483,7 +483,7 @@ async def resolve_authoritative_source(
             elif Path(fn_cand).stem.lower() == Path(s_name).stem or Path(fn_cand).stem.lower() == Path(s_orig).stem:
                 matched = True
                 selected_by = "stem_match"
-        elif (s_name in q_lower or s_orig in q_lower):
+        elif ((s_name and s_name in q_lower) or (s_orig and s_orig in q_lower)):
             # Do not allow general query mention if query explicitly names another specific file
             all_q_files = [ef.lower() for ef in FILE_REGEX.findall(q_lower)]
             if not all_q_files or s_name in all_q_files or s_orig in all_q_files:
@@ -551,7 +551,7 @@ async def resolve_authoritative_source(
 
         if fn_cand and (fn_cand.lower() == a_name or Path(fn_cand).stem.lower() == Path(a_name).stem):
             matched = True
-        elif not fn_cand and (a_name in q_lower):
+        elif not fn_cand and (a_name and a_name in q_lower):
             matched = True
             selected_by = "query_mention"
 

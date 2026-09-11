@@ -297,10 +297,21 @@ def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[b
     Returns (is_sufficient, reason).
     """
     lower_clean = (query or "").lower()
+    is_rca_or_diagnostic = any(k in lower_clean for k in [
+        "rca", "root cause", "failure investigation", "investigate failure",
+        "incident investigation", "why did it fail", "why did the system trip",
+        "troubleshoot", "investigate"
+    ])
     is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
     is_procurement = "procurement" in lower_clean
-    is_corrosion_query = any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "corrosion"]) or bool(re.search(r'\b(?:mpy|nde|ndt)\b', lower_clean))
-    is_inspection_report = any(k in lower_clean for k in ["inspection report", "metallurgical report"]) or bool(re.search(r'\b(?:nde|ndt)\s+report\b', lower_clean))
+    is_corrosion_query = not is_rca_or_diagnostic and (
+        any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "corrosion"])
+        or bool(re.search(r'\b(?:mpy|nde|ndt)\b', lower_clean))
+    )
+    is_inspection_report = not is_rca_or_diagnostic and (
+        any(k in lower_clean for k in ["inspection report", "metallurgical report"])
+        or bool(re.search(r'\b(?:nde|ndt)\s+report\b', lower_clean))
+    )
 
     requested_entities = sorted(set(re.findall(r"\b[A-Z]{1,4}-\d{3,4}[A-Z]?\b", (query or "").upper())))
     entity_grounding_required = bool(requested_entities) and any(
@@ -327,7 +338,7 @@ def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[b
             return False, "Query is for procurement policy, but retrieved context contains no procurement evidence."
 
     if is_corrosion_query or is_inspection_report:
-        has_corr_terms = any(k in lower_ctx for k in ["corrosion", "wall thickness", "remaining life", "inspection report", "ultrasonic"])
+        has_corr_terms = any(k in lower_ctx for k in ["corrosion", "wall thickness", "remaining life", "inspection report", "inspection_report", "inspection", "ultrasonic", "thickness"])
         has_acronyms = bool(re.search(r'\b(?:nde|ndt|mpy)\b', lower_ctx, re.IGNORECASE))
         if not (has_corr_terms or has_acronyms):
             return False, "Query is for corrosion life / inspection report, but retrieved context contains no corrosion or inspection evidence."
@@ -632,12 +643,20 @@ async def _resolve_knowledge_and_page_context(
             colloquial_match = phrase
             break
 
-    is_cross_doc = any(w in lower_input for w in ["compare", "both", "all documents", "cross-reference", "against", "recommendation", "correlat"])
+    is_cross_doc = (
+        any(w in lower_input for w in [
+            "compare", "both", "all documents", "cross-reference", "against", "recommendation", "correlat",
+            "rca", "root cause", "failure investigation", "investigate failure", "investigate", "troubleshoot", "why did"
+        ])
+        or (" and " in lower_input and any(doc_word in lower_input for doc_word in ["manual", "sop", "report", "file", "document", "drawing", "schematic"]))
+    )
 
     if target_doc and colloquial_match and not is_cross_doc:
         # PIN the single matching document and suppress unrelated knowledge sources
         allowed_source_ids = [int(target_doc["id"])]
         active_doc_for_page = target_doc
+    elif target_doc and int(target_doc["id"]) not in allowed_source_ids:
+        allowed_source_ids.append(int(target_doc["id"]))
         if run_id is not None:
             await log_event(
                 db, run_id, "document_reference_resolved",
@@ -2071,10 +2090,15 @@ async def execute_agent_run(
 
                 # Grounding Fail-Closed: If query inquires about organizational policy, procurement, inspection/corrosion, or private SOPs and no matching evidence exists
                 lower_clean = clean_input.lower()
+                is_rca_or_diagnostic = any(k in lower_clean for k in [
+                    "rca", "root cause", "failure investigation", "investigate failure",
+                    "incident investigation", "why did it fail", "why did the system trip",
+                    "troubleshoot", "investigate"
+                ])
                 is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
                 is_procurement = "procurement" in lower_clean
-                is_corrosion_query = any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "mpy", "corrosion"])
-                is_inspection_report = any(k in lower_clean for k in ["inspection report", "nde report", "ndt report", "metallurgical report"])
+                is_corrosion_query = not is_rca_or_diagnostic and any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "mpy", "corrosion"])
+                is_inspection_report = not is_rca_or_diagnostic and any(k in lower_clean for k in ["inspection report", "nde report", "ndt report", "metallurgical report"])
                 is_policy_query = is_remote_work or is_procurement or is_corrosion_query or is_inspection_report or any(k in lower_clean for k in [
                     "policy", "standard operating procedure", "our sop", "leave rule", "travel rule", "reimbursement"
                 ])
@@ -2293,10 +2317,15 @@ async def execute_agent_run(
                 graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
                 lower_clean = clean_input.lower()
+                is_rca_or_diagnostic = any(k in lower_clean for k in [
+                    "rca", "root cause", "failure investigation", "investigate failure",
+                    "incident investigation", "why did it fail", "why did the system trip",
+                    "troubleshoot", "investigate"
+                ])
                 is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
                 is_procurement = "procurement" in lower_clean
-                is_corrosion_query = any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "mpy", "corrosion"])
-                is_inspection_report = any(k in lower_clean for k in ["inspection report", "nde report", "ndt report", "metallurgical report"])
+                is_corrosion_query = not is_rca_or_diagnostic and any(k in lower_clean for k in ["corrosion life", "remaining life", "corrosion rate", "wall thickness", "ultrasonic thickness", "mpy", "corrosion"])
+                is_inspection_report = not is_rca_or_diagnostic and any(k in lower_clean for k in ["inspection report", "nde report", "ndt report", "metallurgical report"])
                 is_policy_query = is_remote_work or is_procurement or is_corrosion_query or is_inspection_report or any(k in lower_clean for k in [
                     "policy", "standard operating procedure", "our sop", "leave rule", "travel rule", "reimbursement"
                 ])

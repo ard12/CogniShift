@@ -98,8 +98,21 @@ class PageAwareChunker:
         return chunk_texts, chunk_ids, metadatas
 
 
+def _get_locator_key(meta: Dict[str, Any]) -> Tuple[Any, ...]:
+    sheet = meta.get("sheet_name")
+    r_start = meta.get("row_start")
+    r_end = meta.get("row_end")
+    sec = metadata_sec = meta.get("section_heading") or meta.get("section")
+    page = meta.get("page") or meta.get("page_number")
+    if sheet or (r_start is not None and r_end is not None):
+        return ("sheet", str(sheet or "").lower(), r_start, r_end)
+    if metadata_sec:
+        return ("section", str(metadata_sec).lower(), int(page) if page else None)
+    return ("page", int(page) if page else 1)
+
+
 def format_grounded_citation(metadata: Dict[str, Any]) -> str:
-    """Formats human-facing citation string with document, page, and extraction method."""
+    """Formats human-facing citation string with document, page/sheet/section, and extraction method."""
     filename = (
         metadata.get("filename")
         or metadata.get("document")
@@ -108,9 +121,35 @@ def format_grounded_citation(metadata: Dict[str, Any]) -> str:
         or metadata.get("name")
         or "Document"
     )
-    page = metadata.get("page") or metadata.get("page_number") or 1
-    method = metadata.get("extraction_method", "native").upper()
-    return f"[{filename} | Page {page} | {method}]"
+    fname_clean = Path(filename).name if ("/" in filename or "\\" in filename) else filename
+    method = str(metadata.get("extraction_method", "native")).upper()
+
+    sheet = metadata.get("sheet_name")
+    r_start = metadata.get("row_start")
+    r_end = metadata.get("row_end")
+    c_start = metadata.get("col_start")
+    c_end = metadata.get("col_end")
+    sec = metadata.get("section_heading") or metadata.get("section")
+    page = metadata.get("page") or metadata.get("page_number")
+
+    if sheet or (r_start is not None and r_end is not None):
+        parts = []
+        if sheet:
+            parts.append(f"Sheet: {sheet}")
+        if r_start is not None and r_end is not None:
+            parts.append(f"Rows {r_start}-{r_end}")
+        if c_start and c_end:
+            parts.append(f"Cols {c_start}:{c_end}")
+        coords = " | ".join(parts) if parts else "Sheet 1"
+        return f"[{fname_clean} | {coords} | SPREADSHEET]"
+
+    if sec:
+        p_str = f"Rendered Page {page}" if page else ""
+        coords = " | ".join(filter(None, [f"Section: {sec}", p_str]))
+        return f"[{fname_clean} | {coords} | {method}]"
+
+    page_num = page or 1
+    return f"[{fname_clean} | Page {page_num} | {method}]"
 
 
 def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
@@ -139,7 +178,7 @@ def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
 def extract_and_normalize_citations(text: str = "", model_citations: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
     Extracts citations from text and/or model_citations list and normalizes them into structured dictionaries:
-    [{"filename": str, "page": int, "method": Optional[str], "citation_str": str}]
+    [{"filename": str, "page": int, "locator_key": tuple, "method": Optional[str], "citation_str": str}]
     """
     candidates: List[str] = []
     if model_citations:
@@ -148,15 +187,15 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
                 candidates.append(c.strip())
 
     if text:
-        # Match bracketed citations like [Document.pdf | Page 3 | NATIVE] or [Document.pdf | Page 3] or [Document.pdf, Page 3]
-        bracketed = re.findall(r"\[([^\]]*?(?:\.pdf|\.csv|\.xlsx|\.png|\.jpg|\.txt)[^\]]*?)\]", text, re.IGNORECASE)
+        # Match bracketed citations
+        bracketed = re.findall(r"\[([^\]]*?(?:\.pdf|\.csv|\.xlsx|\.docx|\.png|\.jpg|\.txt)[^\]]*?)\]", text, re.IGNORECASE)
         candidates.extend(bracketed)
         # Also match standard [file | Page X] even without known extension
         bracketed_generic = re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", text, re.IGNORECASE)
         candidates.extend(bracketed_generic)
 
     results: List[Dict[str, Any]] = []
-    seen: Set[Tuple[str, int]] = set()
+    seen: Set[Tuple[str, Any]] = set()
 
     for item in candidates:
         raw = item.strip().strip("[]").strip()
@@ -168,36 +207,74 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
             continue
 
         filename = parts[0]
-        page = 1
-        method = None
+        page: Optional[int] = None
+        sheet: Optional[str] = None
+        r_start: Optional[int] = None
+        r_end: Optional[int] = None
+        sec: Optional[str] = None
+        method: Optional[str] = None
 
         for p in parts[1:]:
-            page_match = re.search(r"(?:page|p\.)\s*(\d+)", p, re.IGNORECASE)
+            page_match = re.search(r"(?:rendered\s+page|page|p\.)\s*(\d+)", p, re.IGNORECASE)
             if page_match:
                 page = int(page_match.group(1))
-            elif p.upper() in ("NATIVE", "OCR", "TABLE", "SPREADSHEET", "VISION"):
+
+            sheet_match = re.search(r"sheet:\s*([^|]+)", p, re.IGNORECASE)
+            if sheet_match:
+                sheet = sheet_match.group(1).strip()
+
+            rows_match = re.search(r"rows?\s*(\d+)\s*[-:]\s*(\d+)", p, re.IGNORECASE)
+            if rows_match:
+                r_start = int(rows_match.group(1))
+                r_end = int(rows_match.group(2))
+
+            sec_match = re.search(r"section:\s*([^|]+)", p, re.IGNORECASE)
+            if sec_match:
+                sec = sec_match.group(1).strip()
+
+            if p.upper() in ("NATIVE", "OCR", "TABLE", "SPREADSHEET", "VISION", "HYBRID", "DOCUMENT", "TEXT", "VISUAL"):
                 method = p.upper()
 
-        if page == 1:
+        if page is None and not sheet and not sec:
             pm = re.search(r"(?:page|p\.)\s*(\d+)", raw, re.IGNORECASE)
             if pm:
                 page = int(pm.group(1))
-
-        if not method:
-            for m in ("NATIVE", "OCR", "TABLE", "SPREADSHEET", "VISION"):
-                if re.search(rf"\b{m}\b", raw, re.IGNORECASE):
-                    method = m
-                    break
+            else:
+                page = 1
 
         clean_filename = Path(filename).name if ("/" in filename or "\\" in filename) else filename
-        key = (clean_filename.lower(), page)
+
+        if sheet or (r_start is not None and r_end is not None):
+            loc_key = ("sheet", (sheet or "").lower(), r_start, r_end)
+            coords = []
+            if sheet:
+                coords.append(f"Sheet: {sheet}")
+            if r_start is not None and r_end is not None:
+                coords.append(f"Rows {r_start}-{r_end}")
+            c_str = " | ".join(coords)
+            canonical = f"[{clean_filename} | {c_str} | {method or 'SPREADSHEET'}]"
+        elif sec:
+            loc_key = ("section", sec.lower(), page)
+            p_str = f"Rendered Page {page}" if page else ""
+            coords = " | ".join(filter(None, [f"Section: {sec}", p_str]))
+            canonical = f"[{clean_filename} | {coords} | {method or 'DOCUMENT'}]"
+        else:
+            page_val = page if page is not None else 1
+            loc_key = ("page", page_val)
+            canonical = f"[{clean_filename} | Page {page_val} | {method}]" if method else f"[{clean_filename} | Page {page_val}]"
+
+        key = (clean_filename.lower(), loc_key)
         if key not in seen:
             seen.add(key)
-            canonical = f"[{clean_filename} | Page {page} | {method}]" if method else f"[{clean_filename} | Page {page}]"
             results.append({
                 "filename": clean_filename,
-                "page": page,
+                "page": page if page is not None else 1,
+                "sheet_name": sheet,
+                "row_start": r_start,
+                "row_end": r_end,
+                "section_heading": sec,
                 "method": method,
+                "locator_key": loc_key,
                 "citation_str": canonical
             })
 
@@ -212,6 +289,7 @@ def reconcile_citations_against_evidence(
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
     Reconciles model citations against authoritative retrieved evidence chunks.
+    Preserves multiple pages of the same document (e.g. Page 16 and Page 32) without collapsing.
     Eliminates page hallucinations by snapping to retrieved pages.
     Deduplicates and canonicalizes citations.
     Returns (verified_citations, sources_used_string).
@@ -223,8 +301,9 @@ def reconcile_citations_against_evidence(
             return extracted, sources_str
         return [], "None (No matching manual found)"
 
-    exact_map: Dict[Tuple[str, int], Dict[str, Any]] = {}
+    exact_map: Dict[Tuple[str, Any], Dict[str, Any]] = {}
     file_to_chunks: Dict[str, List[Dict[str, Any]]] = {}
+
     for meta in retrieved_evidence:
         fname = (
             meta.get("filename")
@@ -235,38 +314,43 @@ def reconcile_citations_against_evidence(
             or "Document"
         )
         fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
+        loc_key = _get_locator_key(meta)
+        canonical = format_grounded_citation(meta)
         page = int(meta.get("page") or meta.get("page_number") or 1)
         method = str(meta.get("extraction_method", "native")).upper()
-        key = (fname_clean.lower(), page)
-        canonical = f"[{fname_clean} | Page {page} | {method}]"
+
         info = {
             "filename": fname_clean,
             "page": page,
+            "locator_key": loc_key,
             "method": method,
             "citation_str": canonical,
             "meta": meta
         }
-        exact_map[key] = info
+        exact_map[(fname_clean.lower(), loc_key)] = info
+        # Also map by (fname, page) for fast page snapping
+        exact_map[(fname_clean.lower(), ("page", page))] = info
         file_to_chunks.setdefault(fname_clean.lower(), []).append(info)
 
     extracted_candidates = extract_and_normalize_citations(text, model_citations)
     verified: List[Dict[str, Any]] = []
-    seen: Set[Tuple[str, int]] = set()
+    seen: Set[Tuple[str, Any]] = set()
 
     for cand in extracted_candidates:
         cfname = cand["filename"].lower()
+        cloc_key = cand.get("locator_key")
         cpage = cand["page"]
 
-        # 1. Exact match (document and page)
-        if (cfname, cpage) in exact_map:
-            match_info = exact_map[(cfname, cpage)]
-            key = (match_info["filename"].lower(), match_info["page"])
-            if key not in seen:
-                seen.add(key)
-                verified.append(match_info)
+        # 1. Exact match (by locator key or page)
+        matched_info = exact_map.get((cfname, cloc_key)) or exact_map.get((cfname, ("page", cpage)))
+        if matched_info:
+            seen_key = (matched_info["filename"].lower(), matched_info["locator_key"])
+            if seen_key not in seen:
+                seen.add(seen_key)
+                verified.append(matched_info)
             continue
 
-        # 2. Document match with different/hallucinated page
+        # 2. Document match with different/hallucinated page - snap to closest retrieved page
         matched_doc_key = None
         if cfname in file_to_chunks:
             matched_doc_key = cfname
@@ -281,9 +365,9 @@ def reconcile_citations_against_evidence(
             best_chunk = chunks[0]
             if len(chunks) > 1:
                 best_chunk = min(chunks, key=lambda c: abs(c["page"] - cpage))
-            key = (best_chunk["filename"].lower(), best_chunk["page"])
-            if key not in seen:
-                seen.add(key)
+            seen_key = (best_chunk["filename"].lower(), best_chunk["locator_key"])
+            if seen_key not in seen:
+                seen.add(seen_key)
                 verified.append(best_chunk)
             continue
 
@@ -299,15 +383,17 @@ def reconcile_citations_against_evidence(
                 or "Document"
             )
             fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
-            page = int(meta.get("page") or meta.get("page_number") or 1)
-            method = str(meta.get("extraction_method", "native")).upper()
-            canonical = f"[{fname_clean} | Page {page} | {method}]"
-            key = (fname_clean.lower(), page)
-            if key not in seen:
-                seen.add(key)
+            loc_key = _get_locator_key(meta)
+            canonical = format_grounded_citation(meta)
+            seen_key = (fname_clean.lower(), loc_key)
+            if seen_key not in seen:
+                seen.add(seen_key)
+                page = int(meta.get("page") or meta.get("page_number") or 1)
+                method = str(meta.get("extraction_method", "native")).upper()
                 verified.append({
                     "filename": fname_clean,
                     "page": page,
+                    "locator_key": loc_key,
                     "method": method,
                     "citation_str": canonical,
                     "meta": meta

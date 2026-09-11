@@ -28,7 +28,10 @@ def determine_primary_cause_code(
     bundle: RCAEvidenceBundle,
     parsed_code: Optional[str] = None
 ) -> PrimaryCauseCode:
-    """Deterministically extracts or classifies machine-readable PrimaryCauseCode."""
+    """
+    Deterministically validates model-proposed cause code or classifies machine-readable PrimaryCauseCode
+    based on verified physical facts and evidence support. Never relies on hardcoded asset-name bindings.
+    """
     if status == RCAStatus.ASSET_NOT_FOUND or bundle.retrieval_diagnostics.get("ood_triggered"):
         return PrimaryCauseCode.ASSET_NOT_FOUND
     if status == RCAStatus.INSUFFICIENT_EVIDENCE or not bundle.evidence_items:
@@ -36,49 +39,44 @@ def determine_primary_cause_code(
     if status == RCAStatus.CONTRADICTORY_EVIDENCE:
         return PrimaryCauseCode.CONTRADICTORY_EVIDENCE
 
+    evidence_text = " ".join(item.content for item in bundle.evidence_items).lower()
+    combined_query_and_cause = (str(primary_cause_text) + " " + " ".join(observations)).lower()
+    combined = (combined_query_and_cause + " " + evidence_text).lower()
+
+    # 1. Validate model-proposed cause code against evidence
     if parsed_code:
         clean_code = str(parsed_code).strip().upper().replace(" ", "_").replace("-", "_")
         for code in PrimaryCauseCode:
             if code.value == clean_code:
-                return code
+                # Corroborate proposed code with physical keywords in evidence or observations
+                if code == PrimaryCauseCode.SUCTION_STARVATION_CAVITATION:
+                    if any(w in combined for w in ["cavitation", "suction", "npsh", "strainer", "starvation", "feed pressure"]):
+                        return code
+                elif code == PrimaryCauseCode.BEARING_OVERHEAT:
+                    if any(w in combined for w in ["bearing", "temp", "overheat", "vibration", "journal", "wear", "thrust", "tt-"]):
+                        return code
+                elif code == PrimaryCauseCode.VALVE_STEM_BINDING:
+                    if any(w in combined for w in ["valve", "stem", "binding", "actuator", "stuck", "positioner", "hysteresis"]):
+                        return code
+                elif code == PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS:
+                    if any(w in combined for w in ["lube oil", "oil pressure", "seal oil", "filter"]):
+                        return code
+                elif code == PrimaryCauseCode.PROCESS_OVERPRESSURE:
+                    if any(w in combined for w in ["overpressure", "pressure", "discharge", "relief", "esd"]):
+                        return code
+                else:
+                    return code
 
-    evidence_text = " ".join(item.content for item in bundle.evidence_items)
-    evidence_files = " ".join(item.filename for item in bundle.evidence_items)
-    combined_query_and_cause = (str(primary_cause_text) + " " + " ".join(observations)).lower()
-    combined = (combined_query_and_cause + " " + evidence_text + " " + evidence_files).lower()
-    asset_ids = [str(a).strip().upper() for a in (bundle.asset_ids or [])]
-
-    # 1. Pump Specific (P-101A) -> Suction Starvation & Cavitation
-    if any(a in ("P-101A", "P101A") for a in asset_ids) or (
-        any(k in combined_query_and_cause for k in ["p-101", "p101", "cavitation", "suction starvation", "strainer"])
-        and not any(a in ("K-101", "K101") for a in asset_ids)
-    ):
-        if any(k in combined for k in ["cavitation", "suction starvation", "strainer", "npsh", "starvation", "vibration"]):
-            return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
-
-    # 2. Compressor Specific (K-101) -> Bearing Overheat / Journal Bearing
-    if any(a in ("K-101", "K101") for a in asset_ids) or (
-        any(k in combined_query_and_cause for k in ["k-101", "k101", "compressor"])
-        and not any(a in ("P-101A", "P101A") for a in asset_ids)
-    ):
-        if any(k in combined for k in ["bearing", "overheat", "temp", "tt-204", "journal", "wear"]):
-            return PrimaryCauseCode.BEARING_OVERHEAT
-
-    # 3. Control Valve Specific (FV-302, R-301) -> Valve Stem Binding
-    if any(a in ("FV-302", "FV302", "R-301", "R301") for a in asset_ids) or any(k in combined_query_and_cause for k in ["fv-302", "fv302", "valve stem", "actuator"]):
-        if any(k in combined for k in ["valve", "stem", "fv-302", "fv302", "actuator", "stuck", "binding"]):
-            return PrimaryCauseCode.VALVE_STEM_BINDING
-
-    # 4. Inconclusive / Missing Telemetry
+    # 2. Inconclusive check
     if any(k in combined for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
         return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
-    # 5. General Fallbacks
-    if any(k in combined for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh"]):
+    # 3. Grounded Physical Mechanism Fallbacks (General across any equipment)
+    if any(k in combined for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh", "suction pressure"]):
         return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
-    if any(k in combined for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "tt-204"]):
+    if any(k in combined for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration"]):
         return PrimaryCauseCode.BEARING_OVERHEAT
-    if any(k in combined for k in ["valve stem", "stem binding", "fv-302", "fv302", "actuator hysteresis", "valve stuck"]):
+    if any(k in combined for k in ["valve stem", "stem binding", "actuator hysteresis", "valve stuck", "valve binding"]):
         return PrimaryCauseCode.VALVE_STEM_BINDING
     if any(k in combined for k in ["lube oil", "seal oil", "oil pressure loss"]):
         return PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS
@@ -193,6 +191,7 @@ class RCAEvidenceValidator:
         # 5. Check if required roles and explicit sources are satisfied
         required_roles_satisfied = len(bundle.missing_required_roles) == 0
         explicit_missing_sources = [s for s, found in bundle.source_coverage.items() if not found]
+        has_missing_critical = (not required_roles_satisfied) or (len(explicit_missing_sources) > 0)
 
         # 6. Determine RCA Status deterministically
         determined_status = determine_rca_status(
@@ -200,12 +199,13 @@ class RCAEvidenceValidator:
             supporting_items=supported_items,
             contradictions=bundle.contradictions,
             has_causal_chronology=any(i.evidence_role == EvidenceRole.INCIDENT_CHRONOLOGY for i in supported_items),
-            operator_symptoms_only=False
+            operator_symptoms_only=False,
+            has_missing_critical=has_missing_critical
         )
 
         # Downgrade status if explicitly requested sources are missing (e.g. vibration logs)
-        if explicit_missing_sources and determined_status == RCAStatus.CONFIRMED_CAUSE:
-            determined_status = RCAStatus.SUPPORTED_LIKELY_CAUSE
+        if explicit_missing_sources and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE):
+            determined_status = RCAStatus.PLAUSIBLE_HYPOTHESIS
 
         # 7. Construct User-Facing Engineering Output (Section 17 Format)
         status_display = determined_status.value.replace("_", " ")
@@ -246,17 +246,17 @@ class RCAEvidenceValidator:
                     matched_item = None
                     for it in supported_items:
                         stem = Path(it.filename).stem.lower()
-                        if it.filename.lower() in clean_obs.lower() or stem in clean_obs.lower():
+                        it_content_words = set(it.content.lower().split())
+                        obs_words = set(clean_obs.lower().split())
+                        overlap = it_content_words & obs_words - {"the", "a", "an", "is", "in", "at", "to", "on", "of", "and", "was", "with", "for"}
+                        if it.filename.lower() in clean_obs.lower() or stem in clean_obs.lower() or len(overlap) >= 3:
                             matched_item = it
                             break
                     if matched_item:
                         loc = f"Page {matched_item.page_number}" if matched_item.page_number else "Topology"
                         snapped_obs.append(f"[{matched_item.evidence_id}] {clean_obs} [{matched_item.filename} | {loc}]")
-                    elif supported_items:
-                        it = supported_items[0]
-                        loc = f"Page {it.page_number}" if it.page_number else "Topology"
-                        snapped_obs.append(f"[{it.evidence_id}] {clean_obs} [{it.filename} | {loc}]")
                     else:
+                        # Grounded: Never assign random evidence ID without semantic/entity backing
                         snapped_obs.append(clean_obs)
 
             for so in snapped_obs:

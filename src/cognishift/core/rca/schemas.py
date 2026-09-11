@@ -20,6 +20,47 @@ class EvidenceRole(str, Enum):
     OTHER = "OTHER"
 
 
+class EvidenceCriticality(str, Enum):
+    REQUIRED_CRITICAL = "REQUIRED_CRITICAL"
+    REQUIRED_SUPPORTING = "REQUIRED_SUPPORTING"
+    OPTIONAL = "OPTIONAL"
+
+
+class EvidenceRequirement(BaseModel):
+    role: EvidenceRole
+    criticality: EvidenceCriticality = EvidenceCriticality.REQUIRED_CRITICAL
+    description: str = ""
+    replacement_roles: List[EvidenceRole] = Field(default_factory=list)
+
+
+class EvidenceLocator(BaseModel):
+    document_type: str = "pdf"  # "pdf", "xlsx", "docx", "csv", "topology"
+    filename: str
+    page_number: Optional[int] = None
+    sheet_name: Optional[str] = None
+    row_start: Optional[int] = None
+    row_end: Optional[int] = None
+    col_start: Optional[str] = None
+    col_end: Optional[str] = None
+    section_heading: Optional[str] = None
+    node_id: Optional[str] = None
+    raw_locator: str = ""
+
+    def format_locator(self) -> str:
+        if self.document_type == "xlsx" and self.sheet_name:
+            r_str = f"Rows {self.row_start}-{self.row_end}" if self.row_start and self.row_end else ""
+            c_str = f"Cols {self.col_start}:{self.col_end}" if self.col_start and self.col_end else ""
+            coords = " | ".join(filter(None, [f"Sheet: {self.sheet_name}", r_str, c_str]))
+            return f"[{self.filename} | {coords} | SPREADSHEET]"
+        elif self.document_type == "docx" and self.section_heading:
+            p_str = f"Rendered Page {self.page_number}" if self.page_number else ""
+            coords = " | ".join(filter(None, [f"Section: {self.section_heading}", p_str]))
+            return f"[{self.filename} | {coords} | DOCUMENT]"
+        elif self.page_number:
+            return f"[{self.filename} | Page {self.page_number} | {self.document_type.upper()}]"
+        return f"[{self.filename} | {self.document_type.upper()}]"
+
+
 class RCAStatus(str, Enum):
     CONFIRMED_CAUSE = "CONFIRMED_CAUSE"
     SUPPORTED_LIKELY_CAUSE = "SUPPORTED_LIKELY_CAUSE"
@@ -73,6 +114,8 @@ class RCAEvidenceItem(BaseModel):
     content: str
     confidence: float = 1.0
     corroborated: bool = False
+    criticality: EvidenceCriticality = EvidenceCriticality.REQUIRED_SUPPORTING
+    locator: Optional[EvidenceLocator] = None
     timestamp: Optional[str] = None
     equipment_ids: List[str] = Field(default_factory=list)
     sensor_ids: List[str] = Field(default_factory=list)
@@ -83,6 +126,7 @@ class RCAEvidenceBundle(BaseModel):
     asset_ids: List[str] = Field(default_factory=list)
     required_roles: List[EvidenceRole] = Field(default_factory=list)
     optional_roles: List[EvidenceRole] = Field(default_factory=list)
+    evidence_requirements: List[EvidenceRequirement] = Field(default_factory=list)
     evidence_items: List[RCAEvidenceItem] = Field(default_factory=list)
     missing_required_roles: List[EvidenceRole] = Field(default_factory=list)
     contradictions: List[str] = Field(default_factory=list)

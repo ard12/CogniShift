@@ -52,6 +52,7 @@ class FusedPageEvidence(BaseModel):
     filename: str
     retrieval_channel: str = "hybrid"  # 'text', 'visual', or 'hybrid'
     text_score: Optional[float] = None
+    text_distance: Optional[float] = None
     visual_score: Optional[float] = None
     fused_score: float = 0.0
     text_snippets: List[str] = Field(default_factory=list)

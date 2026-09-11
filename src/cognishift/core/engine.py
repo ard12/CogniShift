@@ -3904,10 +3904,6 @@ print("Analysis script finished with returncode 0.")
                             )
                         validator = RCAEvidenceValidator()
                         answer_content = validator.validate_and_finalize(rca_bundle, action.content, clean_input)
-                    elif task_info.task_type == "heavy_reasoning":
-                        answer_content = (
-                            enforce_rca_evidence_boundaries(action.content, clean_input, citations=final_answer_citations)
-                        )
                     else:
                         answer_content = action.content
 

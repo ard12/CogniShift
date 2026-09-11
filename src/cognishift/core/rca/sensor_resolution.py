@@ -173,9 +173,10 @@ async def _query_graph_sensors(
     matched = []
     for r in rows:
         name = r["name"]
+        props_str = str(r["properties"] if "properties" in r.keys() else "").lower()
         if prefix and name.upper().startswith(prefix):
             matched.append(name)
-        elif clean_meas in str(r.get("properties", "")).lower():
+        elif clean_meas in props_str:
             matched.append(name)
 
     if len(matched) == 1:

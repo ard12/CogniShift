@@ -86,28 +86,44 @@ class EvidenceFusion:
         w_text = self.weight_text_override if self.weight_text_override is not None else default_w_text
         w_vis = self.weight_visual_override if self.weight_visual_override is not None else default_w_vis
 
-        # 1. Group text chunks by (source_id, page_number)
+        # 1. Group text chunks by (source_id, page_number)        # 1. Map text results
         text_pages: Dict[Tuple[int, int], Dict[str, Any]] = {}
         for rank_idx, item in enumerate(text_items, start=1):
-            sid = item.get("source_id")
-            p_num = item.get("page", 1)
-            key = (sid, p_num)
-            score_val = item.get("score", 0.0) # Cosine distance
+            sid = item.get("source_id") or item.get("meta", {}).get("source_id")
+            p_num = item.get("page") or item.get("meta", {}).get("page") or 1
+            if not sid:
+                continue
+            key = (int(sid), int(p_num))
+
+            # Distinguish distance (lower is better) vs similarity (higher is better)
+            if "distance" in item and item["distance"] is not None:
+                dist_val = float(item["distance"])
+                sim_val = float(item.get("similarity", item.get("score", max(0.0, 1.0 - (dist_val / 2.0)))))
+            else:
+                # Fallback: if only score is present
+                raw_score = float(item.get("score", 0.5))
+                sim_val = raw_score
+                dist_val = max(0.0, (1.0 - sim_val) * 2.0)
+
             if key not in text_pages:
                 text_pages[key] = {
-                    "source_id": sid,
-                    "page_number": p_num,
+                    "source_id": int(sid),
+                    "page_number": int(p_num),
                     "filename": item.get("filename", ""),
                     "processing_version": item.get("meta", {}).get("processing_version", "v1"),
                     "snippets": [item.get("doc", "")],
-                    "best_score": score_val,
+                    "best_distance": dist_val,
+                    "best_similarity": sim_val,
+                    "best_score": sim_val,
                     "best_rank": rank_idx
                 }
             else:
                 text_pages[key]["snippets"].append(item.get("doc", ""))
-                # In Chroma, smaller distance is better
-                if score_val < text_pages[key]["best_score"]:
-                    text_pages[key]["best_score"] = score_val
+                # For page aggregation: best chunk is the one with minimum distance (maximum similarity)
+                if dist_val < text_pages[key]["best_distance"]:
+                    text_pages[key]["best_distance"] = dist_val
+                    text_pages[key]["best_similarity"] = sim_val
+                    text_pages[key]["best_score"] = sim_val
                     text_pages[key]["best_rank"] = min(text_pages[key]["best_rank"], rank_idx)
 
         # 2. Map visual results
@@ -141,14 +157,16 @@ class EvidenceFusion:
             f_name = (v_data["filename"] if v_data else "") or (t_data["filename"] if t_data else "")
             p_ver = (v_data["processing_version"] if v_data else "") or (t_data["processing_version"] if t_data else "v1")
 
-            t_score = t_data["best_score"] if t_data else None
+            t_dist = t_data.get("best_distance") if t_data else None
+            t_sim = t_data.get("best_similarity") if t_data else None
+            t_score = t_sim
             v_score = v_data["score"] if v_data else None
 
             # Calculate confidence signals
             # Text distance: 0.0 is exact match, 0.78 is threshold
             c_text = 0.0
-            if t_score is not None:
-                c_text = max(0.0, 1.0 - (float(t_score) / 0.78))
+            if t_dist is not None:
+                c_text = max(0.0, 1.0 - (float(t_dist) / 0.78))
 
             # Visual MaxSim: > 10 is very strong, 3-8 moderate
             c_vis = 0.0
@@ -212,6 +230,7 @@ class EvidenceFusion:
                     filename=f_name,
                     retrieval_channel=channel,
                     text_score=t_score,
+                    text_distance=t_dist,
                     visual_score=v_score,
                     fused_score=rrf_score,
                     text_snippets=t_data["snippets"] if t_data else [],

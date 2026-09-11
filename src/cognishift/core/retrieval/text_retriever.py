@@ -173,8 +173,9 @@ class TextRetriever:
             ranked_items.append({
                 "doc": doc,
                 "meta": meta,
-                "distance": dist,
-                "score": sim_score,
+                "distance": float(dist),
+                "similarity": float(sim_score),
+                "score": float(sim_score),
                 "page": int(page_num),
                 "source_id": meta.get("source_id"),
                 "filename": fname

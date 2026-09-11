@@ -253,6 +253,14 @@ class RCAEvidenceAcquirer:
                         # Assign role
                         role = self._classify_evidence_role(doc_text, filename)
 
+                        # Compute confidence from raw distance (monotonic: distance 0.0 -> 1.0, distance 0.78 -> 0.0)
+                        raw_dist = tr.get("distance")
+                        if raw_dist is not None:
+                            calc_conf = max(0.0, min(1.0, 1.0 - (float(raw_dist) / 0.78)))
+                        else:
+                            raw_score = float(tr.get("score", 0.5))
+                            calc_conf = max(0.0, min(1.0, raw_score))
+
                         evidence_items.append(
                             RCAEvidenceItem(
                                 evidence_id=f"E{e_counter}",
@@ -265,7 +273,7 @@ class RCAEvidenceAcquirer:
                                 retrieval_channel="text",
                                 evidence_role=role,
                                 content=doc_text[:600],
-                                confidence=max(0.0, 1.0 - (float(tr.get("score", 0.5)) / 0.78)),
+                                confidence=calc_conf,
                                 equipment_ids=assets
                             )
                         )

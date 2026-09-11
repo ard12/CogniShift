@@ -14,9 +14,9 @@ import { cn } from "@/lib/cn";
 function Brand() {
   return (
     <Link
-      to="/"
+      to="/operator"
       className="flex h-14 shrink-0 items-center gap-2 border-b border-surface-border px-4 transition hover:bg-surface-3/50"
-      title="View Product Overview"
+      title="CogniShift Workbench"
     >
       <span className="text-lg text-brand" aria-hidden="true">
         ⬡

@@ -30,42 +30,42 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "OPERATE",
     items: [
-      { to: "/app/operator", label: "Operator", icon: IconTerminal, roles: ["operator", "supervisor", "administrator"] },
-      { to: "/app/runs", label: "Runs & Traces", icon: IconPlayCircle, roles: ["operator", "supervisor", "administrator"] },
-      { to: "/app/dashboard", label: "Plant Overview", icon: IconGauge, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/operator", label: "Operator", icon: IconTerminal, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/runs", label: "Runs & Traces", icon: IconPlayCircle, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/dashboard", label: "Plant Overview", icon: IconGauge, roles: ["operator", "supervisor", "administrator"] },
     ],
   },
   {
     title: "INTELLIGENCE",
     items: [
-      { to: "/app/knowledge", label: "Knowledge Vault", icon: IconBook, roles: ["supervisor", "administrator"] },
-      { to: "/app/agents", label: "Sovereign Agents", icon: IconBot, roles: ["administrator"] },
+      { to: "/knowledge", label: "Knowledge Vault", icon: IconBook, roles: ["supervisor", "administrator"] },
+      { to: "/agents", label: "Sovereign Agents", icon: IconBot, roles: ["administrator"] },
     ],
   },
   {
     title: "COMMUNICATION",
     items: [
-      { to: "/app/mailbox", label: "Operations Mail", icon: IconMail, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/mailbox", label: "Operations Mail", icon: IconMail, roles: ["operator", "supervisor", "administrator"] },
     ],
   },
   {
     title: "OUTPUT",
     items: [
-      { to: "/app/artifacts", label: "Artifacts & Exports", icon: IconArchive, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/artifacts", label: "Artifacts & Exports", icon: IconArchive, roles: ["operator", "supervisor", "administrator"] },
     ],
   },
   {
     title: "GOVERNANCE",
     items: [
-      { to: "/app/approvals", label: "Approvals & Gates", icon: IconShieldCheck, roles: ["supervisor", "administrator"] },
-      { to: "/app/security", label: "Sovereign Security", icon: IconShieldCheck, roles: ["operator", "supervisor", "administrator"] },
+      { to: "/approvals", label: "Approvals & Gates", icon: IconShieldCheck, roles: ["supervisor", "administrator"] },
+      { to: "/security", label: "Sovereign Security", icon: IconShieldCheck, roles: ["operator", "supervisor", "administrator"] },
     ],
   },
   {
     title: "SYSTEM",
     items: [
-      { to: "/app/workspaces", label: "Workspaces", icon: IconLayers, roles: ["supervisor", "administrator"] },
-      { to: "/app/system", label: "System & Nodes", icon: IconCpu, roles: ["administrator"] },
+      { to: "/workspaces", label: "Workspaces", icon: IconLayers, roles: ["supervisor", "administrator"] },
+      { to: "/system", label: "System & Nodes", icon: IconCpu, roles: ["administrator"] },
     ],
   },
 ];

@@ -747,22 +747,8 @@ html[data-theme="light"] body::after {
 }
 
 /* =========================================================================
-   Sovereign Industrial AI Workbench & Cinematic Storytelling Utilities
+   Sovereign Industrial AI Workbench Utilities
    ========================================================================= */
-
-/* 3D Perspective & Camera Transforms for Cinematic Presentation */
-.perspective-1000 {
-  perspective: 1000px;
-}
-.perspective-2000 {
-  perspective: 2000px;
-}
-.preserve-3d {
-  transform-style: preserve-3d;
-}
-.backface-hidden {
-  backface-visibility: hidden;
-}
 
 /* Evidence Channel Signatures (Zero Slop, Pure Technical Verification) */
 .evidence-channel-fastembed {
@@ -812,14 +798,8 @@ html[data-theme="light"] body::after {
   to { transform: rotate(360deg); }
 }
 
-/* Reduced Motion Override for GSAP & 3D Elements */
+/* Reduced Motion Override */
 @media (prefers-reduced-motion: reduce) {
-  .perspective-1000,
-  .perspective-2000,
-  .preserve-3d {
-    perspective: none !important;
-    transform: none !important;
-  }
   .radar-sweep {
     animation: none !important;
   }

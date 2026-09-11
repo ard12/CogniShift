@@ -94,8 +94,8 @@ def _is_presentation_request(text: str) -> bool:
     return bool(re.search(r"\b(?:ppt|pptx|powerpoint|slides?|presentation)\b", text or "", re.IGNORECASE))
 
 
-def enforce_rca_evidence_boundaries(content: str, operator_input: str) -> str:
-    """Keep symptom-only RCA output explicit about evidence versus hypotheses."""
+def enforce_rca_evidence_boundaries(content: str, operator_input: str, citations: Optional[List[str]] = None) -> str:
+    """Keep symptom-only RCA output explicit about evidence versus hypotheses, while preserving verified citations."""
     lowered_input = operator_input.lower()
     confirmed: List[str] = []
     if "suction pressure" in lowered_input and any(word in lowered_input for word in ("drop", "dropped", "low")):
@@ -137,6 +137,21 @@ def enforce_rca_evidence_boundaries(content: str, operator_input: str) -> str:
             "- Inspection findings for bearings, coupling/alignment, impeller, seals, and suction restrictions.",
         ]
 
+    # Collect any citations present in content or passed explicitly
+    collected_citations: List[str] = []
+    if citations:
+        collected_citations.extend(citations)
+    if content:
+        inline_cites = re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", content)
+        for ic in inline_cites:
+            formatted_ic = f"[{ic.strip()}]"
+            if formatted_ic not in collected_citations:
+                collected_citations.append(formatted_ic)
+
+    citations_section = ""
+    if collected_citations:
+        citations_section = "\n\n## Documented SOP & Baseline Evidence\n" + "\n".join(f"- {c}" for c in collected_citations)
+
     return (
         "## Confirmed Observations\n"
         + "\n".join(f"- {item}" for item in confirmed)
@@ -144,6 +159,7 @@ def enforce_rca_evidence_boundaries(content: str, operator_input: str) -> str:
         + "\n".join(hypotheses)
         + "\n\n## Additional Evidence Needed\n"
         + "\n".join(evidence)
+        + citations_section
         + "\n\n**Conclusion:** No root cause is confirmed from the symptom-only information provided."
     )
 
@@ -1529,6 +1545,8 @@ async def execute_agent_run(
             graph_context = ""
             artifact_citations = []
             combined_context_parts = []
+            retrieved_evidence_catalog: List[Dict[str, Any]] = []
+            final_answer_citations: List[str] = []
 
             if vision_analysis:
                 combined_context_parts.append(
@@ -2019,14 +2037,22 @@ async def execute_agent_run(
 
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids})...")
                 if allowed_source_ids:
-                    context_str = await retrieve_context(
+                    context_str, retrieved_metas = await retrieve_context_with_metadata(
                         workspace_id=workspace_id,
                         query=retrieval_query,
                         top_k=3,
                         allowed_source_ids=allowed_source_ids
                     )
+                    retrieved_evidence_catalog.extend(retrieved_metas)
                 if page_direct_context:
                     context_str = f"{page_direct_context}\n\n{context_str}".strip() if context_str else page_direct_context
+                    from cognishift.core.document_processing.provenance import extract_and_normalize_citations
+                    for pdc in extract_and_normalize_citations(page_direct_context):
+                        retrieved_evidence_catalog.append({
+                            "filename": pdc["filename"],
+                            "page": pdc["page"],
+                            "extraction_method": pdc.get("method") or "NATIVE"
+                        })
 
                 has_tag = any(p in retrieval_query.upper() for p in ["P-", "V-", "T-", "HEX-", "MOV-", "PT-", "TT-"])
                 if has_tag:
@@ -2247,14 +2273,22 @@ async def execute_agent_run(
 
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids}) and plant topology graph...")
                 if allowed_source_ids:
-                    context_str = await retrieve_context(
+                    context_str, retrieved_metas = await retrieve_context_with_metadata(
                         workspace_id=workspace_id,
                         query=retrieval_query,
                         top_k=3,
                         allowed_source_ids=allowed_source_ids
                     )
+                    retrieved_evidence_catalog.extend(retrieved_metas)
                 if page_direct_context:
                     context_str = f"{page_direct_context}\n\n{context_str}".strip() if context_str else page_direct_context
+                    from cognishift.core.document_processing.provenance import extract_and_normalize_citations
+                    for pdc in extract_and_normalize_citations(page_direct_context):
+                        retrieved_evidence_catalog.append({
+                            "filename": pdc["filename"],
+                            "page": pdc["page"],
+                            "extraction_method": pdc.get("method") or "NATIVE"
+                        })
 
                 graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
@@ -3661,8 +3695,9 @@ print("Analysis script finished with returncode 0.")
                     continue
 
                 elif isinstance(action, FinalAnswer):
+                    final_answer_citations = list(action.citations or [])
                     answer_content = (
-                        enforce_rca_evidence_boundaries(action.content, clean_input)
+                        enforce_rca_evidence_boundaries(action.content, clean_input, citations=final_answer_citations)
                         if task_info.task_type == "heavy_reasoning"
                         else action.content
                     )
@@ -3825,6 +3860,34 @@ print("Analysis script finished with returncode 0.")
                         db, run_id, "anomaly_facts_enforced",
                         "Authoritative SCADA anomaly facts enforced over contradictory/hallucinated model generation.",
                         {"timestamp": frozen_scada_anomaly.get("timestamp"), "source": frozen_scada_source}
+                    )
+
+            # Deterministic Citation & Provenance Reconciliation Gate:
+            # Cross-reference model citations and answer text against authoritative retrieved chunks.
+            # Snaps hallucinated page numbers and sets sources_used to verified citations only.
+            if retrieved_evidence_catalog and run_final_status == "completed":
+                from cognishift.core.document_processing.provenance import reconcile_citations_against_evidence
+                verified_cites, reconciled_sources = reconcile_citations_against_evidence(
+                    text=final_text,
+                    model_citations=final_answer_citations,
+                    retrieved_evidence=retrieved_evidence_catalog,
+                    fallback_to_evidence_if_empty=True
+                )
+                if verified_cites:
+                    sources_used = reconciled_sources
+                    if graph_context and "Plant Topology Graph" not in sources_used:
+                        sources_used += " + Plant Topology Graph"
+                    if vision_analysis and "Local VLM Inspection" not in sources_used:
+                        sources_used += " + Local VLM Inspection"
+                    if artifact_citations:
+                        unique_art = [a for a in dict.fromkeys(artifact_citations) if a not in sources_used]
+                        if unique_art:
+                            sources_used += " + " + ", ".join(unique_art)
+
+                    await log_event(
+                        db, run_id, "citations_reconciled",
+                        f"Reconciled citations against retrieved evidence ({len(verified_cites)} verified citations)",
+                        {"verified_citations": [c["citation_str"] for c in verified_cites], "sources_used": sources_used}
                     )
 
             saved_plan_json = serialize_plan(plan)

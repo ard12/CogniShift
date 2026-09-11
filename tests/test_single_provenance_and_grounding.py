@@ -11,7 +11,12 @@ from cognishift.core.document_insights import (
 from cognishift.core.engine import (
     validate_evidence_sufficiency,
     extract_and_strip_thinking,
-    GoalContract
+    GoalContract,
+    enforce_rca_evidence_boundaries
+)
+from cognishift.core.document_processing.provenance import (
+    extract_and_normalize_citations,
+    reconcile_citations_against_evidence
 )
 from cognishift.core.conversation_context import ResolvedSource
 
@@ -139,3 +144,101 @@ def test_goal_contract_evaluation():
     contract.extracted_fields["pat_latest"] = 4321.0
     contract.extracted_fields["revenue_yoy_pct"] = 77.86
     assert contract.is_satisfied() is True
+
+
+def test_extract_and_normalize_citations_handles_all_syntax_variations():
+    """Verify robust extraction across bracketed, pipe, comma, and model-returned formats."""
+    # Test 1: Pipe with method
+    text1 = "As documented in [P-101A_SOP.pdf | Page 4 | NATIVE], the trip point is 15 bar."
+    cites1 = extract_and_normalize_citations(text1)
+    assert len(cites1) == 1
+    assert cites1[0]["filename"] == "P-101A_SOP.pdf"
+    assert cites1[0]["page"] == 4
+    assert cites1[0]["method"] == "NATIVE"
+    assert cites1[0]["citation_str"] == "[P-101A_SOP.pdf | Page 4 | NATIVE]"
+
+    # Test 2: Comma and lowercase page
+    text2 = "Check [Inspection_Report.pdf, page 12] for corrosion thickness."
+    cites2 = extract_and_normalize_citations(text2)
+    assert len(cites2) == 1
+    assert cites2[0]["filename"] == "Inspection_Report.pdf"
+    assert cites2[0]["page"] == 12
+
+    # Test 3: Model citations list
+    model_cites = ["HAZOP_Manual.pdf | Page 8", "[Compressor_Manual.pdf | Page 2 | OCR]"]
+    cites3 = extract_and_normalize_citations(text="", model_citations=model_cites)
+    assert len(cites3) == 2
+    assert cites3[0]["filename"] == "HAZOP_Manual.pdf"
+    assert cites3[0]["page"] == 8
+    assert cites3[1]["filename"] == "Compressor_Manual.pdf"
+    assert cites3[1]["page"] == 2
+    assert cites3[1]["method"] == "OCR"
+
+
+def test_citation_reconciliation_eliminates_page_hallucinations():
+    """Verify that hallucinated page numbers are snapped to authoritative retrieved chunks."""
+    retrieved_evidence = [
+        {"filename": "API610_Pumps.pdf", "page": 14, "extraction_method": "native"},
+        {"filename": "HAZOP_Report.pdf", "page": 3, "extraction_method": "ocr"}
+    ]
+    # Model hallucinated page 99 for API610_Pumps.pdf
+    model_cites = ["API610_Pumps.pdf | Page 99"]
+    text = "The minimum flow rate is specified in [API610_Pumps.pdf | Page 99]."
+
+    verified, sources_str = reconcile_citations_against_evidence(
+        text=text,
+        model_citations=model_cites,
+        retrieved_evidence=retrieved_evidence,
+        fallback_to_evidence_if_empty=False
+    )
+    assert len(verified) == 1
+    # Page must be snapped to true retrieved page 14
+    assert verified[0]["page"] == 14
+    assert verified[0]["filename"] == "API610_Pumps.pdf"
+    assert "[API610_Pumps.pdf | Page 14 | NATIVE]" in sources_str
+
+
+def test_citation_reconciliation_filters_sources_used_to_verified_subset():
+    """Verify that sources_used only includes chunks actually cited, not all retrieved chunks."""
+    retrieved_evidence = [
+        {"filename": "DocA.pdf", "page": 1, "extraction_method": "native"},
+        {"filename": "DocA.pdf", "page": 4, "extraction_method": "native"},
+        {"filename": "DocB.pdf", "page": 9, "extraction_method": "ocr"}
+    ]
+    # Model only referenced DocA Page 4
+    model_cites = ["DocA.pdf | Page 4"]
+    text = "Based on [DocA.pdf | Page 4 | NATIVE], the maximum pressure is 25 bar."
+
+    verified, sources_str = reconcile_citations_against_evidence(
+        text=text,
+        model_citations=model_cites,
+        retrieved_evidence=retrieved_evidence,
+        fallback_to_evidence_if_empty=False
+    )
+    assert len(verified) == 1
+    assert verified[0]["filename"] == "DocA.pdf"
+    assert verified[0]["page"] == 4
+    # DocA Page 1 and DocB Page 9 must NOT be in sources_str
+    assert "DocB" not in sources_str
+    assert "Page 1" not in sources_str
+    assert sources_str == "[DocA.pdf | Page 4 | NATIVE]"
+
+
+def test_enforce_rca_evidence_boundaries_preserves_verified_citations():
+    """Verify that enforce_rca_evidence_boundaries preserves document citations in troubleshooting output."""
+    raw_content = (
+        "## Hypotheses\n"
+        "- Impeller cavitation or suction strainer clogging.\n"
+        "## Evidence Needed\n"
+        "- Differential pressure across suction strainer.\n"
+    )
+    citations = ["[MRPL_Pump_Operations_Manual.pdf | Page 14 | NATIVE]"]
+    rca_result = enforce_rca_evidence_boundaries(
+        content=raw_content,
+        operator_input="suction pressure dropped and vibration increased sharply",
+        citations=citations
+    )
+    assert "## Documented SOP & Baseline Evidence" in rca_result
+    assert "[MRPL_Pump_Operations_Manual.pdf | Page 14 | NATIVE]" in rca_result
+    assert "Confirmed Observations" in rca_result
+

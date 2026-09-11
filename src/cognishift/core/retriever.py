@@ -132,33 +132,33 @@ def purge_workspace_collection(workspace_id: int) -> bool:
         return False
 
 
-async def retrieve_context(
+async def retrieve_context_with_metadata(
     workspace_id: int,
     query: str,
     top_k: int = 3,
     allowed_source_ids: Optional[List[int]] = None,
     distance_threshold: Optional[float] = None
-) -> str:
+) -> Tuple[str, List[Dict[str, Any]]]:
     """
     Searches ChromaDB for the given query within the workspace.
     FAIL-CLOSED: If allowed_source_ids is an empty list, returns empty context immediately.
-    Server-side metadata filtering enforces agent knowledge boundary and active processing version.
+    Returns (context_str, retrieved_metadatas).
     """
     if allowed_source_ids is not None and len(allowed_source_ids) == 0:
-        return ""
+        return "", []
 
     collection_name = f"workspace_{workspace_id}"
     try:
         collection = chroma_client.get_collection(name=collection_name)
         count = await asyncio.to_thread(collection.count)
         if count == 0:
-            return ""
+            return "", []
     except Exception:
-        return ""
+        return "", []
 
     effective_k = min(top_k, count)
     if effective_k <= 0:
-        return ""
+        return "", []
 
     # Look up authoritative active processing versions from SQLite
     version_map: Dict[int, Optional[str]] = {}
@@ -232,10 +232,10 @@ async def retrieve_context(
             **query_kwargs
         )
     except Exception:
-        return ""
+        return "", []
 
     if not results or not results.get('documents') or not results['documents'][0]:
-        return ""
+        return "", []
 
     from cognishift.core.document_processing.provenance import (
         wrap_document_data_for_prompt,
@@ -244,6 +244,7 @@ async def retrieve_context(
 
     max_dist = distance_threshold if distance_threshold is not None else getattr(settings, "semantic_retrieval_max_distance", 0.78)
     formatted_context_parts = []
+    retrieved_metadatas = []
     distances = results.get('distances', [[]])[0] if results.get('distances') else []
     seen_chunk_keys = set()
 
@@ -281,9 +282,32 @@ async def retrieve_context(
         citation = format_grounded_citation(meta)
         wrapped_doc = wrap_document_data_for_prompt(doc, meta)
         formatted_context_parts.append(f"{citation}\n{wrapped_doc}")
+        retrieved_metadatas.append(meta)
 
     if not formatted_context_parts:
-        return ""
+        return "", []
 
     formatted_context = "--- RETRIEVED CONTEXT ---\n" + "\n\n".join(formatted_context_parts)
-    return formatted_context.strip()
+    return formatted_context.strip(), retrieved_metadatas
+
+
+async def retrieve_context(
+    workspace_id: int,
+    query: str,
+    top_k: int = 3,
+    allowed_source_ids: Optional[List[int]] = None,
+    distance_threshold: Optional[float] = None
+) -> str:
+    """
+    Searches ChromaDB for the given query within the workspace.
+    Returns a formatted string containing the text chunks and source citations.
+    Preserves strict backward compatibility with existing callers and subagents.
+    """
+    context_str, _ = await retrieve_context_with_metadata(
+        workspace_id=workspace_id,
+        query=query,
+        top_k=top_k,
+        allowed_source_ids=allowed_source_ids,
+        distance_threshold=distance_threshold
+    )
+    return context_str

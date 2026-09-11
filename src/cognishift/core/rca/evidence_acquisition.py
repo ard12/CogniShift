@@ -22,6 +22,7 @@ from cognishift.core.retrieval.text_retriever import TextRetriever
 from cognishift.core.retrieval.visual_retriever import VisualRetriever
 from cognishift.core.retrieval.evidence_fusion import EvidenceFusion
 from cognishift.core.graph_memory import query_graph_context
+from cognishift.core.retrieval.visual_inspector import VisualEvidenceInspector, get_visual_inspector
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +34,13 @@ class RCAEvidenceAcquirer:
         self,
         text_retriever: Optional[TextRetriever] = None,
         visual_retriever: Optional[VisualRetriever] = None,
-        allow_simulation: bool = False
+        allow_simulation: bool = False,
+        inspector: Optional[VisualEvidenceInspector] = None
     ):
         self.text_retriever = text_retriever or TextRetriever()
         self.visual_retriever = visual_retriever or VisualRetriever(allow_simulation=allow_simulation)
         self.allow_simulation = allow_simulation
+        self.inspector = inspector or get_visual_inspector()
 
     def parse_evidence_contract(self, query: str) -> Dict[str, Any]:
         """
@@ -309,12 +312,35 @@ class RCAEvidenceAcquirer:
                             (e for e in evidence_items if e.filename == vr.filename and e.page_number == vr.page_number),
                             None
                         )
+                        v_role = EvidenceRole.P_AND_ID if any(k in vr.filename.lower() for k in ["p&id", "pid", "schematic", "drawing"]) else EvidenceRole.INSPECTION
+
+                        # Inspect candidate page visually via VisualEvidenceInspector
+                        insp_res = None
+                        try:
+                            insp_res = await self.inspector.inspect_page(
+                                workspace_id=workspace_id,
+                                source_id=vr.source_id,
+                                page_number=vr.page_number,
+                                filename=vr.filename,
+                                visual_score=float(vr.score),
+                                processing_version=vr.processing_version,
+                                query=query
+                            )
+                        except Exception as ie:
+                            logger.warning(f"Visual inspection failed on {vr.filename} page {vr.page_number}: {ie}")
+
+                        obs_text = insp_res.vlm_observation if (insp_res and insp_res.vlm_observation) else f"Visual page match ({vr.filename} Page {vr.page_number}) with MaxSim relevance score {vr.score:.2f}."
+                        extracted_eq = list(dict.fromkeys(assets + (insp_res.equipment_tags if insp_res else [])))
+
                         if existing:
                             existing.retrieval_channel = "hybrid"
                             existing.confidence = max(existing.confidence, min(1.0, float(vr.score) / 10.0))
+                            if insp_res and insp_res.vlm_observation and "Visual match" not in insp_res.vlm_observation:
+                                existing.content += f"\n[Visual Corroboration]: {insp_res.vlm_observation}"
+                            for eq in extracted_eq:
+                                if eq not in existing.equipment_ids:
+                                    existing.equipment_ids.append(eq)
                             continue
-
-                        v_role = EvidenceRole.P_AND_ID if any(k in vr.filename.lower() for k in ["p&id", "pid", "schematic", "drawing"]) else EvidenceRole.INSPECTION
 
                         evidence_items.append(
                             RCAEvidenceItem(
@@ -327,9 +353,9 @@ class RCAEvidenceAcquirer:
                                 processing_version=vr.processing_version,
                                 retrieval_channel="visual",
                                 evidence_role=v_role,
-                                content=f"Visual page match ({vr.filename} Page {vr.page_number}) with MaxSim relevance score {vr.score:.2f}.",
+                                content=obs_text,
                                 confidence=min(1.0, max(0.0, float(vr.score) / 10.0)),
-                                equipment_ids=assets
+                                equipment_ids=extracted_eq
                             )
                         )
                         e_counter += 1

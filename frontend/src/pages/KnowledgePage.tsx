@@ -82,7 +82,7 @@ export function KnowledgePage() {
         title="Sovereign Knowledge Vault"
         description={
           selectedWorkspace
-            ? `Documents (PDF), operational spreadsheets (XLSX, XLS, CSV), and inspection photos (PNG, JPEG) ingested for ${selectedWorkspace.name}. Ingested materials are semantically indexed into local ChromaDB for agent RAG and sandboxed data analysis.`
+            ? `Documents (Word DOCX, PDF), operational spreadsheets (XLSX, CSV), and inspection photos (PNG, JPEG) ingested for ${selectedWorkspace.name}. Ingested materials are semantically indexed into local ChromaDB for agent RAG and sandboxed data analysis.`
             : "Documents, operational spreadsheets, and inspection photos ingested for retrieval and sandboxed analysis during agent runs."
         }
         actions={
@@ -91,7 +91,7 @@ export function KnowledgePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.csv,.pdf,.png,.jpg,.jpeg"
+                accept=".docx,.xlsx,.csv,.pdf,.png,.jpg,.jpeg"
                 className="hidden"
                 onChange={(e) => void handleFileSelected(e.target.files?.[0])}
               />
@@ -100,7 +100,7 @@ export function KnowledgePage() {
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 loading={uploading}
-                title="Upload Excel spreadsheet (.xlsx), CSV, PDF manual, or inspection photo"
+                title="Upload Word document (.docx), Excel spreadsheet (.xlsx), CSV, PDF manual, or inspection photo"
               >
                 <IconUpload className="h-3.5 w-3.5" /> Upload document / spreadsheet
               </Button>
@@ -135,9 +135,10 @@ export function KnowledgePage() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-border bg-surface-2/60 px-4 py-2 text-xs text-ink-3">
               <span>Drag and drop any file here or use the upload button above.</span>
               <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
-                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-brand font-medium">Excel (.xlsx)</span>
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-indigo-300 font-medium">Word (.docx)</span>
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-emerald-300 font-medium">Excel (.xlsx)</span>
                 <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-ink-2">CSV (.csv)</span>
-                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-ink-2">PDF (.pdf)</span>
+                <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-sky-300">PDF (.pdf)</span>
                 <span className="rounded border border-surface-border bg-surface-1 px-1.5 py-0.5 text-ink-2">Images (.png, .jpg)</span>
               </div>
             </div>

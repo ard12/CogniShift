@@ -15,6 +15,8 @@ import {
   IconAlertTriangle,
   IconArchive,
   IconBook,
+  IconChevronDown,
+  IconChevronRight,
   IconDownload,
   IconImage,
   IconPlay,
@@ -24,6 +26,8 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { Select } from "@/components/ui/Select";
 import { EmptyState, InlineError } from "@/components/ui/States";
+import { ResultRenderer } from "@/components/ResultRenderer";
+import { SourceCitationList } from "@/components/SourceCitationList";
 import { useWorkspaces } from "@/context/useWorkspaces";
 import { formatBytes, runStatusLabel, runStatusTone } from "@/lib/format";
 import type { Agent, Approval, Artifact, Run, RunEvent, RunStatusSummary } from "@/types";
@@ -85,6 +89,7 @@ export function OperatorPage() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [artifactImages, setArtifactImages] = useState<Record<number, string>>({});
   const [statusSummary, setStatusSummary] = useState<RunStatusSummary | null>(null);
+  const [traceExpanded, setTraceExpanded] = useState<boolean>(false);
   const traceContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll trace to bottom as new live events arrive
@@ -754,13 +759,185 @@ export function OperatorPage() {
 
             <RequestFlow summary={statusSummary} />
 
-            {/* Execution timeline */}
-            <div className="panel flex flex-1 flex-col overflow-hidden">
-              <div className="flex h-10 shrink-0 items-center justify-between border-b border-surface-border bg-surface-3/40 px-4">
-                <span className="text-xs font-mono font-semibold uppercase tracking-wider text-ink-1">
-                  Execution Trace
-                </span>
+            {/* 1. Primary Operational Synthesis / Result with Markdown & Section 17 RCA cards */}
+            {run?.result_text && (
+              <div className="panel flex flex-col overflow-hidden p-4">
+                <ResultRenderer
+                  content={run.result_text}
+                  confidence={run.confidence}
+                  modelName={run.model_name}
+                  operatingMode={run.operating_mode}
+                  routingInfo={run.routing_info as Record<string, unknown>}
+                />
+
+                {/* Interactive UI Navigation Action */}
+                {(() => {
+                  const routingInfo = run.routing_info;
+                  const details = routingInfo?.details;
+                  const nestedTarget = details && typeof details === "object" && "target_route" in details
+                    ? (details as { target_route?: unknown }).target_route
+                    : undefined;
+                  const directTarget = routingInfo?.target_route;
+                  const targetRoute = (typeof directTarget === "string" ? directTarget : undefined)
+                    || (typeof nestedTarget === "string" ? nestedTarget : undefined)
+                    || (run.result_text?.includes("/knowledge") ? "/knowledge"
+                    : run.result_text?.includes("/approvals") ? "/approvals"
+                    : run.result_text?.includes("/agents") ? "/agents"
+                    : run.result_text?.includes("/workspaces") ? "/workspaces"
+                    : run.result_text?.includes("/system") ? "/system"
+                    : run.result_text?.includes("/dashboard") ? "/dashboard"
+                    : null);
+
+                  const isNav = routingInfo?.intent === "UI_NAVIGATION" 
+                    || run.result_text?.includes("Navigating to") 
+                    || run.result_text?.includes("access **") 
+                    || run.result_text?.includes("Knowledge Vault");
+
+                  if (!targetRoute || !isNav) return null;
+
+                  const nestedFriendly = details && typeof details === "object" && "friendly_name" in details
+                    ? (details as { friendly_name?: unknown }).friendly_name
+                    : undefined;
+                  const friendlyName = (typeof nestedFriendly === "string" ? nestedFriendly : undefined)
+                    || (targetRoute === "/knowledge" ? "Knowledge Vault"
+                    : targetRoute === "/approvals" ? "Approvals"
+                    : targetRoute === "/agents" ? "Agents"
+                    : targetRoute === "/system" ? "System"
+                    : "Portal");
+
+                  return (
+                    <div className="flex items-center justify-between rounded border border-brand/40 bg-brand/10 p-3 mt-3">
+                      <div className="flex items-center gap-2">
+                        <IconBook className="h-4 w-4 text-brand" />
+                        <div>
+                          <span className="block text-xs font-mono font-bold uppercase tracking-wide text-brand">
+                            Direct Interface Navigation
+                          </span>
+                          <span className="text-[11px] text-ink-2">
+                            Destination: <strong className="text-ink-1">{friendlyName}</strong> ({targetRoute})
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => navigate(targetRoute)}
+                      >
+                        Open {friendlyName} →
+                      </Button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* 2. Generated Deliverables / Artifacts */}
+            {artifacts.length > 0 && (
+              <div className="panel space-y-3 p-4">
+                <div className="flex items-center justify-between border-b border-surface-border/60 pb-2">
+                  <span className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-ink-1">
+                    <IconArchive className="h-4 w-4 text-brand" />
+                    Generated Artifacts & Visualizations ({artifacts.length})
+                  </span>
+                  <span className="font-mono text-[10px] text-ink-3">
+                    BACKEND-VERIFIED DELIVERABLES
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {artifacts.map((art) => {
+                    const typeLower = art.artifact_type.toLowerCase();
+                    const isImage = ["png", "jpg", "jpeg"].includes(typeLower);
+                    const imageUrl = artifactImages[art.id];
+
+                    return (
+                      <div
+                        key={art.id}
+                        className="flex flex-col rounded-lg border border-surface-border bg-surface-1 overflow-hidden shadow-sm"
+                      >
+                        {isImage && imageUrl && (
+                          <div className="relative border-b border-surface-border bg-black/20 p-2 flex items-center justify-center max-h-48 overflow-hidden">
+                            <img
+                              src={imageUrl}
+                              alt={art.title || art.filename}
+                              className="max-h-44 object-contain rounded transition hover:scale-105 cursor-pointer"
+                              onClick={() => window.open(imageUrl, "_blank")}
+                              title="Click to view full size"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex flex-1 flex-col justify-between p-3 gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge tone="info" className="uppercase font-mono text-[10px]">
+                                {art.artifact_type}
+                              </Badge>
+                              <span className="truncate font-mono text-xs font-semibold text-ink-1" title={art.filename}>
+                                {art.filename}
+                              </span>
+                            </div>
+                            {art.description && (
+                              <p className="mt-1 line-clamp-2 text-[11px] text-ink-3">
+                                {art.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-surface-border/50 text-[11px] text-ink-3 font-mono">
+                            <span>{formatBytes(art.file_size)}</span>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                selectedWorkspaceId &&
+                                void artifactsApi.download(selectedWorkspaceId, art.id, art.filename)
+                              }
+                              title={`Download ${art.filename}`}
+                            >
+                              <IconDownload className="h-3 w-3" /> Download
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Grounded Provenance Citations */}
+            {run?.sources_used && (
+              <SourceCitationList sourcesUsed={run.sources_used} />
+            )}
+
+            {/* 4. Error banner if any */}
+            {run?.error_message && (
+              <div className="panel p-4">
+                <InlineError message={run.error_message} />
+              </div>
+            )}
+
+            {/* 5. Collapsible Execution Trace */}
+            <div className="panel flex flex-col overflow-hidden">
+              <div
+                className="flex h-10 shrink-0 items-center justify-between border-b border-surface-border bg-surface-3/40 px-4 cursor-pointer select-none hover:bg-surface-3/60 transition"
+                onClick={() => setTraceExpanded((v) => !v)}
+              >
                 <div className="flex items-center gap-2">
+                  {traceExpanded || isExecuting ? (
+                    <IconChevronDown className="h-4 w-4 text-ink-3" />
+                  ) : (
+                    <IconChevronRight className="h-4 w-4 text-ink-3" />
+                  )}
+                  <span className="text-xs font-mono font-semibold uppercase tracking-wider text-ink-1">
+                    Execution Trace ({events.length} events)
+                  </span>
+                  {isExecuting && (
+                    <span className="inline-block h-2 w-2 animate-ping rounded-full bg-status-info ml-1" />
+                  )}
+                </div>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   {recentRuns.length > 1 && (
                     <div className="flex items-center gap-1.5 text-[10px] font-mono text-ink-3">
                       <span>RUN:</span>
@@ -786,182 +963,15 @@ export function OperatorPage() {
                   )}
                 </div>
               </div>
-              <div ref={traceContainerRef} className="max-h-[420px] overflow-y-auto bg-surface-1/40 p-4">
-                {isExecuting && (
-                  <div className="mb-2 flex items-center gap-2 rounded border border-status-info/30 bg-status-info/10 px-2.5 py-1.5 font-mono text-[11px] text-status-info">
-                    <span className="inline-block h-2 w-2 animate-ping rounded-full bg-status-info" />
-                    <span>{dispatchStage || "Agent execution in progress (reasoning & tool verification)…"}</span>
-                  </div>
-                )}
-                <EventTimeline events={events} />
-              </div>
-
-              {run?.sources_used && (
-                <div className="border-t border-surface-border bg-surface-1/60 px-4 py-2.5 font-mono text-xs">
-                  <span className="font-semibold text-ink-2">DATA SOURCES USED:</span>
-                  <p className="mt-0.5 truncate text-status-knowledge/90">{run.sources_used}</p>
-                </div>
-              )}
-
-              {run?.result_text && (
-                <div className="space-y-2 border-t border-surface-border bg-surface-2 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-ink-1">
-                      Operational Synthesis
-                    </span>
-                    {run.model_name && (
-                      <span className="font-mono text-[10px] text-ink-3">
-                        {run.operating_mode?.toLowerCase() === "local" ? "GENERATED LOCALLY" : "EXECUTION LOCATION UNAVAILABLE"} ({run.model_name.toUpperCase()})
-                      </span>
-                    )}
-                  </div>
-                  <div className="whitespace-pre-wrap rounded border border-surface-border bg-surface-1 p-3 text-sm leading-relaxed text-ink-1">
-                    {run.result_text}
-                  </div>
-                  {run.confidence !== null && run.confidence !== undefined && (
-                    <p className="font-mono text-[10px] text-ink-3">
-                      Confidence: {(run.confidence * 100).toFixed(0)}%
-                    </p>
+              {(traceExpanded || isExecuting) && (
+                <div ref={traceContainerRef} className="max-h-[380px] overflow-y-auto bg-surface-1/40 p-4">
+                  {isExecuting && (
+                    <div className="mb-2 flex items-center gap-2 rounded border border-status-info/30 bg-status-info/10 px-2.5 py-1.5 font-mono text-[11px] text-status-info">
+                      <span className="inline-block h-2 w-2 animate-ping rounded-full bg-status-info" />
+                      <span>{dispatchStage || "Agent execution in progress (reasoning & tool verification)…"}</span>
+                    </div>
                   )}
-
-                  {/* Interactive UI Navigation Action */}
-                  {(() => {
-                    const routingInfo = run.routing_info;
-                    const details = routingInfo?.details;
-                    const nestedTarget = details && typeof details === "object" && "target_route" in details
-                      ? (details as { target_route?: unknown }).target_route
-                      : undefined;
-                    const directTarget = routingInfo?.target_route;
-                    const targetRoute = (typeof directTarget === "string" ? directTarget : undefined)
-                      || (typeof nestedTarget === "string" ? nestedTarget : undefined)
-                      || (run.result_text?.includes("/knowledge") ? "/knowledge"
-                      : run.result_text?.includes("/approvals") ? "/approvals"
-                      : run.result_text?.includes("/agents") ? "/agents"
-                      : run.result_text?.includes("/workspaces") ? "/workspaces"
-                      : run.result_text?.includes("/system") ? "/system"
-                      : run.result_text?.includes("/dashboard") ? "/dashboard"
-                      : null);
-
-                    const isNav = routingInfo?.intent === "UI_NAVIGATION" 
-                      || run.result_text?.includes("Navigating to") 
-                      || run.result_text?.includes("access **") 
-                      || run.result_text?.includes("Knowledge Vault");
-
-                    if (!targetRoute || !isNav) return null;
-
-                    const nestedFriendly = details && typeof details === "object" && "friendly_name" in details
-                      ? (details as { friendly_name?: unknown }).friendly_name
-                      : undefined;
-                    const friendlyName = (typeof nestedFriendly === "string" ? nestedFriendly : undefined)
-                      || (targetRoute === "/knowledge" ? "Knowledge Vault"
-                      : targetRoute === "/approvals" ? "Approvals"
-                      : targetRoute === "/agents" ? "Agents"
-                      : targetRoute === "/system" ? "System"
-                      : "Portal");
-
-                    return (
-                      <div className="flex items-center justify-between rounded border border-brand/40 bg-brand/10 p-3 mt-3">
-                        <div className="flex items-center gap-2">
-                          <IconBook className="h-4 w-4 text-brand" />
-                          <div>
-                            <span className="block text-xs font-mono font-bold uppercase tracking-wide text-brand">
-                              Direct Interface Navigation
-                            </span>
-                            <span className="text-[11px] text-ink-2">
-                              Destination: <strong className="text-ink-1">{friendlyName}</strong> ({targetRoute})
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => navigate(targetRoute)}
-                        >
-                          Open {friendlyName} →
-                        </Button>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {artifacts.length > 0 && (
-                <div className="space-y-3 border-t border-surface-border bg-surface-2/70 p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-ink-1">
-                      <IconArchive className="h-4 w-4 text-brand" />
-                      Generated Artifacts & Visualizations ({artifacts.length})
-                    </span>
-                    <span className="font-mono text-[10px] text-ink-3">
-                      BACKEND-VERIFIED RUN ARTIFACTS
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {artifacts.map((art) => {
-                      const typeLower = art.artifact_type.toLowerCase();
-                      const isImage = ["png", "jpg", "jpeg"].includes(typeLower);
-                      const imageUrl = artifactImages[art.id];
-
-                      return (
-                        <div
-                          key={art.id}
-                          className="flex flex-col rounded-lg border border-surface-border bg-surface-1 overflow-hidden shadow-sm"
-                        >
-                          {isImage && imageUrl && (
-                            <div className="relative border-b border-surface-border bg-black/20 p-2 flex items-center justify-center max-h-48 overflow-hidden">
-                              <img
-                                src={imageUrl}
-                                alt={art.title || art.filename}
-                                className="max-h-44 object-contain rounded transition hover:scale-105 cursor-pointer"
-                                onClick={() => window.open(imageUrl, "_blank")}
-                                title="Click to view full size"
-                              />
-                            </div>
-                          )}
-
-                          <div className="flex flex-1 flex-col justify-between p-3 gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <Badge tone="info" className="uppercase font-mono text-[10px]">
-                                  {art.artifact_type}
-                                </Badge>
-                                <span className="truncate font-mono text-xs font-semibold text-ink-1" title={art.filename}>
-                                  {art.filename}
-                                </span>
-                              </div>
-                              {art.description && (
-                                <p className="mt-1 line-clamp-2 text-[11px] text-ink-3">
-                                  {art.description}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between pt-2 border-t border-surface-border/50 text-[11px] text-ink-3 font-mono">
-                              <span>{formatBytes(art.file_size)}</span>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() =>
-                                  selectedWorkspaceId &&
-                                  void artifactsApi.download(selectedWorkspaceId, art.id, art.filename)
-                                }
-                                title={`Download ${art.filename}`}
-                              >
-                                <IconDownload className="h-3 w-3" /> Download
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {run?.error_message && (
-                <div className="border-t border-surface-border p-4">
-                  <InlineError message={run.error_message} />
+                  <EventTimeline events={events} />
                 </div>
               )}
             </div>

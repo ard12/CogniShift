@@ -10,6 +10,8 @@ import { IconArchive, IconDownload, IconPlayCircle, IconRefresh } from "@/compon
 import { PageHeader } from "@/components/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "@/components/ui/Panel";
 import { EmptyState, ErrorState, InlineError, LoadingState } from "@/components/ui/States";
+import { ResultRenderer } from "@/components/ResultRenderer";
+import { SourceCitationList } from "@/components/SourceCitationList";
 import { useWorkspaces } from "@/context/useWorkspaces";
 import { formatBytes, formatDateTime, formatRelativeTime, runStatusLabel, runStatusTone } from "@/lib/format";
 import type { Artifact, Run, RunEvent } from "@/types";
@@ -119,25 +121,20 @@ function RunDetail({ run, onResumed }: { run: Run; onResumed: (r: Run) => void }
         </div>
       </div>
 
-      {run.sources_used && (
-        <div>
-          <p className="label mb-1">Knowledge citations</p>
-          <p className="rounded border border-surface-border bg-surface-1/50 p-2.5 font-mono text-xs text-status-knowledge/90">
-            {run.sources_used}
-          </p>
+      {run.result_text && (
+        <div className="panel p-4">
+          <ResultRenderer
+            content={run.result_text}
+            confidence={run.confidence}
+            modelName={run.model_name}
+            operatingMode={run.operating_mode}
+            routingInfo={run.routing_info as Record<string, unknown>}
+          />
         </div>
       )}
 
-      {run.result_text && (
-        <div>
-          <p className="label mb-1">Result</p>
-          <div className="whitespace-pre-wrap rounded border border-surface-border bg-surface-1 p-3 text-sm leading-relaxed text-ink-1">
-            {run.result_text}
-          </div>
-          {run.confidence !== null && run.confidence !== undefined && (
-            <p className="mt-1 font-mono text-[10px] text-ink-3">Confidence: {(run.confidence * 100).toFixed(0)}%</p>
-          )}
-        </div>
+      {run.sources_used && (
+        <SourceCitationList sourcesUsed={run.sources_used} />
       )}
 
       {artifacts.length > 0 && (

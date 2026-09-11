@@ -799,12 +799,36 @@ def parse_agent_action(model_text: str, strict: bool = False) -> Optional[AgentA
                 if isinstance(content, (dict, list)):
                     content = _render_structured_final_content(content)
                 raw_citations = data.get("citations") or data.get("citation") or []
-                if isinstance(raw_citations, str):
+                normalized_citations: List[str] = []
+                if isinstance(raw_citations, (str, dict)):
                     raw_citations = [raw_citations]
+                if isinstance(raw_citations, list):
+                    for c in raw_citations:
+                        if isinstance(c, str):
+                            if c.strip():
+                                normalized_citations.append(c.strip())
+                        elif isinstance(c, dict):
+                            src = c.get("filename") or c.get("source") or c.get("doc") or c.get("title") or ""
+                            pg = c.get("page") or c.get("page_number") or ""
+                            typ = c.get("type") or c.get("role") or ""
+                            parts = []
+                            if src:
+                                parts.append(str(src))
+                            if pg:
+                                parts.append(f"Page {pg}")
+                            if typ:
+                                parts.append(f"({typ})")
+                            if parts:
+                                normalized_citations.append(" | ".join(parts))
+                            else:
+                                normalized_citations.append(str(c))
+                        elif c is not None:
+                            normalized_citations.append(str(c))
+
                 return FinalAnswer(
                     action="final_answer",
                     content=str(content),
-                    citations=raw_citations
+                    citations=normalized_citations
                 )
             elif action in ("step_observation", "observation"):
                 content = data.get("content") if data.get("content") is not None else data.get("observation", "")

@@ -54,7 +54,10 @@ async def execute_tool(
     scenario_override = parameters.get("scenario")
 
     if tool_name == "check_pressure":
-        sensor_id = parameters.get("sensor_id", "PT-101").upper()
+        raw_sensor = parameters.get("sensor_id")
+        if not raw_sensor:
+            raise ValueError("Parameter 'sensor_id' is required for tool 'check_pressure'.")
+        sensor_id = str(raw_sensor).upper()
         tep_data = _load_json(TELEMETRY_PATH)
         
         # Check if a specific TEP scenario is requested or surge triggered
@@ -85,7 +88,10 @@ async def execute_tool(
         return f"Sensor {sensor_id} reports pressure is 105.2 PSI (Normal Operating Range: 80.0 - 120.0 PSI). Status: NOMINAL."
 
     elif tool_name == "check_temperature":
-        sensor_id = parameters.get("sensor_id", "TT-204").upper()
+        raw_sensor = parameters.get("sensor_id")
+        if not raw_sensor:
+            raise ValueError("Parameter 'sensor_id' is required for tool 'check_temperature'.")
+        sensor_id = str(raw_sensor).upper()
         tep_data = _load_json(TELEMETRY_PATH)
         
         if tep_data and "scenarios" in tep_data:

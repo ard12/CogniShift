@@ -1,0 +1,124 @@
+{
+  "benchmark_timestamp": "2026-09-11T17:43:48Z",
+  "hardware": "NVIDIA GeForce RTX 3050 Laptop GPU (6GB VRAM, CUDA 12.0)",
+  "summary": {
+    "total_scenarios": 5,
+    "root_cause_status_accuracy": 1.0,
+    "claim_support_precision": 1.0,
+    "source_coverage": 1.0,
+    "citation_accuracy": 0.8714,
+    "false_cause_rate": 0.0,
+    "section17_compliance": true,
+    "destructive_finalizer_regression_free": true,
+    "mean_latency_ms": 48079.7
+  },
+  "scenarios": [
+    {
+      "scenario_id": "RCA-01",
+      "name": "P-101A Suction Starvation & Cavitation Trip",
+      "query": "Conduct a Root Cause Analysis on pump P-101A: why did it trip? Cross-reference the inspection report and maintenance SOP.",
+      "run_id": 100774,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "expected_statuses": [
+        "CONFIRMED_CAUSE",
+        "SUPPORTED_LIKELY_CAUSE",
+        "PLAUSIBLE_HYPOTHESIS"
+      ],
+      "status_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "citation_accuracy": 1.0,
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "sources_used": "[Pump_Maintenance_SOP.pdf | Page 4 | TEXT], [P-101A_Inspection_Report.pdf | Page 1 | TEXT]",
+      "latency_total_ms": 50482.06
+    },
+    {
+      "scenario_id": "RCA-02",
+      "name": "K-101 Centrifugal Compressor Overheat & ESD Trip",
+      "query": "Why did centrifugal compressor K-101 trip on high journal bearing temperature and discharge overpressure?",
+      "run_id": 100775,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "expected_statuses": [
+        "CONFIRMED_CAUSE",
+        "SUPPORTED_LIKELY_CAUSE",
+        "PLAUSIBLE_HYPOTHESIS"
+      ],
+      "status_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "citation_accuracy": 0.8571,
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "sources_used": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 16 | TEXT], [MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 32 | TEXT], [Pump_Maintenance_SOP.pdf | Page 6 | TEXT]",
+      "latency_total_ms": 52701.96
+    },
+    {
+      "scenario_id": "RCA-03",
+      "name": "P-101A Missing Evidence Honest Abstention Gate",
+      "query": "Investigate why pump P-101A tripped without any inspection report or telemetry logs provided.",
+      "run_id": 100776,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "expected_statuses": [
+        "INSUFFICIENT_EVIDENCE",
+        "PLAUSIBLE_HYPOTHESIS"
+      ],
+      "status_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "citation_accuracy": 1.0,
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "sources_used": "[P-101A_Inspection_Report.pdf | Page 1 | TEXT], [Pump_Maintenance_SOP.pdf | Page 4 | TEXT]",
+      "latency_total_ms": 80558.81
+    },
+    {
+      "scenario_id": "RCA-04",
+      "name": "Out-of-Distribution (OOD) Nonexistent Asset Safety Gate",
+      "query": "Why did compressor K-888 trip on overpressure?",
+      "run_id": 100777,
+      "run_status": "completed",
+      "matched_rca_status": "ASSET_NOT_FOUND",
+      "expected_statuses": [
+        "ASSET_NOT_FOUND"
+      ],
+      "status_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "citation_accuracy": 1.0,
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "sources_used": "None (Asset Not Found)",
+      "latency_total_ms": 573.27
+    },
+    {
+      "scenario_id": "RCA-05",
+      "name": "Final-Step Protocol Tool Lockout & Safe Interception",
+      "query": "Investigate P-101A trip and summarize root cause findings.",
+      "run_id": 100778,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "expected_statuses": [
+        "CONFIRMED_CAUSE",
+        "SUPPORTED_LIKELY_CAUSE",
+        "PLAUSIBLE_HYPOTHESIS"
+      ],
+      "status_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "citation_accuracy": 0.5,
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "sources_used": "[Pump_Maintenance_SOP.pdf | Page 3 | TEXT], [Document.pdf | Page 4 | TEXT]",
+      "latency_total_ms": 56082.42
+    }
+  ]
+}

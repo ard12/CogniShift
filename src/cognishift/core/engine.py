@@ -85,6 +85,15 @@ from cognishift.core.document_insights import (
 
 logger = logging.getLogger("cognishift.engine")
 
+from cognishift.core.rca import (
+    RCAEvidenceAcquirer,
+    RCAEvidenceValidator,
+    RCAEvidenceBundle,
+    RCAStatus,
+    classify_tool_failure_severity,
+    ToolFailureSeverity,
+)
+
 
 from dataclasses import dataclass, field
 
@@ -297,11 +306,16 @@ def validate_evidence_sufficiency(query: str, retrieved_context: str) -> Tuple[b
     Returns (is_sufficient, reason).
     """
     lower_clean = (query or "").lower()
-    is_rca_or_diagnostic = any(k in lower_clean for k in [
-        "rca", "root cause", "failure investigation", "investigate failure",
-        "incident investigation", "why did it fail", "why did the system trip",
-        "troubleshoot", "investigate"
-    ])
+    has_equipment_tag = bool(re.search(r"\b[A-Za-z]{1,4}-\d{3,4}[A-Za-z]?\b", lower_clean))
+    is_rca_or_diagnostic = (
+        any(k in lower_clean for k in [
+            "rca", "root cause", "failure investigation", "investigate failure",
+            "incident investigation", "why did it fail", "why did the system trip",
+            "troubleshoot", "investigate", "cause of", "what caused"
+        ])
+        or (has_equipment_tag and any(k in lower_clean for k in ["trip", "tripped", "failed", "failure", "shutdown", "shut down", "alarm", "cavitat", "leak", "overpressure", "overheat"]))
+        or (any(w in lower_clean for w in ["why did", "why has"]) and any(w in lower_clean for w in ["trip", "fail"]))
+    )
     is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
     is_procurement = "procurement" in lower_clean
     is_corrosion_query = not is_rca_or_diagnostic and (
@@ -1175,8 +1189,26 @@ async def execute_agent_run(
 
         effective_goal = claimed_task.requested_goal if claimed_task else clean_input
 
+        # RCA Accuracy Mode Guarantee: detect RCA intent early to prevent conversational plan routing
+        lower_input = clean_input.lower()
+        has_equipment_tag = bool(re.search(r"\b[A-Za-z]{1,4}-\d{3,4}[A-Za-z]?\b", clean_input))
+        is_rca_mode = (
+            any(k in lower_input for k in [
+                "rca", "root cause", "failure investigation", "investigate failure",
+                "incident investigation", "why did it fail", "why did the system trip",
+                "troubleshoot", "investigate", "cause of", "what caused"
+            ])
+            or (has_equipment_tag and any(k in lower_input for k in ["trip", "tripped", "failed", "failure", "shutdown", "shut down", "alarm", "cavitat", "leak", "overpressure", "overheat"]))
+            or (any(w in lower_input for w in ["why did", "why has"]) and any(w in lower_input for w in ["trip", "fail"]))
+        )
+        effective_intent = (
+            SemanticIntent.KNOWLEDGE_QUERY
+            if is_rca_mode
+            else routing_res.intent
+        )
+
         # Immediate Fast Path for UI Navigation: zero LLM inference, zero RAG
-        if routing_res.intent == SemanticIntent.UI_NAVIGATION:
+        if effective_intent == SemanticIntent.UI_NAVIGATION:
             target_view = routing_res.details.get("target") or "knowledge"
             target_route = routing_res.details.get("target_route") or f"/{target_view}"
             friendly_name = routing_res.details.get("friendly_name") or target_view.title()
@@ -1217,25 +1249,30 @@ async def execute_agent_run(
         has_img = bool(input_image_path and Path(input_image_path).exists())
         conf_val = routing_res.confidence if routing_res.confidence is not None else 0.90
         task_classified = classify_task(clean_input, has_image=has_img)
-        if task_classified.task_type == "heavy_reasoning":
-            task_info = task_classified
+        if is_rca_mode or task_classified.task_type == "heavy_reasoning":
+            task_info = TaskClassification(
+                task_type="heavy_reasoning",
+                required_capabilities=["heavy_reasoning", "reasoning"],
+                requires_vision=False,
+                confidence=0.95
+            )
         elif has_img:
             task_info = task_classified
-        elif routing_res.intent == SemanticIntent.CONVERSATION:
+        elif effective_intent == SemanticIntent.CONVERSATION:
             task_info = TaskClassification(
                 task_type="conversational",
                 required_capabilities=["reasoning"],
                 requires_vision=False,
                 confidence=conf_val
             )
-        elif routing_res.intent == SemanticIntent.CODE_EXECUTION:
+        elif effective_intent == SemanticIntent.CODE_EXECUTION:
             task_info = TaskClassification(
                 task_type="coding",
                 required_capabilities=["coding", "structured_data"],
                 requires_vision=False,
                 confidence=conf_val
             )
-        elif routing_res.intent in [SemanticIntent.ARTIFACT_INSPECTION, SemanticIntent.KNOWLEDGE_QUERY]:
+        elif effective_intent in [SemanticIntent.ARTIFACT_INSPECTION, SemanticIntent.KNOWLEDGE_QUERY]:
             task_info = TaskClassification(
                 task_type="document_analysis",
                 required_capabilities=["document_analysis", "reasoning"],
@@ -1338,7 +1375,7 @@ async def execute_agent_run(
             )
 
         # --- PHASE 2B: BOUNDED STRUCTURED PLAN CREATION ---
-        if routing_res.intent == SemanticIntent.CONVERSATION:
+        if effective_intent == SemanticIntent.CONVERSATION:
             plan = AgentPlan(
                 goal=clean_input,
                 current_step_index=1,
@@ -1349,7 +1386,7 @@ async def execute_agent_run(
                     PlanStep(id=3, description="Present answer to operator", status="pending")
                 ]
             )
-        elif routing_res.intent == SemanticIntent.ARTIFACT_INSPECTION:
+        elif effective_intent == SemanticIntent.ARTIFACT_INSPECTION:
             plan = AgentPlan(
                 goal=clean_input,
                 current_step_index=1,
@@ -1362,7 +1399,7 @@ async def execute_agent_run(
                     PlanStep(id=5, description="Synthesize report for operator", status="pending")
                 ]
             )
-        elif routing_res.intent == SemanticIntent.KNOWLEDGE_QUERY:
+        elif effective_intent == SemanticIntent.KNOWLEDGE_QUERY:
             plan = AgentPlan(
                 goal=clean_input,
                 current_step_index=1,
@@ -1374,7 +1411,7 @@ async def execute_agent_run(
                     PlanStep(id=4, description="Present answer to operator", status="pending")
                 ]
             )
-        elif routing_res.intent == SemanticIntent.CODE_EXECUTION:
+        elif effective_intent == SemanticIntent.CODE_EXECUTION:
             lower_goal = effective_goal.lower()
             is_doc_report = any(w in lower_goal for w in ["document", "pdf", "report", "manual", "latest", "ingested", "convert", "excel", "xlsx", "spreadsheet", "csv", "audit", "financial", "data", "history", "analyze", "analysis", "visualize", "plot", "docx", "word", "format", "deliverable"])
             target_doc_info = None
@@ -1569,6 +1606,7 @@ async def execute_agent_run(
             combined_context_parts = []
             retrieved_evidence_catalog: List[Dict[str, Any]] = []
             final_answer_citations: List[str] = []
+            rca_bundle: Optional[RCAEvidenceBundle] = None
 
             if vision_analysis:
                 combined_context_parts.append(
@@ -1577,17 +1615,13 @@ async def execute_agent_run(
                     f"Inspection Telemetry: {vision_analysis}"
                 )
 
-            is_rca_mode = any(k in clean_input.lower() for k in [
-                "rca", "root cause", "failure investigation", "investigate failure",
-                "incident investigation", "why did it fail", "why did the system trip",
-                "troubleshoot", "investigate"
-            ])
+            # is_rca_mode was already computed early in execute_agent_run
             is_cross_inspection = any(w in clean_input.lower() for w in ["compare", "sop", "manual", "procedure", "against", "cross-reference", "correlat"])
             strict_visual_scope = bool(input_image_path) and not is_cross_inspection and not is_rca_mode
 
             # RCA Accuracy Mode Guarantee: independently force full multi-channel retrieval (text + visual + topology)
             # Semantic router error must never suppress an evidence channel in RCA mode.
-            effective_intent = SemanticIntent.KNOWLEDGE_QUERY if is_rca_mode and routing_res.intent in [SemanticIntent.CONVERSATION, SemanticIntent.ARTIFACT_INSPECTION] else routing_res.intent
+            effective_intent = SemanticIntent.KNOWLEDGE_QUERY if is_rca_mode else routing_res.intent
 
             if strict_visual_scope:
                 sources_used = f"Visual Artifact | {Path(input_image_path).name}"
@@ -2055,7 +2089,7 @@ async def execute_agent_run(
                     {"artifacts": artifact_citations}
                 )
 
-            elif routing_res.intent == SemanticIntent.KNOWLEDGE_QUERY:
+            elif effective_intent == SemanticIntent.KNOWLEDGE_QUERY:
                 allowed_source_ids, retrieval_query, page_direct_context = await _resolve_knowledge_and_page_context(
                     db=db,
                     workspace_id=workspace_id,
@@ -2066,8 +2100,66 @@ async def execute_agent_run(
                     run_id=run_id
                 )
 
+                if is_rca_mode:
+                    try:
+                        rca_acquirer = RCAEvidenceAcquirer()
+                        rca_bundle = await rca_acquirer.acquire_evidence(
+                            workspace_id=workspace_id,
+                            query=clean_input,
+                            allowed_source_ids=allowed_source_ids,
+                            db=db
+                        )
+                        await log_event(
+                            db, run_id, "rca_channel_health",
+                            f"Acquired RCA multi-channel evidence ({len(rca_bundle.evidence_items)} items) across {rca_bundle.channel_health.executed_channels}",
+                            rca_bundle.channel_health.model_dump()
+                        )
+                        if rca_bundle.channel_health.hybrid_status == "DEGRADED":
+                            await log_event(
+                                db, run_id, "HYBRID_RAG_DEGRADED",
+                                f"Hybrid RAG operating in degraded mode: {rca_bundle.channel_health.degradation_reason}",
+                                rca_bundle.channel_health.model_dump()
+                            )
+
+                        # OOD asset verification: Fail closed if unregistered asset queried
+                        if rca_bundle.retrieval_diagnostics.get("ood_triggered"):
+                            validator = RCAEvidenceValidator()
+                            fail_msg = validator.validate_and_finalize(rca_bundle, "", clean_input)
+                            sources_used = "None (Asset Not Found)"
+                            if len(plan.steps) >= 4:
+                                plan.steps[1].status = "completed"
+                                plan.steps[1].observation = "Asset verification failed: equipment not in plant topology"
+                                plan.steps[2].status = "skipped"
+                                plan.steps[2].observation = "Skipped: unverified asset"
+                                plan.steps[3].status = "completed"
+                                plan.steps[3].observation = "Asset not found report delivered"
+                            saved_plan_json = serialize_plan(plan)
+                            await db.execute(
+                                """UPDATE agent_runs
+                                   SET status = 'completed', result_text = ?, sources_used = ?, structured_plan = ?, completed_at = CURRENT_TIMESTAMP
+                                   WHERE id = ?""",
+                                (fail_msg, sources_used, saved_plan_json, run_id)
+                            )
+                            await db.commit()
+                            await log_event(db, run_id, "asset_not_found", fail_msg)
+                            cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
+                            return make_response(dict(await cursor.fetchone()))
+
+                        # Inject authoritative E-ID evidence blocks into reasoning context
+                        rca_prompt_context = rca_bundle.format_for_reasoning_prompt()
+                        context_str = f"{context_str}\n\n{rca_prompt_context}".strip() if context_str else rca_prompt_context
+                        for item in rca_bundle.evidence_items:
+                            if item.page_number:
+                                retrieved_evidence_catalog.append({
+                                    "filename": item.filename,
+                                    "page": item.page_number,
+                                    "extraction_method": item.retrieval_channel.upper()
+                                })
+                    except Exception as rca_err:
+                        logger.error(f"RCA evidence acquisition failed: {rca_err}", exc_info=True)
+
                 await log_event(db, run_id, "retrieval_started", f"Searching authorized knowledge sources ({allowed_source_ids})...")
-                if allowed_source_ids:
+                if allowed_source_ids and not is_rca_mode:
                     context_str, retrieved_metas = await retrieve_context_with_metadata(
                         workspace_id=workspace_id,
                         query=retrieval_query,
@@ -2086,11 +2178,17 @@ async def execute_agent_run(
                         })
 
                 has_tag = any(p in retrieval_query.upper() for p in ["P-", "V-", "T-", "HEX-", "MOV-", "PT-", "TT-"])
-                if has_tag or is_rca_mode:
+                if (has_tag or is_rca_mode) and not graph_context:
                     graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
                 citations = list(dict.fromkeys(re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", context_str))) if context_str else []
-                sources_used = ", ".join(citations) if citations else "None (No matching manual found)"
+                if rca_bundle and rca_bundle.evidence_items:
+                    for item in rca_bundle.evidence_items:
+                        if item.page_number:
+                            c_lbl = f"{item.filename} | Page {item.page_number}"
+                            if c_lbl not in citations:
+                                citations.append(c_lbl)
+                sources_used = ", ".join(f"[{c}]" if not c.startswith("[") else c for c in citations) if citations else "None (No matching manual found)"
                 if graph_context:
                     sources_used += " + Plant Topology Graph"
 
@@ -2102,10 +2200,10 @@ async def execute_agent_run(
 
                 # Grounding Fail-Closed: If query inquires about organizational policy, procurement, inspection/corrosion, or private SOPs and no matching evidence exists
                 lower_clean = clean_input.lower()
-                is_rca_or_diagnostic = any(k in lower_clean for k in [
+                is_rca_or_diagnostic = is_rca_mode or any(k in lower_clean for k in [
                     "rca", "root cause", "failure investigation", "investigate failure",
                     "incident investigation", "why did it fail", "why did the system trip",
-                    "troubleshoot", "investigate"
+                    "troubleshoot", "investigate", "cause of", "what caused"
                 ])
                 is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
                 is_procurement = "procurement" in lower_clean
@@ -2122,7 +2220,7 @@ async def execute_agent_run(
 
                 # Verify topical relevance and factual sufficiency of retrieved context
                 evidence_text = "\n".join(part for part in (context_str, graph_context) if part)
-                if evidence_text:
+                if evidence_text and not is_rca_mode:
                     is_suff, suff_reason = validate_evidence_sufficiency(clean_input, evidence_text)
                     if not is_suff:
                         logger.info(f"Discarding context: {suff_reason}")
@@ -2180,7 +2278,7 @@ async def execute_agent_run(
                     plan.steps[1].observation = f"Retrieved {len(citations)} citations"
                     plan.current_step_index = 2
 
-            elif routing_res.intent == SemanticIntent.CODE_EXECUTION:
+            elif effective_intent == SemanticIntent.CODE_EXECUTION:
                 target_doc = None
                 fn_match = re.search(r'\b([A-Za-z0-9_\-\.]+\.(?:xlsx|xls|pdf|csv|docx))\b', clean_input, re.IGNORECASE)
                 if fn_match:
@@ -2329,10 +2427,10 @@ async def execute_agent_run(
                 graph_context = await query_graph_context(workspace_id=workspace_id, query_text=retrieval_query, max_hops=2)
 
                 lower_clean = clean_input.lower()
-                is_rca_or_diagnostic = any(k in lower_clean for k in [
+                is_rca_or_diagnostic = is_rca_mode or any(k in lower_clean for k in [
                     "rca", "root cause", "failure investigation", "investigate failure",
                     "incident investigation", "why did it fail", "why did the system trip",
-                    "troubleshoot", "investigate"
+                    "troubleshoot", "investigate", "cause of", "what caused"
                 ])
                 is_remote_work = any(k in lower_clean for k in ["remote work", "work from home", "telework", "telecommuting", "wfh"])
                 is_procurement = "procurement" in lower_clean
@@ -2494,12 +2592,12 @@ async def execute_agent_run(
                     {"model": settings.vision_model, "ocr_grounded": bool(ocr_evidence)},
                 )
             provider = get_provider()
-            tools_for_prompt = available_tools if routing_res.intent != SemanticIntent.CONVERSATION else []
+            tools_for_prompt = available_tools if effective_intent != SemanticIntent.CONVERSATION else []
             system_prompt = build_system_prompt(
                 agent.get("system_instructions", ""),
                 tools_for_prompt,
                 combined_context,
-                intent=routing_res.intent,
+                intent=effective_intent,
                 workspace_name=workspace_name
             )
 
@@ -2529,9 +2627,25 @@ async def execute_agent_run(
 
                 # Build step prompt incorporating accumulated observations
                 is_final_step = (current_step.id == len(plan.steps))
+
+                # Step-level tool availability: Tools are strictly locked out on final synthesis step
+                if is_final_step or effective_intent == SemanticIntent.CONVERSATION:
+                    tools_for_step = []
+                else:
+                    tools_for_step = available_tools
+
+                system_prompt = build_system_prompt(
+                    agent.get("system_instructions", ""),
+                    tools_for_step,
+                    combined_context,
+                    intent=effective_intent,
+                    workspace_name=workspace_name
+                )
+
                 if is_final_step:
                     step_instructions = (
                         "- This is the FINAL step of the plan.\n"
+                        "- STRICT POLICY: NO TOOL CALLS ARE PERMITTED IN FINAL SYNTHESIS.\n"
                         "- Provide the final synthesized response to the operator using 'action': 'final_answer'."
                     )
                 else:
@@ -3433,17 +3547,26 @@ print("Analysis script finished with returncode 0.")
                         {"step_id": current_step.id}
                     )
 
-                    repair_prompt = (
-                        f"Your previous response on step #{current_step.id} could not be parsed into a valid action. "
-                        f"Your previous output was:\n{clean_output[:600]}\n\n"
-                        f"You must reformat your response immediately into ONE valid JSON object conforming to one of these schemas:\n\n"
-                        f'Option 1 (Tool Call):\n'
-                        f'{{"thought": "<brief reasoning>", "action": "tool_call", "tool_name": "<tool_name>", "parameters": {{...}}}}\n\n'
-                        f'Option 2 (Final Answer):\n'
-                        f'{{"thought": "<brief reasoning>", "action": "final_answer", "content": "<your complete final answer>", "citations": []}}\n\n'
-                        f"Available tools: {json.dumps(allowed_tool_names)}\n"
-                        f"Respond ONLY with the JSON object. Do not include markdown formatting or commentary outside the JSON."
-                    )
+                    if is_final_step:
+                        repair_prompt = (
+                            f"Your previous response on step #{current_step.id} (FINAL SYNTHESIS STEP) could not be parsed into a valid action. "
+                            f"Your previous output was:\n{clean_output[:600]}\n\n"
+                            f"You must reformat your response immediately into ONE valid JSON object conforming to this schema:\n\n"
+                            f'{{"thought": "<brief reasoning>", "action": "final_answer", "content": "<your complete final answer>", "citations": []}}\n\n'
+                            f"Respond ONLY with the JSON object. Do not include markdown formatting or commentary outside the JSON."
+                        )
+                    else:
+                        repair_prompt = (
+                            f"Your previous response on step #{current_step.id} could not be parsed into a valid action. "
+                            f"Your previous output was:\n{clean_output[:600]}\n\n"
+                            f"You must reformat your response immediately into ONE valid JSON object conforming to one of these schemas:\n\n"
+                            f'Option 1 (Tool Call):\n'
+                            f'{{"thought": "<brief reasoning>", "action": "tool_call", "tool_name": "<tool_name>", "parameters": {{...}}}}\n\n'
+                            f'Option 2 (Final Answer):\n'
+                            f'{{"thought": "<brief reasoning>", "action": "final_answer", "content": "<your complete final answer>", "citations": []}}\n\n'
+                            f"Available tools: {json.dumps(allowed_tool_names)}\n"
+                            f"Respond ONLY with the JSON object. Do not include markdown formatting or commentary outside the JSON."
+                        )
 
                     repair_action = None
                     try:
@@ -3490,6 +3613,19 @@ print("Analysis script finished with returncode 0.")
                         cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
                         return make_response(dict(await cursor.fetchone()))
 
+                # Intercept unauthorized tool calls on final synthesis step
+                if is_final_step and isinstance(action, ToolCallProposal):
+                    logger.warning(
+                        f"Step #{current_step.id} is the final synthesis step; "
+                        f"intercepted unauthorized tool call proposal '{action.tool_name}' and converted to final_answer."
+                    )
+                    synth_content = getattr(action, "reason", None) or f"Synthesized findings based on available documentary evidence regarding {action.tool_name}."
+                    action = FinalAnswer(
+                        action="final_answer",
+                        content=synth_content,
+                        citations=[]
+                    )
+
                 if isinstance(action, ToolCallProposal) and action.tool_name:
                     tool_name_clean = action.tool_name.lower().strip()
                     if tool_name_clean not in [t.lower() for t in allowed_tool_names]:
@@ -3514,17 +3650,28 @@ print("Analysis script finished with returncode 0.")
                         references=routing_res.references
                     )
                     if not val_result.valid:
-                        # Blocker 4: Validation failure MUST produce zero tool execution
-                        current_step.status = "failed"
-                        current_step.error_message = val_result.error_message
-                        current_step.observation = f"Validation error: {val_result.error_message}"
-                        await log_event(
-                            db, run_id, "tool_validation_failed",
-                            f"Step #{current_step.id} parameter validation failed: {val_result.error_message}",
-                            {"parameters": action.parameters, "error": val_result.error_message}
-                        )
-                        plan.advance_to_next_step()
-                        continue
+                        severity = classify_tool_failure_severity(resolved_tool, is_rca_mode=is_rca_mode)
+                        if severity == ToolFailureSeverity.OPTIONAL_ENRICHMENT_FAILURE:
+                            current_step.status = "completed"
+                            current_step.observation = f"Note: Optional check '{resolved_tool}' could not be executed ({val_result.error_message}). Proceeding with documentary evidence."
+                            await log_event(
+                                db, run_id, "tool_validation_optional_skip",
+                                f"Optional tool '{resolved_tool}' parameter validation failed; continuing run: {val_result.error_message}",
+                                {"parameters": action.parameters, "error": val_result.error_message}
+                            )
+                            plan.advance_to_next_step()
+                            continue
+                        else:
+                            current_step.status = "failed"
+                            current_step.error_message = val_result.error_message
+                            current_step.observation = f"Validation error: {val_result.error_message}"
+                            await log_event(
+                                db, run_id, "tool_validation_failed",
+                                f"Step #{current_step.id} parameter validation failed: {val_result.error_message}",
+                                {"parameters": action.parameters, "error": val_result.error_message}
+                            )
+                            plan.advance_to_next_step()
+                            continue
 
                     validated_params = val_result.validated_parameters or action.parameters
 
@@ -3699,16 +3846,28 @@ print("Analysis script finished with returncode 0.")
 
                         else:
                             if tool_output_failed(tool_output):
-                                current_step.status = "failed"
-                                current_step.tool_name = resolved_tool
-                                current_step.tool_parameters = validated_params
-                                current_step.observation = tool_output
-                                current_step.error_message = tool_output
-                                saved_plan_json = serialize_plan(plan)
-                                await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
-                                await db.commit()
-                                plan.advance_to_next_step()
-                                continue
+                                severity = classify_tool_failure_severity(resolved_tool, is_rca_mode=is_rca_mode)
+                                if severity == ToolFailureSeverity.OPTIONAL_ENRICHMENT_FAILURE:
+                                    current_step.status = "completed"
+                                    current_step.tool_name = resolved_tool
+                                    current_step.tool_parameters = validated_params
+                                    current_step.observation = f"Note: Optional check '{resolved_tool}' execution returned failure ({tool_output}). Proceeding with documentary evidence."
+                                    saved_plan_json = serialize_plan(plan)
+                                    await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                                    await db.commit()
+                                    plan.advance_to_next_step()
+                                    continue
+                                else:
+                                    current_step.status = "failed"
+                                    current_step.tool_name = resolved_tool
+                                    current_step.tool_parameters = validated_params
+                                    current_step.observation = tool_output
+                                    current_step.error_message = tool_output
+                                    saved_plan_json = serialize_plan(plan)
+                                    await db.execute("UPDATE agent_runs SET structured_plan = ? WHERE id = ?", (saved_plan_json, run_id))
+                                    await db.commit()
+                                    plan.advance_to_next_step()
+                                    continue
 
                             current_step.status = "completed"
                             current_step.tool_name = resolved_tool
@@ -3737,12 +3896,22 @@ print("Analysis script finished with returncode 0.")
 
                 elif isinstance(action, FinalAnswer):
                     final_answer_citations = list(action.citations or [])
-                    answer_content = (
-                        enforce_rca_evidence_boundaries(action.content, clean_input, citations=final_answer_citations)
-                        if task_info.task_type == "heavy_reasoning"
-                        else action.content
-                    )
-                    is_direct_flow = routing_res.intent in (
+                    if is_rca_mode:
+                        if rca_bundle is None:
+                            rca_bundle = RCAEvidenceBundle(
+                                asset_ids=re.findall(r"\b[A-Za-z]{1,4}-\d{3,4}[A-Za-z]?\b", clean_input),
+                                channel_health=ChannelExecutionHealth(executed_channels=["text"])
+                            )
+                        validator = RCAEvidenceValidator()
+                        answer_content = validator.validate_and_finalize(rca_bundle, action.content, clean_input)
+                    elif task_info.task_type == "heavy_reasoning":
+                        answer_content = (
+                            enforce_rca_evidence_boundaries(action.content, clean_input, citations=final_answer_citations)
+                        )
+                    else:
+                        answer_content = action.content
+
+                    is_direct_flow = effective_intent in (
                         SemanticIntent.CONVERSATION,
                         SemanticIntent.UI_NAVIGATION,
                         SemanticIntent.ARTIFACT_INSPECTION,

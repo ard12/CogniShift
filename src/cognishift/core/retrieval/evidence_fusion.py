@@ -168,12 +168,27 @@ class EvidenceFusion:
 
             # Confidence-gated modulation
             if self.mode == "confidence_gated":
-                # If text match is very confident (distance <= 0.22, c_text >= 0.72) and query is not visual, boost text
-                if c_text >= 0.70 and intent_type in ["text", "rca"]:
+                # If text match is very confident and query is text-dominant, boost text
+                if c_text >= 0.70 and intent_type == "text":
                     score_text *= (1.0 + 1.5 * c_text)
                 # If query is visual/table or text match is weak, boost visual
-                if intent_type in ["visual", "table"] or c_text < 0.35:
+                elif intent_type in ["visual", "table"] or c_text < 0.35:
                     score_vis *= (1.0 + 1.5 * c_vis)
+                elif intent_type == "rca":
+                    # Balanced dual-channel modulation for RCA
+                    if c_text >= 0.60:
+                        score_text *= (1.0 + c_text)
+                    if c_vis >= 0.50:
+                        score_vis *= (1.0 + c_vis)
+
+            # Winner Preservation Rule (from Benchmark V2 audit):
+            # If visual top-1 is strongly separated on layout/P&ID queries and text lacks dominant confidence,
+            # ensure the visual top-1 candidate is preserved against generic text demotion.
+            if visual_results and key == (visual_results[0].source_id, visual_results[0].page_number):
+                sep = visual_results[0].score - (visual_results[1].score if len(visual_results) > 1 else 0.0)
+                is_visual_query = (intent_type in ["visual", "table"] or bool(VISUAL_LAYOUT_PATTERN.search(query)))
+                if is_visual_query and (sep >= 1.5 or visual_results[0].score >= 8.0) and c_text < 0.80:
+                    score_vis *= 2.0
 
             rrf_score = score_text + score_vis
 
@@ -206,4 +221,23 @@ class EvidenceFusion:
 
         # Sort candidates descending by fused RRF score
         fused_candidates.sort(key=lambda c: c.fused_score, reverse=True)
+
+        # For RCA queries, guarantee modality diversity in the returned ranking:
+        # Prevent 5 identical text pages from crowding out a top-ranked visual schematic.
+        if intent_type == "rca" and len(fused_candidates) > 3:
+            diverse: List[FusedPageEvidence] = []
+            has_vis = any(c.retrieval_channel in ("visual", "hybrid") for c in fused_candidates)
+            if has_vis:
+                first_vis = next((c for c in fused_candidates if c.retrieval_channel in ("visual", "hybrid")), None)
+                first_txt = next((c for c in fused_candidates if c.retrieval_channel in ("text", "hybrid")), None)
+                if first_txt:
+                    diverse.append(first_txt)
+                if first_vis and first_vis not in diverse:
+                    diverse.append(first_vis)
+                for c in fused_candidates:
+                    if c not in diverse:
+                        diverse.append(c)
+                return diverse
+
         return fused_candidates
+

@@ -308,7 +308,34 @@ async def test_rca_accuracy_mode_unsuppressed_by_router():
     mock_sem_router = MagicMock()
     mock_sem_router.route.return_value = bad_router_decision
 
+    from cognishift.core.rca.schemas import RCAEvidenceBundle, RCAEvidenceItem, EvidenceRole, ChannelExecutionHealth
+    mock_bundle = RCAEvidenceBundle(
+        asset_ids=["FV-101"],
+        evidence_items=[
+            RCAEvidenceItem(
+                evidence_id="E1",
+                source_type="pdf",
+                workspace_id=ws_id,
+                source_id=src_id,
+                filename="Heater_Manual.pdf",
+                page_number=3,
+                retrieval_channel="visual",
+                evidence_role=EvidenceRole.P_AND_ID,
+                content="Fuel valve FV-101 failed open according to schematic layout",
+                confidence=0.92,
+                equipment_ids=["FV-101"]
+            )
+        ],
+        channel_health=ChannelExecutionHealth(
+            requested_channels=["text", "visual", "topology"],
+            executed_channels=["text", "visual", "topology"]
+        )
+    )
+
+    mock_acquire = AsyncMock(return_value=mock_bundle)
+
     with patch("cognishift.core.engine.get_semantic_router", return_value=mock_sem_router), \
+         patch("cognishift.core.rca.evidence_acquisition.RCAEvidenceAcquirer.acquire_evidence", new=mock_acquire), \
          patch("cognishift.core.engine.retrieve_context_with_metadata", new=AsyncMock(return_value=("[Heater_Manual.pdf | Page 3 | VISUAL]: Fuel valve FV-101 failed open", [{"filename": "Heater_Manual.pdf", "page": 3}]))), \
          patch("cognishift.core.engine.query_graph_context", new=AsyncMock(return_value="HEX-101 connects to FV-101")), \
          patch("cognishift.core.engine.get_provider") as mock_gp:
@@ -333,6 +360,7 @@ async def test_rca_accuracy_mode_unsuppressed_by_router():
 
         assert run_resp.status == "completed"
         # Retrieval was NOT bypassed despite router saying CONVERSATION!
+        assert mock_acquire.called
         assert "Heater_Manual.pdf | Page 3" in (run_resp.sources_used or "")
         assert "Plant Topology Graph" in (run_resp.sources_used or "")
 

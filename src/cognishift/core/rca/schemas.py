@@ -110,6 +110,73 @@ class PrimaryCauseCode(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class TruthOrigin(str, Enum):
+    DOCUMENT_EVIDENCE = "DOCUMENT_EVIDENCE"
+    VERIFIED_VISUAL_OBSERVATION = "VERIFIED_VISUAL_OBSERVATION"
+    DATABASE_RECORD = "DATABASE_RECORD"
+    DETERMINISTIC_DERIVATION = "DETERMINISTIC_DERIVATION"
+    REAL_SANDBOX_EXECUTION = "REAL_SANDBOX_EXECUTION"
+    SIMULATED_ADAPTER = "SIMULATED_ADAPTER"
+    USER_REPORTED = "USER_REPORTED"
+    MODEL_INFERENCE = "MODEL_INFERENCE"
+
+
+class ObservationQualityStatus(str, Enum):
+    VERIFIED = "VERIFIED"
+    OBSERVED_UNCORROBORATED = "OBSERVED_UNCORROBORATED"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED"
+    VLM_FAILED = "VLM_FAILED"
+    NO_OBSERVATION = "NO_OBSERVATION"
+    RASTERIZATION_FAILED = "RASTERIZATION_FAILED"
+    SOURCE_NOT_FOUND = "SOURCE_NOT_FOUND"
+
+
+class ClaimSupportStatus(str, Enum):
+    SUPPORTED = "SUPPORTED"
+    PARTIALLY_SUPPORTED = "PARTIALLY_SUPPORTED"
+    UNSUPPORTED = "UNSUPPORTED"
+    CONTRADICTED = "CONTRADICTED"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class ClaimRecord(BaseModel):
+    claim_id: str
+    claim_type: str = "observation"  # "observation", "spatial_relation", "causal_link", "trip_sequence", "procedural"
+    text: str
+    supporting_evidence_ids: List[str] = Field(default_factory=list)
+    support_status: ClaimSupportStatus = ClaimSupportStatus.UNSUPPORTED
+    confidence: float = 1.0
+    origin: TruthOrigin = TruthOrigin.DOCUMENT_EVIDENCE
+    provenance: Optional[Dict[str, Any]] = None
+
+
+class VisualCandidate(BaseModel):
+    workspace_id: int
+    source_id: int
+    processing_version: str = "v1"
+    filename: str
+    page_number: int
+    retrieval_score: float = 0.0
+    retrieval_query: str = ""
+    expected_role_hint: Optional[str] = None
+
+
+class VerifiedVisualEvidence(BaseModel):
+    evidence_id: str
+    source_id: int
+    processing_version: str = "v1"
+    filename: str
+    page_number: int
+    evidence_role: EvidenceRole = EvidenceRole.P_AND_ID
+    retrieval_channel: str = "visual"
+    observed_equipment_tags: List[str] = Field(default_factory=list)
+    verified_relations: List[Dict[str, Any]] = Field(default_factory=list)
+    verified_numeric_claims: List[Dict[str, Any]] = Field(default_factory=list)
+    inspection_status: str = "SUCCESS"
+    quality_status: ObservationQualityStatus = ObservationQualityStatus.VERIFIED
+    locator: Optional[EvidenceLocator] = None
+
+
 class ChannelExecutionHealth(BaseModel):
     enabled_channels: List[str] = Field(default_factory=list)
     attempted_channels: List[str] = Field(default_factory=list)
@@ -127,9 +194,11 @@ class ChannelExecutionHealth(BaseModel):
     visual_pages_indexed: int = 0
     topology_status: str = "EMPTY"  # "ACTIVE", "EMPTY"
     vlm_status: str = "UNAVAILABLE"  # "ACTIVE", "UNAVAILABLE"
+    vlm_execution_status: str = "NOT_ATTEMPTED"  # "NOT_ATTEMPTED", "EXECUTED_SUCCESS", "EXECUTED_FAILED"
     text_candidate_count: int = 0
     visual_candidate_count: int = 0
     visual_inspector_executed: bool = False
+    visual_inspection_count: int = 0
     topology_node_count: int = 0
     topology_edge_count: int = 0
 
@@ -144,6 +213,7 @@ class StructuredSpatialRelation(BaseModel):
     processing_version: str = "v1"
     locator: str = ""
     inspection_status: str = "SUCCESS"
+    quality_status: ObservationQualityStatus = ObservationQualityStatus.VERIFIED
     tag_corroboration: bool = False
 
 
@@ -160,11 +230,15 @@ class StructuredRCAResult(BaseModel):
     primary_cause_supporting_evidence_ids: List[str] = Field(default_factory=list)
     confirmed_observations: List[ConfirmedObservationItem] = Field(default_factory=list)
     spatial_relations: List[StructuredSpatialRelation] = Field(default_factory=list)
+    claims: List[ClaimRecord] = Field(default_factory=list)
     evidence_items: List[Dict[str, Any]] = Field(default_factory=list)
     channel_health: Optional[ChannelExecutionHealth] = None
     contradictions: List[str] = Field(default_factory=list)
     additional_evidence_needed: List[str] = Field(default_factory=list)
     sources: List[Dict[str, Any]] = Field(default_factory=list)
+    outcome_match: Optional[bool] = None
+    evidence_chain_valid: Optional[bool] = None
+    scenario_pass: Optional[bool] = None
 
 
 class RCAEvidenceItem(BaseModel):

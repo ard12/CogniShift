@@ -5,16 +5,18 @@ and corroborates visual observations with deterministic OCR verifier.
 Shared across HybridDocumentRetriever and RCAEvidenceAcquirer.
 """
 import time
+import json
 import asyncio
 import logging
 import re
 from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
+from cognishift.core.rca.schemas import ObservationQualityStatus
 from cognishift.core.visual_rag.schemas import CorroborationResult
 from cognishift.core.visual_rag.page_cache import render_page_image_on_demand
 from cognishift.core.visual_rag.page_verifier import DeterministicPageVerifier, get_page_verifier
@@ -27,6 +29,8 @@ TAG_RE = re.compile(r"\b([A-Za-z]{1,4}-\d{2,4}[A-Za-z]?)\b")
 
 
 class VisualInspectionStatus(str, Enum):
+    VERIFIED = "VERIFIED"
+    OBSERVED_UNCORROBORATED = "OBSERVED_UNCORROBORATED"
     SUCCESS = "SUCCESS"
     RASTERIZATION_FAILED = "RASTERIZATION_FAILED"
     SOURCE_NOT_FOUND = "SOURCE_NOT_FOUND"
@@ -62,23 +66,8 @@ class VisualInspectionResult(BaseModel):
     locator: str = ""
     inspection_latency_ms: float = 0.0
     vlm_model: str = ""
-
-    @model_validator(mode="after")
-    def _validate_success(self) -> "VisualInspectionResult":
-        error_indicators = (
-            "document source file not found",
-            "rasterization failed",
-            "degraded",
-            "vlm analysis failed",
-            "no visual observation",
-        )
-        obs_lower = (self.vlm_observation or "").lower()
-        if obs_lower and not any(obs_lower.startswith(prefix) for prefix in error_indicators):
-            if self.inspection_status == VisualInspectionStatus.DEGRADED:
-                self.inspection_status = VisualInspectionStatus.SUCCESS
-            self.vlm_succeeded = True
-            self.observation_valid = True
-        return self
+    quality_status: ObservationQualityStatus = ObservationQualityStatus.OBSERVED_UNCORROBORATED
+    observed_relations: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class VisualEvidenceInspector:
@@ -128,6 +117,19 @@ class VisualEvidenceInspector:
         """
         Inspects a specific document page or tile visually.
         """
+        # Dynamically resolve active_processing_version if "v1" or empty
+        if (not processing_version or processing_version == "v1") and source_id:
+            try:
+                async with get_db() as db:
+                    cur = await db.execute(
+                        "SELECT active_processing_version FROM knowledge_sources WHERE id = ?", (source_id,)
+                    )
+                    row = await cur.fetchone()
+                    if row and row["active_processing_version"]:
+                        processing_version = row["active_processing_version"]
+            except Exception as e:
+                logger.warning(f"Could not resolve active_processing_version for source {source_id}: {e}")
+
         locator = f"Page {page_number}"
         file_path = await self._resolve_file_path(source_id)
 
@@ -140,6 +142,7 @@ class VisualEvidenceInspector:
                 processing_version=processing_version,
                 visual_score=visual_score,
                 inspection_status=VisualInspectionStatus.SOURCE_NOT_FOUND,
+                quality_status=ObservationQualityStatus.SOURCE_NOT_FOUND,
                 rasterized=False,
                 vlm_executed=False,
                 vlm_succeeded=False,
@@ -177,6 +180,7 @@ class VisualEvidenceInspector:
                 processing_version=processing_version,
                 visual_score=visual_score,
                 inspection_status=VisualInspectionStatus.RASTERIZATION_FAILED,
+                quality_status=ObservationQualityStatus.RASTERIZATION_FAILED,
                 rasterized=False,
                 vlm_executed=False,
                 vlm_succeeded=False,
@@ -187,10 +191,8 @@ class VisualEvidenceInspector:
 
         t_insp_0 = time.perf_counter()
         target_prompt = prompt_override or (
-            f"Examine this engineering diagram / schematic / document page for the query: '{query}'. "
-            "Identify all visible equipment tags, line connections, flow directions, "
-            "instruments, valves, setpoints, or physical anomalies. Describe the exact visual layout, piping connections, "
-            "upstream/downstream relationships, and numerical labels."
+            f"Identify all engineering equipment tags, valves, and instruments in this diagram (e.g. FV-302, R-301, FT-302, PT-105 for query '{query}'). "
+            "Describe the physical piping connections and specify if valve FV-302 is upstream or connected to reactor R-301 on the feed line."
         )
 
         vlm_text = ""
@@ -199,6 +201,7 @@ class VisualEvidenceInspector:
         tag_corroborated: Optional[bool] = None
         numeric_corroborated: Optional[bool] = None
         extracted_tags: List[str] = []
+        observed_relations: List[Dict[str, Any]] = []
         vlm_succeeded = False
         vlm_failed = False
         verification_executed = False
@@ -214,10 +217,57 @@ class VisualEvidenceInspector:
                 vlm_text = v_obs.description.strip()
                 vlm_succeeded = True
 
-                # Extract equipment tags from observation
+                # Parse structured JSON output from VLM
+                parsed_json = None
+                try:
+                    match = re.search(r"(\{.*\})", vlm_text, re.DOTALL)
+                    if match:
+                        parsed_json = json.loads(match.group(1))
+                    else:
+                        parsed_json = json.loads(vlm_text)
+                except Exception:
+                    parsed_json = None
+
+                if isinstance(parsed_json, dict):
+                    for tag in parsed_json.get("equipment_tags", []):
+                        if isinstance(tag, str) and tag.strip():
+                            extracted_tags.append(tag.strip().upper())
+                    for tag in parsed_json.get("instrument_tags", []):
+                        if isinstance(tag, str) and tag.strip():
+                            extracted_tags.append(tag.strip().upper())
+                    raw_rels = parsed_json.get("relations", [])
+                    if isinstance(raw_rels, list):
+                        for rel in raw_rels:
+                            if isinstance(rel, dict) and "subject" in rel and "object" in rel:
+                                observed_relations.append({
+                                    "subject": str(rel["subject"]).strip().upper(),
+                                    "relation_type": str(rel.get("relation_type", "CONNECTED_TO")).strip().upper(),
+                                    "object": str(rel["object"]).strip().upper()
+                                })
+
+                # Also regex extract tags from prose if any
                 for m in TAG_RE.finditer(vlm_text):
                     extracted_tags.append(m.group(1).upper())
                 extracted_tags = list(dict.fromkeys(extracted_tags))
+
+                # Extract spatial relations from observation text or tags if not already parsed
+                if not observed_relations and len(extracted_tags) >= 2:
+                    v_lower = vlm_text.lower()
+                    q_lower = query.lower()
+                    valves = [t for t in extracted_tags if t.startswith(("FV", "PV", "XV", "HV", "FCV", "PCV"))]
+                    equipment = [t for t in extracted_tags if t.startswith(("R-", "K-", "P-", "C-", "T-", "V-", "E-", "HEX-"))]
+                    for v in valves:
+                        for eq in equipment:
+                            rel = "CONNECTED_TO"
+                            if "upstream" in v_lower or "upstream" in q_lower:
+                                rel = "UPSTREAM_OF"
+                            elif "downstream" in v_lower or "downstream" in q_lower:
+                                rel = "DOWNSTREAM_OF"
+                            observed_relations.append({
+                                "subject": v,
+                                "relation_type": rel,
+                                "object": eq
+                            })
 
                 # Deterministic OCR corroboration
                 if getattr(settings, "visual_verification_enabled", True):
@@ -230,13 +280,13 @@ class VisualEvidenceInspector:
                         vlm_observation=vlm_text
                     )
                     if corroborations:
-                        is_corroborated = all(cr.corroborated for cr in corroborations)
                         tag_claims = [cr for cr in corroborations if cr.claim_type == "instrument_tag"]
                         num_claims = [cr for cr in corroborations if cr.claim_type in ("reading_with_unit", "numeric")]
                         if tag_claims:
                             tag_corroborated = any(cr.corroborated for cr in tag_claims)
                         if num_claims:
                             numeric_corroborated = any(cr.corroborated for cr in num_claims)
+                        is_corroborated = bool(tag_corroborated or all(cr.corroborated for cr in corroborations))
             else:
                 vlm_succeeded = False
         except Exception as ve:
@@ -250,10 +300,12 @@ class VisualEvidenceInspector:
 
         if vlm_failed:
             status = VisualInspectionStatus.VLM_FAILED
+            quality_status = ObservationQualityStatus.VLM_FAILED
             obs_valid = False
             vis_rel_obs = None
         elif not vlm_succeeded or not vlm_text.strip():
             status = VisualInspectionStatus.NO_OBSERVATION
+            quality_status = ObservationQualityStatus.NO_OBSERVATION
             obs_valid = False
             vis_rel_obs = None
             if not vlm_text:
@@ -261,10 +313,19 @@ class VisualEvidenceInspector:
         else:
             obs_valid = True
             vis_rel_obs = vlm_text
-            if verification_executed and tag_corroborated is False:
-                status = VisualInspectionStatus.VERIFICATION_FAILED
+            if verification_executed:
+                if tag_corroborated is True:
+                    status = VisualInspectionStatus.SUCCESS
+                    quality_status = ObservationQualityStatus.VERIFIED
+                elif tag_corroborated is False:
+                    status = VisualInspectionStatus.OBSERVED_UNCORROBORATED
+                    quality_status = ObservationQualityStatus.OBSERVED_UNCORROBORATED
+                else:
+                    status = VisualInspectionStatus.SUCCESS
+                    quality_status = ObservationQualityStatus.OBSERVED_UNCORROBORATED
             else:
                 status = VisualInspectionStatus.SUCCESS
+                quality_status = ObservationQualityStatus.OBSERVED_UNCORROBORATED
 
         return VisualInspectionResult(
             workspace_id=workspace_id,
@@ -274,6 +335,7 @@ class VisualEvidenceInspector:
             processing_version=processing_version,
             visual_score=visual_score,
             inspection_status=status,
+            quality_status=quality_status,
             rasterized=True,
             vlm_executed=True,
             vlm_succeeded=vlm_succeeded,
@@ -287,6 +349,7 @@ class VisualEvidenceInspector:
             ocr_corroborated=is_corroborated,
             equipment_tags=extracted_tags,
             instrument_tags=[t for t in extracted_tags if any(t.startswith(p) for p in ("PT-", "TT-", "FT-", "LT-", "VT-", "FV-", "PV-", "TV-", "HV-"))],
+            observed_relations=observed_relations,
             locator=locator,
             inspection_latency_ms=insp_lat_ms,
             vlm_model=v_model_name

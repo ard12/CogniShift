@@ -274,6 +274,8 @@ class ExecuteCodeArgs(BaseModel):
     entrypoint: str = Field(default="main.py", pattern=r"^[A-Za-z0-9_.-]+\.(?i:py)$", description="Script entrypoint filename")
     timeout_seconds: int = Field(default=30, ge=5, le=120, description="Execution timeout in seconds")
     input_files: List[SandboxInputReference] = Field(default_factory=list, max_length=10, description="Optional input files")
+    input_requirement: str = Field(default="none", description="Contract: 'none', 'file', 'tabular', 'numeric_series'")
+    required_input_source_ids: List[int] = Field(default_factory=list, description="Authorized knowledge source IDs that must be staged")
     promote_outputs_to_artifacts: bool = Field(default=False, description="Promote outputs to permanent artifacts")
 
     @field_validator("entrypoint", mode="before")

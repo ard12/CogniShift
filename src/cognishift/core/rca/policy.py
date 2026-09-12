@@ -73,6 +73,13 @@ def determine_rca_status(
     }
     has_physical_measurement = bool(distinct_roles & physical_roles)
 
+    # CRITICAL EVIDENCE GATE:
+    # If required evidence roles or critical evidence are missing, status cannot exceed PLAUSIBLE_HYPOTHESIS
+    if not required_roles_satisfied or has_missing_critical:
+        if len(supporting_items) >= 1:
+            return RCAStatus.PLAUSIBLE_HYPOTHESIS
+        return RCAStatus.INSUFFICIENT_EVIDENCE
+
     # Empirical / Incident check: baseline SOPs alone without incident data cannot prove a failure hypothesis
     incident_roles = {
         EvidenceRole.INCIDENT_CHRONOLOGY,
@@ -86,13 +93,6 @@ def determine_rca_status(
     }
     has_incident_evidence = bool(distinct_roles & incident_roles)
     if not has_incident_evidence:
-        return RCAStatus.INSUFFICIENT_EVIDENCE
-
-    # CRITICAL EVIDENCE GATE:
-    # If required evidence roles or critical evidence are missing, status cannot exceed PLAUSIBLE_HYPOTHESIS
-    if not required_roles_satisfied or has_missing_critical:
-        if len(supporting_items) >= 1:
-            return RCAStatus.PLAUSIBLE_HYPOTHESIS
         return RCAStatus.INSUFFICIENT_EVIDENCE
 
     # If required evidence coverage is complete and multiple sources corroborate

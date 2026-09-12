@@ -9,16 +9,19 @@ import time
 import shutil
 import asyncio
 import logging
+import hashlib
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 
 from cognishift.app.config import settings
 from cognishift.core.sandbox.schemas import (
     CodeExecutionRequest,
     CodeExecutionResult,
     SandboxStatus,
-    SandboxUnavailableError
+    SandboxUnavailableError,
+    ExecutionProvenance
 )
 
 logger = logging.getLogger(__name__)
@@ -101,7 +104,13 @@ class DockerPodmanBackend(SandboxBackend):
         else:
             image_ref = settings.sandbox_image
 
+        code_sha256 = hashlib.sha256(request.code.encode("utf-8")).hexdigest()
+        staged_script = source_dir / request.entrypoint
+        staged_code_sha256 = hashlib.sha256(staged_script.read_bytes()).hexdigest() if staged_script.exists() else ""
+        started_at_iso = datetime.now(timezone.utc).isoformat()
+
         # Construct explicit argument vector (NEVER shell=True)
+        # Use as_posix() on Windows host paths for Docker CLI volume mounting
         argv = [
             self.runtime_bin, "run",
             "--rm",
@@ -115,9 +124,9 @@ class DockerPodmanBackend(SandboxBackend):
             "--memory", f"{request.memory_mb}m",
             "--memory-swap", f"{request.memory_mb}m",
             "--pids-limit", str(settings.sandbox_pid_limit),
-            "-v", f"{str(source_dir.resolve())}:/workspace/source:ro",
-            "-v", f"{str(input_dir.resolve())}:/workspace/input:ro",
-            "-v", f"{str(output_dir.resolve())}:/workspace/output:rw",
+            "-v", f"{source_dir.resolve().as_posix()}:/workspace/source:ro",
+            "-v", f"{input_dir.resolve().as_posix()}:/workspace/input:ro",
+            "-v", f"{output_dir.resolve().as_posix()}:/workspace/output:rw",
             "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m",
             "-w", "/workspace/source",
             "--name", container_name,
@@ -144,11 +153,34 @@ class DockerPodmanBackend(SandboxBackend):
                 (stdout_bytes, stdout_truncated), (stderr_bytes, stderr_truncated), _ = captured
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 exit_code = proc.returncode or 0
+                completed_at_iso = datetime.now(timezone.utc).isoformat()
 
                 # Truncate output streams to server limits
-
                 stdout_clean = stdout_bytes[:settings.sandbox_stdout_limit].decode("utf-8", errors="replace")
                 stderr_clean = stderr_bytes[:settings.sandbox_stderr_limit].decode("utf-8", errors="replace")
+
+                stdout_sha256 = hashlib.sha256(stdout_bytes).hexdigest()
+                stderr_sha256 = hashlib.sha256(stderr_bytes).hexdigest()
+
+                # Collect output files and their SHA-256 hashes
+                artifact_sha256s: Dict[str, str] = {}
+                output_filenames: List[str] = []
+                if output_dir.exists():
+                    try:
+                        for of in sorted(output_dir.iterdir()):
+                            try:
+                                if of.is_symlink():
+                                    continue
+                                if of.is_file():
+                                    output_filenames.append(of.name)
+                                    try:
+                                        artifact_sha256s[of.name] = hashlib.sha256(of.read_bytes()).hexdigest()
+                                    except Exception:
+                                        pass
+                            except OSError:
+                                continue
+                    except OSError:
+                        pass
 
                 # Check if execution failed due to image missing locally (--pull=never)
                 if exit_code != 0 and (
@@ -170,6 +202,27 @@ class DockerPodmanBackend(SandboxBackend):
                 else:
                     status = SandboxStatus.RUNTIME_ERROR
 
+                prov = ExecutionProvenance(
+                    execution_id=request.execution_id,
+                    backend="docker",
+                    backend_verified=True,
+                    container_runtime=self.runtime,
+                    image_name=settings.sandbox_image,
+                    image_digest=settings.sandbox_image_digest or "",
+                    code_sha256=code_sha256,
+                    staged_code_sha256=staged_code_sha256,
+                    command=argv,
+                    started_at=started_at_iso,
+                    completed_at=completed_at_iso,
+                    exit_code=exit_code,
+                    stdout_sha256=stdout_sha256,
+                    stderr_sha256=stderr_sha256,
+                    artifact_ids=[],
+                    artifact_sha256s=artifact_sha256s,
+                    simulated=False,
+                    failure_reason=stderr_clean if exit_code != 0 else None
+                )
+
                 return CodeExecutionResult(
                     execution_id=request.execution_id,
                     status=status,
@@ -179,7 +232,10 @@ class DockerPodmanBackend(SandboxBackend):
                     stdout_truncated=stdout_truncated,
                     stderr_truncated=stderr_truncated,
                     duration_ms=duration_ms,
-                    timed_out=False
+                    timed_out=False,
+                    output_files=output_filenames,
+                    provenance=prov,
+                    error_message=stderr_clean if exit_code != 0 else None
                 )
 
             except asyncio.TimeoutError:
@@ -201,6 +257,27 @@ class DockerPodmanBackend(SandboxBackend):
                     proc.kill()
                 await proc.communicate()
 
+                prov = ExecutionProvenance(
+                    execution_id=request.execution_id,
+                    backend="docker",
+                    backend_verified=True,
+                    container_runtime=self.runtime,
+                    image_name=settings.sandbox_image,
+                    image_digest=settings.sandbox_image_digest or "",
+                    code_sha256=code_sha256,
+                    staged_code_sha256=staged_code_sha256,
+                    command=argv,
+                    started_at=started_at_iso,
+                    completed_at=datetime.now(timezone.utc).isoformat(),
+                    exit_code=-1,
+                    stdout_sha256="",
+                    stderr_sha256="",
+                    artifact_ids=[],
+                    artifact_sha256s={},
+                    simulated=False,
+                    failure_reason=f"Execution exceeded hard timeout limit of {request.timeout_seconds}s."
+                )
+
                 return CodeExecutionResult(
                     execution_id=request.execution_id,
                     status=SandboxStatus.TIMEOUT,
@@ -209,6 +286,7 @@ class DockerPodmanBackend(SandboxBackend):
                     stderr=f"Execution exceeded hard timeout limit of {request.timeout_seconds}s.",
                     duration_ms=duration_ms,
                     timed_out=True,
+                    provenance=prov,
                     error_message=f"Timeout limit of {request.timeout_seconds}s exceeded."
                 )
 
@@ -216,6 +294,19 @@ class DockerPodmanBackend(SandboxBackend):
             raise
         except Exception as e:
             duration_ms = int((time.perf_counter() - start_time) * 1000)
+            prov = ExecutionProvenance(
+                execution_id=request.execution_id,
+                backend="docker",
+                backend_verified=False,
+                code_sha256=code_sha256,
+                staged_code_sha256=staged_code_sha256,
+                command=argv,
+                started_at=started_at_iso,
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                exit_code=-1,
+                simulated=False,
+                failure_reason=str(e)
+            )
             return CodeExecutionResult(
                 execution_id=request.execution_id,
                 status=SandboxStatus.INTERNAL_ERROR,
@@ -223,6 +314,7 @@ class DockerPodmanBackend(SandboxBackend):
                 stderr=str(e),
                 duration_ms=duration_ms,
                 timed_out=False,
+                provenance=prov,
                 error_message=f"Sandbox internal error: {str(e)}"
             )
 
@@ -429,20 +521,40 @@ class SimulatedSandboxBackend(SandboxBackend):
                 except Exception:
                     pass
 
+        code_sha256 = hashlib.sha256(request.code.encode("utf-8")).hexdigest()
+        prov = ExecutionProvenance(
+            execution_id=request.execution_id,
+            backend="simulated",
+            backend_verified=False,
+            container_runtime="none",
+            code_sha256=code_sha256,
+            staged_code_sha256="",
+            command=[],
+            exit_code=0,
+            simulated=True,
+            failure_reason=None
+        )
+
         return CodeExecutionResult(
             execution_id=request.execution_id,
             status=SandboxStatus.SUCCESS,
             exit_code=0,
-            stdout=f"[SIMULATED SANDBOX] Execution of '{request.entrypoint}' completed successfully with exit code 0.",
+            stdout=f"[SIMULATED SANDBOX] Execution of '{request.entrypoint}' completed with exit code 0.",
             stderr="",
             duration_ms=45,
-            timed_out=False
+            timed_out=False,
+            provenance=prov
         )
 
 
-def get_sandbox_backend() -> SandboxBackend:
-    """Factory to retrieve the appropriate sandbox backend based on configuration."""
-    if settings.operating_mode == "simulated" or settings.sandbox_runtime == "simulated":
+def get_sandbox_backend(allow_simulation: bool = False) -> SandboxBackend:
+    """
+    Factory to retrieve the appropriate sandbox backend based on configuration.
+    Mandatory Truth Constraint:
+    Simulation is strictly restricted to test fixtures passing allow_simulation=True.
+    Normal and demo execution profiles NEVER fall back to simulation.
+    """
+    if allow_simulation:
         return SimulatedSandboxBackend()
     if not shutil.which(settings.sandbox_runtime):
         raise SandboxUnavailableError(

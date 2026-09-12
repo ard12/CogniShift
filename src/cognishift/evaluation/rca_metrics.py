@@ -60,6 +60,8 @@ def calculate_decomposed_citation_metrics(
     bundle: Optional[RCAEvidenceBundle] = None,
     valid_filenames: Optional[Set[str]] = None,
     is_ood: bool = False,
+    claims: Optional[List[Any]] = None,
+    structured_result: Optional[Any] = None,
 ) -> CitationMetrics:
     """
     Decomposes citation accuracy into three independent dimensions:
@@ -176,7 +178,65 @@ def calculate_decomposed_citation_metrics(
             valid_locator_count += 1
 
         # 3. Claim Binding Accuracy check
-        if fname in bundle_files or not bundle:
+        resolved_claims = claims
+        if resolved_claims is None and structured_result:
+            if isinstance(structured_result, dict):
+                resolved_claims = structured_result.get("claims", [])
+            else:
+                resolved_claims = getattr(structured_result, "claims", [])
+
+        # Build evidence_id -> filename mapping
+        eid_to_fname = {}
+        if bundle:
+            for itm in bundle.evidence_items:
+                eid_to_fname[itm.evidence_id] = Path(itm.filename).name.lower()
+        elif structured_result:
+            s_items = (
+                structured_result.get("evidence_items", [])
+                if isinstance(structured_result, dict)
+                else getattr(structured_result, "evidence_items", [])
+            )
+            for itm in s_items:
+                eid = itm.get("evidence_id") if isinstance(itm, dict) else getattr(itm, "evidence_id", None)
+                fn = itm.get("filename") if isinstance(itm, dict) else getattr(itm, "filename", None)
+                if eid and fn:
+                    eid_to_fname[eid] = Path(fn).name.lower()
+
+        if resolved_claims:
+            is_bound = False
+            matched_item = None
+            if bundle:
+                matched_item = next((i for i in bundle.evidence_items if Path(i.filename).name.lower() == fname), None)
+
+            for clm in resolved_claims:
+                c_status = str(getattr(clm, "support_status", "") or (clm.get("support_status") if isinstance(clm, dict) else "")).upper()
+                is_supported = "SUPPORTED" in c_status or "PARTIALLY_SUPPORTED" in c_status
+                if not is_supported:
+                    continue
+                sup_eids = getattr(clm, "supporting_evidence_ids", []) or (clm.get("supporting_evidence_ids", []) if isinstance(clm, dict) else [])
+                if any(eid_to_fname.get(eid) == fname for eid in sup_eids):
+                    is_bound = True
+                    break
+                if matched_item and matched_item.evidence_id in sup_eids:
+                    is_bound = True
+                    break
+                cit_refs = [str(r).lower() for r in (getattr(clm, "citation_references", []) or (clm.get("citation_references", []) if isinstance(clm, dict) else []))]
+                if any(fname in ref for ref in cit_refs):
+                    is_bound = True
+                    break
+                clm_text = str(getattr(clm, "text", "") or (clm.get("text") if isinstance(clm, dict) else "")).lower()
+                if fname in clm_text or Path(fname).stem.lower() in clm_text:
+                    is_bound = True
+                    break
+
+            if is_bound:
+                claim_bound_count += 1
+            else:
+                invalid_details.append({
+                    "citation": cit,
+                    "reason": f"File '{fname}' cited but does not bind to any verified/supported claim in the evidence chain.",
+                })
+        elif fname in bundle_files or not bundle:
             claim_bound_count += 1
         else:
             invalid_details.append({
@@ -381,6 +441,28 @@ def evaluate_rca_06_ablation(
     visual_model = ch_c.get("visual_model")
     visual_device = ch_c.get("visual_device")
 
+    # Verify structured VLM observation
+    vlm_structured_obs = True
+    if "vlm_structured_observation" in res_c:
+        vlm_structured_obs = bool(res_c["vlm_structured_observation"])
+    elif "observed_relations" in res_c:
+        vlm_structured_obs = bool(res_c["observed_relations"])
+    elif "observed_relations" in ch_c:
+        vlm_structured_obs = bool(ch_c["observed_relations"])
+    elif struct_c and "spatial_relations" in struct_c:
+        vlm_structured_obs = bool(struct_c["spatial_relations"])
+
+    # Verify OCR tag corroboration
+    ocr_corroborated = True
+    if "ocr_corroborated" in res_c:
+        ocr_corroborated = bool(res_c["ocr_corroborated"])
+    elif "quality_status" in res_c:
+        ocr_corroborated = res_c["quality_status"] in ("VERIFIED", "SUCCESS")
+    elif "quality_status" in ch_c:
+        ocr_corroborated = ch_c["quality_status"] in ("VERIFIED", "SUCCESS")
+    elif "ocr_tag_corroboration_passed" in res_c:
+        ocr_corroborated = bool(res_c["ocr_tag_corroboration_passed"])
+
     is_valid_ablation = (
         not vis_in_a
         and not vis_in_b
@@ -390,6 +472,8 @@ def evaluate_rca_06_ablation(
         and visual_e_id_present
         and cause_references_visual
         and inspector_executed
+        and vlm_structured_obs
+        and ocr_corroborated
     )
 
     return {
@@ -418,6 +502,8 @@ def evaluate_rca_06_ablation(
             "visual_device": visual_device,
             "visual_evidence_id": visual_e_id,
             "visual_inspector_executed": inspector_executed,
+            "vlm_structured_observation": vlm_structured_obs,
+            "ocr_corroborated": ocr_corroborated,
             "primary_cause_references_visual_eid": cause_references_visual,
             "spatial_relation_supported": res_c.get("spatial_relation_supported", True),
             "claim_support_precision": res_c.get("claim_support_precision", 0.0),
@@ -425,4 +511,39 @@ def evaluate_rca_06_ablation(
         },
         "ablation_verified": is_valid_ablation,
         "verification_verdict": "VERIFIED" if is_valid_ablation else "INVALID — ABLATION CONDITIONS NOT SATISFIED",
+    }
+
+
+def evaluate_scenario_dual_scoring(
+    scenario_id: str,
+    matched_status: str,
+    expected_status: str,
+    extracted_cause_code: str,
+    expected_cause_code: str,
+    evidence_chain_valid: bool,
+    primary_cause_accuracy: float = 1.0,
+    status_score: float = 1.0,
+) -> Dict[str, Any]:
+    """
+    Dual Scoring for Benchmark V4:
+    - outcome_match: Primary cause and status match expectations.
+    - evidence_chain_valid: Evidence IDs, citations, and claim bindings valid without circularity.
+    - scenario_pass: PASS only if BOTH outcome_match AND evidence_chain_valid are True.
+    """
+    status_match = (
+        (matched_status.upper().strip() == expected_status.upper().strip())
+        or status_score >= 0.99
+    )
+    outcome_match = (
+        status_match
+        and (extracted_cause_code.upper().strip() == expected_cause_code.upper().strip())
+        and primary_cause_accuracy >= 0.99
+    )
+    scenario_pass = bool(outcome_match and evidence_chain_valid)
+    return {
+        "scenario_id": scenario_id,
+        "outcome_match": outcome_match,
+        "evidence_chain_valid": evidence_chain_valid,
+        "scenario_pass": scenario_pass,
+        "verdict": "PASS" if scenario_pass else ("FAIL (Evidence Chain Invalid)" if outcome_match else "FAIL (Outcome Mismatch)")
     }

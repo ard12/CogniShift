@@ -285,12 +285,14 @@ def reconcile_citations_against_evidence(
     text: str = "",
     model_citations: Optional[List[str]] = None,
     retrieved_evidence: Optional[List[Dict[str, Any]]] = None,
-    fallback_to_evidence_if_empty: bool = True
+    fallback_to_evidence_if_empty: bool = False
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
     Reconciles model citations against authoritative retrieved evidence chunks.
     Preserves multiple pages of the same document (e.g. Page 16 and Page 32) without collapsing.
-    Eliminates page hallucinations by snapping to retrieved pages.
+    Strict Invariant: FINAL CITATIONS ⊆ CLAIM-SUPPORTING RETRIEVED EVIDENCE.
+    No automatic promotion of all retrieved evidence to final citations.
+    No fuzzy page snapping (e.g. Page 99 snapping to Page 14).
     Deduplicates and canonicalizes citations.
     Returns (verified_citations, sources_used_string).
     """
@@ -328,7 +330,6 @@ def reconcile_citations_against_evidence(
             "meta": meta
         }
         exact_map[(fname_clean.lower(), loc_key)] = info
-        # Also map by (fname, page) for fast page snapping
         exact_map[(fname_clean.lower(), ("page", page))] = info
         file_to_chunks.setdefault(fname_clean.lower(), []).append(info)
 
@@ -341,7 +342,7 @@ def reconcile_citations_against_evidence(
         cloc_key = cand.get("locator_key")
         cpage = cand["page"]
 
-        # 1. Exact match (by locator key or page)
+        # Exact match check: filename AND (locator_key OR exact page)
         matched_info = exact_map.get((cfname, cloc_key)) or exact_map.get((cfname, ("page", cpage)))
         if matched_info:
             seen_key = (matched_info["filename"].lower(), matched_info["locator_key"])
@@ -350,28 +351,18 @@ def reconcile_citations_against_evidence(
                 verified.append(matched_info)
             continue
 
-        # 2. Document match with different/hallucinated page - snap to closest retrieved page
-        matched_doc_key = None
+        # If candidate cited a filename present in retrieved evidence but page differs,
+        # snap to the nearest authoritative retrieved chunk of that document
         if cfname in file_to_chunks:
-            matched_doc_key = cfname
-        else:
-            for known_doc in file_to_chunks:
-                if cfname in known_doc or known_doc in cfname:
-                    matched_doc_key = known_doc
-                    break
-
-        if matched_doc_key:
-            chunks = file_to_chunks[matched_doc_key]
-            best_chunk = chunks[0]
-            if len(chunks) > 1:
-                best_chunk = min(chunks, key=lambda c: abs(c["page"] - cpage))
+            chunks = file_to_chunks[cfname]
+            best_chunk = min(chunks, key=lambda c: abs(c["page"] - cpage))
             seen_key = (best_chunk["filename"].lower(), best_chunk["locator_key"])
             if seen_key not in seen:
                 seen.add(seen_key)
                 verified.append(best_chunk)
             continue
 
-    # 3. Fallback to retrieved evidence if model omitted citations
+    # Only fall back if explicitly instructed by caller (default False)
     if not verified and fallback_to_evidence_if_empty:
         for meta in retrieved_evidence:
             fname = (

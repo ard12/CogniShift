@@ -566,6 +566,8 @@ async def execute_tool(
         entrypoint = parameters.get("entrypoint", "main.py")
         timeout_seconds = parameters.get("timeout_seconds", 30)
         promote = parameters.get("promote_outputs_to_artifacts", False)
+        input_requirement = parameters.get("input_requirement", "none")
+        required_input_source_ids = parameters.get("required_input_source_ids", [])
         
         input_refs = []
         for inp in parameters.get("input_files", []):
@@ -581,6 +583,8 @@ async def execute_tool(
             code=code,
             entrypoint=entrypoint,
             input_files=input_refs,
+            input_requirement=input_requirement,
+            required_input_source_ids=required_input_source_ids,
             timeout_seconds=timeout_seconds,
             promote_outputs=promote
         )

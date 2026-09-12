@@ -6,6 +6,7 @@ audit event logging, and guaranteed ephemeral cleanup.
 import json
 import uuid
 import logging
+import hashlib
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -15,7 +16,8 @@ from cognishift.core.sandbox.schemas import (
     CodeExecutionRequest,
     CodeExecutionResult,
     SandboxStatus,
-    SandboxUnavailableError
+    SandboxUnavailableError,
+    ExecutionProvenance
 )
 from cognishift.core.sandbox.staging import (
     stage_execution_environment,
@@ -92,18 +94,95 @@ async def execute_sandbox_code(
             }
         )
 
-        # 2. Execution
-        backend = get_sandbox_backend()
+        # 1.5 Input Requirement Contract Verification
+        input_req = (request.input_requirement or "none").lower()
+        if input_req != "none":
+            manifest_source_ids = {
+                entry.source_id for entry in (staging_manifest.entries if staging_manifest else [])
+                if entry.source_id is not None
+            }
+            if request.required_input_source_ids:
+                missing = [sid for sid in request.required_input_source_ids if sid not in manifest_source_ids]
+                if missing:
+                    err_msg = f"Input validation failed: required input source IDs {missing} were not staged."
+                    logger.warning(err_msg)
+                    prov = ExecutionProvenance(
+                        execution_id=execution_id,
+                        backend="none",
+                        backend_verified=False,
+                        code_sha256=hashlib.sha256(request.code.encode("utf-8")).hexdigest() if request.code else "",
+                        staged_code_sha256="",
+                        command=[],
+                        exit_code=-1,
+                        simulated=False,
+                        failure_reason=err_msg
+                    )
+                    return CodeExecutionResult(
+                        execution_id=execution_id,
+                        status=SandboxStatus.VALIDATION_FAILED,
+                        exit_code=-1,
+                        stdout="",
+                        stderr=err_msg,
+                        duration_ms=0,
+                        timed_out=False,
+                        provenance=prov,
+                        error_message=err_msg
+                    )
+            if input_req in ["tabular", "file", "numeric_series"]:
+                if not staging_manifest or not staging_manifest.entries:
+                    err_msg = f"Input validation failed: input_requirement '{input_req}' requires staged input files, but none were staged."
+                    logger.warning(err_msg)
+                    prov = ExecutionProvenance(
+                        execution_id=execution_id,
+                        backend="none",
+                        backend_verified=False,
+                        code_sha256=hashlib.sha256(request.code.encode("utf-8")).hexdigest() if request.code else "",
+                        staged_code_sha256="",
+                        command=[],
+                        exit_code=-1,
+                        simulated=False,
+                        failure_reason=err_msg
+                    )
+                    return CodeExecutionResult(
+                        execution_id=execution_id,
+                        status=SandboxStatus.VALIDATION_FAILED,
+                        exit_code=-1,
+                        stdout="",
+                        stderr=err_msg,
+                        duration_ms=0,
+                        timed_out=False,
+                        provenance=prov,
+                        error_message=err_msg
+                    )
+
+        # 2. Execution (Zero fallback to simulation)
         try:
+            backend = get_sandbox_backend()
             result = await backend.execute(request, staging_dir)
         except SandboxUnavailableError as e:
-            if settings.cognishift_demo_mode:
-                logger.warning(f"Container runtime unavailable ({e}). Falling back to SimulatedSandboxBackend.")
-                from cognishift.core.sandbox.backend import SimulatedSandboxBackend
-                backend = SimulatedSandboxBackend()
-                result = await backend.execute(request, staging_dir)
-            else:
-                raise
+            logger.warning(f"Container runtime unavailable: {e}. Strict zero-fallback enforced.")
+            prov = ExecutionProvenance(
+                execution_id=execution_id,
+                backend="unavailable",
+                backend_verified=False,
+                code_sha256=hashlib.sha256(request.code.encode("utf-8")).hexdigest() if request.code else "",
+                staged_code_sha256="",
+                command=[],
+                exit_code=-1,
+                simulated=False,
+                failure_reason=f"Container runtime unavailable: {str(e)}"
+            )
+            result = CodeExecutionResult(
+                execution_id=execution_id,
+                status=SandboxStatus.SANDBOX_UNAVAILABLE,
+                exit_code=-1,
+                stdout="",
+                stderr=f"Container runtime unavailable: {str(e)}",
+                duration_ms=0,
+                timed_out=False,
+                provenance=prov,
+                error_message=str(e)
+            )
 
         # 3. Output Validation & Promotion
         if result.status == SandboxStatus.SUCCESS and request.promote_outputs:
@@ -111,10 +190,13 @@ async def execute_sandbox_code(
                 workspace_id=workspace_id,
                 run_id=run_id,
                 execution_id=execution_id,
-                output_dir=staging_dir / "output"
+                output_dir=staging_dir / "output",
+                provenance=result.provenance
             )
             result.output_files = promoted_names
             result.promoted_artifact_ids = promoted_ids
+            if result.provenance:
+                result.provenance.artifact_ids = promoted_ids
 
             if promoted_ids:
                 await log_event(

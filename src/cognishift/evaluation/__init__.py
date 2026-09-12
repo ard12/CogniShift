@@ -10,6 +10,7 @@ from cognishift.evaluation.rca_metrics import (
     calculate_decomposed_pca,
     calculate_false_cause_rate,
     evaluate_rca_06_ablation,
+    evaluate_scenario_dual_scoring,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "calculate_decomposed_pca",
     "calculate_false_cause_rate",
     "evaluate_rca_06_ablation",
+    "evaluate_scenario_dual_scoring",
 ]

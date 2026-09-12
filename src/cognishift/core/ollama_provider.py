@@ -66,7 +66,7 @@ class OllamaProvider(ModelProvider):
 
         try:
             async with self._get_semaphore():
-                async with get_sovereign_async_client(timeout=120.0, component="ollama_provider") as client:
+                async with get_sovereign_async_client(timeout=240.0, component="ollama_provider") as client:
                     response = await client.post(f"{self.base_url}/api/chat", json=payload)
                     if response.status_code != 200:
                         err_body = response.text
@@ -116,7 +116,7 @@ class OllamaProvider(ModelProvider):
         except httpx.ConnectError as e:
             raise ProviderConnectionError(f"Cannot connect to local Ollama server at {self.base_url}: {e}")
         except httpx.TimeoutException as e:
-            raise ProviderTimeoutError(f"Inference timed out after 120s: {e}")
+            raise ProviderTimeoutError(f"Inference timed out after 240s: {e}")
         except Exception as e:
             raise ProviderError(f"Ollama inference error: {e}")
 
@@ -137,7 +137,7 @@ class OllamaProvider(ModelProvider):
 
         try:
             async with self._get_semaphore():
-                async with get_sovereign_async_client(timeout=120.0, component="ollama_provider") as client:
+                async with get_sovereign_async_client(timeout=240.0, component="ollama_provider") as client:
                     response = await client.post(f"{self.base_url}/api/chat", json=payload)
                     response.raise_for_status()
                     data = response.json()

@@ -4234,7 +4234,7 @@ print("Analysis script finished with returncode 0.")
                     text=final_text,
                     model_citations=final_answer_citations,
                     retrieved_evidence=retrieved_evidence_catalog,
-                    fallback_to_evidence_if_empty=True
+                    fallback_to_evidence_if_empty=False
                 )
                 if verified_cites:
                     sources_used = reconciled_sources

@@ -184,14 +184,22 @@ def extract_xlsx_structured_content(
                 row_str = [str(c) if c is not None else "" for c in r]
                 md_lines.append(" | ".join(row_str))
 
+            from openpyxl.utils import get_column_letter
+            total_cols = len(headers)
+            col_start = get_column_letter(1)
+            col_end = get_column_letter(max(1, total_cols))
+
             text_chunk = "\n".join(md_lines)
             meta = {
                 "filename": file_path.name,
                 "sheet_name": sheet_name,
                 "row_start": row_start,
                 "row_end": row_end,
+                "col_start": col_start,
+                "col_end": col_end,
                 "page": tile_page_counter,
-                "extraction_method": "SPREADSHEET"
+                "extraction_method": "SPREADSHEET",
+                "processing_version": "v1"
             }
             text_chunks.append({
                 "text": text_chunk,

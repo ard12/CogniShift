@@ -34,7 +34,7 @@ class EvidenceRequirement(BaseModel):
 
 
 class EvidenceLocator(BaseModel):
-    kind: str = "page"  # "page", "spreadsheet", "document_section", "topology_node"
+    kind: str = "page"  # "page", "spreadsheet", "row_range", "document_section", "topology_node"
     document_type: str = "pdf"  # "pdf", "xlsx", "docx", "csv", "topology"
     filename: str
     page_number: Optional[int] = None
@@ -47,21 +47,40 @@ class EvidenceLocator(BaseModel):
     node_id: Optional[str] = None
     raw_locator: str = ""
 
-    def format_locator(self, retrieval_channel: Optional[str] = None) -> str:
-        """Formats native physical document location coordinates with optional retrieval channel specification."""
-        ch_label = (retrieval_channel or "").upper()
+    def format_location(self) -> str:
+        """Returns the physical coordinates without filename or channel semantics."""
         if self.kind == "spreadsheet" or self.document_type in ("xlsx", "xlsm") or self.sheet_name:
-            r_str = f"Rows {self.row_start}-{self.row_end}" if self.row_start and self.row_end else ""
-            c_str = f"Cols {self.col_start}:{self.col_end}" if self.col_start and self.col_end else ""
-            coords = " | ".join(filter(None, [f"Sheet: {self.sheet_name}" if self.sheet_name else None, r_str, c_str]))
-            tag = ch_label if ch_label else "SPREADSHEET"
-            return f"[{self.filename} | {coords} | {tag}]"
+            r_str = f"Rows {self.row_start}-{self.row_end}" if (self.row_start is not None and self.row_end is not None) else ""
+            c_str = f"Cols {self.col_start}:{self.col_end}" if (self.col_start and self.col_end) else ""
+            parts = [f"Sheet: {self.sheet_name}" if self.sheet_name else None, r_str or None, c_str or None]
+            return " | ".join(filter(None, parts)) or "Sheet"
+        elif self.kind == "row_range" or self.document_type == "csv":
+            if self.row_start is not None and self.row_end is not None:
+                return f"Rows {self.row_start}-{self.row_end}"
+            return "Rows"
         elif self.kind == "document_section" or (self.document_type == "docx" and self.section_heading):
             p_str = f"Rendered Page {self.page_number}" if self.page_number else ""
-            coords = " | ".join(filter(None, [f"Section: {self.section_heading}", p_str]))
+            parts = [f"Section: {self.section_heading}", p_str or None]
+            return " | ".join(filter(None, parts))
+        elif self.page_number is not None:
+            return f"Page {self.page_number}"
+        return ""
+
+    def format_locator(self, retrieval_channel: Optional[str] = None) -> str:
+        """Formats native physical document location coordinates with retrieval channel specification."""
+        ch_label = (retrieval_channel or "").upper()
+        loc = self.format_location()
+
+        if self.kind == "spreadsheet" or self.document_type in ("xlsx", "xlsm") or self.sheet_name:
+            tag = ch_label if ch_label else "SPREADSHEET"
+            return f"[{self.filename} | {loc} | {tag}]" if loc else f"[{self.filename} | {tag}]"
+        elif self.kind == "row_range" or self.document_type == "csv":
+            tag = ch_label if ch_label else "TABULAR"
+            return f"[{self.filename} | {loc} | {tag}]" if loc else f"[{self.filename} | {tag}]"
+        elif self.kind == "document_section" or (self.document_type == "docx" and self.section_heading):
             tag = ch_label if ch_label else "DOCUMENT"
-            return f"[{self.filename} | {coords} | {tag}]"
-        elif self.page_number:
+            return f"[{self.filename} | {loc} | {tag}]" if loc else f"[{self.filename} | {tag}]"
+        elif self.page_number is not None:
             if ch_label and ch_label not in ("PDF", "TEXT"):
                 return f"[{self.filename} | Page {self.page_number} | {ch_label}]"
             return f"[{self.filename} | Page {self.page_number}]"
@@ -92,9 +111,13 @@ class PrimaryCauseCode(str, Enum):
 
 
 class ChannelExecutionHealth(BaseModel):
+    enabled_channels: List[str] = Field(default_factory=list)
+    attempted_channels: List[str] = Field(default_factory=list)
+    successful_channels: List[str] = Field(default_factory=list)
+    contributing_channels: List[str] = Field(default_factory=list)
+    failed_channels: List[str] = Field(default_factory=list)
     requested_channels: List[str] = Field(default_factory=list)
     executed_channels: List[str] = Field(default_factory=list)
-    failed_channels: List[str] = Field(default_factory=list)
     degradation_reason: Optional[str] = None
     hybrid_status: str = "ACTIVE"  # "ACTIVE", "DEGRADED", "DISABLED"
     text_status: str = "ACTIVE"
@@ -106,8 +129,42 @@ class ChannelExecutionHealth(BaseModel):
     vlm_status: str = "UNAVAILABLE"  # "ACTIVE", "UNAVAILABLE"
     text_candidate_count: int = 0
     visual_candidate_count: int = 0
+    visual_inspector_executed: bool = False
     topology_node_count: int = 0
     topology_edge_count: int = 0
+
+
+class StructuredSpatialRelation(BaseModel):
+    subject: str  # e.g. "FV-302"
+    relation_type: str  # e.g. "UPSTREAM_OF", "DOWNSTREAM_OF", "FEEDS_INTO"
+    object: str  # e.g. "R-301"
+    supporting_evidence_id: str  # e.g. "E4"
+    source_id: Optional[int] = None
+    filename: str = ""
+    processing_version: str = "v1"
+    locator: str = ""
+    inspection_status: str = "SUCCESS"
+    tag_corroboration: bool = False
+
+
+class ConfirmedObservationItem(BaseModel):
+    claim_id: Optional[str] = None
+    text: str
+    supporting_evidence_ids: List[str] = Field(default_factory=list)
+
+
+class StructuredRCAResult(BaseModel):
+    status: str
+    primary_cause_code: str
+    primary_cause_text: str = ""
+    primary_cause_supporting_evidence_ids: List[str] = Field(default_factory=list)
+    confirmed_observations: List[ConfirmedObservationItem] = Field(default_factory=list)
+    spatial_relations: List[StructuredSpatialRelation] = Field(default_factory=list)
+    evidence_items: List[Dict[str, Any]] = Field(default_factory=list)
+    channel_health: Optional[ChannelExecutionHealth] = None
+    contradictions: List[str] = Field(default_factory=list)
+    additional_evidence_needed: List[str] = Field(default_factory=list)
+    sources: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class RCAEvidenceItem(BaseModel):

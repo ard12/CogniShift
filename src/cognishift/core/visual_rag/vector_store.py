@@ -182,9 +182,6 @@ class LocalMultiVectorStore(VisualVectorStore):
         Executes late-interaction MaxSim query scoped strictly to workspace_id.
         Applies version_map filtering to enforce active processing versions.
         """
-        if allowed_source_ids is not None and len(allowed_source_ids) == 0:
-            return []
-
         async with get_db() as db:
             query_sql = """
                 SELECT workspace_id, source_id, processing_version, page_number,
@@ -194,7 +191,7 @@ class LocalMultiVectorStore(VisualVectorStore):
             """
             params: list = [workspace_id]
 
-            if allowed_source_ids is not None:
+            if allowed_source_ids:
                 placeholders = ",".join("?" for _ in allowed_source_ids)
                 query_sql += f" AND source_id IN ({placeholders})"
                 params.extend([int(sid) for sid in allowed_source_ids])

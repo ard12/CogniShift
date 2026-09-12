@@ -24,7 +24,7 @@ from cognishift.core.retrieval.text_retriever import TextRetriever
 from cognishift.core.retrieval.visual_retriever import VisualRetriever
 from cognishift.core.retrieval.evidence_fusion import EvidenceFusion
 from cognishift.core.graph_memory import query_graph_context
-from cognishift.core.retrieval.visual_inspector import VisualEvidenceInspector, get_visual_inspector
+from cognishift.core.retrieval.visual_inspector import VisualEvidenceInspector, get_visual_inspector, VisualInspectionStatus
 from cognishift.core.visual_rag.embedding_provider import get_visual_embedding_provider
 
 logger = logging.getLogger(__name__)
@@ -152,9 +152,13 @@ class RCAEvidenceAcquirer:
         optional_roles = contract["optional_roles"]
 
         channel_health = ChannelExecutionHealth(
+            enabled_channels=["text"],
+            attempted_channels=["text"],
+            successful_channels=[],
+            contributing_channels=[],
+            failed_channels=[],
             requested_channels=["text", "visual", "topology"],
-            executed_channels=[],
-            failed_channels=[]
+            executed_channels=[]
         )
 
         modality_coverage: Dict[str, bool] = {
@@ -169,6 +173,13 @@ class RCAEvidenceAcquirer:
 
         use_visual = enable_visual if enable_visual is not None else getattr(settings, "colpali_enabled", True)
         use_topology = enable_topology if enable_topology is not None else True
+
+        if use_visual:
+            channel_health.enabled_channels.append("visual")
+            channel_health.attempted_channels.append("visual")
+        if use_topology:
+            channel_health.enabled_channels.append("topology")
+            channel_health.attempted_channels.append("topology")
 
         async def _run_acquisition(conn: Any) -> RCAEvidenceBundle:
             nonlocal e_counter
@@ -242,6 +253,7 @@ class RCAEvidenceAcquirer:
                 )
                 stage_latencies_ms["text_search_ms"] = round((time.perf_counter() - t_text_0) * 1000.0, 2)
                 channel_health.executed_channels.append("text")
+                channel_health.successful_channels.append("text")
                 channel_health.text_status = "ACTIVE"
                 channel_health.text_candidate_count = len(text_ranked) if text_ranked else 0
                 if text_ranked:
@@ -286,24 +298,33 @@ class RCAEvidenceAcquirer:
                             raw_score = float(tr.get("score", 0.5))
                             calc_conf = max(0.0, min(1.0, raw_score))
 
-                        # Build native locator for text evidence
+                        # Build native locator for text evidence without manufactured fallbacks
                         if filename.endswith((".xlsx", ".xlsm")):
                             loc = EvidenceLocator(
                                 kind="spreadsheet",
                                 document_type="xlsx",
                                 filename=filename,
-                                sheet_name=meta_item.get("sheet_name", "Bearing Telemetry"),
-                                row_start=meta_item.get("row_start", 120),
-                                row_end=meta_item.get("row_end", 145),
-                                col_start=meta_item.get("col_start", "A"),
-                                col_end=meta_item.get("col_end", "H")
+                                sheet_name=meta_item.get("sheet_name"),
+                                row_start=meta_item.get("row_start"),
+                                row_end=meta_item.get("row_end"),
+                                col_start=meta_item.get("col_start"),
+                                col_end=meta_item.get("col_end")
+                            )
+                        elif filename.endswith(".csv"):
+                            loc = EvidenceLocator(
+                                kind="row_range",
+                                document_type="csv",
+                                filename=filename,
+                                sheet_name=meta_item.get("sheet_name"),
+                                row_start=meta_item.get("row_start"),
+                                row_end=meta_item.get("row_end")
                             )
                         elif filename.endswith(".docx"):
                             loc = EvidenceLocator(
                                 kind="document_section",
                                 document_type="docx",
                                 filename=filename,
-                                section_heading=meta_item.get("section_heading", "Operating Procedures"),
+                                section_heading=meta_item.get("section_heading"),
                                 page_number=int(page_num) if page_num else 1
                             )
                         else:
@@ -332,6 +353,8 @@ class RCAEvidenceAcquirer:
                             )
                         )
                         e_counter += 1
+                        if "text" not in channel_health.contributing_channels:
+                            channel_health.contributing_channels.append("text")
             except Exception as te:
                 logger.error(f"Text retrieval failed in RCA acquisition: {te}")
                 channel_health.failed_channels.append("text")
@@ -364,15 +387,16 @@ class RCAEvidenceAcquirer:
 
                     if is_avail:
                         channel_health.executed_channels.append("visual")
+                        channel_health.successful_channels.append("visual")
                         channel_health.visual_status = "ACTIVE"
                         channel_health.visual_model = getattr(prov, "model_name", "Qdrant/colmodernvbert") if prov else "Custom/Simulated"
                         channel_health.visual_device = getattr(prov, "device", getattr(settings, "colpali_device", "cuda")) if prov else "cuda"
                     else:
                         channel_health.visual_status = "DISABLED"
+                        channel_health.failed_channels.append("visual")
                         channel_health.degradation_reason = "Visual provider unavailable"
 
                     if vis_results:
-                        modality_coverage["visual"] = True
                         for vr in vis_results:
                             v_role = EvidenceRole.P_AND_ID if any(k in vr.filename.lower() for k in ["p&id", "pid", "schematic", "drawing"]) else EvidenceRole.INSPECTION
 
@@ -390,44 +414,112 @@ class RCAEvidenceAcquirer:
                                 )
                                 if insp_res:
                                     stage_latencies_ms["visual_vlm_ms"] = round(stage_latencies_ms.get("visual_vlm_ms", 0.0) + insp_res.inspection_latency_ms, 2)
+                                    channel_health.visual_inspector_executed = True
                             except Exception as ie:
                                 logger.warning(f"Visual inspection failed on {vr.filename} page {vr.page_number}: {ie}")
 
-                            obs_text = insp_res.vlm_observation if (insp_res and insp_res.vlm_observation) else f"Visual page match ({vr.filename} Page {vr.page_number}) with MaxSim relevance score {vr.score:.2f}."
-                            extracted_eq = list(dict.fromkeys(assets + (insp_res.equipment_tags if insp_res else [])))
+                            # ONLY promote candidate to RCAEvidenceItem if visual inspection was a SUCCESS and valid observation was produced
+                            if insp_res and insp_res.inspection_status == VisualInspectionStatus.SUCCESS and insp_res.vlm_succeeded and insp_res.observation_valid:
+                                obs_text = insp_res.vlm_observation
+                                extracted_eq = list(dict.fromkeys(assets + insp_res.equipment_tags))
 
-                            # Create dedicated visual evidence item
-                            vis_loc = EvidenceLocator(
-                                kind="page",
-                                document_type="pdf" if vr.filename.endswith(".pdf") else ("xlsx" if vr.filename.endswith((".xlsx", ".xlsm")) else "image"),
-                                filename=vr.filename,
-                                page_number=vr.page_number
-                            )
-                            evidence_items.append(
-                                RCAEvidenceItem(
-                                    evidence_id=f"E{e_counter}",
-                                    source_type="image",
-                                    workspace_id=workspace_id,
-                                    source_id=vr.source_id,
+                                vis_loc = EvidenceLocator(
+                                    kind="page",
+                                    document_type="pdf" if vr.filename.endswith(".pdf") else ("xlsx" if vr.filename.endswith((".xlsx", ".xlsm")) else "image"),
                                     filename=vr.filename,
-                                    page_number=vr.page_number,
-                                    processing_version=vr.processing_version,
-                                    retrieval_channel="visual",
-                                    evidence_role=v_role,
-                                    content=obs_text,
-                                    confidence=min(1.0, max(0.0, float(vr.score) / 10.0)),
-                                    corroborated=bool(insp_res.ocr_corroborated) if (insp_res and insp_res.ocr_corroborated is not None) else False,
-                                    locator=vis_loc,
-                                    equipment_ids=extracted_eq,
-                                    metadata={
-                                        "visual_score": float(vr.score),
-                                        "corroborated_tags": insp_res.equipment_tags if insp_res else [],
-                                        "vlm_model": insp_res.vlm_model if insp_res else "",
-                                        "inspection_latency_ms": insp_res.inspection_latency_ms if insp_res else 0.0
-                                    }
+                                    page_number=vr.page_number
                                 )
-                            )
-                            e_counter += 1
+                                evidence_items.append(
+                                    RCAEvidenceItem(
+                                        evidence_id=f"E{e_counter}",
+                                        source_type="image",
+                                        workspace_id=workspace_id,
+                                        source_id=vr.source_id,
+                                        filename=vr.filename,
+                                        page_number=vr.page_number,
+                                        processing_version=vr.processing_version,
+                                        retrieval_channel="visual",
+                                        evidence_role=v_role,
+                                        content=obs_text,
+                                        confidence=min(1.0, max(0.0, float(vr.score) / 10.0)),
+                                        corroborated=bool(insp_res.ocr_corroborated) if (insp_res.ocr_corroborated is not None) else bool(insp_res.tag_corroboration),
+                                        locator=vis_loc,
+                                        equipment_ids=extracted_eq,
+                                        metadata={
+                                            "visual_score": float(vr.score),
+                                            "corroborated_tags": insp_res.equipment_tags,
+                                            "vlm_model": insp_res.vlm_model,
+                                            "inspection_latency_ms": insp_res.inspection_latency_ms,
+                                            "inspection_status": insp_res.inspection_status.value
+                                        }
+                                    )
+                                )
+                                e_counter += 1
+                                modality_coverage["visual"] = True
+                                if "visual" not in channel_health.contributing_channels:
+                                    channel_health.contributing_channels.append("visual")
+                            else:
+                                logger.info(f"Visual candidate {vr.filename} page {vr.page_number} excluded: status {getattr(insp_res, 'inspection_status', 'FAILED')}")
+
+                    # Role-aware acquisition guarantee: If P&ID role is requested, also check any P&ID drawings in workspace
+                    if (EvidenceRole.P_AND_ID in required_roles or "p_and_id" in explicit_sources):
+                        already_have_pid = any(item.evidence_role == EvidenceRole.P_AND_ID and item.retrieval_channel == "visual" for item in evidence_items)
+                        if not already_have_pid:
+                            pid_query = """SELECT id, name, original_filename FROM knowledge_sources 
+                                           WHERE workspace_id = ? AND processing_status = 'completed'
+                                             AND (LOWER(name) LIKE '%p&id%' OR LOWER(original_filename) LIKE '%p&id%' OR LOWER(name) LIKE '%pid%' OR LOWER(original_filename) LIKE '%pid%')"""
+                            cursor_pid = await conn.execute(pid_query, (workspace_id,))
+                            pid_rows = await cursor_pid.fetchall()
+                            for prow in pid_rows:
+                                if allowed_source_ids and prow["id"] not in allowed_source_ids:
+                                    continue
+                                pid_fn = prow["original_filename"] or prow["name"]
+                                try:
+                                    insp_pid = await self.inspector.inspect_page(
+                                        workspace_id=workspace_id,
+                                        source_id=prow["id"],
+                                        page_number=1,
+                                        filename=pid_fn,
+                                        visual_score=25.0,
+                                        query=query
+                                    )
+                                    if insp_pid:
+                                        channel_health.visual_inspector_executed = True
+                                        channel_health.visual_candidate_count = max(channel_health.visual_candidate_count, 1)
+                                    if insp_pid and insp_pid.inspection_status == VisualInspectionStatus.SUCCESS and insp_pid.vlm_succeeded and insp_pid.observation_valid:
+                                        vis_loc = EvidenceLocator(kind="page", document_type="pdf", filename=pid_fn, page_number=1)
+                                        evidence_items.append(
+                                            RCAEvidenceItem(
+                                                evidence_id=f"E{e_counter}",
+                                                source_type="image",
+                                                workspace_id=workspace_id,
+                                                source_id=prow["id"],
+                                                filename=pid_fn,
+                                                page_number=1,
+                                                processing_version="v1",
+                                                retrieval_channel="visual",
+                                                evidence_role=EvidenceRole.P_AND_ID,
+                                                content=insp_pid.vlm_observation,
+                                                confidence=0.9,
+                                                corroborated=bool(insp_pid.ocr_corroborated) if (insp_pid.ocr_corroborated is not None) else bool(insp_pid.tag_corroboration),
+                                                locator=vis_loc,
+                                                equipment_ids=list(dict.fromkeys(assets + insp_pid.equipment_tags)),
+                                                metadata={
+                                                    "visual_score": 25.0,
+                                                    "corroborated_tags": insp_pid.equipment_tags,
+                                                    "vlm_model": insp_pid.vlm_model,
+                                                    "inspection_latency_ms": insp_pid.inspection_latency_ms,
+                                                    "inspection_status": insp_pid.inspection_status.value
+                                                }
+                                            )
+                                        )
+                                        e_counter += 1
+                                        modality_coverage["visual"] = True
+                                        if "visual" not in channel_health.contributing_channels:
+                                            channel_health.contributing_channels.append("visual")
+                                        break
+                                except Exception as e_pid:
+                                    logger.warning(f"Failed fallback P&ID visual inspection: {e_pid}")
                 except Exception as ve:
                     logger.warning(f"Visual retrieval failed in RCA acquisition: {ve}")
                     channel_health.failed_channels.append("visual")
@@ -455,6 +547,7 @@ class RCAEvidenceAcquirer:
 
                     if topo_ctx and topo_ctx.strip():
                         channel_health.executed_channels.append("topology")
+                        channel_health.successful_channels.append("topology")
                         channel_health.topology_status = "ACTIVE"
                         modality_coverage["topology"] = True
                         evidence_items.append(
@@ -473,6 +566,8 @@ class RCAEvidenceAcquirer:
                             )
                         )
                         e_counter += 1
+                        if "topology" not in channel_health.contributing_channels:
+                            channel_health.contributing_channels.append("topology")
                     else:
                         channel_health.topology_status = "EMPTY"
                 except Exception as ge:

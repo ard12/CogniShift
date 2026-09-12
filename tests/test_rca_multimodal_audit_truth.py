@@ -24,7 +24,7 @@ from cognishift.core.rca.schemas import (
     RCAEvidenceBundle,
     ChannelExecutionHealth,
 )
-from cognishift.core.rca.benchmark_metrics import (
+from cognishift.evaluation.rca_metrics import (
     calculate_decomposed_citation_metrics,
     calculate_decomposed_source_coverage,
     calculate_decomposed_pca,

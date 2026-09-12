@@ -1,12 +1,16 @@
 """
 Dedicated RCA Benchmark Evaluation & Decomposed Metrics Subsystem.
-Strictly separated from production RCA policy (cognishift.core.rca.policy).
-Provides scientifically defensible scoring, locator/source/claim citation decomposition,
-source coverage decomposition, physical vs safety-state accuracy, and 3-condition ablation auditing.
+Strictly separated from production RCA runtime and policy code.
+Provides scientifically defensible scoring:
+- Decomposed citation metrics (source validity, locator precision, claim binding)
+- Decomposed source coverage (availability vs requirement accounting completeness)
+- Decomposed PCA (physical failure accuracy vs safety/terminal state accuracy)
+- Strict False Cause Rate (FCR)
+- True 3-condition ablation verification with dynamic evidence ID binding
 """
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Set, Tuple
+from typing import List, Dict, Any, Optional, Set
 from pydantic import BaseModel, Field
 
 from cognishift.core.rca.schemas import (
@@ -23,10 +27,10 @@ class CitationMetrics(BaseModel):
     valid_source_citations: int = 0
     valid_locator_citations: int = 0
     claim_bound_citations: int = 0
-    source_accuracy: float = 1.0
-    locator_accuracy: float = 1.0
-    claim_binding_accuracy: float = 1.0
-    aggregate_accuracy: float = 1.0
+    source_accuracy: Optional[float] = None
+    locator_accuracy: Optional[float] = None
+    claim_binding_accuracy: Optional[float] = None
+    aggregate_accuracy: Optional[float] = None
     invalid_citations: List[Dict[str, Any]] = Field(default_factory=list)
 
 
@@ -55,49 +59,55 @@ def calculate_decomposed_citation_metrics(
     result_text: str,
     bundle: Optional[RCAEvidenceBundle] = None,
     valid_filenames: Optional[Set[str]] = None,
-    is_ood: bool = False
+    is_ood: bool = False,
 ) -> CitationMetrics:
     """
-    Decomposes citation accuracy into three independent metrics:
-    1. Source Accuracy: Correct file/source present in workspace vault.
-    2. Locator Accuracy: Native coordinates (page, sheet/rows/cols, section) valid and format-aware.
-    3. Claim Binding Accuracy: Cited source/E-ID legitimately binds to an observation or claim.
+    Decomposes citation accuracy into three independent dimensions:
+    1. Source Accuracy: File name recognized in the workspace knowledge vault.
+    2. Locator Accuracy: Native coordinates (page, sheet/rows/cols, section) format-valid.
+    3. Claim Binding Accuracy: Cited source binds legitimately to an authoritative evidence item.
+
+    Truth Rule: If total_citations == 0 (e.g. OOD abstention or missing evidence),
+    accuracy is None (N/A) rather than 1.0 or 0.0, and must be excluded from aggregate
+    benchmark citation denominators.
     """
     clean_text = result_text or ""
     valid_names = {f.lower().strip() for f in (valid_filenames or set())}
 
     citation_regex = re.compile(
         r"\[([A-Za-z0-9_\-\.\s]+\.(?:pdf|png|csv|xlsx|docx|jpg|jpeg)\s*\|[^\|\]]+(?:\|[^\|\]]+)*)\]",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     matches = citation_regex.findall(clean_text)
 
     plain_regex = re.compile(
         r"\[([A-Za-z0-9_\-\.\s]+\.(?:pdf|png|csv|xlsx|docx|jpg|jpeg))\]",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     plain_matches = plain_regex.findall(clean_text)
 
     all_citations = matches + plain_matches
-    if is_ood or not all_citations:
+
+    if not all_citations:
         return CitationMetrics(
-            total_citations=len(all_citations),
-            valid_source_citations=len(all_citations),
-            valid_locator_citations=len(all_citations),
-            claim_bound_citations=len(all_citations),
-            source_accuracy=1.0,
-            locator_accuracy=1.0,
-            claim_binding_accuracy=1.0,
-            aggregate_accuracy=1.0
+            total_citations=0,
+            valid_source_citations=0,
+            valid_locator_citations=0,
+            claim_bound_citations=0,
+            source_accuracy=None,
+            locator_accuracy=None,
+            claim_binding_accuracy=None,
+            aggregate_accuracy=None,
+            invalid_citations=[],
         )
 
     valid_source_count = 0
     valid_locator_count = 0
     claim_bound_count = 0
-    invalid_details = []
+    invalid_details: List[Dict[str, Any]] = []
 
-    bundle_files = set()
-    bundle_eids = set()
+    bundle_files: Set[str] = set()
+    bundle_eids: Set[str] = set()
     if bundle:
         for item in bundle.evidence_items:
             bundle_files.add(Path(item.filename).name.lower())
@@ -106,7 +116,7 @@ def calculate_decomposed_citation_metrics(
     for cit in all_citations:
         parts = [p.strip() for p in cit.split("|")]
         fname = Path(parts[0]).name.lower()
-        
+
         # 1. Source Accuracy check
         is_src_valid = (fname in valid_names and "document.pdf" not in fname) if valid_names else True
         if is_src_valid:
@@ -114,7 +124,7 @@ def calculate_decomposed_citation_metrics(
         else:
             invalid_details.append({
                 "citation": cit,
-                "reason": f"Filename '{fname}' not recognized in workspace vault or generic fallback."
+                "reason": f"Filename '{fname}' not recognized in workspace vault or generic fallback.",
             })
 
         # 2. Locator Accuracy check
@@ -127,7 +137,7 @@ def calculate_decomposed_citation_metrics(
                 else:
                     invalid_details.append({
                         "citation": cit,
-                        "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+                        "reason": "Spreadsheet citation missing native sheet/row/col coordinates.",
                     })
             elif fname.endswith(".docx"):
                 if "section" in coord or "page" in coord:
@@ -135,7 +145,7 @@ def calculate_decomposed_citation_metrics(
                 else:
                     invalid_details.append({
                         "citation": cit,
-                        "reason": "Word document citation missing section or page coordinates."
+                        "reason": "Word document citation missing section or page coordinates.",
                     })
             elif fname.endswith(".pdf"):
                 if "page" in coord:
@@ -143,7 +153,15 @@ def calculate_decomposed_citation_metrics(
                 else:
                     invalid_details.append({
                         "citation": cit,
-                        "reason": "PDF citation missing page coordinates."
+                        "reason": "PDF citation missing page coordinates.",
+                    })
+            elif fname.endswith(".csv"):
+                if "rows" in coord or "row" in coord or "lines" in coord:
+                    is_loc_valid = True
+                else:
+                    invalid_details.append({
+                        "citation": cit,
+                        "reason": "CSV citation missing row-range coordinates.",
                     })
             else:
                 is_loc_valid = True
@@ -151,7 +169,7 @@ def calculate_decomposed_citation_metrics(
             is_loc_valid = False
             invalid_details.append({
                 "citation": cit,
-                "reason": "Citation lacks coordinate locator."
+                "reason": "Citation lacks coordinate locator.",
             })
 
         if is_loc_valid:
@@ -163,13 +181,13 @@ def calculate_decomposed_citation_metrics(
         else:
             invalid_details.append({
                 "citation": cit,
-                "reason": f"File '{fname}' cited but was not bound in authoritative evidence bundle."
+                "reason": f"File '{fname}' cited but was not bound in authoritative evidence bundle.",
             })
 
     total = len(all_citations)
-    src_acc = valid_source_count / total if total > 0 else 1.0
-    loc_acc = valid_locator_count / total if total > 0 else 1.0
-    bnd_acc = claim_bound_count / total if total > 0 else 1.0
+    src_acc = valid_source_count / total if total > 0 else 0.0
+    loc_acc = valid_locator_count / total if total > 0 else 0.0
+    bnd_acc = claim_bound_count / total if total > 0 else 0.0
     agg_acc = (src_acc + loc_acc + bnd_acc) / 3.0
 
     return CitationMetrics(
@@ -181,14 +199,14 @@ def calculate_decomposed_citation_metrics(
         locator_accuracy=round(loc_acc, 4),
         claim_binding_accuracy=round(bnd_acc, 4),
         aggregate_accuracy=round(agg_acc, 4),
-        invalid_citations=invalid_details
+        invalid_citations=invalid_details,
     )
 
 
 def calculate_decomposed_source_coverage(
     required_roles: List[EvidenceRole],
     found_roles: List[EvidenceRole],
-    missing_roles: List[EvidenceRole]
+    missing_roles: List[EvidenceRole],
 ) -> SourceCoverageMetrics:
     """
     Decomposes source coverage:
@@ -204,7 +222,7 @@ def calculate_decomposed_source_coverage(
         return SourceCoverageMetrics(
             total_required_roles=0,
             requested_evidence_availability=1.0,
-            requirement_accounting_completeness=1.0
+            requirement_accounting_completeness=1.0,
         )
 
     fnd_roles = [r for r in req_set if r in fnd_set]
@@ -228,7 +246,7 @@ def calculate_decomposed_source_coverage(
         missing_roles=mis_roles,
         requested_evidence_availability=round(avail, 4),
         requirement_accounting_completeness=round(comp, 4),
-        roles_accounting=accounting
+        roles_accounting=accounting,
     )
 
 
@@ -239,7 +257,7 @@ def calculate_decomposed_pca(scenarios_results: List[Dict[str, Any]]) -> PCAMetr
     Safety terminal cases: scenarios expecting safety terminal states (RCA-03, 04, 07).
     """
     safety_scenarios = {"RCA-03", "RCA-04", "RCA-07"}
-    
+
     phys_total = 0
     phys_corr = 0
     safe_total = 0
@@ -249,7 +267,7 @@ def calculate_decomposed_pca(scenarios_results: List[Dict[str, Any]]) -> PCAMetr
         sc_id = s.get("scenario_id", "")
         pca = s.get("primary_cause_accuracy", 0.0)
         is_corr = (pca >= 0.99)
-        
+
         if sc_id in safety_scenarios or s.get("is_ood"):
             safe_total += 1
             if is_corr:
@@ -274,7 +292,7 @@ def calculate_decomposed_pca(scenarios_results: List[Dict[str, Any]]) -> PCAMetr
         safety_terminal_accuracy=round(safe_acc, 4),
         unioned_total=union_total,
         unioned_correct=union_corr,
-        unioned_accuracy=round(union_acc, 4)
+        unioned_accuracy=round(union_acc, 4),
     )
 
 
@@ -282,7 +300,7 @@ def calculate_false_cause_rate(
     matched_status: str,
     extracted_cause_code: str,
     expected_cause_code: str,
-    csp: float = 1.0
+    csp: float = 1.0,
 ) -> float:
     """
     Strict False Cause Rate evaluation.
@@ -311,13 +329,18 @@ def calculate_false_cause_rate(
 def evaluate_rca_06_ablation(
     res_a: Dict[str, Any],
     res_b: Dict[str, Any],
-    res_c: Dict[str, Any]
+    res_c: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Evaluates the 3-Condition Ablation Study for RCA-06:
     Condition A: Text Only (visual/topology disabled, spatial relation unsupported).
     Condition B: Text + Topology (visual disabled, topology free of spatial leak, spatial relation unsupported).
     Condition C: Full Multimodal (visual active, candidate_count > 0, visual E-ID in pack, primary cause references visual E-ID).
+
+    Authoritative dynamically bound verification:
+    Does NOT require a hardcoded literal "E4".
+    Dynamically inspects the visual P&ID evidence item's real runtime ID and verifies
+    it is referenced in primary cause supporting evidence IDs.
     """
     ch_a = res_a.get("channel_health", {})
     exec_a = ch_a.get("executed_channels", [])
@@ -332,9 +355,29 @@ def evaluate_rca_06_ablation(
     exec_c = ch_c.get("executed_channels", [])
     vis_in_c = "visual" in exec_c
     vis_cand_count = ch_c.get("visual_candidate_count", 0)
-    visual_e_id_present = res_c.get("visual_evidence_id_present", False)
+
+    # Resolve dynamic visual evidence ID if structured result is provided
+    struct_c = res_c.get("rca_result_structured") or res_c.get("structured_result") or {}
+    visual_e_id = res_c.get("visual_evidence_id")
+    if not visual_e_id and struct_c:
+        # Check evidence items or evidence pack in structured result
+        for item in (struct_c.get("evidence_items") or struct_c.get("evidence_pack") or []):
+            if item.get("retrieval_channel") == "visual" or item.get("evidence_role") in ("P_AND_ID", "p_and_id") or item.get("role") in ("P_AND_ID", "p_and_id"):
+                visual_e_id = item.get("evidence_id")
+                break
+
+    visual_e_id_present = res_c.get("visual_evidence_id_present", bool(visual_e_id))
+
     cause_references_visual = res_c.get("primary_cause_references_visual_eid", False)
+    if not cause_references_visual and struct_c and visual_e_id:
+        supporting_ids = struct_c.get("primary_cause_supporting_evidence_ids", [])
+        if visual_e_id in supporting_ids:
+            cause_references_visual = True
+
     inspector_executed = res_c.get("visual_inspector_executed", False)
+    if not inspector_executed and ch_c.get("visual_inspector_executed"):
+        inspector_executed = True
+
     visual_model = ch_c.get("visual_model")
     visual_device = ch_c.get("visual_device")
 
@@ -373,7 +416,7 @@ def evaluate_rca_06_ablation(
             "visual_candidate_count": vis_cand_count,
             "visual_model": visual_model,
             "visual_device": visual_device,
-            "visual_evidence_id": res_c.get("visual_evidence_id"),
+            "visual_evidence_id": visual_e_id,
             "visual_inspector_executed": inspector_executed,
             "primary_cause_references_visual_eid": cause_references_visual,
             "spatial_relation_supported": res_c.get("spatial_relation_supported", True),
@@ -381,5 +424,5 @@ def evaluate_rca_06_ablation(
             "status": res_c.get("matched_rca_status"),
         },
         "ablation_verified": is_valid_ablation,
-        "verification_verdict": "VERIFIED" if is_valid_ablation else "INVALID — ABLATION CONDITIONS NOT SATISFIED"
+        "verification_verdict": "VERIFIED" if is_valid_ablation else "INVALID — ABLATION CONDITIONS NOT SATISFIED",
     }

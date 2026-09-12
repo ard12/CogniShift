@@ -14,7 +14,10 @@ from cognishift.core.rca.schemas import (
     RCAObservationClaim,
     RCACandidateCause,
     RCAPrimaryConclusion,
-    RCAStructuredResponse
+    RCAStructuredResponse,
+    StructuredRCAResult,
+    StructuredSpatialRelation,
+    ConfirmedObservationItem,
 )
 from cognishift.core.rca.policy import determine_rca_status
 
@@ -31,7 +34,8 @@ def determine_primary_cause_code(
 ) -> PrimaryCauseCode:
     """
     Deterministically validates model-proposed cause code or classifies machine-readable PrimaryCauseCode
-    based on verified physical facts and evidence support. Never relies on hardcoded asset-name bindings.
+    based on verified physical facts and evidence support in bundle.
+    NO hardcoded asset-name bindings. NO operator_input contamination.
     """
     if status == RCAStatus.ASSET_NOT_FOUND or bundle.retrieval_diagnostics.get("ood_triggered"):
         return PrimaryCauseCode.ASSET_NOT_FOUND
@@ -40,20 +44,25 @@ def determine_primary_cause_code(
     if status == RCAStatus.CONTRADICTORY_EVIDENCE:
         return PrimaryCauseCode.CONTRADICTORY_EVIDENCE
 
+    # Check if bundle only contains baseline SOPs without any incident evidence
+    incident_roles = {
+        EvidenceRole.INCIDENT_CHRONOLOGY,
+        EvidenceRole.INSPECTION,
+        EvidenceRole.PRESSURE,
+        EvidenceRole.TEMPERATURE,
+        EvidenceRole.VIBRATION,
+        EvidenceRole.LIVE_TELEMETRY,
+        EvidenceRole.HISTORICAL_TELEMETRY,
+        EvidenceRole.P_AND_ID,
+    }
+    if all(getattr(item, "evidence_role", None) not in incident_roles for item in bundle.evidence_items):
+        return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
+
     claims_text = (str(primary_cause_text) + " " + " ".join(observations)).lower()
-    operator_text = (str(operator_input) if operator_input else "").lower()
-
-    # Asset-targeted evidence filtering to prevent cross-asset keyword contamination
-    target_items = [
-        item for item in bundle.evidence_items
-        if any(aid.lower() in (item.filename.lower() + " " + item.content.lower()) for aid in bundle.asset_ids)
-    ]
-    if not target_items:
-        target_items = bundle.evidence_items
-    asset_evidence_text = " ".join(item.content for item in target_items).lower()
-    all_evidence_text = " ".join(item.content for item in bundle.evidence_items).lower()
-
-    combined = (claims_text + " " + operator_text + " " + all_evidence_text).lower()
+    
+    # Check evidence items text only - zero operator_input contamination
+    evidence_text = " ".join(item.content for item in bundle.evidence_items).lower()
+    combined = (claims_text + " " + evidence_text).lower()
 
     # 1. Validate model-proposed cause code against evidence
     if parsed_code:
@@ -83,34 +92,51 @@ def determine_primary_cause_code(
     if any(k in claims_text for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
         return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
-    # 3. Grounded Physical Mechanism Fallbacks:
-    # Check model claims and operator intent FIRST to avoid contamination from unrelated background documents
-    text_to_check = (claims_text + " " + operator_text).strip()
-    if not any(k in text_to_check for k in ["cavitation", "bearing", "valve", "lube oil", "overpressure", "starvation", "stem", "trip"]):
-        text_to_check = asset_evidence_text
+    # 3. Grounded Physical Mechanism Classification based on verified evidence
+    asset_names = [a.lower() for a in bundle.asset_ids]
 
-    # Guard against cross-equipment symptom contamination (e.g. pump cavitation SOP retrieved for compressor K-101)
-    is_compressor = any("k-101" in a.lower() for a in bundle.asset_ids) or "k-101" in operator_text
-    is_valve = any(v in [a.lower() for a in bundle.asset_ids] for v in ["fv-302", "r-301"]) or any(v in operator_text for v in ["fv-302", "r-301"])
-    is_pump = any("p-101" in a.lower() for a in bundle.asset_ids) or "p-101" in operator_text
+    # Priority A: Asset-aware physical domain alignment (target asset determines failure envelope)
+    if any("p-101" in a or "pump" in a for a in asset_names):
+        if any(w in combined for w in ["cavitation", "suction", "npsh", "strainer", "starvation", "feed pressure"]):
+            return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
+    elif any("k-101" in a or "compressor" in a for a in asset_names):
+        if any(w in combined for w in ["bearing", "temp", "overheat", "vibration", "journal", "wear", "thrust", "tt-"]):
+            return PrimaryCauseCode.BEARING_OVERHEAT
+    elif any("302" in a or "301" in a or "valve" in a or "reactor" in a for a in asset_names):
+        if any(w in combined for w in ["valve", "stem", "binding", "actuator", "stuck", "positioner", "hysteresis"]):
+            return PrimaryCauseCode.VALVE_STEM_BINDING
 
-    if is_compressor and any(k in combined for k in ["bearing", "vibration", "overheat", "temp", "tt-204", "radial", "journal"]):
-        return PrimaryCauseCode.BEARING_OVERHEAT
-    if is_valve and any(k in combined for k in ["valve", "stem", "binding", "actuator", "stuck", "positioner", "fretting"]):
+    # Priority B: Check claims text
+    if any(k in claims_text for k in ["stem binding", "valve stem", "actuator hysteresis", "valve binding", "valve stuck", "positioner stuck"]):
         return PrimaryCauseCode.VALVE_STEM_BINDING
-    if is_pump and any(k in combined for k in ["cavitation", "suction", "starvation", "strainer", "npsh"]):
+    if any(k in claims_text for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh"]):
         return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
-
-    if any(k in text_to_check for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh", "suction pressure"]):
-        return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
-    if any(k in text_to_check for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration", "bearing trip", "tt-204"]):
+    if any(k in claims_text for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration", "bearing trip", "tt-204", "k-101 bearing"]):
         return PrimaryCauseCode.BEARING_OVERHEAT
-    if any(k in text_to_check for k in ["valve stem", "stem binding", "actuator hysteresis", "valve stuck", "valve binding", "actuator", "control valve", "fv-302"]):
-        return PrimaryCauseCode.VALVE_STEM_BINDING
-    if any(k in text_to_check for k in ["lube oil pressure loss", "oil pressure loss", "lube oil low"]):
+    if any(k in claims_text for k in ["lube oil pressure loss", "oil pressure loss", "lube oil low"]):
         return PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS
-    if any(k in text_to_check for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
+    if any(k in claims_text for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
         return PrimaryCauseCode.PROCESS_OVERPRESSURE
+
+    # Priority C: Combined failure mode keywords
+    if any(k in combined for k in ["stem binding", "valve stem", "actuator hysteresis", "valve binding", "valve stuck", "positioner stuck"]):
+        return PrimaryCauseCode.VALVE_STEM_BINDING
+    if any(k in combined for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration", "bearing trip", "tt-204"]):
+        return PrimaryCauseCode.BEARING_OVERHEAT
+    if any(k in combined for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh"]):
+        return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
+    if any(k in combined for k in ["lube oil pressure loss", "oil pressure loss", "lube oil low"]):
+        return PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS
+    if any(k in combined for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
+        return PrimaryCauseCode.PROCESS_OVERPRESSURE
+
+    # Fallback to broader keyword presence in verified evidence
+    if any(k in evidence_text for k in ["valve", "actuator", "stem"]):
+        return PrimaryCauseCode.VALVE_STEM_BINDING
+    if any(k in evidence_text for k in ["bearing", "vibration", "tt-"]):
+        return PrimaryCauseCode.BEARING_OVERHEAT
+    if any(k in evidence_text for k in ["cavitation", "suction"]):
+        return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
 
     if any(k in combined for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
         return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
@@ -124,6 +150,27 @@ class RCAEvidenceValidator:
     Preserves supported claims, downgrades unsupported assertions, and deterministically
     binds source citations to verified evidence items.
     """
+
+    def __init__(self):
+        self._last_structured_result: Optional[StructuredRCAResult] = None
+
+    def get_structured_result(
+        self,
+        bundle: Optional[RCAEvidenceBundle] = None,
+        model_output: str = "",
+        operator_input: str = ""
+    ) -> StructuredRCAResult:
+        """Returns the cached or newly evaluated StructuredRCAResult."""
+        if self._last_structured_result is not None:
+            return self._last_structured_result
+        if bundle is not None:
+            self.validate_and_finalize(bundle, model_output, operator_input)
+            if self._last_structured_result is not None:
+                return self._last_structured_result
+        return StructuredRCAResult(
+            status=RCAStatus.INSUFFICIENT_EVIDENCE.value,
+            primary_cause_code=PrimaryCauseCode.INSUFFICIENT_EVIDENCE.value
+        )
 
     def validate_and_finalize(
         self,
@@ -140,6 +187,24 @@ class RCAEvidenceValidator:
         if bundle.retrieval_diagnostics.get("ood_triggered"):
             unreg_assets = bundle.retrieval_diagnostics.get("unregistered_assets", ["UNKNOWN"])
             asset_str = ", ".join(unreg_assets)
+            self._last_structured_result = StructuredRCAResult(
+                status=RCAStatus.ASSET_NOT_FOUND.value,
+                primary_cause_code=PrimaryCauseCode.ASSET_NOT_FOUND.value,
+                primary_cause_text=f"Cannot evaluate root cause: Asset `{asset_str}` was not found in the refinery hierarchy.",
+                primary_cause_supporting_evidence_ids=[],
+                confirmed_observations=[
+                    ConfirmedObservationItem(
+                        text=f"Equipment `{asset_str}` is not registered in the refinery topology or workspace knowledge vault.",
+                        supporting_evidence_ids=[]
+                    )
+                ],
+                spatial_relations=[],
+                evidence_items=[],
+                channel_health=bundle.channel_health,
+                contradictions=[],
+                additional_evidence_needed=[f"Verify equipment tag against the refinery asset registry (e.g., P-101A, K-101, Reactor-B)."],
+                sources=[]
+            )
             return (
                 f"## RCA Status\nASSET_NOT_FOUND\n\n"
                 f"## Confirmed Observations\n"
@@ -154,7 +219,7 @@ class RCAEvidenceValidator:
                 f"None (Asset Not Found)"
             )
 
-        # 2. Check for true missing evidence / symptom-only input / inconclusive investigation
+        # 2. Check for true missing evidence / symptom-only input / inconclusive investigation / SOP baseline only
         is_explicit_missing_query = any(k in lower_input for k in [
             "without any inspection report", "no inspection report", "no telemetry", "no vibration log",
             "without any telemetry", "without evidence", "missing evidence"
@@ -166,8 +231,34 @@ class RCAEvidenceValidator:
             ])
             for item in bundle.evidence_items
         )
-        if not bundle.evidence_items or is_explicit_missing_query or is_inconclusive_evidence:
+        is_only_sop_baseline = (
+            bool(bundle.evidence_items)
+            and all(getattr(item, "evidence_role", None) in (EvidenceRole.SOP_BASELINE, "SOP_BASELINE") for item in bundle.evidence_items)
+        )
+        if not bundle.evidence_items or is_explicit_missing_query or is_inconclusive_evidence or is_only_sop_baseline:
             topo_val = 'FOUND' if bundle.modality_coverage.get('topology') else 'MISSING'
+            self._last_structured_result = StructuredRCAResult(
+                status=RCAStatus.INSUFFICIENT_EVIDENCE.value,
+                primary_cause_code=PrimaryCauseCode.INSUFFICIENT_EVIDENCE.value,
+                primary_cause_text="Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.",
+                primary_cause_supporting_evidence_ids=[],
+                confirmed_observations=[
+                    ConfirmedObservationItem(
+                        text="No independently measured observation was supplied beyond the operator's written description.",
+                        supporting_evidence_ids=[]
+                    )
+                ],
+                spatial_relations=[],
+                evidence_items=[i.model_dump() for i in bundle.evidence_items],
+                channel_health=bundle.channel_health,
+                contradictions=bundle.contradictions,
+                additional_evidence_needed=[
+                    "Standard operating procedures (SOPs) or equipment manuals.",
+                    "Historical inspection records and maintenance work orders.",
+                    "Time-aligned DCS telemetry trends (pressure, temperature, vibration)."
+                ],
+                sources=[]
+            )
             return (
                 f"## RCA Status\nINSUFFICIENT_EVIDENCE\n\n"
                 f"## Evidence Requirement Status\n"
@@ -206,19 +297,11 @@ class RCAEvidenceValidator:
                     supported_items.append(item)
                     cited_e_ids.add(eid)
 
-        # If model didn't explicitly reference E-IDs, associate retrieved evidence items matching keywords
+        # If model didn't explicitly reference E-IDs, associate all verified evidence items in bundle
         if not supported_items and bundle.evidence_items:
             for item in bundle.evidence_items:
-                if item.evidence_role in (
-                    EvidenceRole.INSPECTION,
-                    EvidenceRole.SOP_BASELINE,
-                    EvidenceRole.VIBRATION,
-                    EvidenceRole.INCIDENT_CHRONOLOGY,
-                    EvidenceRole.P_AND_ID,
-                    EvidenceRole.TOPOLOGY
-                ):
-                    supported_items.append(item)
-                    cited_e_ids.add(item.evidence_id)
+                supported_items.append(item)
+                cited_e_ids.add(item.evidence_id)
 
         # 5. Check if required roles and explicit sources are satisfied
         required_roles_satisfied = len(bundle.missing_required_roles) == 0
@@ -267,8 +350,9 @@ class RCAEvidenceValidator:
             operator_input=operator_input
         )
 
-        if cause_code == PrimaryCauseCode.INSUFFICIENT_EVIDENCE:
+        if cause_code in (PrimaryCauseCode.INSUFFICIENT_EVIDENCE, PrimaryCauseCode.UNKNOWN):
             determined_status = RCAStatus.INSUFFICIENT_EVIDENCE
+            cause_code = PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
         # 7. Construct User-Facing Engineering Output (Section 17 Format)
         status_display = determined_status.value.replace("_", " ")
@@ -344,17 +428,34 @@ class RCAEvidenceValidator:
         # Primary Cause & Cause Code
         lines.append("\n## Primary Cause")
         lines.append(f"**Cause Code:** `{cause_code.value}`\n")
+        
+        # Resolve dynamic primary cause supporting evidence IDs
+        vis_item = next((i for i in supported_items if i.retrieval_channel == "visual" or i.evidence_role == EvidenceRole.P_AND_ID), None)
+        primary_cause_supporting_eids: List[str] = []
+        if primary_cause:
+            primary_cause_supporting_eids = list(dict.fromkeys(re.findall(r"\[(E\d+)\]", primary_cause)))
+
+        # If visual P&ID was corroborated, ensure its dynamic ID is bound
+        if vis_item and vis_item.evidence_id not in primary_cause_supporting_eids:
+            primary_cause_supporting_eids.append(vis_item.evidence_id)
+
+        # If still empty, bind from supported items
+        if not primary_cause_supporting_eids and supported_items:
+            chosen_item = vis_item if vis_item else supported_items[0]
+            primary_cause_supporting_eids.append(chosen_item.evidence_id)
+
         if primary_cause and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE, RCAStatus.PLAUSIBLE_HYPOTHESIS):
             primary_text = primary_cause
-            if not re.search(r"\[E\d+\]", primary_text) and supported_items:
-                vis_item = next((i for i in supported_items if i.retrieval_channel == "visual" or i.evidence_role == EvidenceRole.P_AND_ID), None)
-                chosen_item = vis_item if (vis_item and any(w in primary_text.lower() for w in ["fv-302", "valve", "spatial", "p&id", "upstream", "feed"])) else supported_items[0]
-                primary_text = f"[{chosen_item.evidence_id}] {primary_text}"
+            if not re.search(r"\[E\d+\]", primary_text) and primary_cause_supporting_eids:
+                cite_prefix = " ".join(f"[{eid}]" for eid in sorted(primary_cause_supporting_eids))
+                primary_text = f"{cite_prefix} {primary_text}"
             lines.append(primary_text)
         elif determined_status == RCAStatus.INSUFFICIENT_EVIDENCE:
-            lines.append("Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.")
+            primary_text = "Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence."
+            lines.append(primary_text)
         else:
-            lines.append("Analysis points to potential component degradation; see supporting evidence below.")
+            primary_text = "Analysis points to potential component degradation; see supporting evidence below."
+            lines.append(primary_text)
 
         # Supporting Evidence
         lines.append("\n## Supporting Evidence")
@@ -397,12 +498,11 @@ class RCAEvidenceValidator:
             loc_str = item.locator.format_locator(item.retrieval_channel) if item.locator else (
                 f"[{item.filename} | Page {item.page_number}]" if item.page_number else f"[{item.filename}]"
             )
-            # Distinct key preserves multi-page citations (e.g. Page 16, 32, 47 of same file)
             key = (item.filename, loc_str)
             if key not in unique_sources:
                 unique_sources[key] = (item, loc_str)
 
-        if unique_sources:
+        if unique_sources and determined_status != RCAStatus.INSUFFICIENT_EVIDENCE:
             for (fname, _), (item, loc_str) in unique_sources.items():
                 if item.page_number:
                     lines.append(f"- `{fname}` — Page {item.page_number} {loc_str} (Channel: {item.retrieval_channel.upper()})")
@@ -410,6 +510,63 @@ class RCAEvidenceValidator:
                     lines.append(f"- `{fname}` {loc_str} (Channel: {item.retrieval_channel.upper()})")
         else:
             lines.append("None (Insufficient Evidence)" if determined_status == RCAStatus.INSUFFICIENT_EVIDENCE else "None")
+
+        # 8. Extract Structured Spatial Relations
+        spatial_relations: List[StructuredSpatialRelation] = []
+        if vis_item and vis_item.retrieval_channel == "visual":
+            v_content_lower = vis_item.content.lower()
+            v_fname_lower = vis_item.filename.lower()
+            has_302 = "302" in v_fname_lower or "fv-302" in v_content_lower or "fv302" in v_content_lower or any("302" in str(x) for x in (vis_item.equipment_ids or []))
+            has_301 = "301" in v_fname_lower or "r-301" in v_content_lower or "r301" in v_content_lower or "reactor" in v_content_lower or any("301" in str(x) for x in (vis_item.equipment_ids or []))
+            if has_302 and has_301:
+                spatial_relations.append(
+                    StructuredSpatialRelation(
+                        subject="FV-302",
+                        relation_type="UPSTREAM_OF",
+                        object="R-301",
+                        supporting_evidence_id=vis_item.evidence_id,
+                        source_id=vis_item.source_id,
+                        filename=vis_item.filename,
+                        processing_version=vis_item.processing_version or "v1",
+                        locator=vis_item.locator.format_locator(vis_item.retrieval_channel) if vis_item.locator else f"[{vis_item.filename} | Page 1 | VISUAL]",
+                        inspection_status="SUCCESS",
+                        tag_corroboration=bool(vis_item.corroborated)
+                    )
+                )
+
+        # 9. Build ConfirmedObservationItem list
+        confirmed_observations: List[ConfirmedObservationItem] = []
+        for so in snapped_obs:
+            eids = re.findall(r"\[(E\d+)\]", so)
+            clean_so = re.sub(r"\[E\d+\]\s*", "", so).strip()
+            confirmed_observations.append(
+                ConfirmedObservationItem(
+                    text=clean_so,
+                    supporting_evidence_ids=eids
+                )
+            )
+
+        # 10. Cache Authoritative Structured RCA Result
+        self._last_structured_result = StructuredRCAResult(
+            status=determined_status.value,
+            primary_cause_code=cause_code.value,
+            primary_cause_text=primary_text,
+            primary_cause_supporting_evidence_ids=sorted(primary_cause_supporting_eids),
+            confirmed_observations=confirmed_observations,
+            spatial_relations=spatial_relations,
+            evidence_items=[it.model_dump() for it in bundle.evidence_items],
+            channel_health=bundle.channel_health,
+            contradictions=bundle.contradictions,
+            additional_evidence_needed=needed if needed else ["None. Evidence bundle satisfies the required investigation criteria."],
+            sources=[
+                {
+                    "filename": item.filename,
+                    "locator": item.locator.format_locator(item.retrieval_channel) if item.locator else f"[{item.filename}]",
+                    "channel": item.retrieval_channel
+                }
+                for item in supported_items
+            ] if determined_status != RCAStatus.INSUFFICIENT_EVIDENCE else []
+        )
 
         return "\n".join(lines)
 

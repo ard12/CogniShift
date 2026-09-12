@@ -658,23 +658,54 @@ async def _resolve_knowledge_and_page_context(
             colloquial_match = phrase
             break
 
+    is_rca_mode = any(w in lower_input for w in [
+        "rca", "root cause", "failure investigation", "investigate failure", "cause analysis"
+    ])
+
     is_cross_doc = (
-        any(w in lower_input for w in [
+        is_rca_mode
+        or any(w in lower_input for w in [
             "compare", "both", "all documents", "cross-reference", "against", "recommendation", "correlat",
-            "rca", "root cause", "failure investigation", "investigate failure", "investigate", "troubleshoot", "why did"
+            "troubleshoot", "why did"
         ])
         or (" and " in lower_input and any(doc_word in lower_input for doc_word in ["manual", "sop", "report", "file", "document", "drawing", "schematic"]))
     )
 
-    if raw_ks_ids:
-        # Agent has a strict sovereign knowledge source allowlist! Never breach it with unallowed sources!
-        if target_doc and int(target_doc["id"]) in allowed_source_ids:
+    # Hard authoritative source scope
+    hard_agent_whitelist: List[int] = list(raw_ks_ids) if raw_ks_ids else []
+
+    # Soft retrieval preference derived from explicitly mentioned/resolved documents
+    focus_source_ids: List[int] = []
+    if target_doc and target_doc.get("id"):
+        focus_source_ids.append(int(target_doc["id"]))
+    if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
+        focus_source_ids.append(int(resolved_context.pinned_source["id"]))
+    for rf in (resolved_context.files if resolved_context else []):
+        c_rf = await db.execute(
+            "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
+            (workspace_id, rf, rf)
+        )
+        for r_rf in await c_rf.fetchall():
+            if r_rf["id"] not in focus_source_ids:
+                focus_source_ids.append(r_rf["id"])
+
+    if hard_agent_whitelist:
+        # Agent has a strict sovereign knowledge source allowlist! Never breach it!
+        if target_doc and int(target_doc["id"]) in hard_agent_whitelist:
             if colloquial_match and not is_cross_doc:
                 allowed_source_ids = [int(target_doc["id"])]
                 active_doc_for_page = target_doc
+            else:
+                allowed_source_ids = list(hard_agent_whitelist)
+        else:
+            allowed_source_ids = list(hard_agent_whitelist)
     else:
         # Agent has unrestricted workspace access; allow colloquial resolution and dynamic doc discovery
-        if target_doc and colloquial_match and not is_cross_doc:
+        if is_cross_doc:
+            allowed_source_ids = []  # Unrestricted: allow searching all completed sources in this workspace
+            if target_doc:
+                active_doc_for_page = target_doc
+        elif target_doc and colloquial_match:
             # PIN the single matching document and suppress unrelated knowledge sources
             allowed_source_ids = [int(target_doc["id"])]
             active_doc_for_page = target_doc
@@ -692,24 +723,7 @@ async def _resolve_knowledge_and_page_context(
                     }
                 )
         else:
-            if target_doc and target_doc.get("id"):
-                td_id = int(target_doc["id"])
-                if td_id not in allowed_source_ids:
-                    allowed_source_ids.append(td_id)
-
-            if resolved_context and resolved_context.pinned_source and resolved_context.pinned_source.get("id"):
-                ps_id = int(resolved_context.pinned_source["id"])
-                if ps_id not in allowed_source_ids:
-                    allowed_source_ids.append(ps_id)
-
-            for rf in (resolved_context.files if resolved_context else []):
-                c_rf = await db.execute(
-                    "SELECT id FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (name = ? OR original_filename = ?)",
-                    (workspace_id, rf, rf)
-                )
-                for r_rf in await c_rf.fetchall():
-                    if r_rf["id"] not in allowed_source_ids:
-                        allowed_source_ids.append(r_rf["id"])
+            allowed_source_ids = []
 
     # Follow-up source logging
     if resolved_context and resolved_context.files and not re.findall(r'\b([a-zA-Z0-9_\-\.]+\.(?:xlsx|xls|csv|pdf))\b', clean_input, re.IGNORECASE):
@@ -752,8 +766,12 @@ async def _resolve_knowledge_and_page_context(
                 f"Authoritative source resolved: {resolved_source.filename} (Origin: {resolved_source.origin_type}, Selected By: {resolved_source.selected_by})",
                 resolved_source.to_dict()
             )
-        if resolved_source.strict_source_scope and resolved_source.source_id:
-            allowed_source_ids = [resolved_source.source_id]
+        if resolved_source.strict_source_scope and resolved_source.source_id and not is_cross_doc:
+            if hard_agent_whitelist:
+                if resolved_source.source_id in hard_agent_whitelist:
+                    allowed_source_ids = [resolved_source.source_id]
+            else:
+                allowed_source_ids = [resolved_source.source_id]
         if resolved_source.origin_type == "knowledge_source" and resolved_source.source_id:
             active_doc_for_page = {
                 "id": resolved_source.source_id,
@@ -761,7 +779,7 @@ async def _resolve_knowledge_and_page_context(
                 "local_path": resolved_source.workspace_relative_path
             }
             target_doc = active_doc_for_page
-    elif only_source_match:
+    elif only_source_match and not is_cross_doc:
         cand_name = only_source_match.group(1).strip()
         c_iso = await db.execute(
             "SELECT * FROM knowledge_sources WHERE workspace_id = ? AND processing_status = 'completed' AND (LOWER(name) = LOWER(?) OR LOWER(original_filename) = LOWER(?)) ORDER BY id DESC LIMIT 1",
@@ -770,9 +788,17 @@ async def _resolve_knowledge_and_page_context(
         iso_row = await c_iso.fetchone()
         if iso_row:
             iso_doc = dict(iso_row)
-            allowed_source_ids = [iso_doc["id"]]
+            if not hard_agent_whitelist or iso_doc["id"] in hard_agent_whitelist:
+                allowed_source_ids = [iso_doc["id"]]
             active_doc_for_page = iso_doc
             target_doc = iso_doc
+
+    # Hard security boundary check: ensure allowed_source_ids never widens outside configured whitelist
+    if hard_agent_whitelist:
+        if not allowed_source_ids:
+            allowed_source_ids = list(hard_agent_whitelist)
+        else:
+            allowed_source_ids = [s for s in allowed_source_ids if s in hard_agent_whitelist] or list(hard_agent_whitelist)
 
     # Direct Page-Level Context Extraction
     requested_page = getattr(resolved_context, "requested_page", None) if resolved_context else None
@@ -2146,6 +2172,12 @@ async def execute_agent_run(
                         if rca_bundle.retrieval_diagnostics.get("ood_triggered"):
                             validator = RCAEvidenceValidator()
                             fail_msg = validator.validate_and_finalize(rca_bundle, "", clean_input)
+                            structured_rca = validator.get_structured_result(rca_bundle, fail_msg, clean_input)
+                            await log_event(
+                                db, run_id, "rca_result_structured",
+                                f"Structured RCA result recorded with status {structured_rca.status} and primary cause {structured_rca.primary_cause_code}",
+                                structured_rca.model_dump()
+                            )
                             sources_used = "None (Asset Not Found)"
                             if len(plan.steps) >= 4:
                                 plan.steps[1].status = "completed"
@@ -4013,6 +4045,13 @@ print("Analysis script finished with returncode 0.")
                         validator = RCAEvidenceValidator()
                         answer_content = validator.validate_and_finalize(rca_bundle, action.content, clean_input)
                         validation_latency_ms = round((time.perf_counter() - t_val_start) * 1000, 2)
+
+                        structured_rca = validator.get_structured_result(rca_bundle, answer_content, clean_input)
+                        await log_event(
+                            db, run_id, "rca_result_structured",
+                            f"Structured RCA result recorded with status {structured_rca.status} and primary cause {structured_rca.primary_cause_code}",
+                            structured_rca.model_dump()
+                        )
 
                         stage_lats = dict(getattr(rca_bundle, "stage_latencies_ms", {}) or {})
                         stage_lats["evidence_validation"] = validation_latency_ms

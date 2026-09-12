@@ -1,0 +1,74 @@
+[
+  {
+    "archetype": "Narrative PDF",
+    "filename": "Pump_Maintenance_SOP.pdf",
+    "workspace_id": 1,
+    "document_type": "pdf",
+    "sample_locator": "[Pump_Maintenance_SOP.pdf | Page 1]",
+    "syntax_valid": true,
+    "text_rag_status": "ACTIVE",
+    "visual_rag_status": "NOT_APPLICABLE",
+    "latency_ms": 0.02,
+    "status": "PASS"
+  },
+  {
+    "archetype": "Scanned PDF",
+    "filename": "SCAN-LOG-REACTOR-R301_Bed_Differential_Pressure_CleanScan.pdf",
+    "workspace_id": 9998,
+    "document_type": "pdf",
+    "sample_locator": "[SCAN-LOG-REACTOR-R301_Bed_Differential_Pressure_CleanScan.pdf | Page 1]",
+    "syntax_valid": true,
+    "text_rag_status": "ACTIVE_OCR",
+    "visual_rag_status": "NOT_APPLICABLE",
+    "latency_ms": 0.01,
+    "status": "PASS"
+  },
+  {
+    "archetype": "P&ID Blueprint",
+    "filename": "RCA-CASE-A-DOC2_Feed_Control_FV302_Spatial_PID.pdf",
+    "workspace_id": 9998,
+    "document_type": "pdf",
+    "sample_locator": "[RCA-CASE-A-DOC2_Feed_Control_FV302_Spatial_PID.pdf | Page 1 | VISUAL]",
+    "syntax_valid": true,
+    "text_rag_status": "ACTIVE_TEXT",
+    "visual_rag_status": "ACTIVE_COLPALI_VLM_VERIFIED",
+    "latency_ms": 0.01,
+    "status": "PASS"
+  },
+  {
+    "archetype": "Dense Engineering Table",
+    "filename": "ENG-TBL-HEX-301A_Reactor_Effluent_Exchanger_Grid_2024.pdf",
+    "workspace_id": 9998,
+    "document_type": "pdf",
+    "sample_locator": "[ENG-TBL-HEX-301A_Reactor_Effluent_Exchanger_Grid_2024.pdf | Page 1]",
+    "syntax_valid": true,
+    "text_rag_status": "ACTIVE_GRID",
+    "visual_rag_status": "NOT_APPLICABLE",
+    "latency_ms": 0.01,
+    "status": "PASS"
+  },
+  {
+    "archetype": "Spreadsheet (XLSX)",
+    "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+    "workspace_id": 1,
+    "document_type": "xlsx",
+    "sample_locator": "[MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: SCADA_48H | Rows 1-100 | Cols A:H | SPREADSHEET]",
+    "syntax_valid": true,
+    "text_rag_status": "ACTIVE_STRUCTURED_ROWS",
+    "visual_rag_status": "ACTIVE_TILED_EMBEDDINGS",
+    "latency_ms": 0.02,
+    "status": "PASS"
+  },
+  {
+    "archetype": "Document (DOCX)",
+    "filename": "Report_MRPL_Financial_History_3Y_REV_B.docx",
+    "workspace_id": 1,
+    "document_type": "docx",
+    "sample_locator": "[Report_MRPL_Financial_History_3Y_REV_B.docx | Section: Operational Summary | Rendered Page 1 | DOCUMENT]",
+    "syntax_valid": true,
+    "text_rag_status": "ACTIVE_SECTIONS",
+    "visual_rag_status": "NOT_IMPLEMENTED_DEGRADED",
+    "latency_ms": 0.01,
+    "status": "PASS"
+  }
+]

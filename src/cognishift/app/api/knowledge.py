@@ -94,6 +94,7 @@ async def upload_document(
             import openpyxl
             import csv
             import asyncio
+            from openpyxl.utils import get_column_letter
             from cognishift.core.retriever import chroma_client, embedding_model
             from cognishift.core.document_insights import detect_header_row_index
 
@@ -110,6 +111,9 @@ async def upload_document(
                 headers = [str(c).strip() if c is not None and str(c).strip() else f"Col_{i+1}" for i, c in enumerate(raw_header)]
                 header_row_num = header_idx + 1
                 data_rows = raw_rows[header_idx + 1:]
+                total_cols = max(1, len(headers))
+                default_col_start = get_column_letter(1)
+                default_col_end = get_column_letter(total_cols)
 
                 header_prefix = f"=== SPREADSHEET: {safe_basename} | SHEET: {sheet_name} (Header Row: #{header_row_num}) ===\nColumns: {', '.join(headers)}\n"
 
@@ -131,7 +135,7 @@ async def upload_document(
                         if current_lines:
                             chunk_text = header_prefix + "\n".join(current_lines)
                             chunks.append(chunk_text)
-                            metadatas.append({
+                            meta = {
                                 "source_id": int(source_id),
                                 "filename": safe_basename,
                                 "document_name": safe_basename,
@@ -143,9 +147,13 @@ async def upload_document(
                                 "segment_count": 1,
                                 "checksum": checksum,
                                 "workspace_id": int(workspace_id),
-                                "extraction_method": "spreadsheet",
+                                "extraction_method": "spreadsheet" if ext == ".xlsx" else "csv",
                                 "processing_version": "v1"
-                            })
+                            }
+                            if ext == ".xlsx":
+                                meta["col_start"] = default_col_start
+                                meta["col_end"] = default_col_end
+                            metadatas.append(meta)
                             ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
                             current_lines = []
                             current_chars = len(header_prefix)
@@ -153,8 +161,8 @@ async def upload_document(
                             chunk_end_row = None
 
                         cols_per_slice = 10
-                        total_cols = len(row)
-                        slices = [row[i:i+cols_per_slice] for i in range(0, total_cols, cols_per_slice)]
+                        row_cols = len(row)
+                        slices = [row[i:i+cols_per_slice] for i in range(0, row_cols, cols_per_slice)]
                         num_segs = max(1, len(slices))
                         for seg_idx, sl in enumerate(slices, start=1):
                             sl_headers = headers[(seg_idx-1)*cols_per_slice : seg_idx*cols_per_slice]
@@ -164,7 +172,9 @@ async def upload_document(
                                 f"Values: {' | '.join(str(c).strip() if c is not None else '' for c in sl)}"
                             )
                             chunks.append(seg_text)
-                            metadatas.append({
+                            c_start_idx = (seg_idx - 1) * cols_per_slice + 1
+                            c_end_idx = min(total_cols, seg_idx * cols_per_slice)
+                            meta = {
                                 "source_id": int(source_id),
                                 "filename": safe_basename,
                                 "document_name": safe_basename,
@@ -176,9 +186,13 @@ async def upload_document(
                                 "segment_count": num_segs,
                                 "checksum": checksum,
                                 "workspace_id": int(workspace_id),
-                                "extraction_method": "spreadsheet",
+                                "extraction_method": "spreadsheet" if ext == ".xlsx" else "csv",
                                 "processing_version": "v1"
-                            })
+                            }
+                            if ext == ".xlsx":
+                                meta["col_start"] = get_column_letter(c_start_idx)
+                                meta["col_end"] = get_column_letter(c_end_idx)
+                            metadatas.append(meta)
                             ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{orig_row}_{orig_row}_seg_{seg_idx}")
                         continue
 
@@ -186,7 +200,7 @@ async def upload_document(
                     if current_chars + row_chars > MAX_WINDOW_CHARS and current_lines:
                         chunk_text = header_prefix + "\n".join(current_lines)
                         chunks.append(chunk_text)
-                        metadatas.append({
+                        meta = {
                             "source_id": int(source_id),
                             "filename": safe_basename,
                             "document_name": safe_basename,
@@ -198,9 +212,13 @@ async def upload_document(
                             "segment_count": 1,
                             "checksum": checksum,
                             "workspace_id": int(workspace_id),
-                            "extraction_method": "spreadsheet",
+                            "extraction_method": "spreadsheet" if ext == ".xlsx" else "csv",
                             "processing_version": "v1"
-                        })
+                        }
+                        if ext == ".xlsx":
+                            meta["col_start"] = default_col_start
+                            meta["col_end"] = default_col_end
+                        metadatas.append(meta)
                         ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
 
                         current_lines = [row_str]
@@ -217,7 +235,7 @@ async def upload_document(
                 if current_lines:
                     chunk_text = header_prefix + "\n".join(current_lines)
                     chunks.append(chunk_text)
-                    metadatas.append({
+                    meta = {
                         "source_id": int(source_id),
                         "filename": safe_basename,
                         "document_name": safe_basename,
@@ -229,9 +247,13 @@ async def upload_document(
                         "segment_count": 1,
                         "checksum": checksum,
                         "workspace_id": int(workspace_id),
-                        "extraction_method": "spreadsheet",
+                        "extraction_method": "spreadsheet" if ext == ".xlsx" else "csv",
                         "processing_version": "v1"
-                    })
+                    }
+                    if ext == ".xlsx":
+                        meta["col_start"] = default_col_start
+                        meta["col_end"] = default_col_end
+                    metadatas.append(meta)
                     ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
 
             def _parse_spreadsheet():
@@ -265,7 +287,7 @@ async def upload_document(
                     from cognishift.core.visual_rag.schemas import PageVectorMetadata
                     from cognishift.core.document_processing.office_renderer import extract_xlsx_structured_content
 
-                    v_prov = get_visual_embedding_provider(allow_simulation=True)
+                    v_prov = get_visual_embedding_provider(allow_simulation=False)
                     if v_prov:
                         _, tiles = await asyncio.to_thread(extract_xlsx_structured_content, file_path)
                         v_store = get_visual_vector_store()
@@ -287,6 +309,8 @@ async def upload_document(
                                 token_count=len(vecs) if hasattr(vecs, "__len__") else 128
                             )
                             await v_store.upsert_page_vectors(v_meta, vecs)
+                    else:
+                        logger.warning(f"Visual embedding provider unavailable for {safe_basename}; skipping XLSX visual indexing (allow_simulation=False)")
                 except Exception as ve:
                     logger.warning(f"Optional XLSX visual indexing skipped: {ve}")
 

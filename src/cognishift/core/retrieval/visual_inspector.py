@@ -8,9 +8,10 @@ import time
 import asyncio
 import logging
 import re
+from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
@@ -25,6 +26,16 @@ logger = logging.getLogger(__name__)
 TAG_RE = re.compile(r"\b([A-Za-z]{1,4}-\d{2,4}[A-Za-z]?)\b")
 
 
+class VisualInspectionStatus(str, Enum):
+    SUCCESS = "SUCCESS"
+    RASTERIZATION_FAILED = "RASTERIZATION_FAILED"
+    SOURCE_NOT_FOUND = "SOURCE_NOT_FOUND"
+    VLM_FAILED = "VLM_FAILED"
+    NO_OBSERVATION = "NO_OBSERVATION"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED"
+    DEGRADED = "DEGRADED"
+
+
 class VisualInspectionResult(BaseModel):
     """Result of targeted visual evidence inspection on a page or sheet tile."""
     workspace_id: int
@@ -33,6 +44,15 @@ class VisualInspectionResult(BaseModel):
     page_number: int
     processing_version: str = "v1"
     visual_score: float = 0.0
+    inspection_status: VisualInspectionStatus = VisualInspectionStatus.DEGRADED
+    rasterized: bool = False
+    vlm_executed: bool = False
+    vlm_succeeded: bool = False
+    observation_valid: bool = False
+    verification_executed: bool = False
+    tag_corroboration: Optional[bool] = None
+    numeric_corroboration: Optional[bool] = None
+    visual_relation_observation: Optional[str] = None
     vlm_observation: str = ""
     corroboration_results: List[CorroborationResult] = Field(default_factory=list)
     ocr_corroborated: Optional[bool] = None
@@ -42,6 +62,23 @@ class VisualInspectionResult(BaseModel):
     locator: str = ""
     inspection_latency_ms: float = 0.0
     vlm_model: str = ""
+
+    @model_validator(mode="after")
+    def _validate_success(self) -> "VisualInspectionResult":
+        error_indicators = (
+            "document source file not found",
+            "rasterization failed",
+            "degraded",
+            "vlm analysis failed",
+            "no visual observation",
+        )
+        obs_lower = (self.vlm_observation or "").lower()
+        if obs_lower and not any(obs_lower.startswith(prefix) for prefix in error_indicators):
+            if self.inspection_status == VisualInspectionStatus.DEGRADED:
+                self.inspection_status = VisualInspectionStatus.SUCCESS
+            self.vlm_succeeded = True
+            self.observation_valid = True
+        return self
 
 
 class VisualEvidenceInspector:
@@ -102,7 +139,12 @@ class VisualEvidenceInspector:
                 page_number=page_number,
                 processing_version=processing_version,
                 visual_score=visual_score,
-                vlm_observation=f"Visual candidate match ({filename} {locator}) with relevance score {visual_score:.2f}.",
+                inspection_status=VisualInspectionStatus.SOURCE_NOT_FOUND,
+                rasterized=False,
+                vlm_executed=False,
+                vlm_succeeded=False,
+                observation_valid=False,
+                vlm_observation=f"Document source file not found on disk ({filename} {locator}) with score {visual_score:.2f}.",
                 locator=locator
             )
 
@@ -134,7 +176,12 @@ class VisualEvidenceInspector:
                 page_number=page_number,
                 processing_version=processing_version,
                 visual_score=visual_score,
-                vlm_observation=f"Visual match on {filename} {locator} (rasterization unavailable).",
+                inspection_status=VisualInspectionStatus.RASTERIZATION_FAILED,
+                rasterized=False,
+                vlm_executed=False,
+                vlm_succeeded=False,
+                observation_valid=False,
+                vlm_observation=f"Rasterization unavailable for {filename} {locator}.",
                 locator=locator
             )
 
@@ -149,7 +196,12 @@ class VisualEvidenceInspector:
         vlm_text = ""
         corroborations: List[CorroborationResult] = []
         is_corroborated: Optional[bool] = None
+        tag_corroborated: Optional[bool] = None
+        numeric_corroborated: Optional[bool] = None
         extracted_tags: List[str] = []
+        vlm_succeeded = False
+        vlm_failed = False
+        verification_executed = False
 
         try:
             v_obs = await self.vision_service.analyze_document_image(
@@ -158,8 +210,9 @@ class VisualEvidenceInspector:
                 prompt=target_prompt,
                 requirement=VisionRequirement.OPTIONAL
             )
-            if v_obs and v_obs.description:
+            if v_obs and v_obs.description and v_obs.description.strip():
                 vlm_text = v_obs.description.strip()
+                vlm_succeeded = True
 
                 # Extract equipment tags from observation
                 for m in TAG_RE.finditer(vlm_text):
@@ -168,6 +221,7 @@ class VisualEvidenceInspector:
 
                 # Deterministic OCR corroboration
                 if getattr(settings, "visual_verification_enabled", True):
+                    verification_executed = True
                     corroborations = await self.verifier.verify_page_claims(
                         workspace_id=workspace_id,
                         source_id=source_id,
@@ -177,15 +231,40 @@ class VisualEvidenceInspector:
                     )
                     if corroborations:
                         is_corroborated = all(cr.corroborated for cr in corroborations)
+                        tag_claims = [cr for cr in corroborations if cr.claim_type == "instrument_tag"]
+                        num_claims = [cr for cr in corroborations if cr.claim_type in ("reading_with_unit", "numeric")]
+                        if tag_claims:
+                            tag_corroborated = any(cr.corroborated for cr in tag_claims)
+                        if num_claims:
+                            numeric_corroborated = any(cr.corroborated for cr in num_claims)
+            else:
+                vlm_succeeded = False
         except Exception as ve:
             logger.warning(f"VLM inspection error on {filename} page {page_number}: {ve}")
-            vlm_text = f"Visual match on {filename} {locator} with relevance score {visual_score:.2f}."
-
-        if not vlm_text:
-            vlm_text = f"Visual match on {filename} {locator} with relevance score {visual_score:.2f}."
+            vlm_succeeded = False
+            vlm_failed = True
+            vlm_text = f"VLM execution error on {filename} {locator}: {ve}"
 
         insp_lat_ms = round((time.perf_counter() - t_insp_0) * 1000.0, 2)
         v_model_name = getattr(settings, "vision_model", "moondream:latest")
+
+        if vlm_failed:
+            status = VisualInspectionStatus.VLM_FAILED
+            obs_valid = False
+            vis_rel_obs = None
+        elif not vlm_succeeded or not vlm_text.strip():
+            status = VisualInspectionStatus.NO_OBSERVATION
+            obs_valid = False
+            vis_rel_obs = None
+            if not vlm_text:
+                vlm_text = f"No visual observation produced for {filename} {locator}."
+        else:
+            obs_valid = True
+            vis_rel_obs = vlm_text
+            if verification_executed and tag_corroborated is False:
+                status = VisualInspectionStatus.VERIFICATION_FAILED
+            else:
+                status = VisualInspectionStatus.SUCCESS
 
         return VisualInspectionResult(
             workspace_id=workspace_id,
@@ -194,6 +273,15 @@ class VisualEvidenceInspector:
             page_number=page_number,
             processing_version=processing_version,
             visual_score=visual_score,
+            inspection_status=status,
+            rasterized=True,
+            vlm_executed=True,
+            vlm_succeeded=vlm_succeeded,
+            observation_valid=obs_valid,
+            verification_executed=verification_executed,
+            tag_corroboration=tag_corroborated,
+            numeric_corroboration=numeric_corroborated,
+            visual_relation_observation=vis_rel_obs,
             vlm_observation=vlm_text,
             corroboration_results=corroborations,
             ocr_corroborated=is_corroborated,

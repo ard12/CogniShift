@@ -48,7 +48,7 @@ class VisualRetriever:
             async with get_db() as db:
                 query_sql = "SELECT id, active_processing_version FROM knowledge_sources WHERE workspace_id = ?"
                 params: list = [workspace_id]
-                if allowed_source_ids is not None:
+                if allowed_source_ids:
                     placeholders = ",".join("?" for _ in allowed_source_ids)
                     query_sql += f" AND id IN ({placeholders})"
                     params.extend([int(sid) for sid in allowed_source_ids])

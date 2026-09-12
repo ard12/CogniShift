@@ -1,0 +1,56 @@
+{
+  "audit_timestamp": "2026-09-12T09:18:47Z",
+  "total_failures": 10,
+  "failures": [
+    {
+      "scenario_id": "RCA-01",
+      "citation": "equipment_readings.csv | Page 1 | TEXT",
+      "reason": "CSV citation missing row-range coordinates."
+    },
+    {
+      "scenario_id": "RCA-01",
+      "citation": "equipment_readings.csv | Page 1 | TEXT",
+      "reason": "CSV citation missing row-range coordinates."
+    },
+    {
+      "scenario_id": "RCA-02",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-02",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-02",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-02",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-05",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-05",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-05",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-05",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    }
+  ]
+}

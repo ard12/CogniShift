@@ -1,0 +1,2650 @@
+{
+  "benchmark_timestamp": "2026-09-12T09:18:47Z",
+  "version": "v3",
+  "hardware": "NVIDIA GeForce RTX 3050 Laptop GPU (6GB VRAM, CUDA 12.0)",
+  "offline_sovereign": true,
+  "preflight": {
+    "status": "PASSED",
+    "diagnostics": {
+      "point_1_colpali_enabled": true,
+      "point_2_multimodal_vision_enabled": true,
+      "point_3_weights_exist": true,
+      "point_4_provider_constructed": true,
+      "provider_device": "cuda",
+      "point_5_query_embed_shape": [
+        23,
+        128
+      ],
+      "point_6_page_png_bytes": 25481,
+      "point_7_source": "disk_cache",
+      "point_7_page_embed_shape": [
+        1149,
+        128
+      ],
+      "point_8_maxsim_score": 15.013311386108398,
+      "point_9_vlm_available": true,
+      "vlm_model": "moondream"
+    }
+  },
+  "summary": {
+    "total_scenarios": 7,
+    "root_cause_status_accuracy": 1.0,
+    "primary_cause_accuracy_unioned": 1.0,
+    "physical_pca": 1.0,
+    "safety_terminal_accuracy": 1.0,
+    "claim_support_precision": 0.9048,
+    "source_coverage": 0.8571,
+    "citation_accuracy": 0.9591,
+    "scored_citation_scenarios": 4,
+    "false_cause_rate": 0.0,
+    "section17_compliance": true,
+    "destructive_finalizer_regression_free": true,
+    "final_step_tool_lockout_verified": true,
+    "mean_normal_latency_ms": 56550.57,
+    "mean_ood_latency_ms": 460.86,
+    "mean_total_latency_ms": 48537.75
+  },
+  "threshold_evaluations": {
+    "rcsa": "PASS",
+    "pca": "PASS",
+    "csp": "PASS",
+    "sc": "PASS",
+    "ca": "PASS",
+    "fcr": "PASS",
+    "section17": "PASS",
+    "regression_free": "PASS"
+  },
+  "ablation_study": {
+    "study": "True Visual RCA 3-Condition Ablation Study (RCA-06)",
+    "evaluated_scenario": "RCA-06 (Hydrocracker R-301 / FV-302 P&ID Spatial Dependency)",
+    "condition_a_text_only": {
+      "executed_channels": [
+        "text"
+      ],
+      "visual_executed": false,
+      "spatial_relation_supported": false,
+      "claim_support_precision": 1.0,
+      "status": "INSUFFICIENT_EVIDENCE"
+    },
+    "condition_b_text_topology": {
+      "executed_channels": [
+        "text",
+        "topology"
+      ],
+      "visual_executed": false,
+      "spatial_relation_supported": false,
+      "spatial_leak_prevented": true,
+      "claim_support_precision": 1.0,
+      "status": "INSUFFICIENT_EVIDENCE"
+    },
+    "condition_c_full_multimodal": {
+      "executed_channels": [
+        "text",
+        "visual"
+      ],
+      "visual_executed": true,
+      "visual_candidate_count": 1,
+      "visual_model": "Qdrant/colmodernvbert",
+      "visual_device": "cuda",
+      "visual_evidence_id": "E1",
+      "visual_inspector_executed": true,
+      "primary_cause_references_visual_eid": true,
+      "spatial_relation_supported": true,
+      "claim_support_precision": 1.0,
+      "status": "PLAUSIBLE_HYPOTHESIS"
+    },
+    "ablation_verified": true,
+    "verification_verdict": "VERIFIED"
+  },
+  "sanity_matrix": [
+    {
+      "archetype": "Narrative PDF",
+      "filename": "Pump_Maintenance_SOP.pdf",
+      "workspace_id": 1,
+      "document_type": "pdf",
+      "sample_locator": "[Pump_Maintenance_SOP.pdf | Page 1]",
+      "syntax_valid": true,
+      "text_rag_status": "ACTIVE",
+      "visual_rag_status": "NOT_APPLICABLE",
+      "latency_ms": 0.02,
+      "status": "PASS"
+    },
+    {
+      "archetype": "Scanned PDF",
+      "filename": "SCAN-LOG-REACTOR-R301_Bed_Differential_Pressure_CleanScan.pdf",
+      "workspace_id": 9998,
+      "document_type": "pdf",
+      "sample_locator": "[SCAN-LOG-REACTOR-R301_Bed_Differential_Pressure_CleanScan.pdf | Page 1]",
+      "syntax_valid": true,
+      "text_rag_status": "ACTIVE_OCR",
+      "visual_rag_status": "NOT_APPLICABLE",
+      "latency_ms": 0.01,
+      "status": "PASS"
+    },
+    {
+      "archetype": "P&ID Blueprint",
+      "filename": "RCA-CASE-A-DOC2_Feed_Control_FV302_Spatial_PID.pdf",
+      "workspace_id": 9998,
+      "document_type": "pdf",
+      "sample_locator": "[RCA-CASE-A-DOC2_Feed_Control_FV302_Spatial_PID.pdf | Page 1 | VISUAL]",
+      "syntax_valid": true,
+      "text_rag_status": "ACTIVE_TEXT",
+      "visual_rag_status": "ACTIVE_COLPALI_VLM_VERIFIED",
+      "latency_ms": 0.01,
+      "status": "PASS"
+    },
+    {
+      "archetype": "Dense Engineering Table",
+      "filename": "ENG-TBL-HEX-301A_Reactor_Effluent_Exchanger_Grid_2024.pdf",
+      "workspace_id": 9998,
+      "document_type": "pdf",
+      "sample_locator": "[ENG-TBL-HEX-301A_Reactor_Effluent_Exchanger_Grid_2024.pdf | Page 1]",
+      "syntax_valid": true,
+      "text_rag_status": "ACTIVE_GRID",
+      "visual_rag_status": "NOT_APPLICABLE",
+      "latency_ms": 0.01,
+      "status": "PASS"
+    },
+    {
+      "archetype": "Spreadsheet (XLSX)",
+      "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+      "workspace_id": 1,
+      "document_type": "xlsx",
+      "sample_locator": "[MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: SCADA_48H | Rows 1-100 | Cols A:H | SPREADSHEET]",
+      "syntax_valid": true,
+      "text_rag_status": "ACTIVE_STRUCTURED_ROWS",
+      "visual_rag_status": "ACTIVE_TILED_EMBEDDINGS",
+      "latency_ms": 0.02,
+      "status": "PASS"
+    },
+    {
+      "archetype": "Document (DOCX)",
+      "filename": "Report_MRPL_Financial_History_3Y_REV_B.docx",
+      "workspace_id": 1,
+      "document_type": "docx",
+      "sample_locator": "[Report_MRPL_Financial_History_3Y_REV_B.docx | Section: Operational Summary | Rendered Page 1 | DOCUMENT]",
+      "syntax_valid": true,
+      "text_rag_status": "ACTIVE_SECTIONS",
+      "visual_rag_status": "NOT_IMPLEMENTED_DEGRADED",
+      "latency_ms": 0.01,
+      "status": "PASS"
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "RCA-01",
+      "name": "P-101A Suction Starvation & Cavitation Trip",
+      "query": "Conduct a Root Cause Analysis on pump P-101A: why did it trip on high vibration and cavitation? Cross-reference the inspection report, maintenance SOP, and vibration telemetry logs.",
+      "run_id": 100937,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_match_class": "EXACT",
+      "expected_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "SUCTION_STARVATION_CAVITATION",
+      "expected_cause_code": "SUCTION_STARVATION_CAVITATION",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "found_sources": [
+        "P-101A_Inspection_Report.pdf",
+        "Pump_Maintenance_SOP.pdf",
+        "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf"
+      ],
+      "missing_sources": [],
+      "citation_accuracy": 0.9753,
+      "citation_metrics": {
+        "total_citations": 27,
+        "valid_source_citations": 27,
+        "valid_locator_citations": 25,
+        "claim_bound_citations": 27,
+        "source_accuracy": 1.0,
+        "locator_accuracy": 0.9259,
+        "claim_binding_accuracy": 1.0,
+        "aggregate_accuracy": 0.9753,
+        "invalid_citations": [
+          {
+            "citation": "equipment_readings.csv | Page 1 | TEXT",
+            "reason": "CSV citation missing row-range coordinates."
+          },
+          {
+            "citation": "equipment_readings.csv | Page 1 | TEXT",
+            "reason": "CSV citation missing row-range coordinates."
+          }
+        ]
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 33 | TEXT], [MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 44 | TEXT], [MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 47 | TEXT], [MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT], [P-101A_Inspection_Report.pdf | Page 1 | TEXT], [Pump_Maintenance_SOP.pdf | Page 5 | TEXT], [equipment_readings.csv | Page 1 | TEXT]",
+      "is_ood": false,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "topology"
+        ],
+        "successful_channels": [
+          "text"
+        ],
+        "contributing_channels": [
+          "text"
+        ],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [
+          "text"
+        ],
+        "degradation_reason": "Visual channel disabled for condition",
+        "hybrid_status": "DEGRADED",
+        "text_status": "ACTIVE",
+        "visual_status": "DISABLED",
+        "visual_model": null,
+        "visual_device": null,
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 10,
+        "visual_candidate_count": 0,
+        "visual_inspector_executed": false,
+        "topology_node_count": 8,
+        "topology_edge_count": 7
+      },
+      "spatial_relation_supported": false,
+      "visual_evidence_id_present": false,
+      "visual_evidence_id": null,
+      "primary_cause_references_visual_eid": false,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 54368.75,
+      "latency_retrieval_ms": 3.7,
+      "latency_reasoning_ms": 53422.93,
+      "latency_synthesis_ms": 1.68,
+      "rca_result_structured": {
+        "status": "PLAUSIBLE_HYPOTHESIS",
+        "primary_cause_code": "SUCTION_STARVATION_CAVITATION",
+        "primary_cause_text": "[E1] **Step Observation:**  \nThe operator should conduct a root cause analysis on pump P-101A. Key observations include:  \n1. High discharge pressure exceeding the critical limit (450.0 PSI).  \n2. Vibration RMS exceeding the critical limit (7.0 mm/s).  \n3. Bearing temperature exceeding the alarm limit (85\u00b0C).",
+        "primary_cause_supporting_evidence_ids": [
+          "E1"
+        ],
+        "confirmed_observations": [],
+        "spatial_relations": [],
+        "evidence_items": [
+          {
+            "evidence_id": "E1",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10037,
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "page_number": 33,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 33]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL)\nMRPL-ENG-MAN-API610-REV5.0 // EMERGENCY: CAVITATION & SUCTION PRESSURE LOSS\nSTRICTLY CONFIDENTIAL // LEVEL 3 REFINERY PROCESS SAFETY ARCHIVE // ZERO CLOUD EGRESS\nPage 33 of 50\nEMERGENCY: CAVITATION & SUCTION PRESSURE LOSS\nRecognizing cavitation signatures, acoustic noise, and emergency countermeasures\nCAVITATION IDENTIFICATION & DIAGNOSTIC SIGNATURES\nIMMEDIATE COUNTERMEASURES FOR FIELD & CCR OPERATORS\n1.0 Check feed surge drum level LT-108. If level is below 35%, ",
+            "confidence": 0.3466580525422708,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+              "page_number": 33,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E2",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10037,
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "page_number": 44,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 44]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL)\nMRPL-ENG-MAN-API610-REV5.0 // ROOT CAUSE ANALYSIS (RCA) FAULT TREE: 492.5 PSI\nSTRICTLY CONFIDENTIAL // LEVEL 3 REFINERY PROCESS SAFETY ARCHIVE // ZERO CLOUD EGRESS\nPage 44 of 50\nROOT CAUSE ANALYSIS (RCA) FAULT TREE: 492.5 PSI\nFault tree analysis and 5-Why investigation of the August 14 excursion\n5-WHY INCIDENT INVESTIGATION TREE (REF: INC-2026-0814)\nCORRECTIVE & PREVENTIVE ACTIONS (CAPA LOG)\n- CAPA-01: Installed dual stainless steel weather hoods on all outdoor ac",
+            "confidence": 0.34342595247121965,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+              "page_number": 44,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E3",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10037,
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "page_number": 47,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 47]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL)\nMRPL-ENG-MAN-API610-REV5.0 // ISO 10816-3 VIBRATION SEVERITY & DIAGNOSTICS\nSTRICTLY CONFIDENTIAL // LEVEL 3 REFINERY PROCESS SAFETY ARCHIVE // ZERO CLOUD EGRESS\nPage 47 of 50\nISO 10816-3 VIBRATION SEVERITY & DIAGNOSTICS\nVibration velocity zones, overall RMS thresholds, and FFT spectral analysis\nISO 10816-3 VIBRATION SEVERITY CLASSIFICATION (RIGID FOUNDATION)\nZONE / STATUS        OVERALL VELOCITY (RMS)   OPERATIONAL MANDATE / DIRECTIVE\n-----------------------------",
+            "confidence": 0.33268152750455415,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+              "page_number": 47,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E4",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10039,
+            "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+            "page_number": 4,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL) // PROCESS SAFETY CELL\nMRPL-HAZOP-U01-2026 // NODE 2: P-101A BOOSTER PUMP TRAIN\nPROCESS SAFETY MANAGEMENT AUDIT // STATUTORY OISD ARCHIVE\nPage 4 of 12\nNODE 2: P-101A/B CENTRIFUGAL BOOSTER PUMP CASING & HYDRAULIC LOOP\n2.1 Node Scope & Rotating Equipment Boundary\nNode 2 covers centrifugal booster pump P-101A (API 610 Type BB2 between-bearing, double suction), driver motor M-101A (6.6\nkV, 450 kW), mechanical seal Plan 53A barrier fluid loop, casing discharge to discharge MOV-102, and by",
+            "confidence": 0.2918544854873266,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+              "page_number": 4,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E5",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10068,
+            "filename": "P-101A_Inspection_Report.pdf",
+            "page_number": 1,
+            "processing_version": "014011e2-ee32-4f29-b93a-9e00362c16e2",
+            "retrieval_channel": "text",
+            "evidence_role": "INSPECTION",
+            "content": "IPMENT: P-101A Centrifugal Booster Pump\n\nCRITICAL TELEMETRY OBSERVATIONS:\n- Equipment Tag P-101A discharge pressure transmitter PT-101 reads: 492.5 PSI.\n- Safe operating threshold: 80 - 120 PSI.\n- CRITICAL TRIP LIMIT (450.0 PSI) EXCEEDED by 42.5 PSI.\n- Bearing temperature transmitter TT-204 metal reading: 92.1 deg C (Alarm limit 85 C).\n- Vibration accelerometer VT-301 reading: 7.8 mm/s RMS (Critical trip limit 7.0 mm/s).\n- Mechanical Seal Plan 53A buffer pressure differential dropping rapidly.",
+            "confidence": 0.2845059205324222,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "P-101A_Inspection_Report.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E6",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10026,
+            "filename": "P-101A_Inspection_Report.pdf",
+            "page_number": 1,
+            "processing_version": "360a73aa-8e4f-4087-8eca-ed1262a45392",
+            "retrieval_channel": "text",
+            "evidence_role": "INSPECTION",
+            "content": "MANGALORE REFINERY AND PETROCHEMICALS LIMITED\nQUALITY ASSURANCE & MECHANICAL INTEGRITY INSPECTION DOSSIER\n\n\nEquipment Tag:          P-101A (Booster Pump)               Inspection Report #:      MRPL-NDT-2026-0982\n\nPlant Location:             Unit 01 (HCU) Area 3B                 Inspection Date:          2026-09-04\n\nInspection Type:          Turnaround NDT & Ultrasonic Survey    Lead Inspector:            P. K. Verma (ASNT Level III)",
+            "confidence": 0.2750877753282205,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "P-101A_Inspection_Report.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E7",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "sponse: Field operator inspects casing within 10 seconds. If cavitation rumble,\nrubbing, or violent shaking (> 5.0 mm/s) occurs, trip immediately.\nStep 6 \u2014 Verify Pressure Rise: Discharge pressure transmitter PT-101 must register immediate pressure rise to shutoff head (~165 PSI)\nagainst the closed discharge valve.\nStep 7 \u2014 Throttled Valve Ramp: Over a duration of 45 to 60 seconds, gradually open the 12-inch discharge motor-operated valve\n(MOV-102) to establish process flow into Reactor-B.",
+            "confidence": 0.27396086546090936,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E8",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10029,
+            "filename": "equipment_readings.csv",
+            "page_number": 1,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "### equipment_readings.csv (Rows 161 to 200):\n          timestamp component_id  discharge_pressure_psi  suction_pressure_psi  flow_rate_m3_h  bearing_temperature_c  vibration_rms_mm_s  motor_current_amps  reactor_inlet_pressure_psi  reactor_bed_temp_c sv402_relief_valve_status  lube_oil_pressure_bar status_indicator\n2026-09-05 13:20:00       P-101A                  104.62                 19.40          374.90                  69.20               2.428               177.6                       96.12               398.2                    CLOSED                   3.31          NOMINAL\n2026-09-05",
+            "confidence": 0.27311386817540884,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "row_range",
+              "document_type": "csv",
+              "filename": "equipment_readings.csv",
+              "page_number": null,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          }
+        ],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "topology"
+          ],
+          "successful_channels": [
+            "text"
+          ],
+          "contributing_channels": [
+            "text"
+          ],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [
+            "text"
+          ],
+          "degradation_reason": "Visual channel disabled for condition",
+          "hybrid_status": "DEGRADED",
+          "text_status": "ACTIVE",
+          "visual_status": "DISABLED",
+          "visual_model": null,
+          "visual_device": null,
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 10,
+          "visual_candidate_count": 0,
+          "visual_inspector_executed": false,
+          "topology_node_count": 8,
+          "topology_edge_count": 7
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Explicitly requested source `Vibration Log` was not found in the workspace vault.",
+          "Missing required role evidence: Incident Chronology."
+        ],
+        "sources": [
+          {
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "locator": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 33]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "locator": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 44]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "locator": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 47]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+            "locator": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4]",
+            "channel": "text"
+          },
+          {
+            "filename": "P-101A_Inspection_Report.pdf",
+            "locator": "[P-101A_Inspection_Report.pdf | Page 1]",
+            "channel": "text"
+          },
+          {
+            "filename": "P-101A_Inspection_Report.pdf",
+            "locator": "[P-101A_Inspection_Report.pdf | Page 1]",
+            "channel": "text"
+          },
+          {
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "locator": "[Pump_Maintenance_SOP.pdf | Page 5]",
+            "channel": "text"
+          },
+          {
+            "filename": "equipment_readings.csv",
+            "locator": "[equipment_readings.csv | Rows | TEXT]",
+            "channel": "text"
+          }
+        ]
+      }
+    },
+    {
+      "scenario_id": "RCA-02",
+      "name": "K-101 Centrifugal Compressor Overheat & ESD Trip",
+      "query": "Why did centrifugal compressor K-101 trip on high journal bearing temperature and discharge overpressure? Cross-reference operating procedure and manual.",
+      "run_id": 100938,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_match_class": "EXACT",
+      "expected_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "BEARING_OVERHEAT",
+      "expected_cause_code": "BEARING_OVERHEAT",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "found_sources": [
+        "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+        "Pump_Maintenance_SOP.pdf",
+        "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+        "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx"
+      ],
+      "missing_sources": [],
+      "citation_accuracy": 0.9444,
+      "citation_metrics": {
+        "total_citations": 24,
+        "valid_source_citations": 24,
+        "valid_locator_citations": 20,
+        "claim_bound_citations": 24,
+        "source_accuracy": 1.0,
+        "locator_accuracy": 0.8333,
+        "claim_binding_accuracy": 1.0,
+        "aggregate_accuracy": 0.9444,
+        "invalid_citations": [
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          },
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          },
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          },
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          }
+        ]
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 1 | TEXT], [MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 16 | TEXT], [MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 32 | TEXT], [MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT], [Pump_Maintenance_SOP.pdf | Page 6 | TEXT], [MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 2 | TEXT]",
+      "is_ood": false,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "topology"
+        ],
+        "successful_channels": [
+          "text"
+        ],
+        "contributing_channels": [
+          "text"
+        ],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [
+          "text"
+        ],
+        "degradation_reason": "Visual channel disabled for condition",
+        "hybrid_status": "DEGRADED",
+        "text_status": "ACTIVE",
+        "visual_status": "DISABLED",
+        "visual_model": null,
+        "visual_device": null,
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 10,
+        "visual_candidate_count": 0,
+        "visual_inspector_executed": false,
+        "topology_node_count": 8,
+        "topology_edge_count": 7
+      },
+      "spatial_relation_supported": false,
+      "visual_evidence_id_present": false,
+      "visual_evidence_id": null,
+      "primary_cause_references_visual_eid": false,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 49935.93,
+      "latency_retrieval_ms": 1.91,
+      "latency_reasoning_ms": 49390.19,
+      "latency_synthesis_ms": 0.63,
+      "rca_result_structured": {
+        "status": "PLAUSIBLE_HYPOTHESIS",
+        "primary_cause_code": "BEARING_OVERHEAT",
+        "primary_cause_text": "[E1] The centrifugal compressor K-101 tripped due to two primary issues: high journal bearing temperature and discharge overpressure. According to the operating procedure and manual, the system automatically trips when the journal bearing temperature exceeds 95.0 \u00b0C or discharge pressure surpasses 450.0 PSI. In this case, the journal bearing temperature was the primary cause, triggering the overpressure trip. The discharge pressure was a secondary indicator, but the main issue was the elevated temperature. The system's response was appropriate as per the operating procedure.",
+        "primary_cause_supporting_evidence_ids": [
+          "E1"
+        ],
+        "confirmed_observations": [],
+        "spatial_relations": [],
+        "evidence_items": [
+          {
+            "evidence_id": "E1",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10062,
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "page_number": 1,
+            "processing_version": "e01a9c3f-a0f6-4dce-97c5-3c7e11c02550",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "ility)                    Approving Supervisor: Jane D. / Vicky S. (Four-Eyes)\n\n 1. Equipment Description & Operational Envelope\n Compressor K-101 is a multi-stage centrifugal recycle gas compressor driven by a 4,200 kW, 6.6 kV electric motor (M-101).\n The machine recirculates hydrogen-rich treat gas through the Unit-01 hydrotreating reactors. All operators and automated\n  control loops must adhere strictly to the safe operating envelope established below:",
+            "confidence": 0.3960741238716321,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E2",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 888802,
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "page_number": 1,
+            "processing_version": "1b922224-cb4a-4283-86b9-0149ce643274",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "ility)                    Approving Supervisor: Jane D. / Vicky S. (Four-Eyes)\n\n 1. Equipment Description & Operational Envelope\n Compressor K-101 is a multi-stage centrifugal recycle gas compressor driven by a 4,200 kW, 6.6 kV electric motor (M-101).\n The machine recirculates hydrogen-rich treat gas through the Unit-01 hydrotreating reactors. All operators and automated\n  control loops must adhere strictly to the safe operating envelope established below:",
+            "confidence": 0.3960741238716321,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E3",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10037,
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "page_number": 16,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 16]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL)\nMRPL-ENG-MAN-API610-REV5.0 // API 617 / 618 HEAVY GAS COMPRESSORS\nSTRICTLY CONFIDENTIAL // LEVEL 3 REFINERY PROCESS SAFETY ARCHIVE // ZERO CLOUD EGRESS\nPage 16 of 50\nAPI 617 / 618 HEAVY GAS COMPRESSORS\nCentrifugal recycle compressors, reciprocating make-up machines, and anti-surge\nCOMPRESSOR MECHANICAL & AERO-THERMODYNAMIC LIMITS\nANTI-SURGE CONTROL LOOP DYNAMICS\nCentrifugal compressor surge occurs when inlet flow drops below the aerodynamic stability boundary, cau",
+            "confidence": 0.38477908189480126,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+              "page_number": 16,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E4",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10037,
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "page_number": 32,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 32]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL)\nMRPL-ENG-MAN-API610-REV5.0 // LONG-TERM EQUIPMENT PRESERVATION & N2 BLANKETING\nSTRICTLY CONFIDENTIAL // LEVEL 3 REFINERY PROCESS SAFETY ARCHIVE // ZERO CLOUD EGRESS\nPage 32 of 50\nLONG-TERM EQUIPMENT PRESERVATION & N2 BLANKETING\nPreservation of idle pumps, nitrogen blankets, and periodic shaft rotation\nEQUIPMENT PRESERVATION PROTOCOL FOR INACTIVE UNITS\nCOMPONENT / SUBSYSTEM     PRESERVATION MEDIUM                MAINTENANCE INSPECTION FREQUENCY\n--------------------",
+            "confidence": 0.36238053517463886,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+              "page_number": 32,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E5",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10039,
+            "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+            "page_number": 4,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL) // PROCESS SAFETY CELL\nMRPL-HAZOP-U01-2026 // NODE 2: P-101A BOOSTER PUMP TRAIN\nPROCESS SAFETY MANAGEMENT AUDIT // STATUTORY OISD ARCHIVE\nPage 4 of 12\nNODE 2: P-101A/B CENTRIFUGAL BOOSTER PUMP CASING & HYDRAULIC LOOP\n2.1 Node Scope & Rotating Equipment Boundary\nNode 2 covers centrifugal booster pump P-101A (API 610 Type BB2 between-bearing, double suction), driver motor M-101A (6.6\nkV, 450 kW), mechanical seal Plan 53A barrier fluid loop, casing discharge to discharge MOV-102, and by",
+            "confidence": 0.3557136028240889,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+              "page_number": 4,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E6",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 6,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "VENTION PROTOCOL & FOUR-EYES SUPERVISORY GATE\n\n5.1 Immediate Automated Response to Overpressure Surge:\nIf discharge pressure exceeds 450.0 PSI (31.02 bar) or bearing temperature breaches 95.0 \u00b0C:\n1. The automated safety interlock trips breaker VCB-101A, de-energizing the main 450 kW drive motor.\n2. Emergency Safety Relief Valve SV-402 opens fully, venting trapped hydrocarbon volume into the Flare-Header.\n3. Minimum recirculation bypass valve opens 100% to dissipate residual hydraulic momentum.",
+            "confidence": 0.29315103934361386,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 6,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E7",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10033,
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "page_number": 4,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "### Workbook: MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Equipment_Health_and_KPIs (Page 4)\nEquipment_Tag | Operating_Hours_YTD | Availability_pct | MTBF_Hours | MTTR_Hours | OEE_pct | Vibration_Trend | Lubrication_Index | Maintenance_Status |  |  |  |  |  | \nP-101A | 5840 | 98.4 | 4200 | 6.2 | 91.2 | Elevated during surge | Good (TAN 0.18) | Overpressure Trip Rectified |  |  |  |  |  | \nP-101B | 1420 | 99.8 | 6800 | 3.5 | 96.5 | Nominal (1.6 mm/s) | Pristine | Standby Armed |  |  |  |  |  | \nReactor-B | 8760 | 99.9 | 12500 | 18 | 98.2 | Normal | N/A (Fixed Bed) | Active Hy",
+            "confidence": 0.27970232107700443,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "spreadsheet",
+              "document_type": "xlsx",
+              "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+              "page_number": null,
+              "sheet_name": "Equipment_Health_and_KPIs",
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E8",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10033,
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "page_number": 2,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "### Workbook: MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Alarm_Event_Log_ISA18_2 (Page 2)\nEvent_ID | Timestamp | Alarm_Tag | Subsystem | Severity | Set_Point_Limit | Trip_Value | Acknowledge_State | Acknowledged_By | Corrective_Action |  |  |  |  | \nALM-88401 | 2026-09-05 04:15:20 | PAH-101 | Discharge Manifold | HIGH | 140.0 PSI | 148.2 PSI | ACKNOWLEDGED | Operator Sam | Throttled bypass valve FV-101 |  |  |  |  | \nALM-88402 | 2026-09-05 11:20:10 | TAH-204 | Inboard Bearing | MEDIUM | 85.0 \u00b0C | 87.4 \u00b0C | ACKNOWLEDGED | Operator Sam | Lube oil cooling fan started |  |  |  ",
+            "confidence": 0.272004151955629,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "spreadsheet",
+              "document_type": "xlsx",
+              "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+              "page_number": null,
+              "sheet_name": "Alarm_Event_Log_ISA18_2",
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          }
+        ],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "topology"
+          ],
+          "successful_channels": [
+            "text"
+          ],
+          "contributing_channels": [
+            "text"
+          ],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [
+            "text"
+          ],
+          "degradation_reason": "Visual channel disabled for condition",
+          "hybrid_status": "DEGRADED",
+          "text_status": "ACTIVE",
+          "visual_status": "DISABLED",
+          "visual_model": null,
+          "visual_device": null,
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 10,
+          "visual_candidate_count": 0,
+          "visual_inspector_executed": false,
+          "topology_node_count": 8,
+          "topology_edge_count": 7
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Missing required role evidence: Pressure.",
+          "Missing required role evidence: Temperature.",
+          "Missing required role evidence: Incident Chronology."
+        ],
+        "sources": [
+          {
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "locator": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 1]",
+            "channel": "text"
+          },
+          {
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "locator": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 1]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "locator": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 16]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf",
+            "locator": "[MRPL_Centrifugal_Pumps_and_Hydrotreater_Operations_Manual_API610.pdf | Page 32]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+            "locator": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4]",
+            "channel": "text"
+          },
+          {
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "locator": "[Pump_Maintenance_SOP.pdf | Page 6]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "locator": "[MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Equipment_Health_and_KPIs | TEXT]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "locator": "[MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Alarm_Event_Log_ISA18_2 | TEXT]",
+            "channel": "text"
+          }
+        ]
+      }
+    },
+    {
+      "scenario_id": "RCA-03",
+      "name": "P-101A Missing Evidence Honest Abstention Gate",
+      "query": "Conduct a Root Cause Analysis on pump P-101A: why did it trip?",
+      "run_id": 100939,
+      "run_status": "completed",
+      "matched_rca_status": "INSUFFICIENT_EVIDENCE",
+      "status_match_class": "EXACT",
+      "expected_status": "INSUFFICIENT_EVIDENCE",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "INSUFFICIENT_EVIDENCE",
+      "expected_cause_code": "INSUFFICIENT_EVIDENCE",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "found_sources": [],
+      "missing_sources": [],
+      "citation_accuracy": null,
+      "citation_metrics": {
+        "total_citations": 0,
+        "valid_source_citations": 0,
+        "valid_locator_citations": 0,
+        "claim_bound_citations": 0,
+        "source_accuracy": null,
+        "locator_accuracy": null,
+        "claim_binding_accuracy": null,
+        "aggregate_accuracy": null,
+        "invalid_citations": []
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "[Pump_Maintenance_SOP.pdf | Page 5 | TEXT]",
+      "is_ood": false,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "topology"
+        ],
+        "successful_channels": [
+          "text"
+        ],
+        "contributing_channels": [
+          "text"
+        ],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [
+          "text"
+        ],
+        "degradation_reason": "Visual channel disabled for condition",
+        "hybrid_status": "DEGRADED",
+        "text_status": "ACTIVE",
+        "visual_status": "DISABLED",
+        "visual_model": null,
+        "visual_device": null,
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 10,
+        "visual_candidate_count": 0,
+        "visual_inspector_executed": false,
+        "topology_node_count": 8,
+        "topology_edge_count": 7
+      },
+      "spatial_relation_supported": false,
+      "visual_evidence_id_present": false,
+      "visual_evidence_id": null,
+      "primary_cause_references_visual_eid": false,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 51207.1,
+      "latency_retrieval_ms": 3.13,
+      "latency_reasoning_ms": 50754.27,
+      "latency_synthesis_ms": 0.15,
+      "rca_result_structured": {
+        "status": "INSUFFICIENT_EVIDENCE",
+        "primary_cause_code": "INSUFFICIENT_EVIDENCE",
+        "primary_cause_text": "Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.",
+        "primary_cause_supporting_evidence_ids": [],
+        "confirmed_observations": [
+          {
+            "claim_id": null,
+            "text": "No independently measured observation was supplied beyond the operator's written description.",
+            "supporting_evidence_ids": []
+          }
+        ],
+        "spatial_relations": [],
+        "evidence_items": [
+          {
+            "evidence_id": "E1",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "0 NORMAL STARTUP, COMMISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.17539159456888842,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E2",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "P, COMMISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.16280240584642458,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E3",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "NORMAL STARTUP, COMMISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.15776367370898914,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E4",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "NORMAL STARTUP, COMMISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.15776367370898914,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E5",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "ISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.15670981773963344,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E6",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "IONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.14945425131382084,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E7",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": ".0 NORMAL STARTUP, COMMISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.1422556913816012,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E8",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "RMAL STARTUP, COMMISIONING & FLOW RAMP-UP SEQUENCE",
+            "confidence": 0.14047068510300076,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "P-101A"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          }
+        ],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "topology"
+          ],
+          "successful_channels": [
+            "text"
+          ],
+          "contributing_channels": [
+            "text"
+          ],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [
+            "text"
+          ],
+          "degradation_reason": "Visual channel disabled for condition",
+          "hybrid_status": "DEGRADED",
+          "text_status": "ACTIVE",
+          "visual_status": "DISABLED",
+          "visual_model": null,
+          "visual_device": null,
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 10,
+          "visual_candidate_count": 0,
+          "visual_inspector_executed": false,
+          "topology_node_count": 8,
+          "topology_edge_count": 7
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Standard operating procedures (SOPs) or equipment manuals.",
+          "Historical inspection records and maintenance work orders.",
+          "Time-aligned DCS telemetry trends (pressure, temperature, vibration)."
+        ],
+        "sources": []
+      }
+    },
+    {
+      "scenario_id": "RCA-04",
+      "name": "Out-of-Distribution (OOD) Nonexistent Asset Safety Gate",
+      "query": "Why did compressor K-888 trip on overpressure?",
+      "run_id": 100940,
+      "run_status": "completed",
+      "matched_rca_status": "ASSET_NOT_FOUND",
+      "status_match_class": "EXACT",
+      "expected_status": "ASSET_NOT_FOUND",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "ASSET_NOT_FOUND",
+      "expected_cause_code": "ASSET_NOT_FOUND",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "found_sources": [],
+      "missing_sources": [],
+      "citation_accuracy": null,
+      "citation_metrics": {
+        "total_citations": 0,
+        "valid_source_citations": 0,
+        "valid_locator_citations": 0,
+        "claim_bound_citations": 0,
+        "source_accuracy": null,
+        "locator_accuracy": null,
+        "claim_binding_accuracy": null,
+        "aggregate_accuracy": null,
+        "invalid_citations": []
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "None (Asset Not Found)",
+      "is_ood": true,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "topology"
+        ],
+        "successful_channels": [],
+        "contributing_channels": [],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [],
+        "degradation_reason": "Asset(s) K-888 not registered in plant topology",
+        "hybrid_status": "ACTIVE",
+        "text_status": "ACTIVE",
+        "visual_status": "DISABLED",
+        "visual_model": null,
+        "visual_device": null,
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 0,
+        "visual_candidate_count": 0,
+        "visual_inspector_executed": false,
+        "topology_node_count": 0,
+        "topology_edge_count": 0
+      },
+      "spatial_relation_supported": false,
+      "visual_evidence_id_present": false,
+      "visual_evidence_id": null,
+      "primary_cause_references_visual_eid": false,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 460.86,
+      "latency_retrieval_ms": 0.0,
+      "latency_reasoning_ms": 460.86,
+      "latency_synthesis_ms": 0.0,
+      "rca_result_structured": {
+        "status": "ASSET_NOT_FOUND",
+        "primary_cause_code": "ASSET_NOT_FOUND",
+        "primary_cause_text": "Cannot evaluate root cause: Asset `K-888` was not found in the refinery hierarchy.",
+        "primary_cause_supporting_evidence_ids": [],
+        "confirmed_observations": [
+          {
+            "claim_id": null,
+            "text": "Equipment `K-888` is not registered in the refinery topology or workspace knowledge vault.",
+            "supporting_evidence_ids": []
+          }
+        ],
+        "spatial_relations": [],
+        "evidence_items": [],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "topology"
+          ],
+          "successful_channels": [],
+          "contributing_channels": [],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [],
+          "degradation_reason": "Asset(s) K-888 not registered in plant topology",
+          "hybrid_status": "ACTIVE",
+          "text_status": "ACTIVE",
+          "visual_status": "DISABLED",
+          "visual_model": null,
+          "visual_device": null,
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 0,
+          "visual_candidate_count": 0,
+          "visual_inspector_executed": false,
+          "topology_node_count": 0,
+          "topology_edge_count": 0
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Verify equipment tag against the refinery asset registry (e.g., P-101A, K-101, Reactor-B)."
+        ],
+        "sources": []
+      }
+    },
+    {
+      "scenario_id": "RCA-05",
+      "name": "Final-Step Protocol Tool Lockout & Safe Interception",
+      "query": "Synthesize the final RCA conclusion for K-101 compressor bearing trip.",
+      "run_id": 100941,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_match_class": "EXACT",
+      "expected_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "BEARING_OVERHEAT",
+      "expected_cause_code": "BEARING_OVERHEAT",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 0.3333,
+      "source_coverage": 1.0,
+      "found_sources": [
+        "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+        "Pump_Maintenance_SOP.pdf"
+      ],
+      "missing_sources": [],
+      "citation_accuracy": 0.9167,
+      "citation_metrics": {
+        "total_citations": 16,
+        "valid_source_citations": 16,
+        "valid_locator_citations": 12,
+        "claim_bound_citations": 16,
+        "source_accuracy": 1.0,
+        "locator_accuracy": 0.75,
+        "claim_binding_accuracy": 1.0,
+        "aggregate_accuracy": 0.9167,
+        "invalid_citations": [
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          },
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          },
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          },
+          {
+            "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT",
+            "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+          }
+        ]
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT], [Pump_Maintenance_SOP.pdf | Page 5 | TEXT], [MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 4 | TEXT], [MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 1 | TEXT], [K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 2 | TEXT], [K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 1 | TEXT]",
+      "is_ood": false,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "topology"
+        ],
+        "successful_channels": [
+          "text"
+        ],
+        "contributing_channels": [
+          "text"
+        ],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [
+          "text"
+        ],
+        "degradation_reason": "Visual channel disabled for condition",
+        "hybrid_status": "DEGRADED",
+        "text_status": "ACTIVE",
+        "visual_status": "DISABLED",
+        "visual_model": null,
+        "visual_device": null,
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 10,
+        "visual_candidate_count": 0,
+        "visual_inspector_executed": false,
+        "topology_node_count": 8,
+        "topology_edge_count": 7
+      },
+      "spatial_relation_supported": false,
+      "visual_evidence_id_present": false,
+      "visual_evidence_id": null,
+      "primary_cause_references_visual_eid": false,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 74867.97,
+      "latency_retrieval_ms": 3.64,
+      "latency_reasoning_ms": 74406.69,
+      "latency_synthesis_ms": 1.84,
+      "rca_result_structured": {
+        "status": "PLAUSIBLE_HYPOTHESIS",
+        "primary_cause_code": "BEARING_OVERHEAT",
+        "primary_cause_text": "Analysis points to potential component degradation; see supporting evidence below.",
+        "primary_cause_supporting_evidence_ids": [
+          "E1"
+        ],
+        "confirmed_observations": [
+          {
+            "claim_id": null,
+            "text": "Vibration Reading: 1.6 mm/s (within the normal operating range as per the standard operating envelope)",
+            "supporting_evidence_ids": []
+          },
+          {
+            "claim_id": null,
+            "text": "Automated Response: Discharge pressure transmitter PT-101 registered immediate pressure rise, confirming the trip was necessary [Pump_Maintenance_SOP.pdf | Page 5]",
+            "supporting_evidence_ids": [
+              "E6"
+            ]
+          },
+          {
+            "claim_id": null,
+            "text": "No signs of cavitation or mechanical issues, as indicated by the vibration trend",
+            "supporting_evidence_ids": []
+          }
+        ],
+        "spatial_relations": [],
+        "evidence_items": [
+          {
+            "evidence_id": "E1",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10062,
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "page_number": 2,
+            "processing_version": "e01a9c3f-a0f6-4dce-97c5-3c7e11c02550",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "bable Root Cause           Automated Sensor Tag   Prescribed Corrective Action\n\n Radial vibration excursion >    Liquid carryover into 1st stage                            Check suction KO drum level (LT-104);\n  3.8 mm/s on DE                 impeller or coupling misalignment   VT-102A / VT-102B        drain condensate immediately.",
+            "confidence": 0.24164827053363513,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+              "page_number": 2,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E2",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 888802,
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "page_number": 2,
+            "processing_version": "1b922224-cb4a-4283-86b9-0149ce643274",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "bable Root Cause           Automated Sensor Tag   Prescribed Corrective Action\n\n Radial vibration excursion >    Liquid carryover into 1st stage                            Check suction KO drum level (LT-104);\n  3.8 mm/s on DE                 impeller or coupling misalignment   VT-102A / VT-102B        drain condensate immediately.",
+            "confidence": 0.24164827053363513,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+              "page_number": 2,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E3",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10062,
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "page_number": 1,
+            "processing_version": "e01a9c3f-a0f6-4dce-97c5-3c7e11c02550",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "ility)                    Approving Supervisor: Jane D. / Vicky S. (Four-Eyes)\n\n 1. Equipment Description & Operational Envelope\n Compressor K-101 is a multi-stage centrifugal recycle gas compressor driven by a 4,200 kW, 6.6 kV electric motor (M-101).\n The machine recirculates hydrogen-rich treat gas through the Unit-01 hydrotreating reactors. All operators and automated\n  control loops must adhere strictly to the safe operating envelope established below:",
+            "confidence": 0.20955850527836728,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E4",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 888802,
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "page_number": 1,
+            "processing_version": "1b922224-cb4a-4283-86b9-0149ce643274",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "ility)                    Approving Supervisor: Jane D. / Vicky S. (Four-Eyes)\n\n 1. Equipment Description & Operational Envelope\n Compressor K-101 is a multi-stage centrifugal recycle gas compressor driven by a 4,200 kW, 6.6 kV electric motor (M-101).\n The machine recirculates hydrogen-rich treat gas through the Unit-01 hydrotreating reactors. All operators and automated\n  control loops must adhere strictly to the safe operating envelope established below:",
+            "confidence": 0.20955850527836728,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E5",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10039,
+            "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+            "page_number": 4,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4]\nMANGALORE REFINERY & PETROCHEMICALS LIMITED (MRPL) // PROCESS SAFETY CELL\nMRPL-HAZOP-U01-2026 // NODE 2: P-101A BOOSTER PUMP TRAIN\nPROCESS SAFETY MANAGEMENT AUDIT // STATUTORY OISD ARCHIVE\nPage 4 of 12\nNODE 2: P-101A/B CENTRIFUGAL BOOSTER PUMP CASING & HYDRAULIC LOOP\n2.1 Node Scope & Rotating Equipment Boundary\nNode 2 covers centrifugal booster pump P-101A (API 610 Type BB2 between-bearing, double suction), driver motor M-101A (6.6\nkV, 450 kW), mechanical seal Plan 53A barrier fluid loop, casing discharge to discharge MOV-102, and by",
+            "confidence": 0.1939141200138973,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+              "page_number": 4,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E6",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10027,
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "page_number": 5,
+            "processing_version": "266f3d48-f3bb-44c8-897d-8ea55b040c8c",
+            "retrieval_channel": "text",
+            "evidence_role": "SOP_BASELINE",
+            "content": "sponse: Field operator inspects casing within 10 seconds. If cavitation rumble,\nrubbing, or violent shaking (> 5.0 mm/s) occurs, trip immediately.\nStep 6 \u2014 Verify Pressure Rise: Discharge pressure transmitter PT-101 must register immediate pressure rise to shutoff head (~165 PSI)\nagainst the closed discharge valve.\nStep 7 \u2014 Throttled Valve Ramp: Over a duration of 45 to 60 seconds, gradually open the 12-inch discharge motor-operated valve\n(MOV-102) to establish process flow into Reactor-B.",
+            "confidence": 0.19007374690129208,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "Pump_Maintenance_SOP.pdf",
+              "page_number": 5,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E7",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10033,
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "page_number": 4,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "### Workbook: MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Equipment_Health_and_KPIs (Page 4)\nEquipment_Tag | Operating_Hours_YTD | Availability_pct | MTBF_Hours | MTTR_Hours | OEE_pct | Vibration_Trend | Lubrication_Index | Maintenance_Status |  |  |  |  |  | \nP-101A | 5840 | 98.4 | 4200 | 6.2 | 91.2 | Elevated during surge | Good (TAN 0.18) | Overpressure Trip Rectified |  |  |  |  |  | \nP-101B | 1420 | 99.8 | 6800 | 3.5 | 96.5 | Nominal (1.6 mm/s) | Pristine | Standby Armed |  |  |  |  |  | \nReactor-B | 8760 | 99.9 | 12500 | 18 | 98.2 | Normal | N/A (Fixed Bed) | Active Hy",
+            "confidence": 0.18487591621203303,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "spreadsheet",
+              "document_type": "xlsx",
+              "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+              "page_number": null,
+              "sheet_name": "Equipment_Health_and_KPIs",
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E8",
+            "source_type": "pdf",
+            "workspace_id": 1,
+            "source_id": 10033,
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "page_number": 1,
+            "processing_version": "v1",
+            "retrieval_channel": "text",
+            "evidence_role": "VIBRATION",
+            "content": "### Workbook: MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Continuous_SCADA_Telemetry (Page 1)\ntimestamp | component_id | discharge_pressure_psi | suction_pressure_psi | flow_rate_m3_h | bearing_temperature_c | vibration_rms_mm_s | motor_current_amps | reactor_inlet_pressure_psi | reactor_bed_temp_c | sv402_relief_valve_status | lube_oil_pressure_bar | status_indicator |  | \n2026-09-05 00:00:00 | P-101A | 104.62 | 19.77 | 377.71 | 69.56 | 2.244 | 178.0 | 96.12 | 398.9 | CLOSED | 3.49 | NOMINAL |  | \n2026-09-05 00:05:00 | P-101A | 104.11 | 20.29 | 377.37 | 69.79 | 2.355 | 175.",
+            "confidence": 0.1836182582072723,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "spreadsheet",
+              "document_type": "xlsx",
+              "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+              "page_number": null,
+              "sheet_name": "Continuous_SCADA_Telemetry",
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "K-101"
+            ],
+            "sensor_ids": [],
+            "metadata": {}
+          }
+        ],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "topology"
+          ],
+          "successful_channels": [
+            "text"
+          ],
+          "contributing_channels": [
+            "text"
+          ],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [
+            "text"
+          ],
+          "degradation_reason": "Visual channel disabled for condition",
+          "hybrid_status": "DEGRADED",
+          "text_status": "ACTIVE",
+          "visual_status": "DISABLED",
+          "visual_model": null,
+          "visual_device": null,
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 10,
+          "visual_candidate_count": 0,
+          "visual_inspector_executed": false,
+          "topology_node_count": 8,
+          "topology_edge_count": 7
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Missing required role evidence: Incident Chronology."
+        ],
+        "sources": [
+          {
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "locator": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 2]",
+            "channel": "text"
+          },
+          {
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "locator": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 2]",
+            "channel": "text"
+          },
+          {
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "locator": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 1]",
+            "channel": "text"
+          },
+          {
+            "filename": "K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf",
+            "locator": "[K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 1]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf",
+            "locator": "[MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4]",
+            "channel": "text"
+          },
+          {
+            "filename": "Pump_Maintenance_SOP.pdf",
+            "locator": "[Pump_Maintenance_SOP.pdf | Page 5]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "locator": "[MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Equipment_Health_and_KPIs | TEXT]",
+            "channel": "text"
+          },
+          {
+            "filename": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx",
+            "locator": "[MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Continuous_SCADA_Telemetry | TEXT]",
+            "channel": "text"
+          }
+        ]
+      }
+    },
+    {
+      "scenario_id": "RCA-06",
+      "name": "Visual-Dependent P&ID RCA (Hydrocracker R-301 / FV-302)",
+      "query": "Conduct a Root Cause Analysis for the high pressure trip on reactor R-301. Cross-reference the incident log, spatial P&ID drawing, and FV-302 valve actuator maintenance log.",
+      "run_id": 100942,
+      "run_status": "completed",
+      "matched_rca_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_match_class": "EXACT",
+      "expected_status": "PLAUSIBLE_HYPOTHESIS",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "VALVE_STEM_BINDING",
+      "expected_cause_code": "VALVE_STEM_BINDING",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 0.0,
+      "found_sources": [],
+      "missing_sources": [
+        "RCA-CASE-A-DOC1_Hydrocracker_High_Pressure_Trip_Chrono.pdf",
+        "RCA-CASE-A-DOC2_Feed_Control_FV302_Spatial_PID.pdf",
+        "RCA-CASE-A-DOC3_Valve_FV302_Maintenance_Actuator_Log.pdf"
+      ],
+      "citation_accuracy": 1.0,
+      "citation_metrics": {
+        "total_citations": 3,
+        "valid_source_citations": 3,
+        "valid_locator_citations": 3,
+        "claim_bound_citations": 3,
+        "source_accuracy": 1.0,
+        "locator_accuracy": 1.0,
+        "claim_binding_accuracy": 1.0,
+        "aggregate_accuracy": 1.0,
+        "invalid_citations": []
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "[PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf | Page 1 | VISUAL]",
+      "is_ood": false,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "successful_channels": [
+          "text",
+          "visual"
+        ],
+        "contributing_channels": [
+          "visual"
+        ],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [
+          "text",
+          "visual"
+        ],
+        "degradation_reason": null,
+        "hybrid_status": "ACTIVE",
+        "text_status": "ACTIVE",
+        "visual_status": "ACTIVE",
+        "visual_model": "Qdrant/colmodernvbert",
+        "visual_device": "cuda",
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 0,
+        "visual_candidate_count": 1,
+        "visual_inspector_executed": true,
+        "topology_node_count": 0,
+        "topology_edge_count": 0
+      },
+      "spatial_relation_supported": true,
+      "visual_evidence_id_present": true,
+      "visual_evidence_id": "E1",
+      "primary_cause_references_visual_eid": true,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 76135.06,
+      "latency_retrieval_ms": 11.53,
+      "latency_reasoning_ms": 60712.9,
+      "latency_synthesis_ms": 0.33,
+      "rca_result_structured": {
+        "status": "PLAUSIBLE_HYPOTHESIS",
+        "primary_cause_code": "VALVE_STEM_BINDING",
+        "primary_cause_text": "[E1] To conduct a Root Cause Analysis (RCA) for the high pressure trip on reactor R-301, we systematically examine the retrieved evidence and current step details.",
+        "primary_cause_supporting_evidence_ids": [
+          "E1"
+        ],
+        "confirmed_observations": [],
+        "spatial_relations": [
+          {
+            "subject": "FV-302",
+            "relation_type": "UPSTREAM_OF",
+            "object": "R-301",
+            "supporting_evidence_id": "E1",
+            "source_id": 1020,
+            "filename": "PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf",
+            "processing_version": "v1",
+            "locator": "[PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf | Page 1 | VISUAL]",
+            "inspection_status": "SUCCESS",
+            "tag_corroboration": false
+          }
+        ],
+        "evidence_items": [
+          {
+            "evidence_id": "E1",
+            "source_type": "image",
+            "workspace_id": 9998,
+            "source_id": 1020,
+            "filename": "PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf",
+            "page_number": 1,
+            "processing_version": "v1",
+            "retrieval_channel": "visual",
+            "evidence_role": "P_AND_ID",
+            "content": "The image presents a detailed engineering diagram of a process control system. The diagram is predominantly black and white, with various equipment and instruments represented by different symbols. The diagram includes a flow chart, a list of equipment tags, and a list of upstream/downstream relationships. The diagram also includes a list of setpoints and a list of physical anomalies. The diagram is accompanied by a list of equipment tags, a list of upstream/downstream relationships, and a list of setpoints. The diagram is accompanied by a list of physical anomalies. The diagram is accompanied by a list of equipment tags, a list of upstream/downstream relationships, and a list of setpoints.",
+            "confidence": 0.9,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [
+              "R-301",
+              "FV-302"
+            ],
+            "sensor_ids": [],
+            "metadata": {
+              "visual_score": 25.0,
+              "corroborated_tags": [],
+              "vlm_model": "moondream",
+              "inspection_latency_ms": 14931.6,
+              "inspection_status": "SUCCESS"
+            }
+          }
+        ],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "successful_channels": [
+            "text",
+            "visual"
+          ],
+          "contributing_channels": [
+            "visual"
+          ],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [
+            "text",
+            "visual"
+          ],
+          "degradation_reason": null,
+          "hybrid_status": "ACTIVE",
+          "text_status": "ACTIVE",
+          "visual_status": "ACTIVE",
+          "visual_model": "Qdrant/colmodernvbert",
+          "visual_device": "cuda",
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 0,
+          "visual_candidate_count": 1,
+          "visual_inspector_executed": true,
+          "topology_node_count": 0,
+          "topology_edge_count": 0
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Missing required role evidence: Pressure.",
+          "Missing required role evidence: Incident Chronology."
+        ],
+        "sources": [
+          {
+            "filename": "PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf",
+            "locator": "[PID-UNIT-100-S01_Atmospheric_Tower_Overhead_System.pdf | Page 1 | VISUAL]",
+            "channel": "visual"
+          }
+        ]
+      }
+    },
+    {
+      "scenario_id": "RCA-07",
+      "name": "Inconclusive Investigation & Missing Telemetry (BFP-02)",
+      "query": "Investigate boiler feed pump BFP-02 trip. Did the substation voltage dip cause the trip or was it mechanical? Check available incident and electrical logs.",
+      "run_id": 100943,
+      "run_status": "completed",
+      "matched_rca_status": "INSUFFICIENT_EVIDENCE",
+      "status_match_class": "EXACT",
+      "expected_status": "INSUFFICIENT_EVIDENCE",
+      "status_accuracy": 1.0,
+      "extracted_cause_code": "INSUFFICIENT_EVIDENCE",
+      "expected_cause_code": "INSUFFICIENT_EVIDENCE",
+      "primary_cause_accuracy": 1.0,
+      "claim_support_precision": 1.0,
+      "source_coverage": 1.0,
+      "found_sources": [],
+      "missing_sources": [],
+      "citation_accuracy": null,
+      "citation_metrics": {
+        "total_citations": 0,
+        "valid_source_citations": 0,
+        "valid_locator_citations": 0,
+        "claim_bound_citations": 0,
+        "source_accuracy": null,
+        "locator_accuracy": null,
+        "claim_binding_accuracy": null,
+        "aggregate_accuracy": null,
+        "invalid_citations": []
+      },
+      "false_cause_rate": 0.0,
+      "section17_compliant": true,
+      "has_destructive_regression": false,
+      "final_step_tool_calls": 0,
+      "sources_used": "[RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf | Page 1 | TEXT], [RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf | Page 2 | TEXT]",
+      "is_ood": false,
+      "channel_health": {
+        "enabled_channels": [
+          "text",
+          "topology"
+        ],
+        "attempted_channels": [
+          "text",
+          "topology"
+        ],
+        "successful_channels": [
+          "text"
+        ],
+        "contributing_channels": [
+          "text"
+        ],
+        "failed_channels": [],
+        "requested_channels": [
+          "text",
+          "visual",
+          "topology"
+        ],
+        "executed_channels": [
+          "text"
+        ],
+        "degradation_reason": "Visual channel disabled for condition",
+        "hybrid_status": "DEGRADED",
+        "text_status": "ACTIVE",
+        "visual_status": "DISABLED",
+        "visual_model": null,
+        "visual_device": null,
+        "visual_pages_indexed": 0,
+        "topology_status": "EMPTY",
+        "vlm_status": "UNAVAILABLE",
+        "text_candidate_count": 3,
+        "visual_candidate_count": 0,
+        "visual_inspector_executed": false,
+        "topology_node_count": 0,
+        "topology_edge_count": 0
+      },
+      "spatial_relation_supported": false,
+      "visual_evidence_id_present": false,
+      "visual_evidence_id": null,
+      "primary_cause_references_visual_eid": false,
+      "visual_inspector_executed": true,
+      "latency_total_ms": 32788.61,
+      "latency_retrieval_ms": 3.85,
+      "latency_reasoning_ms": 32169.75,
+      "latency_synthesis_ms": 0.28,
+      "rca_result_structured": {
+        "status": "INSUFFICIENT_EVIDENCE",
+        "primary_cause_code": "INSUFFICIENT_EVIDENCE",
+        "primary_cause_text": "Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.",
+        "primary_cause_supporting_evidence_ids": [],
+        "confirmed_observations": [
+          {
+            "claim_id": null,
+            "text": "No independently measured observation was supplied beyond the operator's written description.",
+            "supporting_evidence_ids": []
+          }
+        ],
+        "spatial_relations": [],
+        "evidence_items": [
+          {
+            "evidence_id": "E1",
+            "source_type": "pdf",
+            "workspace_id": 9998,
+            "source_id": 1079,
+            "filename": "RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf",
+            "page_number": 1,
+            "processing_version": "26deff70-cb5a-4f44-bb4e-23b7b769175d",
+            "retrieval_channel": "text",
+            "evidence_role": "INCIDENT_CHRONOLOGY",
+            "content": "RCA INCIDENT LOG: BOILER FEED PUMP BFP-02 UNEXPLAINED TRIP\nDoc ID: RCA-INC-2026-BFP02 | Status: INCONCLUSIVE INVESTIGATION | Page 1 of 2\n\n\nINCIDENT CHRONOLOGY:\n\n09:30:12 - Boiler feed pump BFP-02 tripped on main electrical breaker open signal.\n09:30:15 - Standby pump BFP-01 started automatically; drum level recovered.",
+            "confidence": 0.6407237954628773,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E2",
+            "source_type": "pdf",
+            "workspace_id": 9998,
+            "source_id": 1079,
+            "filename": "RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf",
+            "page_number": 1,
+            "processing_version": "26deff70-cb5a-4f44-bb4e-23b7b769175d",
+            "retrieval_channel": "text",
+            "evidence_role": "INCIDENT_CHRONOLOGY",
+            "content": ".\n09:30:15 - Standby pump BFP-01 started automatically; drum level recovered.\n\n\nAVAILABLE DATA & MISSING TELEMETRY:\nMotor protection relay showed no ground fault or overcurrent trip flags.\nSCADA vibration trend recording channel for BFP-02 was offline for calibration.\nNo acoustic or physical distress observed prior to trip.",
+            "confidence": 0.4382138435657208,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf",
+              "page_number": 1,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [],
+            "sensor_ids": [],
+            "metadata": {}
+          },
+          {
+            "evidence_id": "E3",
+            "source_type": "pdf",
+            "workspace_id": 9998,
+            "source_id": 1079,
+            "filename": "RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf",
+            "page_number": 2,
+            "processing_version": "26deff70-cb5a-4f44-bb4e-23b7b769175d",
+            "retrieval_channel": "text",
+            "evidence_role": "INCIDENT_CHRONOLOGY",
+            "content": "RCA INCIDENT LOG: BREAKER & PROTECTION RELAY DIAGNOSTICS\nDoc ID: RCA-INC-2026-BFP02 | Page 2 of 2\n\n\nELECTRICAL SWITCHGEAR INTERROGATION:\n\nBreaker 52-BFP2 mechanical latch was found unlatched without target flags.\nDigital fault recorder buffer for feeder 4 was unconfigured prior to event.\nDC control bus voltage remained steady at 125 VDC throughout event window.",
+            "confidence": 0.277224525427207,
+            "corroborated": false,
+            "criticality": "REQUIRED_SUPPORTING",
+            "locator": {
+              "kind": "page",
+              "document_type": "pdf",
+              "filename": "RCA-CASE-B-DOC1_Boiler_Feed_Pump_BFP02_Trip_Chrono.pdf",
+              "page_number": 2,
+              "sheet_name": null,
+              "row_start": null,
+              "row_end": null,
+              "col_start": null,
+              "col_end": null,
+              "section_heading": null,
+              "node_id": null,
+              "raw_locator": ""
+            },
+            "timestamp": null,
+            "equipment_ids": [],
+            "sensor_ids": [],
+            "metadata": {}
+          }
+        ],
+        "channel_health": {
+          "enabled_channels": [
+            "text",
+            "topology"
+          ],
+          "attempted_channels": [
+            "text",
+            "topology"
+          ],
+          "successful_channels": [
+            "text"
+          ],
+          "contributing_channels": [
+            "text"
+          ],
+          "failed_channels": [],
+          "requested_channels": [
+            "text",
+            "visual",
+            "topology"
+          ],
+          "executed_channels": [
+            "text"
+          ],
+          "degradation_reason": "Visual channel disabled for condition",
+          "hybrid_status": "DEGRADED",
+          "text_status": "ACTIVE",
+          "visual_status": "DISABLED",
+          "visual_model": null,
+          "visual_device": null,
+          "visual_pages_indexed": 0,
+          "topology_status": "EMPTY",
+          "vlm_status": "UNAVAILABLE",
+          "text_candidate_count": 3,
+          "visual_candidate_count": 0,
+          "visual_inspector_executed": false,
+          "topology_node_count": 0,
+          "topology_edge_count": 0
+        },
+        "contradictions": [],
+        "additional_evidence_needed": [
+          "Standard operating procedures (SOPs) or equipment manuals.",
+          "Historical inspection records and maintenance work orders.",
+          "Time-aligned DCS telemetry trends (pressure, temperature, vibration)."
+        ],
+        "sources": []
+      }
+    }
+  ]
+}

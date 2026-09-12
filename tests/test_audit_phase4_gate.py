@@ -42,6 +42,7 @@ async def setup_gate_audit_db():
     await init_db()
     async with get_db() as db:
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name) VALUES (1, 'Audit Workspace')")
+        await db.execute("INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name, system_instructions) VALUES (1, 1, 'Audit Agent', 'instructions')")
         await db.execute("INSERT OR REPLACE INTO agent_runs (id, workspace_id, agent_id, status) VALUES (50, 1, 1, 'completed')")
         await db.execute("DELETE FROM workspace_artifacts WHERE workspace_id = 1")
         await db.commit()

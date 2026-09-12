@@ -89,12 +89,24 @@ def determine_primary_cause_code(
     if not any(k in text_to_check for k in ["cavitation", "bearing", "valve", "lube oil", "overpressure", "starvation", "stem", "trip"]):
         text_to_check = asset_evidence_text
 
-    if any(k in text_to_check for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh", "suction drum level"]):
+    # Guard against cross-equipment symptom contamination (e.g. pump cavitation SOP retrieved for compressor K-101)
+    is_compressor = any("k-101" in a.lower() for a in bundle.asset_ids) or "k-101" in operator_text
+    is_valve = any(v in [a.lower() for a in bundle.asset_ids] for v in ["fv-302", "r-301"]) or any(v in operator_text for v in ["fv-302", "r-301"])
+    is_pump = any("p-101" in a.lower() for a in bundle.asset_ids) or "p-101" in operator_text
+
+    if is_compressor and any(k in combined for k in ["bearing", "vibration", "overheat", "temp", "tt-204", "radial", "journal"]):
+        return PrimaryCauseCode.BEARING_OVERHEAT
+    if is_valve and any(k in combined for k in ["valve", "stem", "binding", "actuator", "stuck", "positioner", "fretting"]):
+        return PrimaryCauseCode.VALVE_STEM_BINDING
+    if is_pump and any(k in combined for k in ["cavitation", "suction", "starvation", "strainer", "npsh"]):
         return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
+
+    if any(k in text_to_check for k in ["cavitation", "suction starvation", "strainer clog", "strainer debris", "npsh", "suction pressure"]):
+        return PrimaryCauseCode.SUCTION_STARVATION_CAVITATION
+    if any(k in text_to_check for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration", "bearing trip", "tt-204"]):
+        return PrimaryCauseCode.BEARING_OVERHEAT
     if any(k in text_to_check for k in ["valve stem", "stem binding", "actuator hysteresis", "valve stuck", "valve binding", "actuator", "control valve", "fv-302"]):
         return PrimaryCauseCode.VALVE_STEM_BINDING
-    if any(k in text_to_check for k in ["bearing overheat", "bearing temp", "bearing wear", "journal bearing", "bearing vibration", "bearing trip", "bearing", "tt-204"]):
-        return PrimaryCauseCode.BEARING_OVERHEAT
     if any(k in text_to_check for k in ["lube oil pressure loss", "oil pressure loss", "lube oil low"]):
         return PrimaryCauseCode.LUBE_OIL_PRESSURE_LOSS
     if any(k in text_to_check for k in ["overpressure", "discharge overpressure", "esd trip", "relief valve"]):
@@ -230,6 +242,22 @@ class RCAEvidenceValidator:
         # Pre-compute primary cause and cause code
         primary_cause = parsed_claims.get("primary_cause")
         obs_lines = parsed_claims.get("observations", [])
+
+        # Sanitize unverified/hallucinated E-IDs from primary cause and observations
+        if primary_cause:
+            for eid in re.findall(r"\[(E\d+)\]", primary_cause):
+                if eid not in valid_e_ids:
+                    primary_cause = re.sub(rf"\[{eid}\]\s*", "", primary_cause)
+
+        sanitized_obs = []
+        for obs in obs_lines:
+            s_obs = obs
+            for eid in re.findall(r"\[(E\d+)\]", s_obs):
+                if eid not in valid_e_ids:
+                    s_obs = re.sub(rf"\[{eid}\]\s*", "", s_obs)
+            sanitized_obs.append(s_obs)
+        obs_lines = sanitized_obs
+
         cause_code = determine_primary_cause_code(
             status=determined_status,
             primary_cause_text=primary_cause or "",
@@ -239,8 +267,7 @@ class RCAEvidenceValidator:
             operator_input=operator_input
         )
 
-        if cause_code in (PrimaryCauseCode.INSUFFICIENT_EVIDENCE, PrimaryCauseCode.UNKNOWN):
-            cause_code = PrimaryCauseCode.INSUFFICIENT_EVIDENCE
+        if cause_code == PrimaryCauseCode.INSUFFICIENT_EVIDENCE:
             determined_status = RCAStatus.INSUFFICIENT_EVIDENCE
 
         # 7. Construct User-Facing Engineering Output (Section 17 Format)
@@ -273,8 +300,10 @@ class RCAEvidenceValidator:
                     for eid in eids:
                         it = bundle.get_evidence_by_id(eid)
                         if it:
-                            loc = f"Page {it.page_number}" if it.page_number else "Topology"
-                            auth_cites.append(f"[{it.filename} | {loc}]")
+                            loc_str = it.locator.format_locator(it.retrieval_channel) if it.locator else (
+                                f"[{it.filename} | Page {it.page_number}]" if it.page_number else f"[{it.filename}]"
+                            )
+                            auth_cites.append(loc_str)
                     cite_suffix = (" " + " ".join(dict.fromkeys(auth_cites))) if auth_cites else ""
                     snapped_obs.append(f"{clean_obs}{cite_suffix}")
                 else:
@@ -288,8 +317,10 @@ class RCAEvidenceValidator:
                             matched_item = it
                             break
                     if matched_item:
-                        loc = f"Page {matched_item.page_number}" if matched_item.page_number else "Topology"
-                        snapped_obs.append(f"[{matched_item.evidence_id}] {clean_obs} [{matched_item.filename} | {loc}]")
+                        loc_str = matched_item.locator.format_locator(matched_item.retrieval_channel) if matched_item.locator else (
+                            f"[{matched_item.filename} | Page {matched_item.page_number}]" if matched_item.page_number else f"[{matched_item.filename}]"
+                        )
+                        snapped_obs.append(f"[{matched_item.evidence_id}] {clean_obs} {loc_str}")
                     else:
                         # Grounded: Never assign random evidence ID without semantic/entity backing
                         snapped_obs.append(clean_obs)
@@ -298,8 +329,10 @@ class RCAEvidenceValidator:
                 lines.append(f"- {so}")
         else:
             for item in supported_items[:4]:
-                loc = f"Page {item.page_number}" if item.page_number else "Topology"
-                lines.append(f"- [{item.evidence_id}] [{item.filename} | {loc}]: {item.content[:200].strip()}...")
+                loc_str = item.locator.format_locator(item.retrieval_channel) if item.locator else (
+                    f"[{item.filename} | Page {item.page_number}]" if item.page_number else f"[{item.filename}]"
+                )
+                lines.append(f"- [{item.evidence_id}] {loc_str}: {item.content[:200].strip()}...")
 
         # Causal Chain / Hypotheses
         causal_steps = parsed_claims.get("causal_chain", [])
@@ -314,7 +347,9 @@ class RCAEvidenceValidator:
         if primary_cause and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE, RCAStatus.PLAUSIBLE_HYPOTHESIS):
             primary_text = primary_cause
             if not re.search(r"\[E\d+\]", primary_text) and supported_items:
-                primary_text = f"[{supported_items[0].evidence_id}] {primary_text}"
+                vis_item = next((i for i in supported_items if i.retrieval_channel == "visual" or i.evidence_role == EvidenceRole.P_AND_ID), None)
+                chosen_item = vis_item if (vis_item and any(w in primary_text.lower() for w in ["fv-302", "valve", "spatial", "p&id", "upstream", "feed"])) else supported_items[0]
+                primary_text = f"[{chosen_item.evidence_id}] {primary_text}"
             lines.append(primary_text)
         elif determined_status == RCAStatus.INSUFFICIENT_EVIDENCE:
             lines.append("Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence.")
@@ -325,9 +360,11 @@ class RCAEvidenceValidator:
         lines.append("\n## Supporting Evidence")
         if supported_items:
             for item in supported_items:
-                loc = f"Page {item.page_number}" if item.page_number else "Topology"
+                loc_str = item.locator.format_locator(item.retrieval_channel) if item.locator else (
+                    f"[{item.filename} | Page {item.page_number}]" if item.page_number else f"[{item.filename}]"
+                )
                 corr = " (OCR Corroborated)" if item.corroborated else ""
-                lines.append(f"- **[{item.evidence_id}]** `{item.filename}` ({loc}) [{item.evidence_role.value}]{corr}: {item.content[:160].strip()}...")
+                lines.append(f"- **[{item.evidence_id}]** `{item.filename}` {loc_str} [{item.evidence_role.value}]{corr}: {item.content[:160].strip()}...")
         else:
             lines.append("- No verified physical evidence directly supported the assertion.")
 
@@ -357,16 +394,20 @@ class RCAEvidenceValidator:
         lines.append("\n## Sources")
         unique_sources = {}
         for item in supported_items:
-            key = (item.filename, item.page_number)
+            loc_str = item.locator.format_locator(item.retrieval_channel) if item.locator else (
+                f"[{item.filename} | Page {item.page_number}]" if item.page_number else f"[{item.filename}]"
+            )
+            # Distinct key preserves multi-page citations (e.g. Page 16, 32, 47 of same file)
+            key = (item.filename, loc_str)
             if key not in unique_sources:
-                unique_sources[key] = item
+                unique_sources[key] = (item, loc_str)
 
         if unique_sources:
-            for (fname, pnum), item in unique_sources.items():
-                if pnum:
-                    lines.append(f"- `{fname}` — Page {pnum} [{fname} | Page {pnum}] (Channel: {item.retrieval_channel.upper()})")
+            for (fname, _), (item, loc_str) in unique_sources.items():
+                if item.page_number:
+                    lines.append(f"- `{fname}` — Page {item.page_number} {loc_str} (Channel: {item.retrieval_channel.upper()})")
                 else:
-                    lines.append(f"- `{fname}` [{fname}] (Channel: {item.retrieval_channel.upper()})")
+                    lines.append(f"- `{fname}` {loc_str} (Channel: {item.retrieval_channel.upper()})")
         else:
             lines.append("None (Insufficient Evidence)" if determined_status == RCAStatus.INSUFFICIENT_EVIDENCE else "None")
 
@@ -387,28 +428,37 @@ class RCAEvidenceValidator:
         e_matches = re.findall(r"\[(E\d+)\]", text)
         claims["all_referenced_e_ids"] = list(set(e_matches))
 
+        json_obj = None
         json_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
         if json_match:
             try:
-                data = json.loads(json_match.group(1))
-                if isinstance(data, dict):
-                    if "confirmed_observations" in data and isinstance(data["confirmed_observations"], list):
-                        for o in data["confirmed_observations"]:
-                            if isinstance(o, dict) and "claim" in o:
-                                claims["observations"].append(o["claim"])
-                            elif isinstance(o, str):
-                                claims["observations"].append(o)
-                    if "causal_chain" in data and isinstance(data["causal_chain"], list):
-                        claims["causal_chain"] = [str(c) for c in data["causal_chain"]]
-                    if "primary_conclusion" in data and isinstance(data["primary_conclusion"], dict):
-                        claims["primary_cause"] = data["primary_conclusion"].get("claim")
-                        if "primary_cause_code" in data["primary_conclusion"]:
-                            claims["primary_cause_code"] = data["primary_conclusion"]["primary_cause_code"]
-                    if "primary_cause_code" in data:
-                        claims["primary_cause_code"] = data["primary_cause_code"]
-                    return claims
+                json_obj = json.loads(json_match.group(1))
             except Exception:
                 pass
+        elif text.strip().startswith("{") and text.strip().endswith("}"):
+            try:
+                json_obj = json.loads(text.strip())
+            except Exception:
+                pass
+
+        if isinstance(json_obj, dict):
+            if "confirmed_observations" in json_obj and isinstance(json_obj["confirmed_observations"], list):
+                for o in json_obj["confirmed_observations"]:
+                    if isinstance(o, dict) and "claim" in o:
+                        claims["observations"].append(o["claim"])
+                    elif isinstance(o, str):
+                        claims["observations"].append(o)
+            if "causal_chain" in json_obj and isinstance(json_obj["causal_chain"], list):
+                claims["causal_chain"] = [str(c) for c in json_obj["causal_chain"]]
+            if "primary_conclusion" in json_obj and isinstance(json_obj["primary_conclusion"], dict):
+                claims["primary_cause"] = json_obj["primary_conclusion"].get("claim")
+                if "primary_cause_code" in json_obj["primary_conclusion"]:
+                    claims["primary_cause_code"] = json_obj["primary_conclusion"]["primary_cause_code"]
+            if "primary_cause_code" in json_obj:
+                claims["primary_cause_code"] = json_obj["primary_cause_code"]
+            if not claims["primary_cause"] and "content" in json_obj and isinstance(json_obj["content"], str):
+                claims["primary_cause"] = json_obj["content"]
+            return claims
 
         code_match = re.search(r"Cause Code:[*\s]*[`'\"]?([A-Za-z0-9_]+)", text, re.IGNORECASE)
         if code_match:
@@ -440,5 +490,12 @@ class RCAEvidenceValidator:
             elif current_section == "primary" and clean_l and not claims["primary_cause"]:
                 if not clean_l.startswith("**Cause Code"):
                     claims["primary_cause"] = clean_l
+
+        if not claims["primary_cause"]:
+            clean_text = text.strip()
+            if clean_text and not clean_text.startswith("##"):
+                paras = [p.strip() for p in clean_text.split("\n\n") if p.strip()]
+                if paras:
+                    claims["primary_cause"] = paras[0]
 
         return claims

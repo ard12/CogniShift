@@ -10,6 +10,7 @@ Implements the central reasoning loop:
 """
 
 import asyncio
+import time
 import json
 import re
 import logging
@@ -854,9 +855,13 @@ async def execute_agent_run(
     input_text: str,
     user_id: str = "operator",
     input_image_path: Optional[str] = None,
-    conversation_history: Optional[List[Any]] = None
+    conversation_history: Optional[List[Any]] = None,
+    enable_visual: Optional[bool] = None,
+    enable_topology: Optional[bool] = None,
+    custom_topology_context: Optional[str] = None,
 ) -> RunResponse:
     """Execute an end-to-end agent reasoning run with text and multimodal vision support."""
+    t_run_start = time.perf_counter()
     routing_res: Optional[SemanticRoutingResult] = None
     frozen_scada_anomaly: Optional[Dict[str, Any]] = None
     frozen_scada_source: str = ""
@@ -1300,7 +1305,6 @@ async def execute_agent_run(
                 info = await provider.model_info()
                 if info and info.get("status") == "available":
                     installed_models = info.get("models", [])
-                    import time
                     update_verified_inventory_cache(exact_tags=installed_models, verified_at=time.monotonic())
             except Exception as e:
                 logger.warning(f"Could not query installed models from Ollama: {e}")
@@ -2115,7 +2119,10 @@ async def execute_agent_run(
                             workspace_id=workspace_id,
                             query=clean_input,
                             allowed_source_ids=allowed_source_ids,
-                            db=db
+                            db=db,
+                            enable_visual=enable_visual,
+                            enable_topology=enable_topology,
+                            custom_topology_context=custom_topology_context
                         )
                         await log_event(
                             db, run_id, "rca_channel_health",
@@ -2127,6 +2134,12 @@ async def execute_agent_run(
                                 db, run_id, "HYBRID_RAG_DEGRADED",
                                 f"Hybrid RAG operating in degraded mode: {rca_bundle.channel_health.degradation_reason}",
                                 rca_bundle.channel_health.model_dump()
+                            )
+                        if (getattr(rca_bundle, "stage_latencies_ms", None) or {}).get("visual_vlm_ms", 0.0) > 0:
+                            await log_event(
+                                db, run_id, "visual_inspector",
+                                f"Visual evidence inspected via VLM: {rca_bundle.stage_latencies_ms.get('visual_vlm_ms', 0.0)}ms",
+                                {"visual_vlm_ms": rca_bundle.stage_latencies_ms.get("visual_vlm_ms", 0.0)}
                             )
 
                         # OOD asset verification: Fail closed if unregistered asset queried
@@ -2150,6 +2163,14 @@ async def execute_agent_run(
                             )
                             await db.commit()
                             await log_event(db, run_id, "asset_not_found", fail_msg)
+                            stage_lats = dict(getattr(rca_bundle, "stage_latencies_ms", {}) or {})
+                            if t_run_start is not None:
+                                stage_lats["e2e_total"] = round((time.perf_counter() - t_run_start) * 1000, 2)
+                            await log_event(
+                                db, run_id, "rca_stage_latencies",
+                                f"RCA pipeline stage latencies recorded: {stage_lats}",
+                                {"stage_latencies_ms": stage_lats}
+                            )
                             cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
                             return make_response(dict(await cursor.fetchone()))
 
@@ -2695,7 +2716,9 @@ async def execute_agent_run(
                 else:
                     await log_event(db, run_id, "model_prompt", f"Prompt dispatched to {selected_model_id} for step #{current_step.id}")
 
+                    llm_step_ms = 0.0
                     try:
+                        t_model_start = time.perf_counter()
                         model_response = await provider.generate_text(
                             prompt=step_prompt,
                             system_prompt=system_prompt,
@@ -2703,6 +2726,7 @@ async def execute_agent_run(
                             model_name=selected_model_id,
                             history=conversation_history
                         )
+                        llm_step_ms = round((time.perf_counter() - t_model_start) * 1000, 2)
                     except Exception as e:
                         # If routed model is not installed locally (HTTP 404), fall back to configured text_model
                         if ("404" in str(e) or "not found" in str(e).lower()) and selected_model_id != settings.text_model:
@@ -2718,6 +2742,7 @@ async def execute_agent_run(
                             )
                             selected_model_id = settings.text_model
                             try:
+                                t_fb_start = time.perf_counter()
                                 model_response = await provider.generate_text(
                                     prompt=step_prompt,
                                     system_prompt=system_prompt,
@@ -2725,6 +2750,7 @@ async def execute_agent_run(
                                     model_name=selected_model_id,
                                     history=conversation_history
                                 )
+                                llm_step_ms = round((time.perf_counter() - t_fb_start) * 1000, 2)
                             except Exception as fb_err:
                                 e = fb_err
                             else:
@@ -2800,7 +2826,11 @@ async def execute_agent_run(
                         cursor = await db.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,))
                         return make_response(dict(await cursor.fetchone()))
 
-                await log_event(db, run_id, "model_response", f"Step #{current_step.id} reasoning received", {"text": clean_output})
+                await log_event(
+                    db, run_id, "model_response",
+                    f"Step #{current_step.id} reasoning received",
+                    {"text": clean_output, "llm_step_ms": llm_step_ms if 'llm_step_ms' in locals() else 0.0}
+                )
 
                 # Strict Action Parsing (Blocker 6: Valid AgentAction schema or verified readable prose only)
                 action = parse_agent_action(clean_output, strict=False)
@@ -3974,6 +4004,7 @@ print("Analysis script finished with returncode 0.")
                 elif isinstance(action, FinalAnswer):
                     final_answer_citations = list(action.citations or [])
                     if is_rca_mode:
+                        t_val_start = time.perf_counter()
                         if rca_bundle is None:
                             rca_bundle = RCAEvidenceBundle(
                                 asset_ids=re.findall(r"\b[A-Za-z]{1,4}-\d{3,4}[A-Za-z]?\b", clean_input),
@@ -3981,6 +4012,17 @@ print("Analysis script finished with returncode 0.")
                             )
                         validator = RCAEvidenceValidator()
                         answer_content = validator.validate_and_finalize(rca_bundle, action.content, clean_input)
+                        validation_latency_ms = round((time.perf_counter() - t_val_start) * 1000, 2)
+
+                        stage_lats = dict(getattr(rca_bundle, "stage_latencies_ms", {}) or {})
+                        stage_lats["evidence_validation"] = validation_latency_ms
+                        if t_run_start is not None:
+                            stage_lats["e2e_total"] = round((time.perf_counter() - t_run_start) * 1000, 2)
+                        await log_event(
+                            db, run_id, "rca_stage_latencies",
+                            f"RCA pipeline stage latencies recorded: {stage_lats}",
+                            {"stage_latencies_ms": stage_lats}
+                        )
                     else:
                         answer_content = action.content
 

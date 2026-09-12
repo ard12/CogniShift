@@ -18,6 +18,7 @@ from cognishift.core.visual_rag.page_verifier import get_page_verifier
 from cognishift.core.document_processing.vision_service import VisionProcessingService
 from cognishift.core.document_processing.schemas import VisionRequirement
 from cognishift.core.retrieval.visual_inspector import VisualEvidenceInspector, get_visual_inspector
+from cognishift.core.document_processing.provenance import wrap_document_data_for_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,16 @@ class HybridDocumentRetriever:
 
             # Attach text snippets
             if cand.text_snippets:
-                block_lines.append("\n".join(cand.text_snippets))
+                raw_text = "\n".join(cand.text_snippets)
+                cand_meta = {
+                    "filename": cand.filename,
+                    "page_number": cand.page_number,
+                    "page": cand.page_number,
+                    "source_id": cand.source_id,
+                    "processing_version": cand.processing_version,
+                }
+                wrapped_text = wrap_document_data_for_prompt(raw_text, cand_meta)
+                block_lines.append(wrapped_text)
 
             # Attach targeted VLM observation
             if cand.vlm_observation:

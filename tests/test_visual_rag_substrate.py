@@ -69,10 +69,11 @@ def test_simulated_embedding_provider_policy():
     assert q_emb.ndim == 2
     assert q_emb.shape[1] == 64
 
-    # Runtime check: without allow_simulation=True, missing weights returns None
-    prov_runtime = get_visual_embedding_provider(allow_simulation=False)
-    # If colpali is disabled (default), prov_runtime must be None
-    assert prov_runtime is None
+    # Runtime check: when colpali is disabled, provider returns None
+    from unittest.mock import patch
+    with patch.object(settings, "colpali_enabled", False):
+        prov_runtime = get_visual_embedding_provider(allow_simulation=False)
+        assert prov_runtime is None
 
 
 @pytest.mark.asyncio

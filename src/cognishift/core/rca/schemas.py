@@ -34,6 +34,7 @@ class EvidenceRequirement(BaseModel):
 
 
 class EvidenceLocator(BaseModel):
+    kind: str = "page"  # "page", "spreadsheet", "document_section", "topology_node"
     document_type: str = "pdf"  # "pdf", "xlsx", "docx", "csv", "topology"
     filename: str
     page_number: Optional[int] = None
@@ -46,19 +47,27 @@ class EvidenceLocator(BaseModel):
     node_id: Optional[str] = None
     raw_locator: str = ""
 
-    def format_locator(self) -> str:
-        if self.document_type == "xlsx" and self.sheet_name:
+    def format_locator(self, retrieval_channel: Optional[str] = None) -> str:
+        """Formats native physical document location coordinates with optional retrieval channel specification."""
+        ch_label = (retrieval_channel or "").upper()
+        if self.kind == "spreadsheet" or self.document_type in ("xlsx", "xlsm") or self.sheet_name:
             r_str = f"Rows {self.row_start}-{self.row_end}" if self.row_start and self.row_end else ""
             c_str = f"Cols {self.col_start}:{self.col_end}" if self.col_start and self.col_end else ""
-            coords = " | ".join(filter(None, [f"Sheet: {self.sheet_name}", r_str, c_str]))
-            return f"[{self.filename} | {coords} | SPREADSHEET]"
-        elif self.document_type == "docx" and self.section_heading:
+            coords = " | ".join(filter(None, [f"Sheet: {self.sheet_name}" if self.sheet_name else None, r_str, c_str]))
+            tag = ch_label if ch_label else "SPREADSHEET"
+            return f"[{self.filename} | {coords} | {tag}]"
+        elif self.kind == "document_section" or (self.document_type == "docx" and self.section_heading):
             p_str = f"Rendered Page {self.page_number}" if self.page_number else ""
             coords = " | ".join(filter(None, [f"Section: {self.section_heading}", p_str]))
-            return f"[{self.filename} | {coords} | DOCUMENT]"
+            tag = ch_label if ch_label else "DOCUMENT"
+            return f"[{self.filename} | {coords} | {tag}]"
         elif self.page_number:
-            return f"[{self.filename} | Page {self.page_number} | {self.document_type.upper()}]"
-        return f"[{self.filename} | {self.document_type.upper()}]"
+            if ch_label and ch_label not in ("PDF", "TEXT"):
+                return f"[{self.filename} | Page {self.page_number} | {ch_label}]"
+            return f"[{self.filename} | Page {self.page_number}]"
+        if ch_label and ch_label not in ("PDF", "TEXT"):
+            return f"[{self.filename} | {ch_label}]"
+        return f"[{self.filename}]"
 
 
 class RCAStatus(str, Enum):
@@ -137,6 +146,7 @@ class RCAEvidenceBundle(BaseModel):
     channel_health: ChannelExecutionHealth = Field(default_factory=ChannelExecutionHealth)
     final_evidence_channels: List[str] = Field(default_factory=list)
     evidence_channel_counts: Dict[str, int] = Field(default_factory=dict)
+    stage_latencies_ms: Dict[str, float] = Field(default_factory=dict)
 
     def get_evidence_by_id(self, evidence_id: str) -> Optional[RCAEvidenceItem]:
         for item in self.evidence_items:

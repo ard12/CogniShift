@@ -4,6 +4,7 @@ Executes targeted on-demand visual page inspection via local VLM (e.g. Moondream
 and corroborates visual observations with deterministic OCR verifier.
 Shared across HybridDocumentRetriever and RCAEvidenceAcquirer.
 """
+import time
 import asyncio
 import logging
 import re
@@ -39,6 +40,8 @@ class VisualInspectionResult(BaseModel):
     instrument_tags: List[str] = Field(default_factory=list)
     validated_numeric_claims: List[Dict[str, Any]] = Field(default_factory=list)
     locator: str = ""
+    inspection_latency_ms: float = 0.0
+    vlm_model: str = ""
 
 
 class VisualEvidenceInspector:
@@ -135,9 +138,10 @@ class VisualEvidenceInspector:
                 locator=locator
             )
 
+        t_insp_0 = time.perf_counter()
         target_prompt = prompt_override or (
             f"Examine this engineering diagram / schematic / document page for the query: '{query}'. "
-            "Identify any visible equipment tags (e.g. FV-302, R-301, P-101), line connections, flow directions, "
+            "Identify all visible equipment tags, line connections, flow directions, "
             "instruments, valves, setpoints, or physical anomalies. Describe the exact visual layout, piping connections, "
             "upstream/downstream relationships, and numerical labels."
         )
@@ -180,6 +184,9 @@ class VisualEvidenceInspector:
         if not vlm_text:
             vlm_text = f"Visual match on {filename} {locator} with relevance score {visual_score:.2f}."
 
+        insp_lat_ms = round((time.perf_counter() - t_insp_0) * 1000.0, 2)
+        v_model_name = getattr(settings, "vision_model", "moondream:latest")
+
         return VisualInspectionResult(
             workspace_id=workspace_id,
             source_id=source_id,
@@ -192,7 +199,9 @@ class VisualEvidenceInspector:
             ocr_corroborated=is_corroborated,
             equipment_tags=extracted_tags,
             instrument_tags=[t for t in extracted_tags if any(t.startswith(p) for p in ("PT-", "TT-", "FT-", "LT-", "VT-", "FV-", "PV-", "TV-", "HV-"))],
-            locator=locator
+            locator=locator,
+            inspection_latency_ms=insp_lat_ms,
+            vlm_model=v_model_name
         )
 
 

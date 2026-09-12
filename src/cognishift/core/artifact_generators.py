@@ -131,7 +131,7 @@ def validate_artifact_structure(file_path: Path, artifact_type: str) -> Artifact
     )
 
 
-def generate_docx_document(dest_path: Path, title: str, sections: List[Dict[str, Any]]) -> None:
+def generate_docx_document(dest_path: Path, title: str, sections: List[Dict[str, Any]], workspace_id: Optional[int] = None, **kwargs) -> None:
     """Generate professional formatted DOCX engineering report."""
     doc = docx.Document()
     
@@ -279,7 +279,7 @@ def generate_pptx_presentation(dest_path: Path, title: str, subtitle: Optional[s
     prs.save(str(dest_path))
 
 
-def generate_pdf_document(dest_path: Path, title: str, sections: List[Dict[str, Any]]) -> None:
+def generate_pdf_document(dest_path: Path, title: str, sections: List[Dict[str, Any]], workspace_id: Optional[int] = None, **kwargs) -> None:
     """Generate professional formatted PDF engineering report using reportlab."""
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors

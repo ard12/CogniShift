@@ -93,7 +93,8 @@ class Settings(BaseSettings):
     semantic_retrieval_max_distance: float = 0.78  # Squared L2 distance threshold on unit vectors (~0.61 cosine similarity)
 
     # Phase 8 Hybrid Multimodal RAG with ColPali Configuration
-    colpali_enabled: bool = False
+    colpali_enabled: bool = True
+    enable_multimodal_vision: bool = True
     colpali_model_path: Path = PROJECT_ROOT / "data" / "models" / "colpali"
     colpali_device: str = "cuda"
     colpali_raster_dpi: int = 150

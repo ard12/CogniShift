@@ -8,6 +8,7 @@ OPERATOR_TSX = FRONTEND_DIR / "src" / "pages" / "OperatorPage.tsx"
 ARTIFACTS_API_TS = FRONTEND_DIR / "src" / "api" / "artifacts.ts"
 MAIL_API_TS = FRONTEND_DIR / "src" / "api" / "mail.ts"
 MAIL_PAGE_TSX = FRONTEND_DIR / "src" / "pages" / "MailPage.tsx"
+MAIL_FEATURES_DIR = FRONTEND_DIR / "src" / "features" / "mail"
 
 
 def test_console_routes_every_primary_view_and_preserves_agent_fallback():
@@ -63,32 +64,37 @@ def test_artifact_downloads_carry_device_proof_and_labels_do_not_invent_sandboxi
 
     assert "getDeviceSession" in artifact_code
     assert '"X-Device-Session"' in artifact_code
-    assert "BACKEND-VERIFIED RUN ARTIFACTS" in operator_code
+    assert "BACKEND-VERIFIED" in operator_code
+    assert "BACKEND-VERIFIED DELIVERABLES" in operator_code
     assert "ISOLATED SANDBOX ARTIFACTS" not in operator_code
 
 
 def test_mail_attachment_downloads_carry_auth_and_device_proof():
     mail_api_code = MAIL_API_TS.read_text(encoding="utf-8")
-    mail_page_code = MAIL_PAGE_TSX.read_text(encoding="utf-8")
+    mail_feature_code = "\n".join(
+        p.read_text(encoding="utf-8") for p in MAIL_FEATURES_DIR.glob("*.tsx")
+    )
 
     assert "downloadAttachment(" in mail_api_code
     assert "getStoredToken" in mail_api_code
     assert "getDeviceSession" in mail_api_code
     assert '"X-Device-Session"' in mail_api_code
-    assert "await mailApi.downloadAttachment" in mail_page_code
-    assert "href={mailApi.downloadAttachmentUrl" not in mail_page_code
-    assert '{currentUserId || "not-verified"}@secure.internal' in mail_page_code
+    assert "await mailApi.downloadAttachment" in mail_feature_code
+    assert "href={mailApi.downloadAttachmentUrl" not in mail_feature_code
+    assert '{currentUserId || "not-verified"}@secure.internal' in mail_feature_code
 
 
 def test_mail_ai_status_and_transport_claims_are_backend_truthful():
-    mail_page_code = MAIL_PAGE_TSX.read_text(encoding="utf-8")
+    mail_feature_code = "\n".join(
+        p.read_text(encoding="utf-8") for p in MAIL_FEATURES_DIR.glob("*.tsx")
+    )
 
-    assert "Draft generated via local ${draft.model}" in mail_page_code
-    assert "deterministic fallback used" in mail_page_code
-    assert "Local SLM Operational Draft Assistant (qwen2.5:7b)" not in mail_page_code
-    assert 'smtpHealth.loopback_only ? "LOCAL ONLY" : "NOT VERIFIED"' in mail_page_code
-    assert "100% OFFLINE" not in mail_page_code
-    assert "ZERO CLOUD" not in mail_page_code
+    assert "Draft generated via local ${draft.model}" in mail_feature_code
+    assert "deterministic fallback used" in mail_feature_code
+    assert "Local SLM Operational Draft Assistant (qwen2.5:7b)" not in mail_feature_code
+    assert 'smtpHealth.loopback_only ? "LOCAL ONLY" : "NOT VERIFIED"' in mail_feature_code
+    assert "100% OFFLINE" not in mail_feature_code
+    assert "ZERO CLOUD" not in mail_feature_code
 
 
 def test_operator_carries_non_image_upload_into_the_run_source_context():

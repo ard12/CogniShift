@@ -1,0 +1,8 @@
+scenario_id,name,is_ood,total_latency_ms,retrieval_ms,reasoning_ms,synthesis_ms,matched_status
+RCA-01,P-101A Suction Starvation & Cavitation Trip,False,148181.35,2.1,147588.78,1.02,PLAUSIBLE_HYPOTHESIS
+RCA-02,K-101 Centrifugal Compressor Overheat & ESD Trip,False,31497.41,2.48,31156.87,0.34,PLAUSIBLE_HYPOTHESIS
+RCA-03,P-101A Missing Evidence Honest Abstention Gate,False,47426.1,2.59,46988.09,0.19,INSUFFICIENT_EVIDENCE
+RCA-04,Out-of-Distribution (OOD) Nonexistent Asset Safety Gate,True,395.36,0.0,395.36,0.0,ASSET_NOT_FOUND
+RCA-05,Final-Step Protocol Tool Lockout & Safe Interception,False,53011.58,2.78,52541.81,0.6,PLAUSIBLE_HYPOTHESIS
+RCA-06,Visual-Dependent P&ID RCA (Hydrocracker R-301 / FV-302),False,69074.01,3909.83,51798.93,0.33,PLAUSIBLE_HYPOTHESIS
+RCA-07,Inconclusive Investigation & Missing Telemetry (BFP-02),False,28638.76,4.1,27459.21,0.05,INSUFFICIENT_EVIDENCE

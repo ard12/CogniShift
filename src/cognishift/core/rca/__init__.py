@@ -1,6 +1,7 @@
 """Root Cause Analysis (RCA) Core Subsystem for CogniShift."""
 from cognishift.core.rca.schemas import (
     EvidenceRole,
+    EvidenceLocator,
     RCAStatus,
     PrimaryCauseCode,
     RCAEvidenceItem,
@@ -22,6 +23,7 @@ from cognishift.core.rca.sensor_resolution import (
 )
 from cognishift.core.rca.evidence_acquisition import (
     RCAEvidenceAcquirer,
+    validate_full_multimodal_runtime,
 )
 from cognishift.core.rca.evidence_validation import (
     RCAEvidenceValidator,
@@ -31,9 +33,20 @@ from cognishift.core.rca.evaluation import (
     evaluate_threshold,
     score_status_strict,
 )
+from cognishift.core.rca.benchmark_metrics import (
+    CitationMetrics,
+    SourceCoverageMetrics,
+    PCAMetrics,
+    calculate_decomposed_citation_metrics,
+    calculate_decomposed_source_coverage,
+    calculate_decomposed_pca,
+    calculate_false_cause_rate,
+    evaluate_rca_06_ablation,
+)
 
 __all__ = [
     "EvidenceRole",
+    "EvidenceLocator",
     "RCAStatus",
     "PrimaryCauseCode",
     "RCAEvidenceItem",
@@ -53,4 +66,13 @@ __all__ = [
     "MetricStatus",
     "evaluate_threshold",
     "score_status_strict",
+    "CitationMetrics",
+    "SourceCoverageMetrics",
+    "PCAMetrics",
+    "calculate_decomposed_citation_metrics",
+    "calculate_decomposed_source_coverage",
+    "calculate_decomposed_pca",
+    "calculate_false_cause_rate",
+    "evaluate_rca_06_ablation",
+    "validate_full_multimodal_runtime",
 ]

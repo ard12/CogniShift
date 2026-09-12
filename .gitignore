@@ -8,6 +8,8 @@ data/*
 !data/benchmarks/**
 !data/vision_test/
 !data/vision_test/**
+!data/rca_final_verification_v2/
+!data/rca_final_verification_v2/**
 *.db
 .venv/
 venv/

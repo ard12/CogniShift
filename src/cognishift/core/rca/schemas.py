@@ -72,14 +72,17 @@ class EvidenceLocator(BaseModel):
         loc = self.format_location()
 
         if self.kind == "spreadsheet" or self.document_type in ("xlsx", "xlsm") or self.sheet_name:
-            tag = ch_label if ch_label else "SPREADSHEET"
-            return f"[{self.filename} | {loc} | {tag}]" if loc else f"[{self.filename} | {tag}]"
+            if ch_label:
+                return f"[{self.filename} | {loc} | {ch_label}]" if loc else f"[{self.filename} | {ch_label}]"
+            return f"[{self.filename} | {loc}]" if loc else f"[{self.filename}]"
         elif self.kind == "row_range" or self.document_type == "csv":
-            tag = ch_label if ch_label else "TABULAR"
-            return f"[{self.filename} | {loc} | {tag}]" if loc else f"[{self.filename} | {tag}]"
+            if ch_label and ch_label not in ("CSV", "TABULAR", "TEXT"):
+                return f"[{self.filename} | {loc} | {ch_label}]" if loc else f"[{self.filename} | {ch_label}]"
+            return f"[{self.filename} | {loc}]" if loc else f"[{self.filename}]"
         elif self.kind == "document_section" or (self.document_type == "docx" and self.section_heading):
-            tag = ch_label if ch_label else "DOCUMENT"
-            return f"[{self.filename} | {loc} | {tag}]" if loc else f"[{self.filename} | {tag}]"
+            if ch_label:
+                return f"[{self.filename} | {loc} | {ch_label}]" if loc else f"[{self.filename} | {ch_label}]"
+            return f"[{self.filename} | {loc}]" if loc else f"[{self.filename}]"
         elif self.page_number is not None:
             if ch_label and ch_label not in ("PDF", "TEXT"):
                 return f"[{self.filename} | Page {self.page_number} | {ch_label}]"

@@ -178,10 +178,8 @@ class RCAEvidenceAcquirer:
 
         if use_visual:
             channel_health.enabled_channels.append("visual")
-            channel_health.attempted_channels.append("visual")
         if use_topology:
             channel_health.enabled_channels.append("topology")
-            channel_health.attempted_channels.append("topology")
 
         async def _run_acquisition(conn: Any) -> RCAEvidenceBundle:
             nonlocal e_counter
@@ -302,39 +300,47 @@ class RCAEvidenceAcquirer:
 
                         # Build native locator for text evidence without manufactured fallbacks
                         if filename.endswith((".xlsx", ".xlsm")):
+                            item_source_type = "spreadsheet"
+                            item_page = None
                             loc = EvidenceLocator(
                                 kind="spreadsheet",
                                 document_type="xlsx",
                                 filename=filename,
                                 sheet_name=meta_item.get("sheet_name"),
-                                row_start=meta_item.get("row_start"),
-                                row_end=meta_item.get("row_end"),
+                                row_start=int(meta_item["row_start"]) if meta_item.get("row_start") is not None else None,
+                                row_end=int(meta_item["row_end"]) if meta_item.get("row_end") is not None else None,
                                 col_start=meta_item.get("col_start"),
                                 col_end=meta_item.get("col_end")
                             )
                         elif filename.endswith(".csv"):
+                            item_source_type = "csv"
+                            item_page = None
                             loc = EvidenceLocator(
                                 kind="row_range",
                                 document_type="csv",
                                 filename=filename,
                                 sheet_name=meta_item.get("sheet_name"),
-                                row_start=meta_item.get("row_start"),
-                                row_end=meta_item.get("row_end")
+                                row_start=int(meta_item["row_start"]) if meta_item.get("row_start") is not None else None,
+                                row_end=int(meta_item["row_end"]) if meta_item.get("row_end") is not None else None
                             )
                         elif filename.endswith(".docx"):
+                            item_source_type = "docx"
+                            item_page = int(page_num) if page_num else 1
                             loc = EvidenceLocator(
                                 kind="document_section",
                                 document_type="docx",
                                 filename=filename,
                                 section_heading=meta_item.get("section_heading"),
-                                page_number=int(page_num) if page_num else 1
+                                page_number=item_page
                             )
                         else:
+                            item_source_type = "pdf"
+                            item_page = int(page_num) if page_num else 1
                             loc = EvidenceLocator(
                                 kind="page",
                                 document_type="pdf",
                                 filename=filename,
-                                page_number=int(page_num) if page_num else 1
+                                page_number=item_page
                             )
 
                         # Assign equipment_ids accurately based on case partition and asset context
@@ -351,11 +357,11 @@ class RCAEvidenceAcquirer:
                         evidence_items.append(
                             RCAEvidenceItem(
                                 evidence_id=f"E{e_counter}",
-                                source_type="pdf",
+                                source_type=item_source_type,
                                 workspace_id=workspace_id,
                                 source_id=sid,
                                 filename=filename,
-                                page_number=int(page_num) if page_num else 1,
+                                page_number=item_page,
                                 processing_version=meta_item.get("processing_version", "v1"),
                                 retrieval_channel="text",
                                 evidence_role=role,
@@ -375,6 +381,8 @@ class RCAEvidenceAcquirer:
 
             # 4. Visual Retrieval (Candidate pool via ColModernVBERT / ColPali)
             if use_visual:
+                if "visual" not in channel_health.attempted_channels:
+                    channel_health.attempted_channels.append("visual")
                 t_vis_0 = time.perf_counter()
                 try:
                     vis_results = await self.visual_retriever.retrieve(
@@ -399,8 +407,10 @@ class RCAEvidenceAcquirer:
                         is_avail = True
 
                     if is_avail:
-                        channel_health.executed_channels.append("visual")
-                        channel_health.successful_channels.append("visual")
+                        if "visual" not in channel_health.executed_channels:
+                            channel_health.executed_channels.append("visual")
+                        if "visual" not in channel_health.successful_channels:
+                            channel_health.successful_channels.append("visual")
                         channel_health.visual_status = "ACTIVE"
                         channel_health.visual_model = getattr(prov, "model_name", "Qdrant/colmodernvbert") if prov else "Custom/Simulated"
                         channel_health.visual_device = getattr(prov, "device", getattr(settings, "colpali_device", "cuda")) if prov else "cuda"
@@ -446,10 +456,11 @@ class RCAEvidenceAcquirer:
                                     filename=vr.filename,
                                     page_number=vr.page_number
                                 )
+
                                 evidence_items.append(
                                     RCAEvidenceItem(
                                         evidence_id=f"E{e_counter}",
-                                        source_type="image",
+                                        source_type="image" if vr.filename.endswith((".png", ".jpg", ".jpeg")) else "pdf",
                                         workspace_id=workspace_id,
                                         source_id=vr.source_id,
                                         filename=vr.filename,
@@ -458,7 +469,7 @@ class RCAEvidenceAcquirer:
                                         retrieval_channel="visual",
                                         evidence_role=v_role,
                                         content=obs_text,
-                                        confidence=min(1.0, max(0.0, float(vr.score) / 10.0)),
+                                        confidence=min(1.0, max(0.5, float(vr.score))),
                                         corroborated=bool(insp_res.ocr_corroborated) if (insp_res.ocr_corroborated is not None) else bool(insp_res.tag_corroboration),
                                         locator=vis_loc,
                                         equipment_ids=extracted_eq,
@@ -491,9 +502,12 @@ class RCAEvidenceAcquirer:
 
             # 5. Plant Topology Graph Retrieval (max_hops = 2)
             if use_topology:
+                if "topology" not in channel_health.attempted_channels:
+                    channel_health.attempted_channels.append("topology")
                 t_topo_0 = time.perf_counter()
                 try:
-                    if custom_topology_context is not None:
+                    is_injected = (custom_topology_context is not None)
+                    if is_injected:
                         topo_ctx = custom_topology_context
                     else:
                         topo_ctx = await query_graph_context(workspace_id, query, max_hops=2)
@@ -506,10 +520,13 @@ class RCAEvidenceAcquirer:
                     e_row = await cur_e.fetchone()
                     channel_health.topology_edge_count = e_row["c"] if e_row else 0
 
-                    if topo_ctx and topo_ctx.strip():
+                    if "topology" not in channel_health.executed_channels:
                         channel_health.executed_channels.append("topology")
-                        channel_health.successful_channels.append("topology")
-                        channel_health.topology_status = "ACTIVE"
+
+                    if topo_ctx and topo_ctx.strip():
+                        if "topology" not in channel_health.successful_channels:
+                            channel_health.successful_channels.append("topology")
+                        channel_health.topology_status = "ACTIVE_INJECTED_FIXTURE" if is_injected else "ACTIVE"
                         modality_coverage["topology"] = True
                         evidence_items.append(
                             RCAEvidenceItem(

@@ -1,0 +1,157 @@
+{
+  "total_failures": 38,
+  "failures": [
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "equipment_readings.csv | Rows",
+      "reason": "Filename 'equipment_readings.csv' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "equipment_readings.csv | Rows",
+      "reason": "Filename 'equipment_readings.csv' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "File 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "Filename 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "MRPL_Unit01_Hydrotreater_HAZOP_and_Risk_Audit.pdf | Page 4 | TEXT",
+      "reason": "File 'mrpl_unit01_hydrotreater_hazop_and_risk_audit.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Equipment_Health_and_KPIs",
+      "reason": "File 'mrpl_unit01_scada_continuous_telemetry_48h_rev_b.xlsx' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Sheet: Continuous_SCADA_Telemetry",
+      "reason": "File 'mrpl_unit01_scada_continuous_telemetry_48h_rev_b.xlsx' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-CASE-A-DOC3_Valve_FV302_Maintenance_Actuator_Log.pdf | Page 1 | TEXT",
+      "reason": "File 'rca-case-a-doc3_valve_fv302_maintenance_actuator_log.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "File 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "File 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-CASE-A-DOC3_Valve_FV302_Maintenance_Actuator_Log.pdf | Page 1 | TEXT",
+      "reason": "File 'rca-case-a-doc3_valve_fv302_maintenance_actuator_log.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "File 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "File 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' cited but does not bind to any verified/supported claim in the evidence chain."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    },
+    {
+      "citation": "RCA-INC-2025-09_Sulfur_Plant_Thermal_Reactor_Trip.pdf | Page 5 | TEXT",
+      "reason": "Filename 'rca-inc-2025-09_sulfur_plant_thermal_reactor_trip.pdf' not recognized in workspace vault or generic fallback."
+    }
+  ]
+}

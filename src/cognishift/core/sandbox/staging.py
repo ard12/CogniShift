@@ -63,9 +63,9 @@ def stage_execution_environment(
         input_dir.mkdir(parents=True, exist_ok=True)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. Stage Source Code
+        # 1. Stage Source Code (binary exact without OS CRLF translation)
         script_path = source_dir / request.entrypoint
-        script_path.write_text(request.code, encoding="utf-8")
+        script_path.write_bytes(request.code.encode("utf-8"))
 
         # 2. Stage Input Files
         if len(request.input_files) > settings.sandbox_max_input_files:

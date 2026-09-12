@@ -1,0 +1,65 @@
+{
+  "mean_normal_latency_ms": 94915.13,
+  "mean_ood_latency_ms": 458.74,
+  "mean_total_latency_ms": 81421.36,
+  "mean_unaccounted_latency_ms": 3026.62,
+  "timing_methodology": "Actual clock intervals measured via time.perf_counter(). Zero arithmetic reconstruction.",
+  "scenarios": [
+    {
+      "scenario_id": "RCA-01",
+      "total_ms": 68691.31,
+      "retrieval_ms": 3.23,
+      "reasoning_ms": 67846.5,
+      "synthesis_ms": 4.33,
+      "unaccounted_ms": 837.25
+    },
+    {
+      "scenario_id": "RCA-02",
+      "total_ms": 91050.11,
+      "retrieval_ms": 2.43,
+      "reasoning_ms": 90280.27,
+      "synthesis_ms": 4.85,
+      "unaccounted_ms": 762.56
+    },
+    {
+      "scenario_id": "RCA-03",
+      "total_ms": 40351.48,
+      "retrieval_ms": 3.39,
+      "reasoning_ms": 39823.37,
+      "synthesis_ms": 1.19,
+      "unaccounted_ms": 523.53
+    },
+    {
+      "scenario_id": "RCA-04",
+      "total_ms": 458.74,
+      "retrieval_ms": 0.0,
+      "reasoning_ms": 0.0,
+      "synthesis_ms": 0.0,
+      "unaccounted_ms": 458.74
+    },
+    {
+      "scenario_id": "RCA-05",
+      "total_ms": 122265.56,
+      "retrieval_ms": 3.6,
+      "reasoning_ms": 121600.1,
+      "synthesis_ms": 8.88,
+      "unaccounted_ms": 652.98
+    },
+    {
+      "scenario_id": "RCA-06",
+      "total_ms": 170586.61,
+      "retrieval_ms": 5743.82,
+      "reasoning_ms": 147203.87,
+      "synthesis_ms": 2.19,
+      "unaccounted_ms": 17636.73
+    },
+    {
+      "scenario_id": "RCA-07",
+      "total_ms": 76545.71,
+      "retrieval_ms": 1.88,
+      "reasoning_ms": 76229.17,
+      "synthesis_ms": 0.12,
+      "unaccounted_ms": 314.54
+    }
+  ]
+}

@@ -18,6 +18,10 @@ data/*
 !data/rca_benchmark_v4/**
 !data/rca_final_verification_v4/
 !data/rca_final_verification_v4/**
+!data/rca_benchmark_v4_1/
+!data/rca_benchmark_v4_1/**
+!data/rca_final_verification_v4_1/
+!data/rca_final_verification_v4_1/**
 *.db
 .venv/
 venv/

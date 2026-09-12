@@ -547,3 +547,32 @@ def evaluate_scenario_dual_scoring(
         "scenario_pass": scenario_pass,
         "verdict": "PASS" if scenario_pass else ("FAIL (Evidence Chain Invalid)" if outcome_match else "FAIL (Outcome Mismatch)")
     }
+
+
+def calculate_aggregate_citation_accuracy(
+    scenario_metrics: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Computes aggregate citation accuracy strictly excluding N/A scenarios from denominators.
+    Reports scored_count, excluded_count, and exclusion_reasons per Amendment 7.
+    """
+    scored_values: List[float] = []
+    excluded_reasons: List[Dict[str, str]] = []
+
+    for s in scenario_metrics:
+        sc_id = s.get("scenario_id", "UNKNOWN")
+        acc = s.get("citation_accuracy")
+        if acc is None:
+            reason = s.get("exclusion_reason") or "No citations required (honest abstention/OOD/insufficient evidence)"
+            excluded_reasons.append({"scenario_id": sc_id, "reason": reason})
+        else:
+            scored_values.append(float(acc))
+
+    avg_acc = (sum(scored_values) / len(scored_values)) if scored_values else None
+    return {
+        "aggregate_citation_accuracy": round(avg_acc, 4) if avg_acc is not None else None,
+        "scored_count": len(scored_values),
+        "excluded_count": len(excluded_reasons),
+        "exclusion_reasons": excluded_reasons,
+    }
+

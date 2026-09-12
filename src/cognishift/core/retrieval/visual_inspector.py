@@ -191,8 +191,9 @@ class VisualEvidenceInspector:
 
         t_insp_0 = time.perf_counter()
         target_prompt = prompt_override or (
-            f"Identify all engineering equipment tags, valves, and instruments in this diagram (e.g. FV-302, R-301, FT-302, PT-105 for query '{query}'). "
-            "Describe the physical piping connections and specify if valve FV-302 is upstream or connected to reactor R-301 on the feed line."
+            "Describe the visible equipment and instrument tags, physical piping connections, "
+            "and flow directions between components in this engineering diagram. "
+            "Specify which valves or instruments are upstream, connected to, or downstream of vessels along process lines."
         )
 
         vlm_text = ""
@@ -217,7 +218,7 @@ class VisualEvidenceInspector:
                 vlm_text = v_obs.description.strip()
                 vlm_succeeded = True
 
-                # Parse structured JSON output from VLM
+                # Parse structured JSON output from VLM if available
                 parsed_json = None
                 try:
                     match = re.search(r"(\{.*\})", vlm_text, re.DOTALL)
@@ -229,13 +230,13 @@ class VisualEvidenceInspector:
                     parsed_json = None
 
                 if isinstance(parsed_json, dict):
-                    for tag in parsed_json.get("equipment_tags", []):
+                    for tag in parsed_json.get("observed_equipment_tags", parsed_json.get("equipment_tags", [])):
                         if isinstance(tag, str) and tag.strip():
                             extracted_tags.append(tag.strip().upper())
-                    for tag in parsed_json.get("instrument_tags", []):
+                    for tag in parsed_json.get("observed_instrument_tags", parsed_json.get("instrument_tags", [])):
                         if isinstance(tag, str) and tag.strip():
                             extracted_tags.append(tag.strip().upper())
-                    raw_rels = parsed_json.get("relations", [])
+                    raw_rels = parsed_json.get("observed_relations", parsed_json.get("relations", []))
                     if isinstance(raw_rels, list):
                         for rel in raw_rels:
                             if isinstance(rel, dict) and "subject" in rel and "object" in rel:
@@ -250,24 +251,31 @@ class VisualEvidenceInspector:
                     extracted_tags.append(m.group(1).upper())
                 extracted_tags = list(dict.fromkeys(extracted_tags))
 
-                # Extract spatial relations from observation text or tags if not already parsed
+                # Extract spatial relations from observation text ONLY (never manufacture from query)
                 if not observed_relations and len(extracted_tags) >= 2:
                     v_lower = vlm_text.lower()
-                    q_lower = query.lower()
                     valves = [t for t in extracted_tags if t.startswith(("FV", "PV", "XV", "HV", "FCV", "PCV"))]
                     equipment = [t for t in extracted_tags if t.startswith(("R-", "K-", "P-", "C-", "T-", "V-", "E-", "HEX-"))]
                     for v in valves:
                         for eq in equipment:
-                            rel = "CONNECTED_TO"
-                            if "upstream" in v_lower or "upstream" in q_lower:
-                                rel = "UPSTREAM_OF"
-                            elif "downstream" in v_lower or "downstream" in q_lower:
-                                rel = "DOWNSTREAM_OF"
-                            observed_relations.append({
-                                "subject": v,
-                                "relation_type": rel,
-                                "object": eq
-                            })
+                            if "upstream" in v_lower:
+                                observed_relations.append({
+                                    "subject": v,
+                                    "relation_type": "UPSTREAM_OF",
+                                    "object": eq
+                                })
+                            elif "downstream" in v_lower:
+                                observed_relations.append({
+                                    "subject": v,
+                                    "relation_type": "DOWNSTREAM_OF",
+                                    "object": eq
+                                })
+                            elif any(k in v_lower for k in ["connected", "connect", "feed", "pipe"]):
+                                observed_relations.append({
+                                    "subject": v,
+                                    "relation_type": "CONNECTED_TO",
+                                    "object": eq
+                                })
 
                 # Deterministic OCR corroboration
                 if getattr(settings, "visual_verification_enabled", True):

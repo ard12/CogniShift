@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     sandbox_enabled: bool = True
     sandbox_runtime: str = "docker"  # 'docker' or 'podman'
     sandbox_image: str = "cognishift/sandbox-python:3.12-v1"
-    sandbox_image_digest: str = ""
+    sandbox_image_digest: str = "sha256:2fd2a36859ee06c86bb687b54ebe7c50a3eb5754ac0d5a5de0aa001ac5bb4841"
     sandbox_cpu_limit: float = 1.0
     sandbox_memory_mb: int = 512
     sandbox_pid_limit: int = 64

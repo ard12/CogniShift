@@ -93,7 +93,11 @@ def determine_primary_cause_code(
                     return code
 
     # 2. Inconclusive check (prioritize explicit insufficient/inconclusive claims)
-    if any(k in claims_text for k in ["inconclusive investigation", "insufficient evidence", "missing telemetry", "insufficient to determine"]):
+    if any(k in claims_text for k in [
+        "inconclusive investigation", "insufficient evidence", "missing telemetry",
+        "insufficient to determine", "is missing", "missing from", "manual is missing",
+        "missing manual", "not found in the repository", "not found in vault"
+    ]):
         return PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
     # 3. Grounded Physical Mechanism Classification based on verified evidence
@@ -375,6 +379,10 @@ class RCAEvidenceValidator:
         if explicit_missing_sources and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE):
             determined_status = RCAStatus.PLAUSIBLE_HYPOTHESIS
 
+        # If no cause/hypothesis was asserted and critical sources are missing, status is INSUFFICIENT_EVIDENCE
+        if not primary_cause and not parsed_claims.get("causal_chain") and (not required_roles_satisfied or explicit_missing_sources):
+            determined_status = RCAStatus.INSUFFICIENT_EVIDENCE
+
         cause_code = determine_primary_cause_code(
             status=determined_status,
             primary_cause_text=primary_cause or "",
@@ -384,7 +392,9 @@ class RCAEvidenceValidator:
             operator_input=operator_input
         )
 
-        if cause_code in (PrimaryCauseCode.INSUFFICIENT_EVIDENCE, PrimaryCauseCode.UNKNOWN) and determined_status != RCAStatus.PLAUSIBLE_HYPOTHESIS:
+        if cause_code == PrimaryCauseCode.INSUFFICIENT_EVIDENCE:
+            determined_status = RCAStatus.INSUFFICIENT_EVIDENCE
+        elif cause_code == PrimaryCauseCode.UNKNOWN and determined_status != RCAStatus.PLAUSIBLE_HYPOTHESIS:
             determined_status = RCAStatus.INSUFFICIENT_EVIDENCE
             cause_code = PrimaryCauseCode.INSUFFICIENT_EVIDENCE
 
@@ -464,7 +474,10 @@ class RCAEvidenceValidator:
         lines.append(f"**Cause Code:** `{cause_code.value}`\n")
         
         # Resolve dynamic primary cause supporting evidence IDs strictly from cited or corroborated evidence
-        vis_item = next((i for i in supported_items if i.retrieval_channel == "visual" or i.evidence_role == EvidenceRole.P_AND_ID), None)
+        vis_item = next((i for i in supported_items if i.retrieval_channel == "visual" and i.evidence_role == EvidenceRole.P_AND_ID), None)
+        if not vis_item:
+            vis_item = next((i for i in supported_items if i.retrieval_channel == "visual"), None)
+
         primary_cause_supporting_eids: List[str] = []
         if primary_cause:
             primary_cause_supporting_eids = list(dict.fromkeys(re.findall(r"\[(E\d+)\]", primary_cause)))
@@ -477,33 +490,31 @@ class RCAEvidenceValidator:
                 if stem in pc_lower or item.filename.lower() in pc_lower or any(t.lower() in pc_lower for t in item.equipment_ids if len(t) >= 3):
                     primary_cause_supporting_eids.append(item.evidence_id)
 
-        # Fallback if primary cause supporting evidence IDs are still empty: bind to supported items matching target asset tags or first supported items
-        if not primary_cause_supporting_eids and supported_items:
-            target_tags = [a.lower() for a in bundle.asset_ids]
-            for item in supported_items:
-                if any(t in item.filename.lower() or any(t in eq.lower() for eq in item.equipment_ids) for t in target_tags):
-                    primary_cause_supporting_eids.append(item.evidence_id)
-            if not primary_cause_supporting_eids:
-                primary_cause_supporting_eids = [item.evidence_id for item in supported_items[:2]]
-
         # Bind verified visual evidence into primary cause supporting evidence IDs when spatial relation is corroborated
-        if vis_item:
-            if vis_item.evidence_id not in primary_cause_supporting_eids:
-                obs_rels = vis_item.metadata.get("observed_relations", [])
-                has_spatial = any("upstream" in str(r).lower() or "connected" in str(r).lower() for r in obs_rels)
-                has_tag_in_cause = any(t.lower() in (primary_cause or "").lower() for t in vis_item.equipment_ids) if vis_item.equipment_ids else False
-                if has_spatial or has_tag_in_cause or vis_item.corroborated:
+        if vis_item and vis_item.corroborated:
+            obs_rels = vis_item.metadata.get("observed_relations", [])
+            has_spatial = any("upstream" in str(r).lower() or "connected" in str(r).lower() for r in obs_rels)
+            has_tag_in_cause = any(t.lower() in (primary_cause or "").lower() for t in vis_item.equipment_ids) if vis_item.equipment_ids else False
+            if has_spatial and (has_tag_in_cause or primary_cause):
+                if vis_item.evidence_id not in primary_cause_supporting_eids:
                     primary_cause_supporting_eids.append(vis_item.evidence_id)
             # When verified visual spatial evidence confirms upstream causal dependency, allow status upgrade to CONFIRMED_CAUSE
-            if determined_status == RCAStatus.PLAUSIBLE_HYPOTHESIS and vis_item.corroborated and len(supported_items) >= 2:
+            if determined_status == RCAStatus.PLAUSIBLE_HYPOTHESIS and has_spatial and len(supported_items) >= 2:
                 determined_status = RCAStatus.CONFIRMED_CAUSE
                 lines[0] = f"## RCA Status\n{determined_status.value.replace('_', ' ')}\n"
 
+        # Check for procedural non-causal text
+        is_procedural = False
+        if primary_cause:
+            pc_low = primary_cause.lower()
+            if any(p in pc_low for p in ["this approach ensures", "evidence-backed rca", "structured approach", "ensures structured", "methodology ensures"]):
+                is_procedural = True
+                if determined_status == RCAStatus.CONFIRMED_CAUSE:
+                    determined_status = RCAStatus.PLAUSIBLE_HYPOTHESIS
+                    lines[0] = f"## RCA Status\n{determined_status.value.replace('_', ' ')}\n"
+
         if primary_cause and determined_status in (RCAStatus.CONFIRMED_CAUSE, RCAStatus.SUPPORTED_LIKELY_CAUSE, RCAStatus.PLAUSIBLE_HYPOTHESIS):
             primary_text = primary_cause
-            if not re.search(r"\[E\d+\]", primary_text) and primary_cause_supporting_eids:
-                cite_prefix = " ".join(f"[{eid}]" for eid in sorted(primary_cause_supporting_eids))
-                primary_text = f"{cite_prefix} {primary_text}"
             lines.append(primary_text)
         elif determined_status == RCAStatus.INSUFFICIENT_EVIDENCE:
             primary_text = "Not established from available evidence. No root cause could be authoritatively confirmed due to missing required evidence."
@@ -568,33 +579,34 @@ class RCAEvidenceValidator:
 
         # 8. Extract Structured Spatial Relations strictly from VLM-observed relations
         spatial_relations: List[StructuredSpatialRelation] = []
-        if vis_item and vis_item.retrieval_channel == "visual":
-            observed_rels = vis_item.metadata.get("observed_relations", [])
-            for rel in observed_rels:
-                subj = str(rel.get("subject", "")).strip().upper()
-                rel_type = str(rel.get("relation_type", "CONNECTED_TO")).strip().upper()
-                obj = str(rel.get("object", "")).strip().upper()
-                if subj and obj:
-                    q_status = (
-                        ObservationQualityStatus.VERIFIED
-                        if vis_item.corroborated
-                        else ObservationQualityStatus.OBSERVED_UNCORROBORATED
-                    )
-                    spatial_relations.append(
-                        StructuredSpatialRelation(
-                            subject=subj,
-                            relation_type=rel_type,
-                            object=obj,
-                            supporting_evidence_id=vis_item.evidence_id,
-                            source_id=vis_item.source_id,
-                            filename=vis_item.filename,
-                            processing_version=vis_item.processing_version or "v1",
-                            locator=vis_item.locator.format_locator(vis_item.retrieval_channel) if vis_item.locator else f"[{vis_item.filename} | Page 1 | VISUAL]",
-                            inspection_status=vis_item.metadata.get("inspection_status", "SUCCESS"),
-                            quality_status=q_status,
-                            tag_corroboration=bool(vis_item.corroborated)
+        for v_item in supported_items:
+            if v_item.retrieval_channel == "visual":
+                observed_rels = v_item.metadata.get("observed_relations", [])
+                for rel in observed_rels:
+                    subj = str(rel.get("subject", "")).strip().upper()
+                    rel_type = str(rel.get("relation_type", "CONNECTED_TO")).strip().upper()
+                    obj = str(rel.get("object", "")).strip().upper()
+                    if subj and obj:
+                        q_status = (
+                            ObservationQualityStatus.VERIFIED
+                            if v_item.corroborated
+                            else ObservationQualityStatus.OBSERVED_UNCORROBORATED
                         )
-                    )
+                        spatial_relations.append(
+                            StructuredSpatialRelation(
+                                subject=subj,
+                                relation_type=rel_type,
+                                object=obj,
+                                supporting_evidence_id=v_item.evidence_id,
+                                source_id=v_item.source_id,
+                                filename=v_item.filename,
+                                processing_version=v_item.processing_version or "v1",
+                                locator=v_item.locator.format_locator(v_item.retrieval_channel) if v_item.locator else f"[{v_item.filename} | Page 1 | VISUAL]",
+                                inspection_status=v_item.metadata.get("inspection_status", "SUCCESS"),
+                                quality_status=q_status,
+                                tag_corroboration=bool(v_item.corroborated)
+                            )
+                        )
 
         # 9. Build ConfirmedObservationItem list
         confirmed_observations: List[ConfirmedObservationItem] = []

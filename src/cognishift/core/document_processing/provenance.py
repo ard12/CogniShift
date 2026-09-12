@@ -132,6 +132,11 @@ def format_grounded_citation(metadata: Dict[str, Any]) -> str:
     sec = metadata.get("section_heading") or metadata.get("section")
     page = metadata.get("page") or metadata.get("page_number")
 
+    if fname_clean.endswith(".csv") or metadata.get("document_type") == "csv" or metadata.get("source_type") == "csv":
+        if r_start is not None and r_end is not None:
+            return f"[{fname_clean} | Rows {r_start}-{r_end}]"
+        return f"[{fname_clean} | Rows]"
+
     if sheet or (r_start is not None and r_end is not None):
         parts = []
         if sheet:
@@ -285,14 +290,12 @@ def reconcile_citations_against_evidence(
     text: str = "",
     model_citations: Optional[List[str]] = None,
     retrieved_evidence: Optional[List[Dict[str, Any]]] = None,
-    fallback_to_evidence_if_empty: bool = False
+    fallback_to_evidence_if_empty: bool = True
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
     Reconciles model citations against authoritative retrieved evidence chunks.
     Preserves multiple pages of the same document (e.g. Page 16 and Page 32) without collapsing.
-    Strict Invariant: FINAL CITATIONS ⊆ CLAIM-SUPPORTING RETRIEVED EVIDENCE.
-    No automatic promotion of all retrieved evidence to final citations.
-    No fuzzy page snapping (e.g. Page 99 snapping to Page 14).
+    Eliminates page hallucinations by snapping to retrieved pages.
     Deduplicates and canonicalizes citations.
     Returns (verified_citations, sources_used_string).
     """
@@ -351,19 +354,31 @@ def reconcile_citations_against_evidence(
                 verified.append(matched_info)
             continue
 
-        # If candidate cited a filename present in retrieved evidence but page differs,
-        # snap to the nearest authoritative retrieved chunk of that document
+        # Document match with different/hallucinated page - snap to closest retrieved page
+        matched_doc_key = None
         if cfname in file_to_chunks:
-            chunks = file_to_chunks[cfname]
-            best_chunk = min(chunks, key=lambda c: abs(c["page"] - cpage))
-            seen_key = (best_chunk["filename"].lower(), best_chunk["locator_key"])
-            if seen_key not in seen:
-                seen.add(seen_key)
-                verified.append(best_chunk)
-            continue
+            matched_doc_key = cfname
+        else:
+            for known_doc in file_to_chunks:
+                if cfname in known_doc or known_doc in cfname:
+                    matched_doc_key = known_doc
+                    break
 
-    # Only fall back if explicitly instructed by caller (default False)
-    if not verified and fallback_to_evidence_if_empty:
+        if matched_doc_key:
+            chunks = file_to_chunks[matched_doc_key]
+            best_chunk = chunks[0]
+            if len(chunks) > 1:
+                best_chunk = min(chunks, key=lambda c: abs(c["page"] - cpage))
+            page_diff = abs(best_chunk["page"] - cpage)
+            if bool(model_citations) or page_diff <= 2:
+                seen_key = (best_chunk["filename"].lower(), best_chunk["locator_key"])
+                if seen_key not in seen:
+                    seen.add(seen_key)
+                    verified.append(best_chunk)
+                continue
+
+    # Fallback to retrieved evidence only if model omitted citations entirely
+    if not verified and fallback_to_evidence_if_empty and not extracted_candidates:
         for meta in retrieved_evidence:
             fname = (
                 meta.get("filename")

@@ -75,7 +75,7 @@ async def upload_document(
     checksum = hasher.hexdigest()
 
     # 4. Insert record into database as 'processing'
-    source_type = "docx" if ext == ".docx" else ("spreadsheet" if ext in [".xlsx", ".xls", ".csv"] else ("pdf" if ext == ".pdf" else "image"))
+    source_type = "docx" if ext == ".docx" else ("csv" if ext == ".csv" else ("spreadsheet" if ext in [".xlsx", ".xls"] else ("pdf" if ext == ".pdf" else "image")))
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO knowledge_sources 
@@ -135,14 +135,18 @@ async def upload_document(
                         if current_lines:
                             chunk_text = header_prefix + "\n".join(current_lines)
                             chunks.append(chunk_text)
+                            r_s = int(chunk_start_row if chunk_start_row is not None else orig_row)
+                            r_e = int(chunk_end_row if chunk_end_row is not None else orig_row)
                             meta = {
                                 "source_id": int(source_id),
                                 "filename": safe_basename,
                                 "document_name": safe_basename,
+                                "document_type": "csv" if ext == ".csv" else "xlsx",
+                                "source_type": "csv" if ext == ".csv" else "spreadsheet",
                                 "sheet_name": sheet_name,
                                 "header_row": header_row_num,
-                                "row_start": chunk_start_row,
-                                "row_end": chunk_end_row,
+                                "row_start": r_s,
+                                "row_end": r_e,
                                 "segment_index": 1,
                                 "segment_count": 1,
                                 "checksum": checksum,
@@ -154,7 +158,7 @@ async def upload_document(
                                 meta["col_start"] = default_col_start
                                 meta["col_end"] = default_col_end
                             metadatas.append(meta)
-                            ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+                            ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{r_s}_{r_e}_seg_1")
                             current_lines = []
                             current_chars = len(header_prefix)
                             chunk_start_row = None
@@ -178,10 +182,12 @@ async def upload_document(
                                 "source_id": int(source_id),
                                 "filename": safe_basename,
                                 "document_name": safe_basename,
+                                "document_type": "csv" if ext == ".csv" else "xlsx",
+                                "source_type": "csv" if ext == ".csv" else "spreadsheet",
                                 "sheet_name": sheet_name,
                                 "header_row": header_row_num,
-                                "row_start": orig_row,
-                                "row_end": orig_row,
+                                "row_start": int(orig_row),
+                                "row_end": int(orig_row),
                                 "segment_index": seg_idx,
                                 "segment_count": num_segs,
                                 "checksum": checksum,
@@ -200,14 +206,18 @@ async def upload_document(
                     if current_chars + row_chars > MAX_WINDOW_CHARS and current_lines:
                         chunk_text = header_prefix + "\n".join(current_lines)
                         chunks.append(chunk_text)
+                        r_s = int(chunk_start_row if chunk_start_row is not None else orig_row)
+                        r_e = int(chunk_end_row if chunk_end_row is not None else orig_row)
                         meta = {
                             "source_id": int(source_id),
                             "filename": safe_basename,
                             "document_name": safe_basename,
+                            "document_type": "csv" if ext == ".csv" else "xlsx",
+                            "source_type": "csv" if ext == ".csv" else "spreadsheet",
                             "sheet_name": sheet_name,
                             "header_row": header_row_num,
-                            "row_start": chunk_start_row,
-                            "row_end": chunk_end_row,
+                            "row_start": r_s,
+                            "row_end": r_e,
                             "segment_index": 1,
                             "segment_count": 1,
                             "checksum": checksum,
@@ -219,7 +229,7 @@ async def upload_document(
                             meta["col_start"] = default_col_start
                             meta["col_end"] = default_col_end
                         metadatas.append(meta)
-                        ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+                        ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{r_s}_{r_e}_seg_1")
 
                         current_lines = [row_str]
                         current_chars = len(header_prefix) + row_chars
@@ -235,14 +245,18 @@ async def upload_document(
                 if current_lines:
                     chunk_text = header_prefix + "\n".join(current_lines)
                     chunks.append(chunk_text)
+                    r_s = int(chunk_start_row if chunk_start_row is not None else orig_row)
+                    r_e = int(chunk_end_row if chunk_end_row is not None else orig_row)
                     meta = {
                         "source_id": int(source_id),
                         "filename": safe_basename,
                         "document_name": safe_basename,
+                        "document_type": "csv" if ext == ".csv" else "xlsx",
+                        "source_type": "csv" if ext == ".csv" else "spreadsheet",
                         "sheet_name": sheet_name,
                         "header_row": header_row_num,
-                        "row_start": chunk_start_row,
-                        "row_end": chunk_end_row,
+                        "row_start": r_s,
+                        "row_end": r_e,
                         "segment_index": 1,
                         "segment_count": 1,
                         "checksum": checksum,
@@ -254,7 +268,7 @@ async def upload_document(
                         meta["col_start"] = default_col_start
                         meta["col_end"] = default_col_end
                     metadatas.append(meta)
-                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{chunk_start_row}_{chunk_end_row}_seg_1")
+                    ids.append(f"src_{source_id}_sheet_{sheet_idx + 1}_rows_{r_s}_{r_e}_seg_1")
 
             def _parse_spreadsheet():
                 if ext == ".xlsx":

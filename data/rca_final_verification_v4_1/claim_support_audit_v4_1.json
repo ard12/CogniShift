@@ -1,0 +1,105 @@
+{
+  "total_claims_audited": 9,
+  "claims": [
+    {
+      "scenario_id": "RCA-01",
+      "claim_id": "C_CAUSE",
+      "claim_type": "causal_link",
+      "text": "**Action:** step_observation  \n**Content:**  \nThe pump P-101A tripped due to high vibration (7.8 mm/s RMS, over 7.0 mm/s limit) and elevated bearing temperature (92.1\u00b0C, over 85\u00b0C limit). The discharge pressure (492.5 PSI) exceeded the safe operating range (80-120 PSI). Cavitation symptoms such as rumble, rubbing, or excessive vibration should be checked. The bearing temperature exceeding its limit could indicate a failing component, requiring further inspection.",
+      "supporting_evidence_ids": [
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "E5",
+        "E6",
+        "E7",
+        "E8"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-02",
+      "claim_id": "C_CAUSE",
+      "claim_type": "causal_link",
+      "text": "The centrifugal compressor K-101 tripped due to exceeding its safety limits for high journal bearing temperature (95.0 \u00b0C) and discharge overpressure (450.0 PSI). The system automatically tripped as per the predefined safety protocols. The immediate response included de-energizing the drive motor, opening the emergency relief valve, and initiating a bypass to dissipate momentum. The trip was confirmed by both the thermal and pressure sensors, and no additional evidence is needed to support this conclusion as the system responses are well-documented in the operating procedures.",
+      "supporting_evidence_ids": [
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "E5",
+        "E6",
+        "E7",
+        "E8"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-05",
+      "claim_id": "C1",
+      "claim_type": "observation",
+      "text": "The recorded vibration trend in P-101A is 1.6 mm/s, which is below the threshold of 3.8 mm/s mentioned in the standard operating procedure (SOP) for detecting liquid carryover into the first stage. [K-101_Compressor_Standard_Operating_Procedure_and_Emergency_Trip.pdf | Page 2]",
+      "supporting_evidence_ids": [
+        "E1"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-05",
+      "claim_id": "C2",
+      "claim_type": "observation",
+      "text": "The discharge pressure for P-101A is 104.62 PSI, which is within the normal operational range. [Pump_Maintenance_SOP.pdf | Page 5]",
+      "supporting_evidence_ids": [
+        "E6"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-05",
+      "claim_id": "C3",
+      "claim_type": "observation",
+      "text": "The vibration trend for P-101B is nominal, indicating no immediate mechanical issues.",
+      "supporting_evidence_ids": [],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-06",
+      "claim_id": "C1",
+      "claim_type": "observation",
+      "text": "The reactor pressure surge (168 bar) was triggered by a high pressure trip interlock (PSHH-301). [RCA-CASE-A-DOC1_Hydrocracker_High_Pressure_Trip_Chrono.pdf | Page 1]",
+      "supporting_evidence_ids": [
+        "E1"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-06",
+      "claim_id": "C2",
+      "claim_type": "observation",
+      "text": "The feed flow transmitter indicated an abrupt drop to 0 m\u00b3/h, prompting the controller to initiate full demand to control the feed flow valve (FV-302). [RCA-CASE-A-DOC1_Hydrocracker_High_Pressure_Trip_Chrono.pdf | Page 1]",
+      "supporting_evidence_ids": [
+        "E3"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-06",
+      "claim_id": "C3",
+      "claim_type": "observation",
+      "text": "Field operator reported severe banging in the preheat loop, leading to the pressure surge. [RCA-CASE-A-DOC1_Hydrocracker_High_Pressure_Trip_Chrono.pdf | Page 1]",
+      "supporting_evidence_ids": [
+        "E3"
+      ],
+      "benchmark_evidence_chain_valid": false
+    },
+    {
+      "scenario_id": "RCA-06",
+      "claim_id": "C_CAUSE",
+      "claim_type": "causal_link",
+      "text": "**Final Answer:**",
+      "supporting_evidence_ids": [],
+      "benchmark_evidence_chain_valid": false
+    }
+  ]
+}

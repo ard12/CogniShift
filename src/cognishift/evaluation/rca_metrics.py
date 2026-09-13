@@ -576,3 +576,39 @@ def calculate_aggregate_citation_accuracy(
         "exclusion_reasons": excluded_reasons,
     }
 
+
+def calculate_aggregate_claim_support_precision(
+    scenario_metrics: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Computes aggregate Claim Support Precision (CSP) strictly excluding N/A scenarios
+    (honest abstention/OOD with no positive supportable causal claims) from denominators.
+    Reports scored_csp_scenarios, excluded_csp_scenarios, and exclusion_reasons per Constraint 17.
+    """
+    scored_values: List[float] = []
+    scored_scenarios: List[str] = []
+    excluded_scenarios: List[str] = []
+    exclusion_reasons: List[Dict[str, str]] = []
+
+    for s in scenario_metrics:
+        sc_id = s.get("scenario_id", "UNKNOWN")
+        csp = s.get("claim_support_precision")
+        if csp is None:
+            reason = s.get("claim_support_exclusion_reason") or "NO_POSITIVE_SUPPORTABLE_CLAIMS"
+            excluded_scenarios.append(sc_id)
+            exclusion_reasons.append({"scenario_id": sc_id, "reason": reason})
+        else:
+            scored_scenarios.append(sc_id)
+            scored_values.append(float(csp))
+
+    avg_csp = (sum(scored_values) / len(scored_values)) if scored_values else None
+    return {
+        "aggregate_claim_support_precision": round(avg_csp, 4) if avg_csp is not None else None,
+        "scored_count": len(scored_values),
+        "scored_csp_scenarios": scored_scenarios,
+        "excluded_count": len(excluded_scenarios),
+        "excluded_csp_scenarios": excluded_scenarios,
+        "exclusion_reasons": exclusion_reasons,
+    }
+
+

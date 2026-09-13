@@ -19,6 +19,9 @@ from cognishift.core.rca.schemas import (
     VerifiedVisualEvidence,
     StructuredSpatialRelation,
     StructuredRCAResult,
+    EvidenceAdmissionReason,
+    EvidenceAdmissionCategory,
+    EvidenceAdmissionDecision,
 )
 from cognishift.core.rca.policy import (
     ToolFailureSeverity,

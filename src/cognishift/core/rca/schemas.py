@@ -127,11 +127,51 @@ class TruthOrigin(str, Enum):
 class ObservationQualityStatus(str, Enum):
     VERIFIED = "VERIFIED"
     OBSERVED_UNCORROBORATED = "OBSERVED_UNCORROBORATED"
+    AMBIGUOUS = "AMBIGUOUS"
+    UNSUPPORTED = "UNSUPPORTED"
+    FAILED = "FAILED"
     VERIFICATION_FAILED = "VERIFICATION_FAILED"
     VLM_FAILED = "VLM_FAILED"
     NO_OBSERVATION = "NO_OBSERVATION"
     RASTERIZATION_FAILED = "RASTERIZATION_FAILED"
     SOURCE_NOT_FOUND = "SOURCE_NOT_FOUND"
+
+
+class EvidenceAdmissionReason(str, Enum):
+    ADMITTED = "ADMITTED"
+    NOT_AUTHORIZED = "NOT_AUTHORIZED"
+    STALE_VERSION = "STALE_VERSION"
+    WRONG_WORKSPACE = "WRONG_WORKSPACE"
+    ASSET_MISMATCH = "ASSET_MISMATCH"
+    EQUIPMENT_CLASS_MISMATCH = "EQUIPMENT_CLASS_MISMATCH"
+    ROLE_MISMATCH = "ROLE_MISMATCH"
+    INCIDENT_MISMATCH = "INCIDENT_MISMATCH"
+    LOW_RELEVANCE = "LOW_RELEVANCE"
+    DUPLICATE = "DUPLICATE"
+
+
+class EvidenceAdmissionCategory(str, Enum):
+    DIRECT_ASSET_EVIDENCE = "DIRECT_ASSET_EVIDENCE"
+    SYSTEM_LEVEL_RELEVANT_EVIDENCE = "SYSTEM_LEVEL_RELEVANT_EVIDENCE"
+    GENERIC_PROCEDURAL_EVIDENCE = "GENERIC_PROCEDURAL_EVIDENCE"
+    DISTRACTOR = "DISTRACTOR"
+
+
+class EvidenceAdmissionDecision(BaseModel):
+    source_id: Optional[int] = None
+    evidence_candidate_id: str
+    admitted: bool
+    reason: EvidenceAdmissionReason
+    admission_category: EvidenceAdmissionCategory = EvidenceAdmissionCategory.DISTRACTOR
+    asset_relevance: float = 1.0
+    source_role_relevance: float = 1.0
+    incident_relevance: float = 1.0
+    authorization_valid: bool = True
+    processing_version_valid: bool = True
+    decision_inputs: Dict[str, Any] = Field(default_factory=dict)
+    decision_score: float = 1.0
+    decision_threshold: float = 0.5
+    rule_triggered: str = ""
 
 
 class ClaimSupportStatus(str, Enum):
@@ -214,10 +254,14 @@ class StructuredSpatialRelation(BaseModel):
     source_id: Optional[int] = None
     filename: str = ""
     processing_version: str = "v1"
+    page_number: int = 1
     locator: str = ""
     inspection_status: str = "SUCCESS"
     quality_status: ObservationQualityStatus = ObservationQualityStatus.VERIFIED
+    structured_observation: bool = True
     tag_corroboration: bool = False
+    relation_quality: str = "VERIFIED"
+    evidence_basis: str = ""
 
 
 class ConfirmedObservationItem(BaseModel):
@@ -239,6 +283,10 @@ class StructuredRCAResult(BaseModel):
     contradictions: List[str] = Field(default_factory=list)
     additional_evidence_needed: List[str] = Field(default_factory=list)
     sources: List[Dict[str, Any]] = Field(default_factory=list)
+    retrieved_candidate_count: int = 0
+    admitted_evidence_count: int = 0
+    rejected_candidate_count: int = 0
+    admission_decisions: List[Dict[str, Any]] = Field(default_factory=list)
     outcome_match: Optional[bool] = None
     evidence_chain_valid: Optional[bool] = None
     scenario_pass: Optional[bool] = None
@@ -281,6 +329,10 @@ class RCAEvidenceBundle(BaseModel):
     final_evidence_channels: List[str] = Field(default_factory=list)
     evidence_channel_counts: Dict[str, int] = Field(default_factory=dict)
     stage_latencies_ms: Dict[str, float] = Field(default_factory=dict)
+    retrieved_candidate_count: int = 0
+    admitted_evidence_count: int = 0
+    rejected_candidate_count: int = 0
+    admission_decisions: List[EvidenceAdmissionDecision] = Field(default_factory=list)
 
     def get_evidence_by_id(self, evidence_id: str) -> Optional[RCAEvidenceItem]:
         for item in self.evidence_items:

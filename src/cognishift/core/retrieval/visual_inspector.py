@@ -191,9 +191,21 @@ class VisualEvidenceInspector:
 
         t_insp_0 = time.perf_counter()
         target_prompt = prompt_override or (
-            "Describe the visible equipment and instrument tags, physical piping connections, "
-            "and flow directions between components in this engineering diagram. "
-            "Specify which valves or instruments are upstream, connected to, or downstream of vessels along process lines."
+            "Inspect this engineering diagram. Identify visible tagged equipment and instruments. "
+            "Determine explicit directional process-flow relationships only when arrow direction, "
+            "line flow, or diagram semantics visibly support them. Return machine-readable JSON. "
+            "Do not infer direction from query wording. Format:\n"
+            "{\n"
+            '  "observed_equipment_tags": ["..."],\n'
+            '  "observed_relations": [\n'
+            '    {\n'
+            '      "subject": "...",\n'
+            '      "relation_type": "UPSTREAM_OF|DOWNSTREAM_OF|CONNECTED_TO",\n'
+            '      "object": "...",\n'
+            '      "evidence_basis": "..."\n'
+            '    }\n'
+            '  ]\n'
+            "}"
         )
 
         vlm_text = ""
@@ -218,14 +230,18 @@ class VisualEvidenceInspector:
                 vlm_text = v_obs.description.strip()
                 vlm_succeeded = True
 
-                # Parse structured JSON output from VLM if available
+                # Parse structured JSON output from VLM strictly
                 parsed_json = None
                 try:
-                    match = re.search(r"(\{.*\})", vlm_text, re.DOTALL)
+                    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", vlm_text, re.DOTALL)
                     if match:
                         parsed_json = json.loads(match.group(1))
                     else:
-                        parsed_json = json.loads(vlm_text)
+                        match2 = re.search(r"(\{.*\})", vlm_text, re.DOTALL)
+                        if match2:
+                            parsed_json = json.loads(match2.group(1))
+                        else:
+                            parsed_json = json.loads(vlm_text)
                 except Exception:
                     parsed_json = None
 
@@ -243,39 +259,14 @@ class VisualEvidenceInspector:
                                 observed_relations.append({
                                     "subject": str(rel["subject"]).strip().upper(),
                                     "relation_type": str(rel.get("relation_type", "CONNECTED_TO")).strip().upper(),
-                                    "object": str(rel["object"]).strip().upper()
+                                    "object": str(rel["object"]).strip().upper(),
+                                    "evidence_basis": str(rel.get("evidence_basis", "")).strip()
                                 })
 
-                # Also regex extract tags from prose if any
+                # Regex extract tags from prose for deterministic OCR verification
                 for m in TAG_RE.finditer(vlm_text):
                     extracted_tags.append(m.group(1).upper())
                 extracted_tags = list(dict.fromkeys(extracted_tags))
-
-                # Extract spatial relations from observation text ONLY (never manufacture from query)
-                if not observed_relations and len(extracted_tags) >= 2:
-                    v_lower = vlm_text.lower()
-                    valves = [t for t in extracted_tags if t.startswith(("FV", "PV", "XV", "HV", "FCV", "PCV"))]
-                    equipment = [t for t in extracted_tags if t.startswith(("R-", "K-", "P-", "C-", "T-", "V-", "E-", "HEX-"))]
-                    for v in valves:
-                        for eq in equipment:
-                            if "upstream" in v_lower:
-                                observed_relations.append({
-                                    "subject": v,
-                                    "relation_type": "UPSTREAM_OF",
-                                    "object": eq
-                                })
-                            elif "downstream" in v_lower:
-                                observed_relations.append({
-                                    "subject": v,
-                                    "relation_type": "DOWNSTREAM_OF",
-                                    "object": eq
-                                })
-                            elif any(k in v_lower for k in ["connected", "connect", "feed", "pipe"]):
-                                observed_relations.append({
-                                    "subject": v,
-                                    "relation_type": "CONNECTED_TO",
-                                    "object": eq
-                                })
 
                 # Deterministic OCR corroboration
                 if getattr(settings, "visual_verification_enabled", True):

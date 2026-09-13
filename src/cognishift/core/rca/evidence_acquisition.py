@@ -20,13 +20,15 @@ from cognishift.core.rca.schemas import (
     EvidenceLocator,
     ObservationQualityStatus,
     TruthOrigin,
+    EvidenceAdmissionDecision,
+    EvidenceAdmissionReason,
+    EvidenceAdmissionCategory,
 )
 from cognishift.core.tool_schemas import SUPPORTED_SIMULATED_TARGETS, resolve_equipment_alias
 from cognishift.core.retrieval.text_retriever import TextRetriever
 from cognishift.core.retrieval.visual_retriever import VisualRetriever
 from cognishift.core.retrieval.evidence_fusion import EvidenceFusion
 from cognishift.core.graph_memory import query_graph_context
-from cognishift.core.retrieval.visual_inspector import VisualEvidenceInspector, get_visual_inspector, VisualInspectionStatus
 from cognishift.core.visual_rag.embedding_provider import get_visual_embedding_provider
 
 logger = logging.getLogger(__name__)
@@ -40,12 +42,15 @@ class RCAEvidenceAcquirer:
         text_retriever: Optional[TextRetriever] = None,
         visual_retriever: Optional[VisualRetriever] = None,
         allow_simulation: bool = False,
-        inspector: Optional[VisualEvidenceInspector] = None
+        inspector: Optional[Any] = None
     ):
         self.text_retriever = text_retriever or TextRetriever()
         self.visual_retriever = visual_retriever or VisualRetriever(allow_simulation=allow_simulation)
         self.allow_simulation = allow_simulation
-        self.inspector = inspector or get_visual_inspector()
+        if inspector is None:
+            from cognishift.core.retrieval.visual_inspector import get_visual_inspector
+            inspector = get_visual_inspector()
+        self.inspector = inspector
 
     def parse_evidence_contract(self, query: str) -> Dict[str, Any]:
         """
@@ -83,7 +88,9 @@ class RCAEvidenceAcquirer:
             required_roles.append(EvidenceRole.PRESSURE)
         if "temperature" in lower_q or "overheat" in lower_q:
             required_roles.append(EvidenceRole.TEMPERATURE)
-        if any(k in lower_q for k in ["trip", "tripped", "failed", "incident", "anomaly", "alarm"]):
+        if any(k in lower_q for k in ["chronology", "incident report", "incident log", "event log", "alarm sequence", "sequence of events"]):
+            required_roles.append(EvidenceRole.INCIDENT_CHRONOLOGY)
+        elif any(k in lower_q for k in ["trip", "tripped", "failed", "incident", "anomaly"]) and not any(lower_q.startswith(p) for p in ["synthesize", "verify", "check", "hypothesize"]):
             required_roles.append(EvidenceRole.INCIDENT_CHRONOLOGY)
 
         # 4. Optional roles
@@ -193,6 +200,10 @@ class RCAEvidenceAcquirer:
                 "total_acquisition_ms": 0.0
             }
             t_acq_start = time.perf_counter()
+            retrieved_candidate_count = 0
+            admitted_evidence_count = 0
+            rejected_candidate_count = 0
+            admission_decisions: List[EvidenceAdmissionDecision] = []
 
             # 1. OOD Asset Verification
             t_pref_0 = time.perf_counter()
@@ -223,7 +234,11 @@ class RCAEvidenceAcquirer:
                         "ood_triggered": True,
                         "stage_latencies_ms": stage_latencies_ms
                     },
-                    channel_health=channel_health
+                    channel_health=channel_health,
+                    retrieved_candidate_count=0,
+                    admitted_evidence_count=0,
+                    rejected_candidate_count=0,
+                    admission_decisions=[]
                 )
 
             # 2. Check explicit source availability in knowledge_sources
@@ -258,10 +273,11 @@ class RCAEvidenceAcquirer:
                 channel_health.text_candidate_count = len(text_ranked) if text_ranked else 0
                 if text_ranked:
                     modality_coverage["text"] = True
-                    for tr in text_ranked[:8]:
+                    for idx, tr in enumerate(text_ranked):
                         doc_text = tr.get("doc", "").strip()
                         if not doc_text:
                             continue
+                        retrieved_candidate_count += 1
                         meta_item = tr.get("meta") or {}
                         filename = (
                             tr.get("filename")
@@ -274,18 +290,52 @@ class RCAEvidenceAcquirer:
                         page_num = tr.get("page") or meta_item.get("page") or meta_item.get("page_number") or 1
                         sid = tr.get("source_id") or meta_item.get("source_id")
 
+                        active_ver = None
                         if not filename or filename == "Document.pdf":
                             if sid:
                                 cursor_f = await conn.execute(
-                                    "SELECT original_filename, name FROM knowledge_sources WHERE id = ?", (sid,)
+                                    "SELECT original_filename, name, active_processing_version FROM knowledge_sources WHERE id = ?", (sid,)
                                 )
                                 s_row = await cursor_f.fetchone()
                                 if s_row:
                                     filename = s_row["original_filename"] or s_row["name"] or "Document.pdf"
+                                    active_ver = s_row["active_processing_version"]
                                 else:
                                     filename = "Document.pdf"
                             else:
                                 filename = "Document.pdf"
+                        else:
+                            if sid:
+                                cursor_f = await conn.execute(
+                                    "SELECT active_processing_version FROM knowledge_sources WHERE id = ?", (sid,)
+                                )
+                                s_row = await cursor_f.fetchone()
+                                if s_row:
+                                    active_ver = s_row["active_processing_version"]
+
+                        cand_id = f"cand_text_{idx+1}"
+                        decision = self.evaluate_admission(
+                            candidate_id=cand_id,
+                            source_id=sid,
+                            filename=filename,
+                            doc_text=doc_text,
+                            meta_item=meta_item,
+                            workspace_id=workspace_id,
+                            target_assets=assets,
+                            required_roles=required_roles,
+                            explicit_sources=explicit_sources,
+                            allowed_source_ids=allowed_source_ids,
+                            active_version=active_ver,
+                            query=query
+                        )
+                        admission_decisions.append(decision)
+
+                        if not decision.admitted:
+                            rejected_candidate_count += 1
+                            logger.info(f"Text candidate {cand_id} ({filename}) REJECTED: {decision.reason.value} ({decision.rule_triggered})")
+                            continue
+
+                        admitted_evidence_count += 1
 
                         # Assign role
                         role = self._classify_evidence_role(doc_text, filename)
@@ -420,7 +470,28 @@ class RCAEvidenceAcquirer:
                         channel_health.degradation_reason = "Visual provider unavailable"
 
                     if vis_results:
-                        for vr in vis_results:
+                        for v_idx, vr in enumerate(vis_results):
+                            retrieved_candidate_count += 1
+                            v_cand_id = f"cand_vis_{v_idx+1}"
+                            v_decision = self.evaluate_admission(
+                                candidate_id=v_cand_id,
+                                source_id=vr.source_id,
+                                filename=vr.filename,
+                                doc_text=vr.filename,
+                                meta_item={"processing_version": vr.processing_version, "workspace_id": workspace_id},
+                                workspace_id=workspace_id,
+                                target_assets=assets,
+                                required_roles=required_roles,
+                                explicit_sources=explicit_sources,
+                                allowed_source_ids=allowed_source_ids,
+                                query=query
+                            )
+                            admission_decisions.append(v_decision)
+                            if not v_decision.admitted:
+                                rejected_candidate_count += 1
+                                logger.info(f"Visual candidate {v_cand_id} ({vr.filename}) REJECTED: {v_decision.reason.value} ({v_decision.rule_triggered})")
+                                continue
+
                             v_role = EvidenceRole.P_AND_ID if any(k in vr.filename.lower() for k in ["p&id", "pid", "schematic", "drawing"]) else EvidenceRole.INSPECTION
 
                             # Inspect candidate page visually via VisualEvidenceInspector
@@ -442,11 +513,13 @@ class RCAEvidenceAcquirer:
                                 logger.warning(f"Visual inspection failed on {vr.filename} page {vr.page_number}: {ie}")
 
                             # ONLY promote candidate to RCAEvidenceItem if visual inspection produced valid observation
+                            insp_st = str(getattr(insp_res, "inspection_status", "")).upper()
                             if (
                                 insp_res
-                                and insp_res.inspection_status != VisualInspectionStatus.VLM_FAILED
-                                and (insp_res.observation_valid or bool(insp_res.vlm_observation))
+                                and "VLM_FAILED" not in insp_st
+                                and (getattr(insp_res, "observation_valid", False) or bool(getattr(insp_res, "vlm_observation", None)))
                             ):
+                                admitted_evidence_count += 1
                                 obs_text = insp_res.vlm_observation
                                 extracted_eq = list(dict.fromkeys(insp_res.equipment_tags))
 
@@ -491,6 +564,7 @@ class RCAEvidenceAcquirer:
                                 if "visual" not in channel_health.contributing_channels:
                                     channel_health.contributing_channels.append("visual")
                             else:
+                                rejected_candidate_count += 1
                                 logger.info(f"Visual candidate {vr.filename} page {vr.page_number} excluded: status {getattr(insp_res, 'inspection_status', 'FAILED')}")
                 except Exception as ve:
                     logger.warning(f"Visual retrieval failed in RCA acquisition: {ve}")
@@ -618,7 +692,11 @@ class RCAEvidenceAcquirer:
                     "explicit_sources": explicit_sources,
                     "stage_latencies_ms": stage_latencies_ms
                 },
-                channel_health=channel_health
+                channel_health=channel_health,
+                retrieved_candidate_count=retrieved_candidate_count,
+                admitted_evidence_count=admitted_evidence_count,
+                rejected_candidate_count=rejected_candidate_count,
+                admission_decisions=admission_decisions
             )
 
         if db is not None:
@@ -659,6 +737,244 @@ class RCAEvidenceAcquirer:
             return EvidenceRole.MAINTENANCE
 
         return EvidenceRole.INCIDENT_CHRONOLOGY
+
+    def evaluate_admission(
+        self,
+        candidate_id: str,
+        source_id: Optional[int],
+        filename: str,
+        doc_text: str,
+        meta_item: Dict[str, Any],
+        workspace_id: int,
+        target_assets: List[str],
+        required_roles: List[EvidenceRole],
+        explicit_sources: List[str],
+        allowed_source_ids: Optional[List[int]],
+        active_version: Optional[str] = None,
+        query: str = ""
+    ) -> EvidenceAdmissionDecision:
+        """
+        Deterministic, structured evidence admission gate (Constraints 3, 4, 5, 6).
+        Enforces authorization boundary first, then version validity, then asset/role relevance.
+        Distinguishes:
+          - DIRECT_ASSET_EVIDENCE
+          - SYSTEM_LEVEL_RELEVANT_EVIDENCE
+          - GENERIC_PROCEDURAL_EVIDENCE
+          - DISTRACTOR
+        """
+        fn_upper = filename.upper()
+        text_upper = doc_text.upper()
+
+        # Step 1: Authorization check (Hard Security Boundary)
+        if allowed_source_ids is not None and len(allowed_source_ids) > 0:
+            if source_id is None or int(source_id) not in allowed_source_ids:
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=False,
+                    reason=EvidenceAdmissionReason.NOT_AUTHORIZED,
+                    admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+                    authorization_valid=False,
+                    rule_triggered="SECURITY_BOUNDARY_NOT_AUTHORIZED",
+                    decision_inputs={"allowed_source_ids": allowed_source_ids, "source_id": source_id}
+                )
+
+        # Step 2: Workspace check
+        cand_ws = meta_item.get("workspace_id")
+        if cand_ws is not None and int(cand_ws) != int(workspace_id):
+            return EvidenceAdmissionDecision(
+                source_id=source_id,
+                evidence_candidate_id=candidate_id,
+                admitted=False,
+                reason=EvidenceAdmissionReason.WRONG_WORKSPACE,
+                admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+                rule_triggered="WORKSPACE_MISMATCH",
+                decision_inputs={"expected_ws": workspace_id, "candidate_ws": cand_ws}
+            )
+
+        # Step 3: Stale processing version check
+        cand_ver = meta_item.get("processing_version")
+        if active_version and cand_ver and str(cand_ver) != str(active_version):
+            return EvidenceAdmissionDecision(
+                source_id=source_id,
+                evidence_candidate_id=candidate_id,
+                admitted=False,
+                reason=EvidenceAdmissionReason.STALE_VERSION,
+                admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+                processing_version_valid=False,
+                rule_triggered="STALE_PROCESSING_VERSION",
+                decision_inputs={"active_version": active_version, "candidate_version": cand_ver}
+            )
+
+        # Step 4: Asset and Role Relevance
+        if not target_assets:
+            return EvidenceAdmissionDecision(
+                source_id=source_id,
+                evidence_candidate_id=candidate_id,
+                admitted=True,
+                reason=EvidenceAdmissionReason.ADMITTED,
+                admission_category=EvidenceAdmissionCategory.GENERIC_PROCEDURAL_EVIDENCE,
+                rule_triggered="SYSTEM_WIDE_OR_OOD"
+            )
+
+        target_set = {a.upper().replace('_', '-') for a in target_assets}
+        target_classes = set()
+        for a in target_set:
+            if a.startswith("P-") or a.startswith("BFP") or "PUMP" in a:
+                target_classes.add("PUMP")
+            if a.startswith("K-") or "COMPRESSOR" in a:
+                target_classes.add("COMPRESSOR")
+            if a.startswith("R-") or "REACTOR" in a:
+                target_classes.add("REACTOR")
+            if a.startswith("FV-") or a.startswith("MOV-") or a.startswith("XV-") or "VALVE" in a:
+                target_classes.add("VALVE")
+            if a.startswith("B-") or "BOILER" in a:
+                target_classes.add("BOILER")
+
+        # Extract equipment tags from candidate
+        cand_tags = {t.upper().replace('_', '-') for t in re.findall(r"\b([A-Za-z]{1,4}-[0-9]{3,4}[A-Za-z]?)\b", filename + " " + doc_text)}
+
+        # A. Direct Asset Tag Match
+        if any(t in cand_tags or t in fn_upper or t in text_upper for t in target_set):
+            return EvidenceAdmissionDecision(
+                source_id=source_id,
+                evidence_candidate_id=candidate_id,
+                admitted=True,
+                reason=EvidenceAdmissionReason.ADMITTED,
+                admission_category=EvidenceAdmissionCategory.DIRECT_ASSET_EVIDENCE,
+                asset_relevance=1.0,
+                decision_score=1.0,
+                rule_triggered="DIRECT_ASSET_TAG_MATCH",
+                decision_inputs={"matched_tags": list(target_set.intersection(cand_tags) or target_set)}
+            )
+
+        # B. Plant-wide system infrastructure (Topology, Instrument Registry)
+        if any(k in fn_upper for k in ["TOPOLOGY", "REGISTRY", "ISO15926", "PIPING_REGISTRY"]):
+            return EvidenceAdmissionDecision(
+                source_id=source_id,
+                evidence_candidate_id=candidate_id,
+                admitted=True,
+                reason=EvidenceAdmissionReason.ADMITTED,
+                admission_category=EvidenceAdmissionCategory.SYSTEM_LEVEL_RELEVANT_EVIDENCE,
+                asset_relevance=0.8,
+                decision_score=0.8,
+                rule_triggered="SYSTEM_LEVEL_INFRASTRUCTURE"
+            )
+
+        # B2. Plant Schematics & P&ID Drawings matching target equipment class or drawing request
+        if any(k in fn_upper for k in ["PID", "P&ID", "SCHEMATIC", "DRAWING"]):
+            if any(tc in fn_upper for tc in target_classes) or (any(k in query.lower() for k in ["drawing", "pid", "p&id", "schematic", "blueprint"]) and not any(other_c in fn_upper for other_c in {"BOILER", "FLAME"} - target_classes)):
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=True,
+                    reason=EvidenceAdmissionReason.ADMITTED,
+                    admission_category=EvidenceAdmissionCategory.SYSTEM_LEVEL_RELEVANT_EVIDENCE,
+                    asset_relevance=0.85,
+                    decision_score=0.85,
+                    rule_triggered="MATCHED_EQUIPMENT_CLASS_PID_DRAWING",
+                    decision_inputs={"target_classes": list(target_classes)}
+                )
+
+        # C. Equipment-Specific Document Mismatch
+        # Inspection, readings, telemetry, or NDE report describing other specific equipment
+        if any(k in fn_upper for k in ["INSPECTION", "READINGS", "SCADA", "TELEMETRY", "CHRONOLOGY", "NDE"]):
+            non_target_tags = cand_tags - target_set
+            if non_target_tags:
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=False,
+                    reason=EvidenceAdmissionReason.ASSET_MISMATCH,
+                    admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+                    asset_relevance=0.0,
+                    decision_score=0.0,
+                    decision_threshold=0.5,
+                    rule_triggered="EQUIPMENT_SPECIFIC_ASSET_MISMATCH",
+                    decision_inputs={"candidate_tags": list(cand_tags), "target_assets": list(target_set)}
+                )
+
+        # D. Equipment Class Mismatch (e.g. Boiler log when target is pump/reactor)
+        if "BOILER" in fn_upper or "FLAME" in fn_upper:
+            if "BOILER" not in target_classes:
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=False,
+                    reason=EvidenceAdmissionReason.EQUIPMENT_CLASS_MISMATCH,
+                    admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+                    asset_relevance=0.0,
+                    decision_score=0.0,
+                    decision_threshold=0.5,
+                    rule_triggered="EQUIPMENT_CLASS_MISMATCH_BOILER",
+                    decision_inputs={"target_classes": list(target_classes)}
+                )
+
+        # E. Unrelated incident / HAZOP distractor
+        if "HAZOP" in fn_upper or "AUDIT" in fn_upper:
+            if "hazop_audit" not in explicit_sources and not any(r == EvidenceRole.RISK_HAZOP for r in required_roles):
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=False,
+                    reason=EvidenceAdmissionReason.ROLE_MISMATCH,
+                    admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+                    source_role_relevance=0.0,
+                    decision_score=0.0,
+                    decision_threshold=0.5,
+                    rule_triggered="UNREQUESTED_HAZOP_DISTRACTOR"
+                )
+
+        # F. Generic Procedural Baseline
+        if any(k in fn_upper for k in ["SOP", "PROCEDURE", "MANUAL", "API610", "STANDARD"]):
+            cand_is_pump = "PUMP" in fn_upper or "API610" in fn_upper
+            cand_is_comp = "COMPRESSOR" in fn_upper
+            if cand_is_pump and "PUMP" in target_classes:
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=True,
+                    reason=EvidenceAdmissionReason.ADMITTED,
+                    admission_category=EvidenceAdmissionCategory.GENERIC_PROCEDURAL_EVIDENCE,
+                    asset_relevance=0.9,
+                    decision_score=0.9,
+                    rule_triggered="GENERIC_EQUIPMENT_CLASS_SOP_PUMP"
+                )
+            elif cand_is_comp and "COMPRESSOR" in target_classes:
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=True,
+                    reason=EvidenceAdmissionReason.ADMITTED,
+                    admission_category=EvidenceAdmissionCategory.GENERIC_PROCEDURAL_EVIDENCE,
+                    asset_relevance=0.9,
+                    decision_score=0.9,
+                    rule_triggered="GENERIC_EQUIPMENT_CLASS_SOP_COMPRESSOR"
+                )
+            elif any(r == EvidenceRole.SOP_BASELINE for r in required_roles) or any(k in query.lower() for k in ["sop", "manual", "procedure"]):
+                return EvidenceAdmissionDecision(
+                    source_id=source_id,
+                    evidence_candidate_id=candidate_id,
+                    admitted=True,
+                    reason=EvidenceAdmissionReason.ADMITTED,
+                    admission_category=EvidenceAdmissionCategory.GENERIC_PROCEDURAL_EVIDENCE,
+                    asset_relevance=0.7,
+                    decision_score=0.7,
+                    rule_triggered="GENERAL_MAINTENANCE_SOP_BASELINE"
+                )
+
+        # G. Default fallback: low relevance distractor
+        return EvidenceAdmissionDecision(
+            source_id=source_id,
+            evidence_candidate_id=candidate_id,
+            admitted=False,
+            reason=EvidenceAdmissionReason.LOW_RELEVANCE,
+            admission_category=EvidenceAdmissionCategory.DISTRACTOR,
+            asset_relevance=0.1,
+            decision_score=0.1,
+            decision_threshold=0.5,
+            rule_triggered="UNMATCHED_DISTRACTOR"
+        )
 
 
 async def validate_full_multimodal_runtime(

@@ -216,7 +216,11 @@ class RCAEvidenceValidator:
                 channel_health=bundle.channel_health,
                 contradictions=[],
                 additional_evidence_needed=[f"Verify equipment tag against the refinery asset registry (e.g., P-101A, K-101, Reactor-B)."],
-                sources=[]
+                sources=[],
+                retrieved_candidate_count=getattr(bundle, "retrieved_candidate_count", 0),
+                admitted_evidence_count=getattr(bundle, "admitted_evidence_count", 0),
+                rejected_candidate_count=getattr(bundle, "rejected_candidate_count", 0),
+                admission_decisions=[d.model_dump() for d in getattr(bundle, "admission_decisions", [])]
             )
             return (
                 f"## RCA Status\nASSET_NOT_FOUND\n\n"
@@ -287,7 +291,11 @@ class RCAEvidenceValidator:
                     "Historical inspection records and maintenance work orders.",
                     "Time-aligned DCS telemetry trends (pressure, temperature, vibration)."
                 ],
-                sources=[]
+                sources=[],
+                retrieved_candidate_count=getattr(bundle, "retrieved_candidate_count", 0),
+                admitted_evidence_count=getattr(bundle, "admitted_evidence_count", 0),
+                rejected_candidate_count=getattr(bundle, "rejected_candidate_count", 0),
+                admission_decisions=[d.model_dump() for d in getattr(bundle, "admission_decisions", [])]
             )
             return (
                 f"## RCA Status\nINSUFFICIENT_EVIDENCE\n\n"
@@ -592,6 +600,7 @@ class RCAEvidenceValidator:
                             if v_item.corroborated
                             else ObservationQualityStatus.OBSERVED_UNCORROBORATED
                         )
+                        rel_quality = "VERIFIED" if (v_item.corroborated and rel_type == "UPSTREAM_OF") else "OBSERVED_UNCORROBORATED"
                         spatial_relations.append(
                             StructuredSpatialRelation(
                                 subject=subj,
@@ -601,10 +610,14 @@ class RCAEvidenceValidator:
                                 source_id=v_item.source_id,
                                 filename=v_item.filename,
                                 processing_version=v_item.processing_version or "v1",
+                                page_number=v_item.page_number or 1,
                                 locator=v_item.locator.format_locator(v_item.retrieval_channel) if v_item.locator else f"[{v_item.filename} | Page 1 | VISUAL]",
                                 inspection_status=v_item.metadata.get("inspection_status", "SUCCESS"),
                                 quality_status=q_status,
-                                tag_corroboration=bool(v_item.corroborated)
+                                structured_observation=True,
+                                tag_corroboration=bool(v_item.corroborated),
+                                relation_quality=rel_quality,
+                                evidence_basis=str(rel.get("evidence_basis", ""))
                             )
                         )
 
@@ -697,7 +710,11 @@ class RCAEvidenceValidator:
                     "channel": item.retrieval_channel
                 }
                 for item in supported_items
-            ] if determined_status != RCAStatus.INSUFFICIENT_EVIDENCE else []
+            ] if determined_status != RCAStatus.INSUFFICIENT_EVIDENCE else [],
+            retrieved_candidate_count=getattr(bundle, "retrieved_candidate_count", 0),
+            admitted_evidence_count=getattr(bundle, "admitted_evidence_count", 0),
+            rejected_candidate_count=getattr(bundle, "rejected_candidate_count", 0),
+            admission_decisions=[d.model_dump() for d in getattr(bundle, "admission_decisions", [])]
         )
 
         return "\n".join(lines)

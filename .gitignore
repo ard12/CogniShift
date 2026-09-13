@@ -41,4 +41,6 @@ frontend/dist/
 .pytest-tmp*
 *.ppt
 *.pptx
+*.etl
+artifacts/**/pktmon*.txt
 /demo/

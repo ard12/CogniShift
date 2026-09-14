@@ -585,9 +585,18 @@
                 fetchApprovals();
 
                 if (runId) {
+                    let resumedRun = null;
                     const res = await authFetch(`${API_BASE}/runs/${runId}/resume`, { method: 'POST' });
                     if (res.ok) {
-                        const resumedRun = await res.json();
+                        resumedRun = await res.json();
+                    } else {
+                        // Fallback: fetch the updated run record directly
+                        const getRes = await authFetch(`${API_BASE}/runs/${runId}`);
+                        if (getRes.ok) {
+                            resumedRun = await getRes.json();
+                        }
+                    }
+                    if (resumedRun) {
                         renderRunOutcome(resumedRun);
                     }
                 }

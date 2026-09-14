@@ -44,7 +44,8 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=80)
 chroma_client = chromadb.PersistentClient(path=str(settings.chroma_path))
 
 # Initialize FastEmbed locally (CPU optimized, 100% offline in sovereign mode)
-os.environ["HF_HUB_OFFLINE"] = "1"
+if settings.fastembed_offline:
+    os.environ["HF_HUB_OFFLINE"] = "1"
 try:
     embedding_model = TextEmbedding(
         model_name="BAAI/bge-small-en-v1.5",
@@ -52,6 +53,8 @@ try:
         local_files_only=settings.fastembed_offline,
     )
 except Exception:
+    if "HF_HUB_OFFLINE" in os.environ:
+        del os.environ["HF_HUB_OFFLINE"]
     embedding_model = TextEmbedding(
         model_name="BAAI/bge-small-en-v1.5"
     )

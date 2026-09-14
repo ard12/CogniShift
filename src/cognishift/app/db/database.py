@@ -218,6 +218,13 @@ async def init_db() -> None:
         ''')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_doc_pages_source ON document_pages(source_id, processing_version)")
         
+        # Audit Finding DEF-10: Database Relational Storage Indexing Deficit
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_agent_runs_ws_time ON agent_runs(workspace_id, started_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_run_events_run ON run_events(run_id, created_at ASC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_approval_status ON approval_requests(status, requested_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_graph_edges_lookup ON graph_edges(workspace_id, source_node_id, target_node_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_ws ON knowledge_sources(workspace_id)")
+        
         # Phase 6 Bounded Network Audit Ledger
         await db.execute('''
             CREATE TABLE IF NOT EXISTS network_events (

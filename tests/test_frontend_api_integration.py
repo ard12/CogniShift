@@ -9,7 +9,12 @@ TEST_ADM_TOKEN = "test-token-admin-front-integration"
 
 
 @pytest.fixture(autouse=True)
-def setup_credentials():
+async def setup_credentials():
+    from cognishift.app.db.database import init_db, get_db
+    await init_db()
+    async with get_db() as db:
+        await db.execute("INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Main Refinery Workspace', 'Default workspace')")
+        await db.commit()
     register_local_credential(TEST_OP_TOKEN, User(user_id="op_tester", role="operator", allowed_workspace_ids=[1]))
     register_local_credential(TEST_SUP_TOKEN, User(user_id="sup_tester", role="supervisor", allowed_workspace_ids=[1]))
     register_local_credential(TEST_ADM_TOKEN, User(user_id="adm_tester", role="administrator", allowed_workspace_ids=[1, 2, 3]))

@@ -767,7 +767,11 @@ def approve_action(
                     console.print(f"[bold red]Conflict: Request #{request_id} was already resolved concurrently.[/bold red]")
                     return
                 await db.commit()
-            elif req["status"] != "approved":
+            elif req["status"] == "approved":
+                if run_row["status"] != "paused":
+                    console.print(f"[bold yellow]Notice: Request #{request_id} was already approved (Run #{run_id} status: '{run_row['status']}').[/bold yellow]")
+                    return
+            else:
                 console.print(f"[bold red]Error: Request #{request_id} cannot be approved from status '{req['status']}'.[/bold red]")
                 return
 

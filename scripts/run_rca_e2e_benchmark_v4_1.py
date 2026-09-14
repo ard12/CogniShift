@@ -1245,7 +1245,7 @@ async def main():
 **Multimodal Late-Interaction Model:** Qdrant/colmodernvbert ONNX on CUDA (device: {preflight_diag.get('provider_device', 'cuda')})  
 **Sandbox Runtime:** Real Isolated Docker Container (`{settings.sandbox_image}`) with Digest `{prov_a.image_digest}`  
 **Sovereignty & Egress Statement:**  
-> **Local sovereign execution with no public-cloud model dependency during the verified run.**  
+> **Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.**
 > **Zero observed external egress during benchmark execution (100% offline localhost).**
 
 ---

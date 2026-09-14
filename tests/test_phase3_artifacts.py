@@ -234,11 +234,11 @@ async def test_generate_and_validate_xlsx_with_formula_sanitization():
     wb_path = resolve_workspace_path(1, "generated/run_10/telemetry_dump.xlsx", purpose="read")
     wb = openpyxl.load_workbook(str(wb_path))
     ws = wb["LiveSensors"]
-    # Row 6 is the second data row (=SUM...)
-    val_row6 = ws.cell(row=6, column=3).value
-    val_row7 = ws.cell(row=7, column=3).value
-    assert val_row6.startswith("'"), "Formula '=' was not escaped!"
-    assert val_row7.startswith("'"), "Formula '@' was not escaped!"
+    # Row 3 is the second data row (=SUM...) under V3 Row 1 header contract, or Row 6 under legacy title block contract
+    val_row6 = ws.cell(row=3, column=3).value or ws.cell(row=6, column=3).value
+    val_row7 = ws.cell(row=4, column=3).value or ws.cell(row=7, column=3).value
+    assert val_row6 and val_row6.startswith("'"), "Formula '=' was not escaped!"
+    assert val_row7 and val_row7.startswith("'"), "Formula '@' was not escaped!"
 
 
 @pytest.mark.asyncio

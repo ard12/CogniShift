@@ -10,7 +10,7 @@ from typing import Optional, List, Tuple, Dict, Any
 
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db
-from cognishift.core.retrieval.text_retriever import TextRetriever
+from cognishift.core.retrieval.text_retriever import TextRetriever, is_workspace_evidence_overview_query
 from cognishift.core.retrieval.visual_retriever import VisualRetriever
 from cognishift.core.retrieval.evidence_fusion import EvidenceFusion
 from cognishift.core.visual_rag.page_cache import render_page_image_on_demand
@@ -65,6 +65,13 @@ class HybridDocumentRetriever:
             allowed_source_ids=allowed_source_ids,
             distance_threshold=distance_threshold
         )
+
+        # Broad corpus inventories need representative textual evidence, not
+        # expensive page-layout reranking. Returning the diversified text set
+        # also prevents a visually indexed document from crowding out the
+        # other source types in the workspace summary.
+        if is_workspace_evidence_overview_query(query):
+            return text_ctx, text_metas
 
         # If visual retrieval is completely disabled in settings, return text baseline immediately
         if not getattr(settings, "hybrid_retrieval_enabled", True):
@@ -164,6 +171,7 @@ class HybridDocumentRetriever:
                 "processing_version": cand.processing_version,
                 "page": cand.page_number,
                 "page_number": cand.page_number,
+                "slide_number": cand.slide_number or cand.page_number,
                 "filename": cand.filename,
                 "retrieval_channel": cand.retrieval_channel,
                 "fused_score": cand.fused_score,

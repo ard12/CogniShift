@@ -36,7 +36,7 @@ export function SecurityMessageDetail({ detail }: SecurityMessageDetailProps) {
       </div>
 
       <div className="rounded border border-surface-border bg-surface-1 p-2.5 text-[11px] font-mono text-ink-3">
-        Zero Cloud Egress Integrity: Verified on-premise local audit trail. This alert was generated and stored locally within SQLite WAL storage.
+        Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.
       </div>
     </div>
   );

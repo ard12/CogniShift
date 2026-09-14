@@ -67,7 +67,7 @@ async def render_page_image_on_demand(
     dpi: int = 150
 ) -> bytes:
     """
-    Renders a PDF page to PNG bytes on demand with bounded LRU caching.
+    Renders a PDF page or Office slide/page to PNG bytes on demand with bounded LRU caching.
     Guarantees no redundant rasterization if recently inspected.
     """
     cache = get_page_image_cache()
@@ -76,11 +76,27 @@ async def render_page_image_on_demand(
         return cached
 
     def _render() -> bytes:
-        doc = pymupdf.open(str(file_path))
-        try:
-            return render_page_to_png_bytes(doc, page_number, dpi=dpi)
-        finally:
-            doc.close()
+        p = Path(file_path)
+        ext = p.suffix.lower()
+        if ext == ".pptx":
+            from cognishift.core.document_processing.office_renderer import render_pptx_slides
+            slides, status = render_pptx_slides(p)
+            for s_num, s_bytes in slides:
+                if s_num == page_number:
+                    return s_bytes
+            raise ValueError(f"Slide {page_number} not found in {file_path} (render status: {status})")
+        elif ext == ".docx":
+            from cognishift.core.document_processing.office_renderer import render_docx_pages
+            pages, status = render_docx_pages(p)
+            if 1 <= page_number <= len(pages):
+                return pages[page_number - 1]
+            raise ValueError(f"Page {page_number} not found in {file_path} (render status: {status})")
+        else:
+            doc = pymupdf.open(str(file_path))
+            try:
+                return render_page_to_png_bytes(doc, page_number, dpi=dpi)
+            finally:
+                doc.close()
 
     png_bytes = await asyncio.to_thread(_render)
     await cache.put(str(file_path), page_number, dpi, png_bytes)

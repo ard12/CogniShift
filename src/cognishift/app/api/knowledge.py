@@ -2,6 +2,7 @@ import os
 import json
 import hashlib
 import uuid
+import logging
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from typing import List, Optional
@@ -13,6 +14,8 @@ from cognishift.core.retriever import purge_knowledge_source
 from cognishift.core.security import resolve_workspace_path
 from cognishift.app.core.auth import get_current_user, verify_workspace_access, User
 from fastapi import Depends
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["Knowledge"])
 
@@ -28,15 +31,15 @@ async def upload_document(
     # 1. Validate file extension (case-insensitive)
     filename = file.filename or "document.pdf"
     ext = Path(filename).suffix.lower()
-    if ext in [".xls", ".doc"]:
+    if ext in [".xls", ".doc", ".ppt", ".docm", ".pptm"]:
         raise HTTPException(
             status_code=400,
-            detail="Legacy .doc/.xls format is unsupported. Please convert your file to modern .docx/.xlsx or .pdf format."
+            detail="Legacy (.doc, .xls, .ppt) or macro-enabled (.docm, .pptm) formats are unsupported. Please convert your file to modern .docx/.xlsx/.pptx or .pdf format."
         )
-    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv", ".docx"]:
+    if ext not in [".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".csv", ".docx", ".pptx"]:
         raise HTTPException(
             status_code=400,
-            detail="Supported formats: PDF (.pdf), Word (.docx), Excel (.xlsx), CSV (.csv), PNG (.png), and JPEG (.jpg/.jpeg)."
+            detail="Supported formats: PDF (.pdf), Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV (.csv), PNG (.png), and JPEG (.jpg/.jpeg)."
         )
 
     # 2. Validate workspace existence BEFORE saving to disk
@@ -75,7 +78,7 @@ async def upload_document(
     checksum = hasher.hexdigest()
 
     # 4. Insert record into database as 'processing'
-    source_type = "docx" if ext == ".docx" else ("csv" if ext == ".csv" else ("spreadsheet" if ext in [".xlsx", ".xls"] else ("pdf" if ext == ".pdf" else "image")))
+    source_type = "pptx" if ext == ".pptx" else ("docx" if ext == ".docx" else ("csv" if ext == ".csv" else ("spreadsheet" if ext in [".xlsx", ".xls"] else ("pdf" if ext == ".pdf" else "image"))))
     async with get_db() as db:
         cursor = await db.execute(
             """INSERT INTO knowledge_sources 
@@ -370,7 +373,10 @@ async def upload_document(
         # DOCX Ingestion: Extract structured sections, headings, and tables
         try:
             from cognishift.core.retriever import chroma_client, embedding_model
-            from cognishift.core.document_processing.office_renderer import extract_docx_structured_content
+            from cognishift.core.document_processing.office_renderer import extract_docx_structured_content, render_docx_pages
+            from cognishift.core.visual_rag.embedding_provider import get_visual_embedding_provider
+            from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+            from cognishift.core.visual_rag.schemas import PageVectorMetadata
 
             docx_chunks_data = await asyncio.to_thread(extract_docx_structured_content, file_path)
             chunks = []
@@ -380,12 +386,17 @@ async def upload_document(
             for idx, item in enumerate(docx_chunks_data, start=1):
                 chunk_text = item["text"]
                 chunks.append(chunk_text)
+                sec_head = item.get("section_heading") or "General"
+                sec_idx = int(item.get("section_index", idx))
                 metadatas.append({
                     "source_id": int(source_id),
                     "filename": safe_basename,
                     "document_name": safe_basename,
-                    "section_heading": item.get("section_heading", "General"),
-                    "page": int(item.get("page", idx)),
+                    "document_type": "docx",
+                    "section_heading": sec_head,
+                    "section_index": sec_idx,
+                    "chunk_index": int(item.get("chunk_index", idx)),
+                    "page": sec_idx,  # preserved as section index for downstream numeric compatibility
                     "checksum": checksum,
                     "workspace_id": int(workspace_id),
                     "extraction_method": "document",
@@ -401,6 +412,41 @@ async def upload_document(
                     col.upsert(documents=chunks, embeddings=embs, metadatas=metadatas, ids=ids)
 
                 await asyncio.to_thread(_embed_and_upsert_docx)
+
+            # Local Word COM Page Rendering & Visual Vector Indexing
+            try:
+                rendered_pages_data, prov = await asyncio.to_thread(render_docx_pages, file_path)
+                render_status = prov.get("render_status") if isinstance(prov, dict) else str(prov)
+                if rendered_pages_data and (render_status == "SUCCESS" or (isinstance(prov, dict) and prov.get("renderer_type") == "WORD_COM")):
+                    v_prov = get_visual_embedding_provider(allow_simulation=False)
+                    if v_prov:
+                        v_store = get_visual_vector_store()
+                        for p_idx, page_bytes in rendered_pages_data:
+                            p_chk = hashlib.sha256(page_bytes).hexdigest()
+                            vecs = await asyncio.to_thread(v_prov.embed_page, page_bytes)
+                            v_meta = PageVectorMetadata(
+                                workspace_id=workspace_id,
+                                source_id=source_id,
+                                processing_version="v1",
+                                page_number=p_idx,
+                                filename=safe_basename,
+                                checksum=p_chk,
+                                document_type="docx",
+                                locator_kind="page",
+                                token_count=len(vecs) if hasattr(vecs, "__len__") else 128
+                            )
+                            await v_store.upsert_page(
+                                workspace_id=workspace_id,
+                                source_id=source_id,
+                                processing_version="v1",
+                                page_number=p_idx,
+                                vectors=vecs,
+                                metadata=v_meta
+                            )
+                else:
+                    logger.warning(f"DOCX visual rendering status for {safe_basename}: {render_status}")
+            except Exception as ve:
+                logger.warning(f"Optional DOCX visual indexing skipped for {safe_basename}: {ve}")
 
             async with get_db() as db:
                 for idx, c_text in enumerate(chunks, start=1):
@@ -437,6 +483,124 @@ async def upload_document(
                 await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
                 await db.commit()
             raise HTTPException(status_code=500, detail="Failed to process DOCX document. Internal processing error.")
+
+    elif ext == ".pptx":
+        # PPTX Ingestion: Extract structured slide titles, body frames, tables, shapes, and notes
+        try:
+            from cognishift.core.retriever import chroma_client, embedding_model
+            from cognishift.core.document_processing.office_renderer import extract_pptx_structured_content, render_pptx_slides
+            from cognishift.core.visual_rag.embedding_provider import get_visual_embedding_provider
+            from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+            from cognishift.core.visual_rag.schemas import PageVectorMetadata
+
+            pptx_slides_data = await asyncio.to_thread(extract_pptx_structured_content, file_path)
+            chunks = []
+            metadatas = []
+            ids = []
+
+            for idx, item in enumerate(pptx_slides_data, start=1):
+                chunk_text = item["text"]
+                chunks.append(chunk_text)
+                slide_num = int(item.get("slide_number", idx))
+                metadatas.append({
+                    "source_id": int(source_id),
+                    "filename": safe_basename,
+                    "document_name": safe_basename,
+                    "document_type": "pptx",
+                    "slide_number": slide_num,
+                    "slide_title": str(item.get("slide_title") or ""),
+                    "page": slide_num,  # for downstream compatibility
+                    "has_tables": bool(item.get("has_tables", False)),
+                    "has_notes": bool(item.get("has_notes", False)),
+                    "notes_status": str(item.get("notes_status") or ""),
+                    "checksum": checksum,
+                    "workspace_id": int(workspace_id),
+                    "extraction_method": "presentation",
+                    "processing_version": "v1"
+                })
+                ids.append(f"src_{source_id}_pptx_slide_{slide_num}")
+
+            if chunks:
+                def _embed_and_upsert_pptx():
+                    gen = embedding_model.embed(chunks)
+                    embs = [e.tolist() if hasattr(e, "tolist") else [float(x) for x in e] for e in gen]
+                    col = chroma_client.get_or_create_collection(f"workspace_{workspace_id}")
+                    col.upsert(documents=chunks, embeddings=embs, metadatas=metadatas, ids=ids)
+
+                await asyncio.to_thread(_embed_and_upsert_pptx)
+
+            # Local PowerPoint COM Slide Rendering & Visual Vector Indexing
+            try:
+                rendered_slides, prov = await asyncio.to_thread(render_pptx_slides, file_path)
+                render_status = prov.get("render_status") if isinstance(prov, dict) else str(prov)
+                if rendered_slides and (render_status == "SUCCESS" or (isinstance(prov, dict) and prov.get("renderer_type") == "POWERPOINT_COM")):
+                    v_prov = get_visual_embedding_provider(allow_simulation=False)
+                    if v_prov:
+                        v_store = get_visual_vector_store()
+                        for s_num, slide_bytes in rendered_slides:
+                            s_chk = hashlib.sha256(slide_bytes).hexdigest()
+                            vecs = await asyncio.to_thread(v_prov.embed_page, slide_bytes)
+                            v_meta = PageVectorMetadata(
+                                workspace_id=workspace_id,
+                                source_id=source_id,
+                                processing_version="v1",
+                                page_number=s_num,
+                                slide_number=s_num,
+                                filename=safe_basename,
+                                checksum=s_chk,
+                                document_type="pptx",
+                                locator_kind="slide",
+                                token_count=len(vecs) if hasattr(vecs, "__len__") else 128
+                            )
+                            await v_store.upsert_page(
+                                workspace_id=workspace_id,
+                                source_id=source_id,
+                                processing_version="v1",
+                                page_number=s_num,
+                                vectors=vecs,
+                                metadata=v_meta
+                            )
+                else:
+                    logger.warning(f"PPTX visual slide rendering status for {safe_basename}: {render_status}")
+            except Exception as ve:
+                logger.warning(f"Optional PPTX visual indexing skipped for {safe_basename}: {ve}")
+
+            async with get_db() as db:
+                for idx, c_text in enumerate(chunks, start=1):
+                    s_num = pptx_slides_data[idx - 1].get("slide_number", idx)
+                    await db.execute(
+                        """INSERT INTO document_pages (source_id, workspace_id, processing_version, page_number, text_content, extraction_method)
+                           VALUES (?, ?, 'v1', ?, ?, 'presentation')""",
+                        (source_id, workspace_id, s_num, c_text)
+                    )
+                await db.execute(
+                    "UPDATE knowledge_sources SET processing_status = 'completed', chunk_count = ?, active_processing_version = 'v1' WHERE id = ?",
+                    (len(chunks), source_id)
+                )
+                c_agents = await db.execute("SELECT id, knowledge_source_ids FROM agent_definitions WHERE workspace_id = ?", (workspace_id,))
+                for ag in await c_agents.fetchall():
+                    try:
+                        curr_ids = json.loads(ag["knowledge_source_ids"]) if ag["knowledge_source_ids"] else []
+                        if not isinstance(curr_ids, list):
+                            curr_ids = []
+                    except Exception:
+                        curr_ids = []
+                    if source_id not in curr_ids:
+                        curr_ids.append(source_id)
+                        await db.execute(
+                            "UPDATE agent_definitions SET knowledge_source_ids = ? WHERE id = ?",
+                            (json.dumps(curr_ids), ag["id"])
+                        )
+                await db.commit()
+                cursor = await db.execute("SELECT * FROM knowledge_sources WHERE id = ?", (source_id,))
+                updated_row = await cursor.fetchone()
+                return KnowledgeSourceResponse.model_validate(dict(updated_row))
+        except Exception as e:
+            logger.error(f"Failed to process PPTX {source_id}: {e}", exc_info=True)
+            async with get_db() as db:
+                await db.execute("UPDATE knowledge_sources SET processing_status = 'failed' WHERE id = ?", (source_id,))
+                await db.commit()
+            raise HTTPException(status_code=500, detail="Failed to process PPTX document. Internal processing error.")
 
     # 6. Native PDF, OCR, or Vision
     try:

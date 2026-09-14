@@ -1,6 +1,6 @@
 """
 OCR Provider Abstraction & Local Backends.
-Supports RapidOCR (ONNX Runtime, 100% offline, CPU-first) and Simulated fallback.
+Supports RapidOCR (ONNX Runtime, local execution, CPU-first) and Simulated fallback.
 Strictly fails closed if local models/binaries are missing (OCRUnavailableError).
 """
 from abc import ABC, abstractmethod
@@ -37,7 +37,7 @@ class OCRProvider(ABC):
 class RapidOCREngine(OCRProvider):
     """
     Primary local OCR engine using RapidOCR and ONNX Runtime.
-    Runs 100% offline on CPU with pre-provisioned model weights.
+    Runs locally on CPU with pre-provisioned model weights and no public-cloud model dependency.
     """
     def __init__(self):
         self._engine = None

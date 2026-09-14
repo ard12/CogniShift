@@ -6,11 +6,23 @@ Provides local sovereign ingestion for:
 - Cell-level deterministic numeric verification for spreadsheets.
 """
 import io
+import gc
+import hashlib
+import tempfile
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 import docx
+import pptx
 import openpyxl
+try:
+    import pymupdf as fitz
+except ImportError:
+    try:
+        import fitz
+    except ImportError:
+        fitz = None
 import matplotlib
 matplotlib.use("Agg")  # Headless backend
 import matplotlib.pyplot as plt
@@ -81,25 +93,38 @@ def extract_docx_structured_content(file_path: Path) -> List[Dict[str, Any]]:
     doc = docx.Document(str(file_path))
     chunks: List[Dict[str, Any]] = []
 
+    # Attempt to extract document title
+    doc_title = ""
+    try:
+        if doc.core_properties and doc.core_properties.title:
+            doc_title = doc.core_properties.title.strip()
+    except Exception:
+        doc_title = ""
+
     current_section = "General"
+    current_section_idx = 1
     current_text_parts: List[str] = []
-    approx_page = 1
+    chunk_counter = 1
     item_counter = 0
 
     def _flush_section():
-        nonlocal current_text_parts, approx_page
+        nonlocal current_text_parts, chunk_counter, current_section_idx
         if current_text_parts:
             full_text = "\n\n".join(current_text_parts).strip()
             if full_text:
                 chunks.append({
                     "text": full_text,
                     "section_heading": current_section,
-                    "page": approx_page,
+                    "section_index": current_section_idx,
+                    "document_title": doc_title,
+                    "chunk_index": chunk_counter,
                     "filename": file_path.name,
-                    "extraction_method": "DOCUMENT"
+                    "document_type": "docx",
+                    "extraction_method": "DOCUMENT",
+                    "page": None  # Native DOCX does not have physical page numbers
                 })
+                chunk_counter += 1
             current_text_parts = []
-            approx_page += 1
 
     for p in doc.paragraphs:
         txt = p.text.strip()
@@ -109,6 +134,9 @@ def extract_docx_structured_content(file_path: Path) -> List[Dict[str, Any]]:
         if "heading" in style_name or style_name.startswith("title"):
             _flush_section()
             current_section = txt
+            current_section_idx += 1
+            if not doc_title and style_name.startswith("title"):
+                doc_title = txt
         else:
             current_text_parts.append(txt)
             item_counter += 1
@@ -133,6 +161,272 @@ def extract_docx_structured_content(file_path: Path) -> List[Dict[str, Any]]:
 
     _flush_section()
     return chunks
+
+
+def render_docx_pages(file_path: Path) -> Tuple[List[Tuple[int, bytes]], Dict[str, Any]]:
+    """
+    Renders each page of a DOCX document to PNG bytes locally.
+    Uses Word COM on Windows to convert to intermediate PDF, then renders pages via PyMuPDF.
+    Guarantees strict cleanup of temporary files and zero arbitrary command execution.
+    Returns ([(page_number, png_bytes), ...], provenance_dict).
+    """
+    source_sha256 = hashlib.sha256(file_path.read_bytes()).hexdigest()
+    t_now = datetime.now(timezone.utc).isoformat()
+
+    try:
+        import win32com.client
+        import pythoncom
+        pythoncom.CoInitialize()
+        word = None
+        doc = None
+        pages_out: List[Tuple[int, bytes]] = []
+        intermediate_sha: Optional[str] = None
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_p = Path(tmp_dir)
+            pdf_path = tmp_p / "rendered_intermediate.pdf"
+            try:
+                word = win32com.client.Dispatch("Word.Application")
+                word.Visible = False
+                doc = word.Documents.Open(str(file_path.resolve()))
+                doc.SaveAs(str(pdf_path.resolve()), FileFormat=17)  # 17 = wdFormatPDF
+                doc.Close()
+                doc = None
+            finally:
+                if doc:
+                    try:
+                        doc.Close()
+                    except Exception:
+                        pass
+                    doc = None
+                if word:
+                    try:
+                        word.Quit()
+                    except Exception:
+                        pass
+                    word = None
+                gc.collect()
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+            if pdf_path.exists() and pdf_path.stat().st_size > 0:
+                pdf_bytes = pdf_path.read_bytes()
+                intermediate_sha = hashlib.sha256(pdf_bytes).hexdigest()
+                if fitz is not None:
+                    pdf_doc = fitz.open(str(pdf_path))
+                    for i, page in enumerate(pdf_doc, start=1):
+                        pix = page.get_pixmap(dpi=150)
+                        pages_out.append((i, pix.tobytes("png")))
+                    pdf_doc.close()
+
+            if pages_out:
+                prov = {
+                    "renderer_type": "WORD_COM",
+                    "renderer_version": "16.0",
+                    "source_sha256": source_sha256,
+                    "rendered_intermediate_sha256": intermediate_sha,
+                    "render_timestamp": t_now,
+                    "page_count": len(pages_out),
+                    "render_status": "SUCCESS"
+                }
+                return pages_out, prov
+    except Exception as com_err:
+        logger.warning(f"Local Word COM rendering unavailable for {file_path.name}: {com_err}")
+
+    prov_failed = {
+        "renderer_type": None,
+        "renderer_version": None,
+        "source_sha256": source_sha256,
+        "rendered_intermediate_sha256": None,
+        "render_timestamp": t_now,
+        "page_count": 0,
+        "render_status": "RENDERER_UNAVAILABLE",
+        "error": "No local Word COM renderer available on host."
+    }
+    return [], prov_failed
+
+
+def extract_pptx_structured_content(file_path: Path) -> List[Dict[str, Any]]:
+    """
+    Extracts text, slide titles, tables, shapes, and speaker notes from a PPTX presentation.
+    Preserves 1-indexed slide boundaries.
+    Returns a list of structured chunk dicts.
+    """
+    prs = pptx.Presentation(str(file_path))
+    chunks: List[Dict[str, Any]] = []
+
+    for slide_idx, slide in enumerate(prs.slides, start=1):
+        # 1. Slide Title
+        slide_title = ""
+        try:
+            if slide.shapes.title and slide.shapes.title.text:
+                slide_title = slide.shapes.title.text.strip()
+        except Exception:
+            slide_title = ""
+
+        if not slide_title and slide.shapes:
+            for sh in slide.shapes:
+                if sh.has_text_frame and sh.text_frame.text.strip():
+                    slide_title = sh.text_frame.text.strip().split("\n")[0]
+                    break
+        if not slide_title:
+            slide_title = f"Slide {slide_idx}"
+
+        # 2. Text shapes and paragraphs
+        body_parts: List[str] = []
+        table_parts: List[str] = []
+        table_count = 0
+
+        for shape in slide.shapes:
+            # Avoid repeating slide title verbatim
+            if hasattr(slide.shapes, "title") and shape == slide.shapes.title:
+                continue
+
+            if shape.has_text_frame:
+                txt = shape.text_frame.text.strip()
+                if txt and txt != slide_title:
+                    body_parts.append(txt)
+
+            elif shape.has_table:
+                table_count += 1
+                table = shape.table
+                t_rows = []
+                for row in table.rows:
+                    t_rows.append([cell.text.strip() for cell in row.cells])
+                if t_rows:
+                    hdr = t_rows[0]
+                    data = t_rows[1:] if len(t_rows) > 1 else t_rows
+                    t_lines = [" | ".join(hdr), " | ".join(["---"] * len(hdr))]
+                    for dr in data:
+                        t_lines.append(" | ".join(dr))
+                    table_parts.append(f"[Table {table_count}]\n" + "\n".join(t_lines))
+
+        # 3. Speaker notes
+        notes_text = None
+        notes_status = "NOT_PRESENT"
+        try:
+            if slide.has_notes_slide:
+                ntf = slide.notes_slide.notes_text_frame
+                if ntf and ntf.text and ntf.text.strip():
+                    notes_text = ntf.text.strip()
+                    notes_status = "SUPPORTED"
+        except Exception as ne:
+            logger.warning(f"Error extracting speaker notes for slide {slide_idx}: {ne}")
+            notes_status = "DEGRADED"
+
+        # 4. Construct unified slide chunk text
+        chunk_lines = [f"### SLIDE {slide_idx}: {slide_title}"]
+        if body_parts:
+            chunk_lines.append("\n\n".join(body_parts))
+        if table_parts:
+            chunk_lines.append("\n\n".join(table_parts))
+        if notes_text:
+            chunk_lines.append(f"[Speaker Notes]: {notes_text}")
+
+        full_text = "\n\n".join(chunk_lines).strip()
+        chunks.append({
+            "text": full_text,
+            "slide_number": slide_idx,
+            "slide_title": slide_title,
+            "filename": file_path.name,
+            "document_type": "pptx",
+            "element_type": "slide",
+            "chunk_index": slide_idx,
+            "extraction_method": "PRESENTATION",
+            "notes_status": notes_status,
+            "notes": notes_text,
+            "has_notes": bool(notes_text and notes_text.strip()),
+            "table_count": table_count,
+            "has_tables": table_count > 0,
+            "shape_count": len(slide.shapes),
+            "page": slide_idx  # For general locator fallback, but slide_number is authoritative
+        })
+
+    return chunks
+
+
+def render_pptx_slides(file_path: Path) -> Tuple[List[Tuple[int, bytes]], Dict[str, Any]]:
+    """
+    Renders each slide of a PPTX file to PNG bytes locally.
+    Uses PowerPoint COM on Windows if available.
+    Guarantees strict cleanup of temporary files and zero arbitrary command execution.
+    Returns ([(slide_number, png_bytes), ...], provenance_dict).
+    """
+    source_sha256 = hashlib.sha256(file_path.read_bytes()).hexdigest()
+    t_now = datetime.now(timezone.utc).isoformat()
+
+    try:
+        import win32com.client
+        import pythoncom
+        pythoncom.CoInitialize()
+        ppt = None
+        presentation = None
+        slides_out: List[Tuple[int, bytes]] = []
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_p = Path(tmp_dir)
+            try:
+                ppt = win32com.client.Dispatch("PowerPoint.Application")
+                presentation = ppt.Presentations.Open(
+                    str(file_path.resolve()),
+                    ReadOnly=True,
+                    Untitled=False,
+                    WithWindow=False
+                )
+                slide_count = presentation.Slides.Count
+                for i in range(1, slide_count + 1):
+                    out_png = tmp_p / f"slide_{i}.png"
+                    presentation.Slides(i).Export(str(out_png), "PNG", 1920, 1080)
+                    if out_png.exists() and out_png.stat().st_size > 0:
+                        slides_out.append((i, out_png.read_bytes()))
+
+                presentation.Close()
+                presentation = None
+            finally:
+                if presentation:
+                    try:
+                        presentation.Close()
+                    except Exception:
+                        pass
+                    presentation = None
+                if ppt:
+                    try:
+                        ppt.Quit()
+                    except Exception:
+                        pass
+                    ppt = None
+                gc.collect()
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+            if slides_out:
+                prov = {
+                    "renderer_type": "POWERPOINT_COM",
+                    "renderer_version": "16.0",
+                    "source_sha256": source_sha256,
+                    "rendered_intermediate_sha256": None,
+                    "render_timestamp": t_now,
+                    "slide_count": len(slides_out),
+                    "render_status": "SUCCESS"
+                }
+                return slides_out, prov
+    except Exception as com_err:
+        logger.warning(f"Local PowerPoint COM rendering unavailable for {file_path.name}: {com_err}")
+
+    prov_failed = {
+        "renderer_type": None,
+        "renderer_version": None,
+        "source_sha256": source_sha256,
+        "rendered_intermediate_sha256": None,
+        "render_timestamp": t_now,
+        "slide_count": 0,
+        "render_status": "RENDERER_UNAVAILABLE",
+        "error": "No local PowerPoint COM renderer available on host."
+    }
+    return [], prov_failed
 
 
 def extract_xlsx_structured_content(

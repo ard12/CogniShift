@@ -59,6 +59,14 @@ def parse_artifact_request_contract(query: str) -> ArtifactRequestContract:
         or re.search(r"\bgive\s+me\s+(?:an?\s+)?csv\b", clean_q)
     )
 
+    # 3b. PPTX / Presentation requirement
+    pptx_patterns = [
+        r"\b(?:pptx|powerpoint|presentation|slide\s*deck|management\s*brief|management\s*presentation|executive\s*briefing|slides)\b",
+        r"\b(?:create|generate|export|build|make)\s+(?:a\s+)?(?:presentation|slide\s*deck|pptx|powerpoint|briefing)\b"
+    ]
+    pptx_required = any(re.search(pat, clean_q) for pat in pptx_patterns)
+    pptx_count = 1 if pptx_required else 0
+
     # 4. PNG / Visualization requirement
     viz_keywords = [
         "visualization", "visualizations", "visualisation", "visualisations",
@@ -107,13 +115,15 @@ def parse_artifact_request_contract(query: str) -> ArtifactRequestContract:
     if sheet_matches:
         explicit_sheet = sheet_matches[0].strip()
 
-    is_deliv = pdf_required or docx_required or xlsx_required or csv_required or png_required
+    is_deliv = pdf_required or docx_required or xlsx_required or csv_required or png_required or pptx_required
 
     return ArtifactRequestContract(
         pdf_required=pdf_required,
         docx_required=docx_required,
         xlsx_required=xlsx_required,
         csv_required=csv_required,
+        pptx_required=pptx_required,
+        pptx_count=pptx_count,
         png_required=png_required,
         png_count=png_count,
         requested_chart_type=requested_chart_type,

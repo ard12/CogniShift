@@ -1,6 +1,6 @@
 # CogniShift Live Multi-Terminal Demonstration Configuration
 # Environment: Shared Hackathon Wi-Fi (10.10.128.0/18)
-# Sovereignty: Sovereign Policy Active (Zero Cloud Egress)
+# Sovereignty: Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.
 
 server:
   host: "0.0.0.0"

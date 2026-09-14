@@ -63,7 +63,7 @@ Traditional commercial cloud AI services present critical operational and legal 
 
 ## Core Architectural Pillars
 
-* **Local-First & Air-Gapped by Default:** 100% offline model runtimes. FastEmbed executes on CPU ONNX; Ollama serves local open-weight SLMs/VLMs; and internal messaging operates via a local loopback SMTP daemon.
+* **Local Sovereign Execution:** Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow. FastEmbed executes on CPU ONNX; Ollama serves local open-weight SLMs/VLMs; and internal messaging operates via a local loopback SMTP daemon.
 * **Hardware-Bound WebCrypto Device Security:** Non-exportable browser-generated ECDSA P-256 keys. Every API transaction is validated via cryptographic challenge-response and bound to an approved physical terminal.
 * **Deterministic Safety Interlocks (Four-Eyes Principle):** High-consequence actions (emergency pressure relief, pump transfer, equipment shutdown) cannot be triggered autonomously by model prose; they halt the execution state machine until two independent supervisors sign off.
 * **Hybrid Knowledge Substrate:** Unifies dense semantic vector retrieval over technical manuals with multi-hop graph traversal over physical plant topology (equipment piping, instrumentation, and relief valves).
@@ -451,7 +451,7 @@ CogniShift applies defense-in-depth across three architectural layers:
 ## Installation & Getting Started
 
 ### System Prerequisites
-* **Operating System:** Windows 10/11, Ubuntu 22.04 LTS, or Debian 12 (100% offline air-gapped support)
+* **Operating System:** Windows 10/11, Ubuntu 22.04 LTS, or Debian 12 (local sovereign edge runtime support)
 * **Python:** 3.12+ (64-bit)
 * **Node.js:** 20+ and npm 10+
 * **Local Inference:** [Ollama](https://ollama.com/) installed and running locally with models:

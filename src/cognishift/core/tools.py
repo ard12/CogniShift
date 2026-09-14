@@ -323,11 +323,8 @@ async def execute_tool(
             return f"Error creating directory '{directory_path}': {str(e)}"
 
     elif tool_name == "generate_docx":
-        from cognishift.core.artifact_generators import (
-            create_and_register_artifact,
-            generate_docx_document,
-            resolve_image_for_embedding
-        )
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
+        from cognishift.core.artifact_generators import resolve_image_for_embedding
         filename = parameters.get("filename", "report.docx")
         title = parameters.get("title", "Plant Engineering Report")
         sections = parameters.get("sections", [])
@@ -345,115 +342,140 @@ async def execute_tool(
             if resolved_images:
                 sec["images"] = resolved_images
 
-        art_meta = {}
-        if embedded_artifact_ids:
-            art_meta["embedded_visualization_artifact_ids"] = list(dict.fromkeys(embedded_artifact_ids))
+        custom_spec = type('CustomDocxSpec', (), {
+            'title': title,
+            'document_id': Path(filename).stem,
+            'sections': sections,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
 
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="docx",
-                generator_fn=lambda p: generate_docx_document(p, title, sections, workspace_id=ws_id),
-                title=title,
-                description="Generated DOCX Engineering Report",
                 run_id=run_id,
-                metadata=art_meta
+                explicit_format="docx",
+                custom_spec=custom_spec,
+                candidate_visual_metadata=parameters.get("candidate_visual_metadata")
             )
-            return (
-                f"Successfully generated and registered DOCX artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered DOCX artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected DOCX artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating DOCX artifact: {str(e)}"
 
     elif tool_name == "generate_xlsx":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_xlsx_workbook
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
         filename = parameters.get("filename", "telemetry.xlsx")
         title = parameters.get("title", "Plant Telemetry Workbook")
         sheets = parameters.get("sheets", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        custom_spec = type('CustomXlsxSpec', (), {
+            'title': title,
+            'report_id': Path(filename).stem,
+            'sheets': sheets,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="xlsx",
-                generator_fn=lambda p: generate_xlsx_workbook(p, title, sheets),
-                title=title,
-                description="Generated XLSX Telemetry Workbook",
-                run_id=run_id
+                run_id=run_id,
+                explicit_format="xlsx",
+                custom_spec=custom_spec
             )
-            return (
-                f"Successfully generated and registered XLSX artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered XLSX artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected XLSX artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating XLSX artifact: {str(e)}"
 
     elif tool_name == "generate_csv":
-        import csv
-        from cognishift.core.artifact_generators import create_and_register_artifact
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
         filename = parameters.get("filename", "data.csv")
         title = parameters.get("title", "Operational Data Export")
         headers = parameters.get("headers", [])
         rows = parameters.get("rows", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
 
-        def _write_csv(path: Path) -> None:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("w", encoding="utf-8", newline="") as handle:
-                writer = csv.writer(handle)
-                if headers:
-                    writer.writerow(headers)
-                writer.writerows(rows)
+        custom_spec = type('CustomCsvSpec', (), {
+            'title': title,
+            'report_id': Path(filename).stem,
+            'headers': headers,
+            'rows': rows,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
 
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="csv",
-                generator_fn=_write_csv,
-                title=title,
-                description="Generated CSV data export",
                 run_id=run_id,
+                explicit_format="csv",
+                custom_spec=custom_spec
             )
-            return (
-                f"Successfully generated and registered CSV artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered CSV artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected CSV artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating CSV artifact: {str(e)}"
 
     elif tool_name == "generate_pptx":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_pptx_presentation
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
         filename = parameters.get("filename", "briefing.pptx")
         title = parameters.get("title", "Plant Operations Briefing")
         subtitle = parameters.get("subtitle")
         slides = parameters.get("slides", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        custom_spec = type('CustomPptxSpec', (), {
+            'title': title,
+            'report_id': Path(filename).stem,
+            'subtitle': subtitle,
+            'slides': slides,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="pptx",
-                generator_fn=lambda p: generate_pptx_presentation(p, title, subtitle, slides),
-                title=title,
-                description="Generated PPTX Executive Presentation",
-                run_id=run_id
+                run_id=run_id,
+                explicit_format="pptx",
+                custom_spec=custom_spec,
+                candidate_visual_metadata=parameters.get("candidate_visual_metadata")
             )
-            return (
-                f"Successfully generated and registered PPTX artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered PPTX artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected PPTX artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating PPTX artifact: {str(e)}"
 
     elif tool_name == "generate_pdf":
-        from cognishift.core.artifact_generators import (
-            create_and_register_artifact,
-            generate_pdf_document,
-            resolve_image_for_embedding
-        )
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
+        from cognishift.core.artifact_generators import resolve_image_for_embedding
         filename = parameters.get("filename", "report.pdf")
         title = parameters.get("title", "Plant Engineering Report")
         sections = parameters.get("sections", [])
@@ -471,25 +493,30 @@ async def execute_tool(
             if resolved_images:
                 sec["images"] = resolved_images
 
-        art_meta = {}
-        if embedded_artifact_ids:
-            art_meta["embedded_visualization_artifact_ids"] = list(dict.fromkeys(embedded_artifact_ids))
+        custom_spec = type('CustomPdfSpec', (), {
+            'title': title,
+            'document_id': Path(filename).stem,
+            'sections': sections,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
 
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="pdf",
-                generator_fn=lambda p: generate_pdf_document(p, title, sections, workspace_id=ws_id),
-                title=title,
-                description="Generated PDF Engineering Report",
                 run_id=run_id,
-                metadata=art_meta
+                explicit_format="pdf",
+                custom_spec=custom_spec,
+                candidate_visual_metadata=parameters.get("candidate_visual_metadata")
             )
-            return (
-                f"Successfully generated and registered PDF artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered PDF artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected PDF artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating PDF artifact: {str(e)}"
 

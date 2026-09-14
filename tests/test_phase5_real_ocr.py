@@ -1,6 +1,6 @@
 """
 Phase 5 Tier-B Real OCR Integration Tests.
-Executes the actual local RapidOCR engine (ONNX Runtime, 100% offline) against
+Executes the actual local RapidOCR engine (ONNX Runtime, local sovereign execution) against
 known scanned fixtures to verify character extraction, confidence, and page provenance.
 """
 import io

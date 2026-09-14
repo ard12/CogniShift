@@ -18,7 +18,8 @@ from cognishift.app.config import settings
 from cognishift.app.db.database import init_db, get_db
 from cognishift.core.retrieval.evidence_fusion import EvidenceFusion, QueryIntentWeighting
 from cognishift.core.retrieval.hybrid_retriever import HybridDocumentRetriever
-from cognishift.core.retrieval.text_retriever import TextRetriever
+from cognishift.core.retrieval.text_retriever import TextRetriever, is_workspace_evidence_overview_query
+from cognishift.core.engine import _operator_retrieval_top_k
 from cognishift.core.retrieval.visual_retriever import VisualRetriever
 from cognishift.core.visual_rag.schemas import VisualSearchResult, PageVectorMetadata
 from cognishift.core.visual_rag.vector_store import LocalMultiVectorStore, get_visual_vector_store
@@ -46,6 +47,50 @@ def test_query_intent_weighting():
     cat, w_t, w_v = QueryIntentWeighting.determine_weights("Conduct an RCA on the boiler trip: why did it trip and fail?")
     assert cat == "rca"
     assert w_t == 0.5 and w_v == 0.5
+
+
+def test_workspace_evidence_overview_intent_is_narrowly_detected():
+    assert is_workspace_evidence_overview_query(
+        "Summarize the evidence currently available in this workspace and cite the sources you used."
+    )
+    assert not is_workspace_evidence_overview_query("What is the discharge pressure for P-101A?")
+
+
+def test_operator_evidence_overview_uses_one_slot_per_authorized_source():
+    query = "What evidence is available in this workspace about Unit 100?"
+    assert _operator_retrieval_top_k(query, [1, 2, 3, 4, 5]) == 5
+    assert _operator_retrieval_top_k(
+        "What is the discharge pressure for P-101A?", [1, 2, 3, 4, 5]
+    ) == 3
+    assert _operator_retrieval_top_k(
+        "Correlate the telemetry, inspection report and SOP for the Unit 100 event.",
+        [1, 2, 3, 4, 5],
+    ) == 5
+
+
+@pytest.mark.asyncio
+async def test_hybrid_workspace_overview_returns_diversified_text_without_visual_reranking():
+    mock_text_retriever = AsyncMock()
+    mock_text_retriever.retrieve.return_value = (
+        "grounded representative evidence",
+        [{"source_id": 1}, {"source_id": 2}, {"source_id": 3}],
+        [],
+    )
+    mock_vis_retriever = AsyncMock()
+    retriever = HybridDocumentRetriever(
+        text_retriever=mock_text_retriever,
+        visual_retriever=mock_vis_retriever,
+    )
+
+    context, metadata = await retriever.retrieve(
+        workspace_id=1,
+        query="Summarize the evidence currently available in this workspace and cite the sources you used.",
+        top_k=3,
+    )
+
+    assert context == "grounded representative evidence"
+    assert [item["source_id"] for item in metadata] == [1, 2, 3]
+    mock_vis_retriever.retrieve.assert_not_awaited()
 
 
 def test_evidence_fusion_rrf():
@@ -363,5 +408,3 @@ async def test_rca_accuracy_mode_unsuppressed_by_router():
         assert mock_acquire.called
         assert "Heater_Manual.pdf | Page 3" in (run_resp.sources_used or "")
         assert "Plant Topology Graph" in (run_resp.sources_used or "")
-
-

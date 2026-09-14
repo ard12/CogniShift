@@ -44,3 +44,6 @@ frontend/dist/
 *.etl
 artifacts/**/pktmon*.txt
 /demo/
+.agents/
+skills-lock.json
+

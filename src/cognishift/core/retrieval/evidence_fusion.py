@@ -86,13 +86,37 @@ class EvidenceFusion:
         w_text = self.weight_text_override if self.weight_text_override is not None else default_w_text
         w_vis = self.weight_visual_override if self.weight_visual_override is not None else default_w_vis
 
-        # 1. Group text chunks by (source_id, page_number)        # 1. Map text results
+        # 1. Map text results
         text_pages: Dict[Tuple[int, int], Dict[str, Any]] = {}
         for rank_idx, item in enumerate(text_items, start=1):
-            sid = item.get("source_id") or item.get("meta", {}).get("source_id")
-            p_num = item.get("page") or item.get("meta", {}).get("page") or 1
+            meta = item.get("meta") or {}
+            sid = item.get("source_id") or meta.get("source_id")
             if not sid:
                 continue
+
+            fname = item.get("filename") or meta.get("filename") or ""
+            doc_type = str(meta.get("document_type") or item.get("document_type") or "").lower()
+            if not doc_type:
+                if fname.lower().endswith(".pptx"):
+                    doc_type = "pptx"
+                elif fname.lower().endswith(".docx"):
+                    doc_type = "docx"
+                elif fname.lower().endswith(".pdf"):
+                    doc_type = "pdf"
+
+            slide_val = meta.get("slide_number") or item.get("slide_number")
+            sec_heading = meta.get("section_heading") or item.get("section_heading")
+
+            if doc_type == "pptx" or slide_val is not None:
+                p_num = int(slide_val) if slide_val is not None else int(item.get("page") or meta.get("page") or 1)
+                loc_kind = "slide"
+            elif doc_type == "docx" and sec_heading:
+                p_num = int(meta.get("section_index") or item.get("page") or meta.get("page") or 1)
+                loc_kind = "section"
+            else:
+                p_num = int(item.get("page") or meta.get("page") or 1)
+                loc_kind = "page"
+
             key = (int(sid), int(p_num))
 
             # Distinguish distance (lower is better) vs similarity (higher is better)
@@ -100,7 +124,6 @@ class EvidenceFusion:
                 dist_val = float(item["distance"])
                 sim_val = float(item.get("similarity", item.get("score", max(0.0, 1.0 - (dist_val / 2.0)))))
             else:
-                # Fallback: if only score is present
                 raw_score = float(item.get("score", 0.5))
                 sim_val = raw_score
                 dist_val = max(0.0, (1.0 - sim_val) * 2.0)
@@ -109,8 +132,12 @@ class EvidenceFusion:
                 text_pages[key] = {
                     "source_id": int(sid),
                     "page_number": int(p_num),
-                    "filename": item.get("filename", ""),
-                    "processing_version": item.get("meta", {}).get("processing_version", "v1"),
+                    "slide_number": int(slide_val) if slide_val is not None else (int(p_num) if doc_type == "pptx" else None),
+                    "filename": fname,
+                    "document_type": doc_type,
+                    "locator_kind": loc_kind,
+                    "section_heading": sec_heading,
+                    "processing_version": meta.get("processing_version", "v1"),
                     "snippets": [item.get("doc", "")],
                     "best_distance": dist_val,
                     "best_similarity": sim_val,
@@ -130,11 +157,30 @@ class EvidenceFusion:
         vis_pages: Dict[Tuple[int, int], Dict[str, Any]] = {}
         for rank_idx, vr in enumerate(visual_results, start=1):
             key = (vr.source_id, vr.page_number)
+            fname = vr.filename or ""
+            doc_type = vr.document_type
+            if not doc_type:
+                if fname.lower().endswith(".pptx"):
+                    doc_type = "pptx"
+                elif fname.lower().endswith(".docx"):
+                    doc_type = "docx"
+                else:
+                    doc_type = "pdf"
+
+            loc_kind = vr.locator_kind
+            if not loc_kind:
+                loc_kind = "slide" if doc_type == "pptx" else "page"
+
+            slide_val = vr.slide_number if vr.slide_number is not None else (vr.page_number if doc_type == "pptx" else None)
+
             vis_pages[key] = {
                 "source_id": vr.source_id,
                 "workspace_id": vr.workspace_id,
                 "page_number": vr.page_number,
-                "filename": vr.filename,
+                "slide_number": slide_val,
+                "filename": fname,
+                "document_type": doc_type,
+                "locator_kind": loc_kind,
                 "processing_version": vr.processing_version,
                 "score": vr.score, # MaxSim score
                 "rank": rank_idx
@@ -153,9 +199,13 @@ class EvidenceFusion:
             v_data = vis_pages.get(key)
 
             # Determine coordinates and filename
-            ws_id = (v_data.get("workspace_id") if v_data else None) or (t_data.get("meta", {}).get("workspace_id") if t_data else None) or 1
+            ws_id = (v_data.get("workspace_id") if v_data else None) or (t_data.get("workspace_id") if t_data else None) or 1
             f_name = (v_data["filename"] if v_data else "") or (t_data["filename"] if t_data else "")
             p_ver = (v_data["processing_version"] if v_data else "") or (t_data["processing_version"] if t_data else "v1")
+
+            doc_type = (v_data.get("document_type") if v_data else None) or (t_data.get("document_type") if t_data else None) or "pdf"
+            slide_num = (v_data.get("slide_number") if v_data else None) or (t_data.get("slide_number") if t_data else None)
+            sec_heading = t_data.get("section_heading") if t_data else None
 
             t_dist = t_data.get("best_distance") if t_data else None
             t_sim = t_data.get("best_similarity") if t_data else None
@@ -210,16 +260,34 @@ class EvidenceFusion:
 
             rrf_score = score_text + score_vis
 
-            # Channel attribution
+            # Channel attribution & format-aware citation formatting
             if t_data and v_data:
-                channel = "hybrid"
-                citation = f"[{f_name} | Page {p_num} | HYBRID]"
+                channel = "BOTH" if doc_type == "pptx" else "hybrid"
+                if doc_type == "pptx" or f_name.lower().endswith(".pptx"):
+                    citation = f"[{f_name} | Slide {slide_num or p_num} | BOTH]"
+                elif doc_type == "docx" or f_name.lower().endswith(".docx"):
+                    citation = f"[{f_name} | Page {p_num} | HYBRID]"
+                else:
+                    citation = f"[{f_name} | Page {p_num} | HYBRID]"
             elif v_data:
-                channel = "visual"
-                citation = f"[{f_name} | Page {p_num} | VISUAL]"
+                channel = "VISUAL" if doc_type == "pptx" else "visual"
+                if doc_type == "pptx" or f_name.lower().endswith(".pptx"):
+                    citation = f"[{f_name} | Slide {slide_num or p_num} | VISUAL]"
+                elif doc_type == "docx" or f_name.lower().endswith(".docx"):
+                    citation = f"[{f_name} | Page {p_num} | VISUAL]"
+                else:
+                    citation = f"[{f_name} | Page {p_num} | VISUAL]"
             else:
-                channel = "text"
-                citation = f"[{f_name} | Page {p_num} | NATIVE]"
+                channel = "TEXT" if doc_type == "pptx" else "text"
+                if doc_type == "pptx" or f_name.lower().endswith(".pptx"):
+                    citation = f"[{f_name} | Slide {slide_num or p_num} | TEXT]"
+                elif doc_type == "docx" or f_name.lower().endswith(".docx"):
+                    sec_str = sec_heading or "General"
+                    citation = f"[{f_name} | Section: {sec_str} | TEXT]"
+                else:
+                    citation = f"[{f_name} | Page {p_num} | NATIVE]"
+
+            loc_kind = "slide" if doc_type == "pptx" else ("section" if (doc_type == "docx" and not v_data) else "page")
 
             fused_candidates.append(
                 FusedPageEvidence(
@@ -229,6 +297,10 @@ class EvidenceFusion:
                     page_number=p_num,
                     filename=f_name,
                     retrieval_channel=channel,
+                    document_type=doc_type,
+                    locator_kind=loc_kind,
+                    slide_number=slide_num if doc_type == "pptx" else None,
+                    section_heading=sec_heading,
                     text_score=t_score,
                     text_distance=t_dist,
                     visual_score=v_score,
@@ -245,10 +317,10 @@ class EvidenceFusion:
         # Prevent 5 identical text pages from crowding out a top-ranked visual schematic.
         if intent_type == "rca" and len(fused_candidates) > 3:
             diverse: List[FusedPageEvidence] = []
-            has_vis = any(c.retrieval_channel in ("visual", "hybrid") for c in fused_candidates)
+            has_vis = any(c.retrieval_channel.lower() in ("visual", "hybrid", "both") for c in fused_candidates)
             if has_vis:
-                first_vis = next((c for c in fused_candidates if c.retrieval_channel in ("visual", "hybrid")), None)
-                first_txt = next((c for c in fused_candidates if c.retrieval_channel in ("text", "hybrid")), None)
+                first_vis = next((c for c in fused_candidates if c.retrieval_channel.lower() in ("visual", "hybrid", "both")), None)
+                first_txt = next((c for c in fused_candidates if c.retrieval_channel.lower() in ("text", "hybrid", "both")), None)
                 if first_txt:
                     diverse.append(first_txt)
                 if first_vis and first_vis not in diverse:

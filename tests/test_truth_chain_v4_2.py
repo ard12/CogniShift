@@ -157,7 +157,7 @@ def test_gate_06_unmeasured_egress_claim_absent_from_report():
         "physically isolated",
     ]
     approved_statement = (
-        "Local sovereign execution with no public-cloud model dependency during the verified run."
+        "Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow."
     )
     for phrase in forbidden_phrases:
         assert phrase not in approved_statement.lower()

@@ -1047,7 +1047,7 @@ async def main():
     report_data = {
         "benchmark_timestamp": datetime.now(timezone.utc).isoformat(),
         "benchmark_version": "v4",
-        "system_truth_statement": "Local sovereign execution with no public-cloud model dependency during the verified run.",
+        "system_truth_statement": "Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.",
         "egress_audit_statement": "Zero observed external egress during benchmark execution.",
         "hardware": "NVIDIA GeForce RTX 3050 Laptop GPU (6GB VRAM, CUDA 12.0)",
         "docker_sandbox": {
@@ -1105,7 +1105,7 @@ async def main():
 **Multimodal Late-Interaction Model:** Qdrant/colmodernvbert ONNX on CUDA (device: {preflight_diag.get('provider_device', 'cuda')})  
 **Sandbox Runtime:** Real Isolated Docker Container (`{settings.sandbox_image}`) with SHA-256 Execution Provenance  
 **Sovereignty & Egress Statement:**  
-> **Local sovereign execution with no public-cloud model dependency during the verified run.**  
+> **Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.**
 > **Zero observed external egress during benchmark execution.**
 
 ---

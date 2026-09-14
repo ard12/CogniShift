@@ -5,6 +5,7 @@ active processing version enforcement, and text chunk provenance.
 """
 import asyncio
 import logging
+import re
 from typing import List, Tuple, Optional, Dict, Any
 
 from cognishift.app.config import settings
@@ -15,6 +16,19 @@ from cognishift.core.document_processing.provenance import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+_WORKSPACE_EVIDENCE_OVERVIEW_PATTERNS = (
+    re.compile(r"\bevidence\s+(?:currently\s+)?available\s+in\s+(?:this|the)\s+workspace\b", re.IGNORECASE),
+    re.compile(r"\b(?:summarize|summarise|list|describe)\b.*\b(?:workspace|knowledge\s+(?:base|vault))\b.*\b(?:evidence|sources|documents|files)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\b.*\b(?:evidence|sources|documents|files)\b.*\bavailable\b", re.IGNORECASE),
+)
+
+
+def is_workspace_evidence_overview_query(query: str) -> bool:
+    """Return True only for broad corpus-inventory questions with no topical anchor."""
+    clean_query = (query or "").strip()
+    return bool(clean_query) and any(pattern.search(clean_query) for pattern in _WORKSPACE_EVIDENCE_OVERVIEW_PATTERNS)
 
 
 class TextRetriever:
@@ -51,12 +65,24 @@ class TextRetriever:
         if effective_k <= 0:
             return "", [], []
 
+        # A broad workspace-summary question has no topical term that can be an
+        # exact semantic match. Search a wider candidate pool, then return one
+        # representative chunk per source. This keeps the response grounded
+        # without globally weakening relevance thresholds for normal queries.
+        is_evidence_overview = is_workspace_evidence_overview_query(query)
+        search_k = (
+            min(count, max(effective_k, min(100, effective_k * 25)))
+            if is_evidence_overview
+            else effective_k
+        )
+
         # Look up authoritative active processing versions from SQLite
         version_map: Dict[int, Optional[str]] = {}
+        source_name_map: Dict[int, str] = {}
         try:
             from cognishift.app.db.database import get_db
             async with get_db() as db:
-                query_sql = "SELECT id, active_processing_version FROM knowledge_sources WHERE workspace_id = ?"
+                query_sql = "SELECT id, name, original_filename, active_processing_version FROM knowledge_sources WHERE workspace_id = ?"
                 params: list = [workspace_id]
                 if allowed_source_ids is not None:
                     placeholders = ",".join("?" for _ in allowed_source_ids)
@@ -65,6 +91,7 @@ class TextRetriever:
                 cursor = await db.execute(query_sql, params)
                 rows = await cursor.fetchall()
                 for r in rows:
+                    source_name_map[int(r["id"])] = str(r["original_filename"] or r["name"] or "Document")
                     if r["active_processing_version"]:
                         version_map[r["id"]] = r["active_processing_version"]
         except Exception:
@@ -113,7 +140,7 @@ class TextRetriever:
             q_vec = await asyncio.to_thread(_get_q_emb)
             query_kwargs = {
                 "query_embeddings": [q_vec],
-                "n_results": effective_k
+                "n_results": search_k
             }
             if where_filter:
                 query_kwargs["where"] = where_filter
@@ -127,11 +154,29 @@ class TextRetriever:
             return "", [], []
 
         max_dist = distance_threshold if distance_threshold is not None else getattr(settings, "semantic_retrieval_max_distance", 0.78)
+        if is_evidence_overview and distance_threshold is None:
+            # Calibrated only for inventory-style questions. The production
+            # corpus currently places valid representative chunks around
+            # 0.88-0.92 squared-L2 for this intentionally generic intent.
+            max_dist = max(max_dist, 1.0)
         formatted_context_parts = []
         retrieved_metadatas = []
         ranked_items = []
         distances = results.get("distances", [[]])[0] if results.get("distances") else []
         seen_chunk_keys = set()
+        seen_source_ids = set()
+        overview_sources_with_content_sheet = set()
+        if is_evidence_overview and results.get("metadatas") and results["metadatas"]:
+            for raw_meta in results["metadatas"][0]:
+                candidate_meta = dict(raw_meta or {})
+                candidate_sheet = str(candidate_meta.get("sheet_name") or "").strip()
+                candidate_source = candidate_meta.get("source_id")
+                try:
+                    candidate_source = int(candidate_source)
+                except (TypeError, ValueError):
+                    candidate_source = None
+                if candidate_source is not None and candidate_sheet and not candidate_sheet.startswith("_"):
+                    overview_sources_with_content_sheet.add(candidate_source)
 
         for i, doc in enumerate(results["documents"][0]):
             dist = distances[i] if i < len(distances) else 0.0
@@ -142,6 +187,30 @@ class TextRetriever:
                 continue
 
             meta = results["metadatas"][0][i] if results.get("metadatas") and len(results["metadatas"]) > 0 else {}
+            meta = dict(meta or {})
+            source_id = meta.get("source_id")
+            if source_id is not None:
+                try:
+                    source_id = int(source_id)
+                except (TypeError, ValueError):
+                    source_id = None
+            if source_id is not None and not any(
+                meta.get(key) for key in ("filename", "document", "document_name", "original_filename", "name")
+            ):
+                meta["filename"] = source_name_map.get(source_id, "Document")
+            sheet_name = str(meta.get("sheet_name") or "").strip()
+            if (
+                is_evidence_overview
+                and source_id in overview_sources_with_content_sheet
+                and sheet_name.startswith("_")
+            ):
+                # Prefer the workbook's actual evidence over its administrative
+                # provenance sheet when producing a source-level inventory.
+                continue
+            if is_evidence_overview and source_id is not None:
+                if source_id in seen_source_ids:
+                    continue
+                seen_source_ids.add(source_id)
             chunk_key = (
                 meta.get("source_id"),
                 meta.get("sheet_name"),
@@ -180,6 +249,9 @@ class TextRetriever:
                 "source_id": meta.get("source_id"),
                 "filename": fname
             })
+
+            if is_evidence_overview and len(ranked_items) >= effective_k:
+                break
 
         formatted_context = ""
         if formatted_context_parts:

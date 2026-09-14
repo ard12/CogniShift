@@ -58,11 +58,12 @@ def _resolve_fastembed_cache_dir() -> str:
         return str(alt)
     return str(target)
 
-# Initialize FastEmbed locally (CPU optimized, 100% offline in sovereign mode)
+# Initialize FastEmbed locally (CPU optimized, no public-cloud model dependency in sovereign mode)
 embedding_model = TextEmbedding(
     model_name="BAAI/bge-small-en-v1.5",
     cache_dir=_resolve_fastembed_cache_dir(),
     local_files_only=settings.fastembed_offline,
+    providers=["CPUExecutionProvider"],
 )
 
 

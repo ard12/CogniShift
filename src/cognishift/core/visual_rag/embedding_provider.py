@@ -45,7 +45,7 @@ class ColPaliLocalProvider(VisualEmbeddingProvider):
     """
     Local ColPali / ColModernVBERT late-interaction model provider.
     Supports ONNX Runtime late-interaction models via FastEmbed as well as PyTorch Transformers.
-    Loads 100% offline from settings.colpali_model_path (default data/models/colpali/).
+    Loads locally from settings.colpali_model_path (default data/models/colpali/) with no public-cloud dependency.
     """
     IS_SIMULATION: bool = False
 

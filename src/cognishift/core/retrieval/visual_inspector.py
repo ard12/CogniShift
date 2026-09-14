@@ -22,6 +22,7 @@ from cognishift.core.visual_rag.page_cache import render_page_image_on_demand
 from cognishift.core.visual_rag.page_verifier import DeterministicPageVerifier, get_page_verifier
 from cognishift.core.document_processing.vision_service import VisionProcessingService
 from cognishift.core.document_processing.schemas import VisionRequirement
+from cognishift.core.multimodal.router import MultimodalModelRouter, get_multimodal_router
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +80,12 @@ class VisualEvidenceInspector:
 
     def __init__(
         self,
+        router: Optional[MultimodalModelRouter] = None,
         vision_service: Optional[VisionProcessingService] = None,
         verifier: Optional[DeterministicPageVerifier] = None
     ):
-        self.vision_service = vision_service or VisionProcessingService()
+        self.router = router or get_multimodal_router()
+        self.vision_service = vision_service
         self.verifier = verifier or get_page_verifier()
         self._source_path_cache: Dict[int, Optional[Path]] = {}
 
@@ -220,48 +223,35 @@ class VisualEvidenceInspector:
         verification_executed = False
 
         try:
-            v_obs = await self.vision_service.analyze_document_image(
+            # Single authoritative visual inference path via MultimodalModelRouter
+            inf_res = await self.router.inspect_image(
                 image_bytes=image_bytes,
-                page_number=page_number,
-                prompt=target_prompt,
-                requirement=VisionRequirement.OPTIONAL
+                task_query=query,
+                model_override=getattr(settings, "vision_model", None)
             )
-            if v_obs and v_obs.description and v_obs.description.strip():
-                vlm_text = v_obs.description.strip()
-                vlm_succeeded = True
+            vlm_succeeded = inf_res.success
+            vlm_text = inf_res.raw_text
+            insp_lat_ms = inf_res.latency_ms
+            v_model_name = inf_res.actual_model
 
-                # Parse structured JSON output from VLM strictly
-                parsed_json = None
-                try:
-                    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", vlm_text, re.DOTALL)
-                    if match:
-                        parsed_json = json.loads(match.group(1))
-                    else:
-                        match2 = re.search(r"(\{.*\})", vlm_text, re.DOTALL)
-                        if match2:
-                            parsed_json = json.loads(match2.group(1))
-                        else:
-                            parsed_json = json.loads(vlm_text)
-                except Exception:
-                    parsed_json = None
-
-                if isinstance(parsed_json, dict):
-                    for tag in parsed_json.get("observed_equipment_tags", parsed_json.get("equipment_tags", [])):
-                        if isinstance(tag, str) and tag.strip():
-                            extracted_tags.append(tag.strip().upper())
-                    for tag in parsed_json.get("observed_instrument_tags", parsed_json.get("instrument_tags", [])):
-                        if isinstance(tag, str) and tag.strip():
-                            extracted_tags.append(tag.strip().upper())
-                    raw_rels = parsed_json.get("observed_relations", parsed_json.get("relations", []))
-                    if isinstance(raw_rels, list):
-                        for rel in raw_rels:
-                            if isinstance(rel, dict) and "subject" in rel and "object" in rel:
-                                observed_relations.append({
-                                    "subject": str(rel["subject"]).strip().upper(),
-                                    "relation_type": str(rel.get("relation_type", "CONNECTED_TO")).strip().upper(),
-                                    "object": str(rel["object"]).strip().upper(),
-                                    "evidence_basis": str(rel.get("evidence_basis", "")).strip()
-                                })
+            if not inf_res.success:
+                vlm_failed = True
+                if inf_res.failure_reason and "MODEL_UNAVAILABLE" in inf_res.failure_reason:
+                    vlm_text = inf_res.failure_reason
+                elif not vlm_text:
+                    vlm_text = f"VLM execution error on {filename} {locator}: {inf_res.failure_reason}"
+            else:
+                # Populate structured outputs directly from MultimodalInferenceResult
+                st_obs = inf_res.structured_observation
+                extracted_tags.extend(st_obs.observed_equipment_tags)
+                extracted_tags.extend(st_obs.observed_instrument_tags)
+                for r in st_obs.observed_relations:
+                    observed_relations.append({
+                        "subject": r.subject,
+                        "relation_type": r.relation_type,
+                        "object": r.object,
+                        "evidence_basis": r.evidence_basis
+                    })
 
                 # Regex extract tags from prose for deterministic OCR verification
                 for m in TAG_RE.finditer(vlm_text):
@@ -286,16 +276,13 @@ class VisualEvidenceInspector:
                         if num_claims:
                             numeric_corroborated = any(cr.corroborated for cr in num_claims)
                         is_corroborated = bool(tag_corroborated or all(cr.corroborated for cr in corroborations))
-            else:
-                vlm_succeeded = False
         except Exception as ve:
             logger.warning(f"VLM inspection error on {filename} page {page_number}: {ve}")
             vlm_succeeded = False
             vlm_failed = True
             vlm_text = f"VLM execution error on {filename} {locator}: {ve}"
-
-        insp_lat_ms = round((time.perf_counter() - t_insp_0) * 1000.0, 2)
-        v_model_name = getattr(settings, "vision_model", "moondream:latest")
+            insp_lat_ms = round((time.perf_counter() - t_insp_0) * 1000.0, 2)
+            v_model_name = getattr(settings, "vision_model", "qwen2-vl:2b")
 
         if vlm_failed:
             status = VisualInspectionStatus.VLM_FAILED

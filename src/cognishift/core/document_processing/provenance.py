@@ -99,20 +99,29 @@ class PageAwareChunker:
 
 
 def _get_locator_key(meta: Dict[str, Any]) -> Tuple[Any, ...]:
+    fname = str(meta.get("filename") or meta.get("document") or "").lower()
+    doc_type = str(meta.get("document_type") or "").lower()
+    slide = meta.get("slide_number")
+    if slide is not None or meta.get("locator_kind") == "slide" or fname.endswith(".pptx") or doc_type == "pptx":
+        slide_val = slide if slide is not None else (meta.get("page") or meta.get("page_number") or 1)
+        return ("slide", int(slide_val))
+
     sheet = meta.get("sheet_name")
     r_start = meta.get("row_start")
     r_end = meta.get("row_end")
-    sec = metadata_sec = meta.get("section_heading") or meta.get("section")
+    sec = meta.get("section_heading") or meta.get("section")
     page = meta.get("page") or meta.get("page_number")
     if sheet or (r_start is not None and r_end is not None):
         return ("sheet", str(sheet or "").lower(), r_start, r_end)
-    if metadata_sec:
-        return ("section", str(metadata_sec).lower(), int(page) if page else None)
+    if sec and (fname.endswith(".docx") or doc_type == "docx"):
+        return ("section", str(sec).lower())
+    if sec:
+        return ("section", str(sec).lower(), int(page) if page else None)
     return ("page", int(page) if page else 1)
 
 
 def format_grounded_citation(metadata: Dict[str, Any]) -> str:
-    """Formats human-facing citation string with document, page/sheet/section, and extraction method."""
+    """Formats human-facing citation string with document, page/sheet/section/slide, and extraction method."""
     filename = (
         metadata.get("filename")
         or metadata.get("document")
@@ -123,6 +132,20 @@ def format_grounded_citation(metadata: Dict[str, Any]) -> str:
     )
     fname_clean = Path(filename).name if ("/" in filename or "\\" in filename) else filename
     method = str(metadata.get("extraction_method", "native")).upper()
+    doc_type = str(metadata.get("document_type", "")).lower()
+
+    # 1. PPTX presentation slide citations: [Doc.pptx | Slide N | TEXT/VISUAL/BOTH]
+    slide = metadata.get("slide_number")
+    if slide is not None or fname_clean.lower().endswith(".pptx") or doc_type == "pptx":
+        slide_idx = int(slide) if slide is not None else int(metadata.get("page") or 1)
+        ch_raw = str(metadata.get("channel") or "").upper()
+        if ch_raw in ("BOTH", "HYBRID"):
+            channel = "BOTH"
+        elif ch_raw == "VISUAL" or "VISUAL" in method:
+            channel = "VISUAL"
+        else:
+            channel = "TEXT"
+        return f"[{fname_clean} | Slide {slide_idx} | {channel}]"
 
     sheet = metadata.get("sheet_name")
     r_start = metadata.get("row_start")
@@ -132,7 +155,7 @@ def format_grounded_citation(metadata: Dict[str, Any]) -> str:
     sec = metadata.get("section_heading") or metadata.get("section")
     page = metadata.get("page") or metadata.get("page_number")
 
-    if fname_clean.endswith(".csv") or metadata.get("document_type") == "csv" or metadata.get("source_type") == "csv":
+    if fname_clean.endswith(".csv") or doc_type == "csv" or metadata.get("source_type") == "csv":
         if r_start is not None and r_end is not None:
             return f"[{fname_clean} | Rows {r_start}-{r_end}]"
         return f"[{fname_clean} | Rows]"
@@ -147,6 +170,15 @@ def format_grounded_citation(metadata: Dict[str, Any]) -> str:
             parts.append(f"Cols {c_start}:{c_end}")
         coords = " | ".join(parts) if parts else "Sheet 1"
         return f"[{fname_clean} | {coords} | SPREADSHEET]"
+
+    # 2. DOCX section / rendered page citations
+    if fname_clean.lower().endswith(".docx") or doc_type == "docx":
+        channel = "VISUAL" if metadata.get("channel") == "visual" or "VISUAL" in method else "TEXT"
+        if channel == "VISUAL" and page:
+            return f"[{fname_clean} | Page {page} | VISUAL]"
+        if sec:
+            return f"[{fname_clean} | Section: {sec} | TEXT]"
+        return f"[{fname_clean} | Section: General | TEXT]"
 
     if sec:
         p_str = f"Rendered Page {page}" if page else ""
@@ -192,11 +224,11 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
                 candidates.append(c.strip())
 
     if text:
-        # Match bracketed citations
-        bracketed = re.findall(r"\[([^\]]*?(?:\.pdf|\.csv|\.xlsx|\.docx|\.png|\.jpg|\.txt)[^\]]*?)\]", text, re.IGNORECASE)
+        # Match bracketed citations including .pptx
+        bracketed = re.findall(r"\[([^\]]*?(?:\.pdf|\.csv|\.xlsx|\.docx|\.pptx|\.png|\.jpg|\.txt)[^\]]*?)\]", text, re.IGNORECASE)
         candidates.extend(bracketed)
-        # Also match standard [file | Page X] even without known extension
-        bracketed_generic = re.findall(r"\[([^\]]*?\|\s*Page\s*\d+[^\]]*?)\]", text, re.IGNORECASE)
+        # Also match standard [file | Page X] or [file | Slide X] even without known extension
+        bracketed_generic = re.findall(r"\[([^\]]*?\|\s*(?:Page|Slide)\s*\d+[^\]]*?)\]", text, re.IGNORECASE)
         candidates.extend(bracketed_generic)
 
     results: List[Dict[str, Any]] = []
@@ -213,6 +245,7 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
 
         filename = parts[0]
         page: Optional[int] = None
+        slide: Optional[int] = None
         sheet: Optional[str] = None
         r_start: Optional[int] = None
         r_end: Optional[int] = None
@@ -220,6 +253,10 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
         method: Optional[str] = None
 
         for p in parts[1:]:
+            slide_match = re.search(r"slide\s*(\d+)", p, re.IGNORECASE)
+            if slide_match:
+                slide = int(slide_match.group(1))
+
             page_match = re.search(r"(?:rendered\s+page|page|p\.)\s*(\d+)", p, re.IGNORECASE)
             if page_match:
                 page = int(page_match.group(1))
@@ -237,19 +274,28 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
             if sec_match:
                 sec = sec_match.group(1).strip()
 
-            if p.upper() in ("NATIVE", "OCR", "TABLE", "SPREADSHEET", "VISION", "HYBRID", "DOCUMENT", "TEXT", "VISUAL"):
+            if p.upper() in ("NATIVE", "OCR", "TABLE", "SPREADSHEET", "VISION", "HYBRID", "DOCUMENT", "TEXT", "VISUAL", "PRESENTATION"):
                 method = p.upper()
 
-        if page is None and not sheet and not sec:
-            pm = re.search(r"(?:page|p\.)\s*(\d+)", raw, re.IGNORECASE)
-            if pm:
-                page = int(pm.group(1))
+        if page is None and slide is None and not sheet and not sec:
+            sm = re.search(r"slide\s*(\d+)", raw, re.IGNORECASE)
+            if sm:
+                slide = int(sm.group(1))
             else:
-                page = 1
+                pm = re.search(r"(?:page|p\.)\s*(\d+)", raw, re.IGNORECASE)
+                if pm:
+                    page = int(pm.group(1))
+                else:
+                    page = 1
 
         clean_filename = Path(filename).name if ("/" in filename or "\\" in filename) else filename
 
-        if sheet or (r_start is not None and r_end is not None):
+        if clean_filename.lower().endswith(".pptx") or slide is not None:
+            slide_val = slide if slide is not None else (page if page is not None else 1)
+            loc_key = ("slide", slide_val)
+            channel = "VISUAL" if method == "VISUAL" else "TEXT"
+            canonical = f"[{clean_filename} | Slide {slide_val} | {channel}]"
+        elif sheet or (r_start is not None and r_end is not None):
             loc_key = ("sheet", (sheet or "").lower(), r_start, r_end)
             coords = []
             if sheet:
@@ -258,6 +304,16 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
                 coords.append(f"Rows {r_start}-{r_end}")
             c_str = " | ".join(coords)
             canonical = f"[{clean_filename} | {c_str} | {method or 'SPREADSHEET'}]"
+        elif clean_filename.lower().endswith(".docx"):
+            if (method or "").upper() == "VISUAL" and page is not None:
+                loc_key = ("page", page)
+                canonical = f"[{clean_filename} | Page {page} | VISUAL]"
+            elif sec:
+                loc_key = ("section", sec.lower())
+                canonical = f"[{clean_filename} | Section: {sec} | TEXT]"
+            else:
+                loc_key = ("section", "general")
+                canonical = f"[{clean_filename} | Section: General | TEXT]"
         elif sec:
             loc_key = ("section", sec.lower(), page)
             p_str = f"Rendered Page {page}" if page else ""
@@ -274,6 +330,7 @@ def extract_and_normalize_citations(text: str = "", model_citations: Optional[Li
             results.append({
                 "filename": clean_filename,
                 "page": page if page is not None else 1,
+                "slide_number": slide,
                 "sheet_name": sheet,
                 "row_start": r_start,
                 "row_end": r_end,
@@ -466,15 +523,27 @@ def reconcile_citations_in_text(
                     break
 
         if matched_info:
+            fn = matched_info['filename']
+            if fn.lower().endswith(".pptx") or matched_info.get("slide_number") is not None:
+                s = matched_info.get("slide_number") or matched_info.get("page") or 1
+                m = matched_info.get("method") or "TEXT"
+                return f"[{fn} | Slide {s} | {m}]"
+            elif fn.lower().endswith(".docx"):
+                m = matched_info.get("method") or "TEXT"
+                if m == "VISUAL" and matched_info.get("page"):
+                    return f"[{fn} | Page {matched_info['page']} | VISUAL]"
+                sec = matched_info.get("section_heading") or "General"
+                return f"[{fn} | Section: {sec} | TEXT]"
+
             p = matched_info["page"]
             m = matched_info.get("method")
             if m:
-                return f"[{matched_info['filename']} | Page {p} | {m}]"
-            return f"[{matched_info['filename']} | Page {p}]"
+                return f"[{fn} | Page {p} | {m}]"
+            return f"[{fn} | Page {p}]"
 
         return match.group(0)
 
-    pattern = r"\[([^\]]+?(?:\.pdf|\.csv|\.xlsx|\.png|\.jpg|\.txt)[^\]]*?)\]"
+    pattern = r"\[([^\]]+?(?:\.pdf|\.csv|\.xlsx|\.docx|\.pptx|\.png|\.jpg|\.txt)[^\]]*?)\]"
     return re.sub(pattern, _replace_cite, text, flags=re.IGNORECASE)
 
 

@@ -24,7 +24,12 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://127.0.0.1:11434"
     text_model: str = "qwen2.5:7b"
-    vision_model: str = "moondream:latest"
+    # Unified Multimodal Qwen2-VL Layer (Moondream is deprecated as primary path)
+    vision_model: str = "qwen2-vl:2b"
+    multimodal_profile: str = "fast"
+    qwen2_vl_fast_model: str = "qwen2-vl:2b"
+    qwen2_vl_deep_model: str = "qwen2-vl:7b"
+    multimodal_allow_fallback: bool = False
     data_dir: Path = PROJECT_ROOT / "data"
     database_path: Path = PROJECT_ROOT / "data" / "cognishift.db"
     chroma_path: Path = PROJECT_ROOT / "data" / "chroma"

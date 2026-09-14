@@ -1399,7 +1399,7 @@ async def main():
         "benchmark_timestamp": datetime.now(timezone.utc).isoformat(),
         "benchmark_version": "v4.2",
         "system_truth_statement": "Local sovereign execution with independent evaluator auditing raw evidence structures. Zero circular trust.",
-        "sovereignty_statement": "Local sovereign execution with no public-cloud model dependency during the verified run.",
+        "sovereignty_statement": "Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.",
         "hardware": "NVIDIA GeForce RTX 3050 Laptop GPU (6GB VRAM, CUDA 12.0)",
         "docker_sandbox": {
             "image": settings.sandbox_image,
@@ -1470,7 +1470,7 @@ async def main():
 **Multimodal Late-Interaction Model:** Qdrant/colmodernvbert ONNX on CUDA (device: {preflight_diag.get('provider_device', 'cuda')})  
 **Sandbox Runtime:** Real Isolated Docker Container (`{settings.sandbox_image}`) with Digest `{image_digest}`  
 **Sovereignty & Egress Statement:**  
-> **Local sovereign execution with no public-cloud model dependency during the verified run.**
+> **Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.**
 
 ---
 

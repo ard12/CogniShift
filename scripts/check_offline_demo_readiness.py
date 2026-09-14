@@ -21,7 +21,7 @@ from cognishift.app.config import settings
 def main():
     print("============================================================")
     print("  COGNISHIFT OFFLINE DEMO PREFLIGHT CHECKER")
-    print("  Mode: 100% Offline / Zero Cloud / Zero Auto-Download")
+    print("  Mode: Local Sovereign Execution / No Public-Cloud Model Dependency")
     print("============================================================")
 
     all_passed = True

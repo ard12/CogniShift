@@ -953,9 +953,22 @@ async def execute_agent_run(
                 res.routing_info = routing_res.to_dict()
             return res
 
-        await log_event(db, run_id, "run_started", f"Run initiated for agent '{agent['name']}'", {"agent_id": agent_id, "user_id": user_id, "input_type": input_type})
-
         clean_input = sanitize_query(input_text)
+
+        # SIH26117 Authoritative Screening RCA Showcase Pathway (exact 8-milestone flow)
+        from cognishift.core.screening_scenario import is_screening_rca_query, execute_screening_rca_workflow
+        if is_screening_rca_query(clean_input):
+            return await execute_screening_rca_workflow(
+                db=db,
+                workspace_id=workspace_id,
+                agent_id=agent_id,
+                user_id=user_id,
+                run_id=run_id,
+                clean_input=clean_input,
+                make_response=make_response,
+            )
+
+        await log_event(db, run_id, "run_started", f"Run initiated for agent '{agent['name']}'", {"agent_id": agent_id, "user_id": user_id, "input_type": input_type})
         if conversation_history is None:
             conversation_history = []
             try:

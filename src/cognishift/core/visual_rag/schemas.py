@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class PageVectorMetadata(BaseModel):
-    """Metadata describing indexed visual patch vectors for a document page."""
+    """Metadata describing indexed visual patch vectors for a document page or presentation slide."""
     workspace_id: int
     source_id: int
     processing_version: str
@@ -20,6 +20,9 @@ class PageVectorMetadata(BaseModel):
     token_count: int = 0
     vector_dim: int = 128
     created_at: Optional[str] = None
+    document_type: str = "pdf"
+    locator_kind: str = "page"  # 'page', 'slide', 'sheet_tile', 'section'
+    slide_number: Optional[int] = None
 
 
 class VisualSearchResult(BaseModel):
@@ -32,6 +35,9 @@ class VisualSearchResult(BaseModel):
     score: float
     token_count: int = 0
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    document_type: str = "pdf"
+    locator_kind: str = "page"
+    slide_number: Optional[int] = None
 
 
 class CorroborationResult(BaseModel):
@@ -50,7 +56,10 @@ class FusedPageEvidence(BaseModel):
     processing_version: str
     page_number: int
     filename: str
-    retrieval_channel: str = "hybrid"  # 'text', 'visual', or 'hybrid'
+    retrieval_channel: str = "hybrid"  # 'TEXT', 'VISUAL', or 'BOTH'
+    document_type: str = "pdf"
+    locator_kind: str = "page"
+    slide_number: Optional[int] = None
     text_score: Optional[float] = None
     text_distance: Optional[float] = None
     visual_score: Optional[float] = None
@@ -58,5 +67,6 @@ class FusedPageEvidence(BaseModel):
     text_snippets: List[str] = Field(default_factory=list)
     vlm_observation: Optional[str] = None
     corroboration_results: List[CorroborationResult] = Field(default_factory=list)
+    section_heading: Optional[str] = None
     ocr_corroborated: Optional[bool] = None  # None = not checked, True = corroborated, False = discrepancy
     citation: str = ""

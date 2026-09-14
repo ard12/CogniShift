@@ -2,7 +2,7 @@
 **Document Version:** 3.0.0 (Validated Local Authentication and Workflow Baseline)  
 **Target Event:** Smart India Hackathon (SIH26117) — Live Jury Walkthrough  
 **Theme:** Sovereign On-Premise Agentic AI Workbench for Industrial Operations  
-**Security Posture:** Strict Local Runtime / Air-Gap-Oriented / Zero Cloud Dependencies
+**Security Posture:** Strict Local Runtime / Air-Gap-Oriented / No public-cloud AI/model dependency in this workflow
 
 ---
 
@@ -63,7 +63,7 @@ python scripts/check_offline_demo_readiness.py
 ```text
 ============================================================
   COGNISHIFT OFFLINE DEMO PREFLIGHT CHECKER
-  Mode: 100% Offline / Zero Cloud / Zero Auto-Download
+  Mode: Local Sovereign Execution / No Public-Cloud Model Dependency
 ============================================================
   [OK] SQLite Database                     (15 tables initialized)
   [OK] ChromaDB Vector Store               (data/chroma)

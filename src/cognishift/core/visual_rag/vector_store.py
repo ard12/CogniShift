@@ -250,6 +250,13 @@ class LocalMultiVectorStore(VisualVectorStore):
                 max_per_query = np.max(sim_matrix, axis=1)
                 score = float(np.sum(max_per_query))
 
+                fname_str = r["filename"]
+                is_pptx_file = fname_str.lower().endswith(".pptx")
+                is_docx_file = fname_str.lower().endswith(".docx")
+                doc_type_val = "pptx" if is_pptx_file else ("docx" if is_docx_file else "pdf")
+                loc_kind_val = "slide" if is_pptx_file else "page"
+                slide_num_val = r["page_number"] if is_pptx_file else None
+
                 scored.append(
                     VisualSearchResult(
                         workspace_id=r["workspace_id"],
@@ -259,12 +266,18 @@ class LocalMultiVectorStore(VisualVectorStore):
                         filename=r["filename"],
                         score=score,
                         token_count=r["token_count"],
+                        document_type=doc_type_val,
+                        locator_kind=loc_kind_val,
+                        slide_number=slide_num_val,
                         metadata={
                             "checksum": r["checksum"],
                             "dpi": r["dpi"],
                             "width": r["width"],
                             "height": r["height"],
-                            "vector_file_path": v_path_str
+                            "vector_file_path": v_path_str,
+                            "document_type": doc_type_val,
+                            "locator_kind": loc_kind_val,
+                            "slide_number": slide_num_val
                         }
                     )
                 )

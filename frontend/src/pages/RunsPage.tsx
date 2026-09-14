@@ -116,8 +116,8 @@ function RunDetail({ run, onResumed }: { run: Run; onResumed: (r: Run) => void }
 
       <div>
         <p className="label mb-1.5">Execution trace</p>
-        <div className="max-h-64 overflow-y-auto rounded border border-surface-border bg-surface-1/50 p-3">
-          {eventsLoading ? <LoadingState label="Loading trace…" /> : <EventTimeline events={events} />}
+        <div className="max-h-[500px] overflow-y-auto rounded border border-surface-border bg-surface-1/50 p-3">
+          {eventsLoading ? <LoadingState label="Loading trace…" /> : <EventTimeline events={events} runId={run.id} />}
         </div>
       </div>
 

@@ -968,14 +968,14 @@ export function OperatorPage() {
                 </div>
               </div>
               {(traceExpanded || isExecuting) && (
-                <div ref={traceContainerRef} className="max-h-[380px] overflow-y-auto bg-surface-1/40 p-4">
+                <div ref={traceContainerRef} className="max-h-[580px] overflow-y-auto bg-surface-1/40 p-3 sm:p-4">
                   {isExecuting && (
                     <div className="mb-2 flex items-center gap-2 rounded border border-status-info/30 bg-status-info/10 px-2.5 py-1.5 font-mono text-[11px] text-status-info">
                       <span className="inline-block h-2 w-2 animate-ping rounded-full bg-status-info" />
                       <span>{dispatchStage || "Agent execution in progress (reasoning & tool verification)…"}</span>
                     </div>
                   )}
-                  <EventTimeline events={events} />
+                  <EventTimeline events={events} runId={run?.id} />
                 </div>
               )}
             </div>

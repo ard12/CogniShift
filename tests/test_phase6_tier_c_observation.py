@@ -12,6 +12,14 @@ from scripts.observe_network import NetworkObserver, run_negative_control
 from cognishift.core.network.client import get_sovereign_async_client
 from cognishift.app.config import settings
 from cognishift.core.retriever import embedding_model
+import httpx
+
+try:
+    httpx.get("http://127.0.0.1:11434/api/tags", timeout=1.0)
+    has_ollama = True
+except Exception:
+    has_ollama = False
+require_ollama = pytest.mark.skipif(not has_ollama, reason="Local Ollama is not running")
 
 
 def test_observer_negative_control():
@@ -22,6 +30,7 @@ def test_observer_negative_control():
 
 
 @pytest.mark.asyncio
+@require_ollama
 async def test_strict_workflow_records_zero_unauthorized_egress():
     """Verify that a full local inference & embedding workflow produces zero unauthorized egress."""
     observer = NetworkObserver(target_pids=[os.getpid()], sample_interval=0.01)

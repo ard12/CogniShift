@@ -1,0 +1,8 @@
+scenario_id,name,is_ood,matched_status,cause_code,outcome_match,benchmark_evidence_chain_valid,production_evidence_chain_valid,divergence_detected,scenario_pass,total_ms,retr_ms,reason_ms,synth_ms,unaccounted_ms
+RCA-01,P-101A Suction Starvation & Cavitation Trip (Restored Historical Query),False,PLAUSIBLE_HYPOTHESIS,SUCTION_STARVATION_CAVITATION,True,False,True,True,False,68691.31,3.23,67846.5,4.33,837.25
+RCA-02,K-101 Centrifugal Compressor Overheat & ESD Trip,False,PLAUSIBLE_HYPOTHESIS,BEARING_OVERHEAT,True,False,True,True,False,91050.11,2.43,90280.27,4.85,762.56
+RCA-03,P-101A Missing Evidence Honest Abstention Gate,False,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,True,True,True,False,True,40351.48,3.39,39823.37,1.19,523.53
+RCA-04,Out-of-Distribution (OOD) Nonexistent Asset Safety Gate,True,ASSET_NOT_FOUND,ASSET_NOT_FOUND,True,True,True,False,True,458.74,0.0,0.0,0.0,458.74
+RCA-05,Final-Step Protocol Tool Lockout & Safe Interception,False,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,False,False,True,True,False,122265.56,3.6,121600.1,8.88,652.98
+RCA-06,Visual-Dependent P&ID RCA (Hydrocracker R-301 / FV-302),False,PLAUSIBLE_HYPOTHESIS,VALVE_STEM_BINDING,False,False,False,False,False,170586.61,5743.82,147203.87,2.19,17636.73
+RCA-07,Inconclusive Investigation & Missing Telemetry (BFP-02),False,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,True,False,True,True,False,76545.71,1.88,76229.17,0.12,314.54

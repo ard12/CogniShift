@@ -12,7 +12,8 @@ StepStatus = Literal[
     "waiting_for_approval",
     "completed",
     "failed",
-    "blocked"
+    "blocked",
+    "skipped"
 ]
 
 
@@ -51,7 +52,7 @@ class AgentPlan(BaseModel):
         """Returns True if all steps are completed or max_steps reached."""
         if self.current_step_index >= len(self.steps) or self.current_step_index >= self.max_steps:
             return True
-        return all(s.status in ["completed", "blocked", "failed"] for s in self.steps)
+        return all(s.status in ["completed", "blocked", "failed", "skipped"] for s in self.steps)
 
 
 def create_initial_plan(goal: str, task_type: str = "general_reasoning") -> AgentPlan:
@@ -75,23 +76,34 @@ def create_initial_plan(goal: str, task_type: str = "general_reasoning") -> Agen
             PlanStep(id=3, description="Cross-reference sensor readings against safe operating envelope"),
             PlanStep(id=4, description="Synthesize findings and generate engineering recommendation")
         ]
-    elif task_type == "conversational":
+    elif task_type in ["inquiry", "conversational"]:
         steps = [
-            PlanStep(id=1, description="Synthesize direct conversational answer addressing user query")
+            PlanStep(id=1, description="Synthesize engineering answer using domain knowledge and operational context")
         ]
     elif task_type == "document_analysis":
         steps = [
-            PlanStep(id=1, description="Retrieve relevant SOP and OISD standards via RAG vector search"),
-            PlanStep(id=2, description="Query plant topology graph for connected equipment and interlocks"),
-            PlanStep(id=3, description="Evaluate operating limits and compliance status"),
-            PlanStep(id=4, description="Synthesize formal deliverable with precise manual citations")
+            PlanStep(id=1, description="Synthesize formal deliverable with precise manual citations from retrieved SOP context")
+        ]
+    elif any(w in goal.lower() for w in ["restart", "emergency", "run diagnostic", "relief", "check pressure", "check temperature"]):
+        steps = [
+            PlanStep(id=1, description=f"Execute requested operational action: {goal}"),
+            PlanStep(id=2, description="Synthesize execution outcome and telemetry status")
         ]
     else:
-        steps = [
-            PlanStep(id=1, description="Retrieve relevant domain context from knowledge base"),
-            PlanStep(id=2, description="Formulate technical assessment and execute necessary diagnostics"),
-            PlanStep(id=3, description="Synthesize final engineering response")
-        ]
+        is_informational = any(w in goal.lower() for w in [
+            "explain", "what is", "tell me", "describe", "how does", "why is",
+            "can you", "overview", "details", "meaning", "definition"
+        ])
+        if is_informational:
+            steps = [
+                PlanStep(id=1, description="Synthesize engineering explanation using domain knowledge and operational context")
+            ]
+        else:
+            steps = [
+                PlanStep(id=1, description="Analyze domain context and formulate engineering assessment"),
+                PlanStep(id=2, description="Execute necessary diagnostic inspection if required"),
+                PlanStep(id=3, description="Synthesize final engineering response")
+            ]
 
     return AgentPlan(goal=goal, current_step_index=0, max_steps=10, steps=steps)
 
@@ -110,7 +122,8 @@ def format_plan_for_prompt(plan: AgentPlan) -> str:
             "waiting_for_approval": "[!] WAITING FOR SUPERVISOR APPROVAL",
             "completed": "[X] COMPLETED",
             "failed": "[-] FAILED",
-            "blocked": "[#] BLOCKED"
+            "blocked": "[#] BLOCKED",
+            "skipped": "[~] SKIPPED"
         }.get(step.status, step.status)
 
         line = f"  {step.id}. {status_badge}: {step.description}"

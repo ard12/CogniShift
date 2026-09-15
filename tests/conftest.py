@@ -19,6 +19,7 @@ os.environ["DATABASE_PATH"] = str(TEST_RUNTIME_ROOT / "cognishift.db")
 os.environ["CHROMA_PATH"] = str(TEST_RUNTIME_ROOT / "chroma")
 os.environ["UPLOAD_DIR"] = str(TEST_RUNTIME_ROOT / "uploads")
 os.environ["AUTH_STORE_PATH"] = str(TEST_RUNTIME_ROOT / "private" / "auth_store.json")
+os.environ["TRUSTED_DEVICE_REQUIRED"] = "false"
 
 from cognishift.app.config import settings
 from cognishift.app.core.auth import (
@@ -38,6 +39,12 @@ TEST_REVOKED_TOKEN = "test-token-revoked-000"
 def pytest_sessionfinish(session, exitstatus):
     """Remove the isolated test persistence tree after the test session."""
     shutil.rmtree(TEST_RUNTIME_ROOT, ignore_errors=True)
+
+@pytest.fixture(autouse=True)
+async def auto_init_db():
+    """Ensure database schema is created in isolated test environment."""
+    from cognishift.app.db.database import init_db
+    await init_db()
 
 @pytest.fixture(autouse=True)
 def setup_test_auth_credentials(tmp_path, monkeypatch):

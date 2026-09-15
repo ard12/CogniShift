@@ -54,7 +54,10 @@ async def execute_tool(
     scenario_override = parameters.get("scenario")
 
     if tool_name == "check_pressure":
-        sensor_id = parameters.get("sensor_id", "PT-101").upper()
+        raw_sensor = parameters.get("sensor_id")
+        if not raw_sensor:
+            raise ValueError("Parameter 'sensor_id' is required for tool 'check_pressure'.")
+        sensor_id = str(raw_sensor).upper()
         tep_data = _load_json(TELEMETRY_PATH)
         
         # Check if a specific TEP scenario is requested or surge triggered
@@ -85,7 +88,10 @@ async def execute_tool(
         return f"Sensor {sensor_id} reports pressure is 105.2 PSI (Normal Operating Range: 80.0 - 120.0 PSI). Status: NOMINAL."
 
     elif tool_name == "check_temperature":
-        sensor_id = parameters.get("sensor_id", "TT-204").upper()
+        raw_sensor = parameters.get("sensor_id")
+        if not raw_sensor:
+            raise ValueError("Parameter 'sensor_id' is required for tool 'check_temperature'.")
+        sensor_id = str(raw_sensor).upper()
         tep_data = _load_json(TELEMETRY_PATH)
         
         if tep_data and "scenarios" in tep_data:
@@ -112,14 +118,48 @@ async def execute_tool(
         return f"Thermocouple {sensor_id} reports bearing temperature is 68.4 C (Normal Operating Range: 60.0 - 80.0 C). Status: NORMAL."
 
     elif tool_name == "run_diagnostic":
-        subsystem = parameters.get("subsystem", "P-101A Crude Feed Booster Pump")
+        subsystem = str(parameters.get("component_id") or parameters.get("equipment_id") or parameters.get("subsystem", "P-101A Crude Feed Booster Pump")).strip()
+        tag_upper = subsystem.upper()
+
+        if any(tag_upper.startswith(p) for p in ["K-", "COMP"]) or "COMPRESSOR" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Stage 1 suction pressure: 2.8 bar, discharge pressure: 9.4 bar (Compression Ratio: 3.35). "
+                f"Lube oil header pressure: 2.4 bar (Normal: > 1.8 bar). Axial shaft displacement: +0.03 mm (Tolerance: ±0.08 mm). "
+                f"Vibration: 1.8 mm/s RMS (ISO 10816 Zone A - Good). Surge margin: 18.5% above minimum control line. Overall asset health: NOMINAL / OPERATIONAL."
+            )
+        elif any(tag_upper.startswith(p) for p in ["SV-", "PSV-", "MOV-", "PV-", "FV-"]) or "VALVE" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Actuator stroke time: 2.8s (Specification: < 4.0s). "
+                f"Seat tightness leakage rate: 0.0 sccm (Bubble-tight, API 527 Class VI). Pilot pop pressure verified at calibrated setpoint. "
+                f"Limit switch feedback: Verified. Overall asset health: VERIFIED / STANDBY."
+            )
+        elif any(tag_upper.startswith(p) for p in ["TK-", "VESSEL", "DRUM", "REACTOR"]) or (tag_upper.startswith("V-") and not tag_upper.startswith("VALVE")):
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Ultrasonic shell wall thickness: 18.4 mm (Nominal: 18.5 mm, Corrosion Allowance Remaining: 3.8 mm). "
+                f"Cathodic protection potential: -920 mV vs CSE (NACE SP0169 Compliant). Relief nozzle visual inspection: Clear of deposits. "
+                f"Hydrostatic test certification valid through 2027. Overall asset health: SOUND / IN SERVICE."
+            )
+        elif any(tag_upper.startswith(p) for p in ["MOTOR-", "M-"]) or "MOTOR" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: Stator winding temperature: 68.2 °C (Class F insulation, limit 105 °C). "
+                f"Insulation resistance (Megger 1000V): 185 MΩ (IEEE 43 threshold: > 5 MΩ). 3-Phase current balance: U=42.1A, V=41.8A, W=42.4A (Unbalance: 0.7%). "
+                f"Bearing DE/NDE vibration: 1.2 mm/s RMS. Overall asset health: NOMINAL / OPERATIONAL."
+            )
+        elif any(tag_upper.startswith(p) for p in ["PT-", "TT-", "FT-", "LT-"]) or "TRANSMITTER" in tag_upper:
+            return (
+                f"Telemetry diagnostic completed for {subsystem}: 4-20mA current loop output: 12.84 mA (Zero error: +0.05%, Span error: -0.08%). "
+                f"Hart diagnostics: Healthy, no loop noise or damping faults. Process connection impulse line: Cleared of obstruction. "
+                f"Calibration validity: Current (Calibrated per ISA-RP55.1). Overall asset health: CALIBRATED / ONLINE."
+            )
+
+        # Default pump / rotary equipment diagnostic
         maint_data = _load_json(MAINTENANCE_PATH)
         past_order = ""
         if maint_data and "orders" in maint_data:
-            match = next((o for o in maint_data["orders"] if "101" in o.get("equipment_tag", "")), None)
+            match = next((o for o in maint_data["orders"] if any(t in o.get("equipment_tag", "") for t in [subsystem, "101"])), None)
             if match:
                 past_order = f" Past SAP PM Order {match['order_number']}: {match['damage_code']} resolved via {match['corrective_actions_taken'][0]}."
-        
+
         return (
             f"Telemetry diagnostic completed for {subsystem}: Dual cartridge mechanical seal (API 682 Plan 53A) "
             f"barrier pressure differential is +20 PSI. Vibration FFT spectrum shows 2.4 mm/s RMS (ISO 10816 Zone B - Acceptable)."
@@ -138,8 +178,16 @@ async def execute_tool(
     elif tool_name == "restart_component":
         component_id = parameters.get("component_id", "P-101A")
         return (
-            f"[SUPERVISED RESTART EXECUTED] Motor breaker for {component_id} re-engaged under permit OISD-STD-240. "
+            f"[SUPERVISED RESTART EXECUTED - SIMULATED PROTOTYPE] Motor breaker for {component_id} re-engaged under permit OISD-STD-240. "
             f"Inrush current nominal at 48.2A, pump reached rated speed 2950 RPM. Discharge pressure established at 104.5 PSI."
+        )
+
+    elif tool_name == "operate_pump":
+        component_id = parameters.get("equipment_id") or parameters.get("component_id") or parameters.get("resource", "P-101A")
+        return (
+            f"[SIMULATED INDUSTRIAL ACTION - SIH FINALS PROTOTYPE] Motor starter energized for centrifugal pump {component_id}. "
+            f"Discharge pressure established at 104.5 PSI (Normal Range: 95.0 - 110.0 PSI). Suction valve interlock: OPEN. "
+            f"Vibration telemetry: 1.6 mm/s RMS (Nominal). Operational permit verified and logged to audit trail."
         )
 
     elif tool_name == "check_maintenance_order":
@@ -158,7 +206,7 @@ async def execute_tool(
         return f"SAP PM Order #{order_no} not found in current plant maintenance ledger."
 
     elif tool_name == "check_network":
-        segment = parameters.get("segment", "SCADA-VLAN-10")
+        segment = parameters.get("target_host") or parameters.get("segment", "SCADA-VLAN-10")
         return f"Industrial Ethernet segment {segment} is ONLINE. Gateway: 10.14.0.1, Round-trip latency: 1.8ms, Packet drop: 0%."
 
     elif tool_name == "restart_service":
@@ -275,74 +323,265 @@ async def execute_tool(
             return f"Error creating directory '{directory_path}': {str(e)}"
 
     elif tool_name == "generate_docx":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_docx_document
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
+        from cognishift.core.artifact_generators import resolve_image_for_embedding
         filename = parameters.get("filename", "report.docx")
         title = parameters.get("title", "Plant Engineering Report")
         sections = parameters.get("sections", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        embedded_artifact_ids = []
+        for sec in sections:
+            resolved_images = []
+            for img_item in sec.get("images", []):
+                img_p, img_cap, art_id = await resolve_image_for_embedding(ws_id, img_item)
+                if img_p:
+                    resolved_images.append({"path": str(img_p), "caption": img_cap})
+                    if art_id:
+                        embedded_artifact_ids.append(art_id)
+            if resolved_images:
+                sec["images"] = resolved_images
+
+        custom_spec = type('CustomDocxSpec', (), {
+            'title': title,
+            'document_id': Path(filename).stem,
+            'sections': sections,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="docx",
-                generator_fn=lambda p: generate_docx_document(p, title, sections),
-                title=title,
-                description="Generated DOCX Engineering Report",
-                run_id=run_id
+                run_id=run_id,
+                explicit_format="docx",
+                custom_spec=custom_spec,
+                candidate_visual_metadata=parameters.get("candidate_visual_metadata")
             )
-            return (
-                f"Successfully generated and registered DOCX artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered DOCX artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected DOCX artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating DOCX artifact: {str(e)}"
 
     elif tool_name == "generate_xlsx":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_xlsx_workbook
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
         filename = parameters.get("filename", "telemetry.xlsx")
         title = parameters.get("title", "Plant Telemetry Workbook")
         sheets = parameters.get("sheets", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        custom_spec = type('CustomXlsxSpec', (), {
+            'title': title,
+            'report_id': Path(filename).stem,
+            'sheets': sheets,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
         try:
-            artifact = await create_and_register_artifact(
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="xlsx",
-                generator_fn=lambda p: generate_xlsx_workbook(p, title, sheets),
-                title=title,
-                description="Generated XLSX Telemetry Workbook",
-                run_id=run_id
+                run_id=run_id,
+                explicit_format="xlsx",
+                custom_spec=custom_spec
             )
-            return (
-                f"Successfully generated and registered XLSX artifact #{artifact['id']}: '{artifact['relative_path']}' "
-                f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
-            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered XLSX artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected XLSX artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
         except Exception as e:
             return f"Error generating XLSX artifact: {str(e)}"
 
+    elif tool_name == "generate_csv":
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
+        filename = parameters.get("filename", "data.csv")
+        title = parameters.get("title", "Operational Data Export")
+        headers = parameters.get("headers", [])
+        rows = parameters.get("rows", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        custom_spec = type('CustomCsvSpec', (), {
+            'title': title,
+            'report_id': Path(filename).stem,
+            'headers': headers,
+            'rows': rows,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
+        try:
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
+                workspace_id=ws_id,
+                run_id=run_id,
+                explicit_format="csv",
+                custom_spec=custom_spec
+            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered CSV artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected CSV artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
+        except Exception as e:
+            return f"Error generating CSV artifact: {str(e)}"
+
     elif tool_name == "generate_pptx":
-        from cognishift.core.artifact_generators import create_and_register_artifact, generate_pptx_presentation
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
         filename = parameters.get("filename", "briefing.pptx")
         title = parameters.get("title", "Plant Operations Briefing")
         subtitle = parameters.get("subtitle")
         slides = parameters.get("slides", [])
         ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        custom_spec = type('CustomPptxSpec', (), {
+            'title': title,
+            'report_id': Path(filename).stem,
+            'subtitle': subtitle,
+            'slides': slides,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
+        try:
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
+                workspace_id=ws_id,
+                run_id=run_id,
+                explicit_format="pptx",
+                custom_spec=custom_spec,
+                candidate_visual_metadata=parameters.get("candidate_visual_metadata")
+            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered PPTX artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected PPTX artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
+        except Exception as e:
+            return f"Error generating PPTX artifact: {str(e)}"
+
+    elif tool_name == "generate_pdf":
+        from cognishift.core.artifact_quality.service import ArtifactGenerationService
+        from cognishift.core.artifact_generators import resolve_image_for_embedding
+        filename = parameters.get("filename", "report.pdf")
+        title = parameters.get("title", "Plant Engineering Report")
+        sections = parameters.get("sections", [])
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        embedded_artifact_ids = []
+        for sec in sections:
+            resolved_images = []
+            for img_item in sec.get("images", []):
+                img_p, img_cap, art_id = await resolve_image_for_embedding(ws_id, img_item)
+                if img_p:
+                    resolved_images.append({"path": str(img_p), "caption": img_cap})
+                    if art_id:
+                        embedded_artifact_ids.append(art_id)
+            if resolved_images:
+                sec["images"] = resolved_images
+
+        custom_spec = type('CustomPdfSpec', (), {
+            'title': title,
+            'document_id': Path(filename).stem,
+            'sections': sections,
+            'sovereignty_statement': 'Local sovereign execution with no public-cloud AI/model dependency in the demonstrated workflow.'
+        })()
+
+        try:
+            final_path, report = await ArtifactGenerationService.generate_artifact(
+                request_text=parameters.get("request_text") or title,
+                context=parameters.get("context"),
+                workspace_id=ws_id,
+                run_id=run_id,
+                explicit_format="pdf",
+                custom_spec=custom_spec,
+                candidate_visual_metadata=parameters.get("candidate_visual_metadata")
+            )
+            if (report.enterprise_ready or report.demo_ready) and final_path:
+                return (
+                    f"Successfully generated and registered PDF artifact: '{final_path.name}' "
+                    f"(SHA-256: {report.artifact_sha256[:16]}..., Lifecycle: {report.lifecycle_state.value})."
+                )
+            else:
+                return f"Quality Gate Rejected PDF artifact ({report.lifecycle_state.value}): {report.get_failure_summary()}"
+        except Exception as e:
+            return f"Error generating PDF artifact: {str(e)}"
+
+    elif tool_name == "render_document_page":
+        from cognishift.core.artifact_generators import create_and_register_artifact, render_document_page_to_image
+        from cognishift.core.security import resolve_workspace_path, get_workspace_root
+        from cognishift.app.db.database import get_db
+        src_ref = str(parameters.get("source_path_or_id") or parameters.get("source_id") or "")
+        page_num = int(parameters.get("page_number", 1))
+        out_fname = parameters.get("output_filename", f"page_{page_num}.png")
+        img_fmt = parameters.get("format", "png").lower()
+        ws_id = workspace_id or parameters.get("workspace_id", 1)
+
+        doc_path = None
+        ws_root = get_workspace_root(ws_id)
+        if src_ref.isdigit():
+            async with get_db() as db:
+                c = await db.execute("SELECT local_path FROM knowledge_sources WHERE id = ? AND workspace_id = ?", (int(src_ref), ws_id))
+                row = await c.fetchone()
+                if row and row["local_path"]:
+                    p = Path(row["local_path"])
+                    doc_path = p if p.is_absolute() else (ws_root / p)
+        if not doc_path:
+            # First check if src_ref matches an original_filename in knowledge_sources
+            async with get_db() as db:
+                c = await db.execute(
+                    "SELECT local_path FROM knowledge_sources WHERE workspace_id = ? AND original_filename = ? ORDER BY id DESC LIMIT 1",
+                    (ws_id, src_ref)
+                )
+                row = await c.fetchone()
+                if row and row["local_path"]:
+                    p = Path(row["local_path"])
+                    cand = p if p.is_absolute() else (ws_root / p)
+                    if cand.resolve().is_relative_to(ws_root) and cand.exists():
+                        doc_path = cand
+
+        if not doc_path:
+            # Resolve securely within workspace boundary
+            try:
+                doc_path = resolve_workspace_path(ws_id, src_ref, purpose="read")
+            except Exception:
+                try:
+                    doc_path = resolve_workspace_path(ws_id, f"documents/{src_ref}", purpose="read")
+                except Exception:
+                    doc_path = None
+
+        if not doc_path or not doc_path.exists():
+            return f"Error: Source document '{src_ref}' not found in workspace {ws_id}."
+
         try:
             artifact = await create_and_register_artifact(
                 workspace_id=ws_id,
-                filename=filename,
-                artifact_type="pptx",
-                generator_fn=lambda p: generate_pptx_presentation(p, title, subtitle, slides),
-                title=title,
-                description="Generated PPTX Executive Presentation",
+                filename=out_fname,
+                artifact_type=img_fmt,
+                generator_fn=lambda p: render_document_page_to_image(doc_path, p, page_num, img_fmt),
+                title=f"Rendered Page {page_num} of {doc_path.name}",
+                description=f"Rasterized page {page_num} from {doc_path.name} to {img_fmt.upper()}",
                 run_id=run_id
             )
             return (
-                f"Successfully generated and registered PPTX artifact #{artifact['id']}: '{artifact['relative_path']}' "
+                f"Successfully rendered and registered image artifact #{artifact['id']}: '{artifact['relative_path']}' "
                 f"(SHA-256: {artifact['sha256_hash'][:16]}..., Size: {artifact['file_size']} bytes)."
             )
         except Exception as e:
-            return f"Error generating PPTX artifact: {str(e)}"
+            return f"Error rendering document page: {str(e)}"
 
     elif tool_name == "execute_code":
         from cognishift.core.sandbox.schemas import CodeExecutionRequest, SandboxInputFile, SandboxStatus
@@ -354,6 +593,8 @@ async def execute_tool(
         entrypoint = parameters.get("entrypoint", "main.py")
         timeout_seconds = parameters.get("timeout_seconds", 30)
         promote = parameters.get("promote_outputs_to_artifacts", False)
+        input_requirement = parameters.get("input_requirement", "none")
+        required_input_source_ids = parameters.get("required_input_source_ids", [])
         
         input_refs = []
         for inp in parameters.get("input_files", []):
@@ -369,6 +610,8 @@ async def execute_tool(
             code=code,
             entrypoint=entrypoint,
             input_files=input_refs,
+            input_requirement=input_requirement,
+            required_input_source_ids=required_input_source_ids,
             timeout_seconds=timeout_seconds,
             promote_outputs=promote
         )

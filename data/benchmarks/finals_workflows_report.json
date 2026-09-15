@@ -1,0 +1,117 @@
+{
+  "verdict": "PASS (ALL CRITICAL PATH SLAS VERIFIED)",
+  "all_passed": true,
+  "results": {
+    "1. Device Verification": {
+      "stats": {
+        "min": 12.7,
+        "p50": 16.12,
+        "p95": 31.6,
+        "max": 45.41
+      },
+      "errors": 0,
+      "sla": 250.0
+    },
+    "2. Authorization Creation": {
+      "stats": {
+        "min": 15.51,
+        "p50": 28.18,
+        "p95": 54.58,
+        "max": 63.75
+      },
+      "errors": 0,
+      "sla": 250.0
+    },
+    "3. Supervisor Approval #1": {
+      "stats": {
+        "min": 11.47,
+        "p50": 27.44,
+        "p95": 66.5,
+        "max": 72.13
+      },
+      "errors": 0,
+      "sla": 250.0
+    },
+    "4. Supervisor Approval #2": {
+      "stats": {
+        "min": 9.88,
+        "p50": 36.84,
+        "p95": 190.95,
+        "max": 547.12
+      },
+      "errors": 0,
+      "sla": 1000.0
+    },
+    "5. Atomic Permit Execution": {
+      "stats": {
+        "min": 14.16,
+        "p50": 45.94,
+        "p95": 155.59,
+        "max": 210.22
+      },
+      "errors": 0,
+      "sla": 250.0
+    },
+    "6. Consumed Rejection Check": {
+      "stats": {
+        "min": 4.69,
+        "p50": 17.54,
+        "p95": 137.19,
+        "max": 158.69
+      },
+      "errors": 0,
+      "sla": 250.0
+    },
+    "7. Mailbox List Retrieval": {
+      "stats": {
+        "min": 6.44,
+        "p50": 8.06,
+        "p95": 10.56,
+        "max": 26.68
+      },
+      "errors": 0,
+      "sla": 150.0
+    },
+    "8. Mailbox Detail Retrieval": {
+      "stats": {
+        "min": 7.0,
+        "p50": 10.1,
+        "p95": 27.09,
+        "max": 53.22
+      },
+      "errors": 0,
+      "sla": 150.0
+    },
+    "9. Notification Composition": {
+      "stats": {
+        "min": 0.03,
+        "p50": 0.04,
+        "p95": 0.08,
+        "max": 0.09
+      },
+      "errors": 0,
+      "sla": 250.0
+    },
+    "10. SMTP Loopback Delivery": {
+      "stats": {
+        "min": 7.47,
+        "p50": 14.73,
+        "p95": 32.21,
+        "max": 34.59
+      },
+      "errors": 0,
+      "sla": 200.0
+    },
+    "11. 5-Client Concurrent Load": {
+      "stats": {
+        "min": 314.76,
+        "p50": 424.14,
+        "p95": 647.64,
+        "max": 705.87
+      },
+      "errors": 0,
+      "sla": 1000.0
+    }
+  },
+  "timestamp": "2026-09-08T18:20:09.271603+00:00Z"
+}

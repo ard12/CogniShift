@@ -52,6 +52,7 @@ def test_model_response_dataclass():
 
 @pytest.mark.asyncio
 async def test_simulated_provider_with_history():
+    from cognishift.core.simulated_provider import SimulatedProvider
     provider = SimulatedProvider()
     response = await provider.generate_text(
         "test prompt with history",
@@ -108,3 +109,4 @@ async def test_ollama_provider_history_formatting():
         assert any(m["role"] == "user" and m["content"] == "My name is John." for m in messages_sent)
         assert any(m["role"] == "assistant" and m["content"] == "Nice to meet you, John." for m in messages_sent)
         assert any(m["role"] == "user" and m["content"] == "What is my name?" for m in messages_sent)
+

@@ -1,0 +1,31 @@
+{
+  "verified_at": "2026-09-12T14:05:33.801975+00:00",
+  "environment": "Local Sovereign Docker Desktop (Windows Host)",
+  "container_image": "cognishift/sandbox-python:3.12-v1",
+  "container_image_digest": "sha256:2fd2a36859ee06c86bb687b54ebe7c50a3eb5754ac0d5a5de0aa001ac5bb4841",
+  "two_program_differential_test": {
+    "program_a": {
+      "nonce": "COGNISHIFT_NONCE_A_1789221931_5850ba42",
+      "code_sha256": "caaf68d93d3c5cacb23e2f76b4d9fd56665477b96d48378f6655e4041ead96ec",
+      "staged_code_sha256": "caaf68d93d3c5cacb23e2f76b4d9fd56665477b96d48378f6655e4041ead96ec",
+      "exit_code": 0,
+      "simulated": false,
+      "stdout": "COGNISHIFT_NONCE_A_1789221931_5850ba42"
+    },
+    "program_b": {
+      "nonce": "COGNISHIFT_NONCE_B_1789221931_6b80a7b9",
+      "code_sha256": "8b138f213f262f72a66ffc62553c8ec3290b430dfb3c87f60bc5c7a4d2275592",
+      "exit_code": 0,
+      "simulated": false,
+      "stdout": "COGNISHIFT_NONCE_B_1789221931_6b80a7b9"
+    }
+  },
+  "deliberate_syntax_failure_test": {
+    "status": "runtime_error",
+    "exit_code": 1,
+    "simulated": false,
+    "stderr_preview": "  File \"/workspace/source/main.py\", line 2\n    print(\n         ^\nSyntaxError: '(' was never closed\n",
+    "artifacts_produced": 0
+  },
+  "verdict": "REAL_DOCKER_DIFFERENTIAL_EXECUTION_VERIFIED"
+}

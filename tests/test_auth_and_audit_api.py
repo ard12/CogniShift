@@ -130,6 +130,10 @@ async def test_real_sqlite_row_supports_two_stage_approval():
             "INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Approval Regression', 'isolated test')"
         )
         await db.execute(
+            """INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name, description, system_instructions)
+               VALUES (1, 1, 'Test Agent', 'Operator', 'Test Prompt')"""
+        )
+        await db.execute(
             """INSERT OR IGNORE INTO tool_definitions
                (id, name, description, risk_level, requires_approval, implementation_key)
                VALUES (7001, 'approval_regression_tool', 'test tool', 'service_interrupting', 1, 'test')"""

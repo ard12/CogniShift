@@ -1,0 +1,288 @@
+{
+  "benchmark_version": "1.0.0",
+  "created_at": "2026-09-07T21:30:00Z",
+  "environment": {
+    "operating_mode": "sovereign_on_premise",
+    "zero_cloud_egress": true,
+    "ollama_base_url": "http://localhost:11434"
+  },
+  "fixtures": [
+    {
+      "fixture_id": "gauge_pressure_critical_485psi",
+      "path": "data/vision_test/gauge_pressure_critical_485psi.png",
+      "sha256": "69bff1fa4ef002ed2987e1f5a4f4b23ef734a66a1bc8019c0c6d791bbc7a50a5",
+      "type": "image/png",
+      "expected_reading_psi": 485.0,
+      "tolerance_psi": 5.0,
+      "tag": "PT-101"
+    },
+    {
+      "fixture_id": "handwritten_note_negative_case",
+      "path": "data/demo/handwritten_note.png",
+      "sha256": "4f9be0ccfd5d486c2c1699c76f4f45822d79c094e212a6da2638845e5e3f5bb4",
+      "type": "image/png",
+      "is_gauge": false,
+      "expected_behavior": "abstain_or_reject_non_gauge"
+    },
+    {
+      "fixture_id": "gauge_photo_normal",
+      "path": "data/demo/gauge_photo.png",
+      "sha256": "ec798bc9ce6114ffea45d28629e41bb0011a5af7232b0592561f23ca05ad134b",
+      "type": "image/png",
+      "is_gauge": true
+    }
+  ],
+  "test_suites": {
+    "vision": {
+      "target_model": "moondream:latest",
+      "trials": {
+        "positive": {
+          "fixture": "gauge_pressure_critical_485psi",
+          "prompt": "What number is the needle pointing to on this pressure gauge dial? Describe the gauge reading in PSI.",
+          "expected_min": 480.0,
+          "expected_max": 490.0
+        },
+        "negative": {
+          "fixture": "handwritten_note_negative_case",
+          "prompt": "Is this an analog gauge? Describe what is shown in this image.",
+          "expected_contains_any": [
+            "not a gauge",
+            "no gauge",
+            "unable to read",
+            "cannot read",
+            "handwritten",
+            "no dial",
+            "unreadable",
+            "not visible",
+            "not an analog gauge"
+          ]
+        }
+      }
+    },
+    "coding": {
+      "target_model": "qwen2.5-coder:7b",
+      "function_name": "detect_excursions",
+      "prompt": "Write a clean Python function detect_excursions(readings: list[float], limit: float) -> list[int] that returns the 0-indexed positions where readings exceed limit. Only output valid Python code without markdown or explanation.",
+      "verification": {
+        "test_input": {
+          "readings": [
+            10.2,
+            15.5,
+            9.8,
+            20.1,
+            14.3
+          ],
+          "limit": 15.0
+        },
+        "expected_output": [
+          1,
+          3
+        ]
+      }
+    },
+    "reasoning": {
+      "target_model": "deepseek-r1:7b",
+      "prompt": "During crude distillation unit startup, reflux accumulator V-102 pressure rose to 5.2 barg while condenser overhead temperature dropped 15\u00b0C. Cooling water valve FCV-201 indicates 85% open. Analyze whether this indicates non-condensable gas accumulation, tray flooding, or sensor failure. Provide a concise 3-point diagnostic rationale.",
+      "evaluation_criteria": {
+        "min_points": 3,
+        "required_concepts": [
+          "non-condensable",
+          "pressure",
+          "temperature"
+        ]
+      }
+    },
+    "structured_tool": {
+      "target_model": "qwen2.5:7b",
+      "prompt": "You are an industrial plant operator. Propose a tool call to check the pressure of pump P-101A. Output strictly JSON without explanation: {\"action\": \"tool_call\", \"tool_name\": \"check_pressure\", \"parameters\": {\"component_id\": \"P-101A\"}}",
+      "scenarios": [
+        {
+          "id": 1,
+          "action": "check_pressure",
+          "params": {
+            "component_id": "P-101A"
+          }
+        },
+        {
+          "id": 2,
+          "action": "check_temperature",
+          "params": {
+            "component_id": "T-201"
+          }
+        },
+        {
+          "id": 3,
+          "action": "get_valve_status",
+          "params": {
+            "valve_tag": "SV-402"
+          }
+        },
+        {
+          "id": 4,
+          "action": "query_sop",
+          "params": {
+            "topic": "crude_tower_startup"
+          }
+        },
+        {
+          "id": 5,
+          "action": "check_vibration",
+          "params": {
+            "component_id": "P-101B"
+          }
+        },
+        {
+          "id": 6,
+          "action": "isolate_line",
+          "params": {
+            "line_id": "L-401"
+          }
+        },
+        {
+          "id": 7,
+          "action": "check_flow_rate",
+          "params": {
+            "meter_id": "FT-101"
+          }
+        },
+        {
+          "id": 8,
+          "action": "get_alarm_summary",
+          "params": {
+            "severity": "CRITICAL"
+          }
+        },
+        {
+          "id": 9,
+          "action": "inspect_gauge",
+          "params": {
+            "gauge_id": "PG-101"
+          }
+        },
+        {
+          "id": 10,
+          "action": "set_setpoint",
+          "params": {
+            "controller": "TIC-102",
+            "value": 210.5
+          }
+        },
+        {
+          "id": 11,
+          "action": "check_liquid_level",
+          "params": {
+            "vessel_id": "V-102"
+          }
+        },
+        {
+          "id": 12,
+          "action": "trip_pump",
+          "params": {
+            "component_id": "P-202A"
+          }
+        },
+        {
+          "id": 13,
+          "action": "reset_alarm",
+          "params": {
+            "alarm_id": "ALM-991"
+          }
+        },
+        {
+          "id": 14,
+          "action": "sample_analyzers",
+          "params": {
+            "stream": "naphtha_overhead"
+          }
+        },
+        {
+          "id": 15,
+          "action": "purge_nitrogen",
+          "params": {
+            "unit": "hydrotreater"
+          }
+        },
+        {
+          "id": 16,
+          "action": "check_motor_current",
+          "params": {
+            "motor_id": "M-101"
+          }
+        },
+        {
+          "id": 17,
+          "action": "verify_interlock",
+          "params": {
+            "interlock_id": "I-04"
+          }
+        },
+        {
+          "id": 18,
+          "action": "calculate_heat_duty",
+          "params": {
+            "exchanger_id": "E-101"
+          }
+        },
+        {
+          "id": 19,
+          "action": "check_differential_pressure",
+          "params": {
+            "filter_id": "F-301"
+          }
+        },
+        {
+          "id": 20,
+          "action": "request_tool_approval",
+          "params": {
+            "tool": "open_bypass",
+            "valve": "HV-102"
+          }
+        },
+        {
+          "id": 21,
+          "action": "check_corrosion_coupon",
+          "params": {
+            "location": "tray_14"
+          }
+        },
+        {
+          "id": 22,
+          "action": "monitor_flare_stack",
+          "params": {
+            "flare_id": "FL-01"
+          }
+        },
+        {
+          "id": 23,
+          "action": "calibrate_transmitter",
+          "params": {
+            "tag": "PT-501"
+          }
+        },
+        {
+          "id": 24,
+          "action": "check_steam_trap",
+          "params": {
+            "trap_id": "ST-12"
+          }
+        },
+        {
+          "id": 25,
+          "action": "execute_sandbox_analysis",
+          "params": {
+            "script_name": "yoy_calc.py"
+          }
+        }
+      ]
+    },
+    "edge_dialogue": {
+      "target_model": "llama3.2:3b",
+      "prompt": "State your operational status, current workspace role, and readiness to assist the refinery operator in 2 sentences.",
+      "max_sentences": 3,
+      "required_elements": [
+        "status",
+        "readiness"
+      ]
+    }
+  }
+}

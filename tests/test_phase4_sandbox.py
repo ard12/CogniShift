@@ -62,6 +62,9 @@ async def initialize_isolated_sandbox_database():
             "INSERT OR IGNORE INTO workspaces (id, name, description) VALUES (1, 'Sandbox Test', 'Isolated pytest workspace')"
         )
         await db.execute(
+            "INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name) VALUES (1, 1, 'Default Sandbox Agent')"
+        )
+        await db.execute(
             "INSERT OR IGNORE INTO agent_runs (id, workspace_id, agent_id, status, user_id) VALUES (10, 1, 1, 'completed', 'test_operator')"
         )
         await db.commit()
@@ -242,6 +245,29 @@ async def test_output_validation_rejects_executable_scripts(tmp_path):
     assert "malware.exe" not in promoted_names
     assert "report.csv" in promoted_names
     assert len(promoted_ids) == 1
+
+
+@pytest.mark.asyncio
+async def test_output_validation_enforces_aggregate_cap(tmp_path, monkeypatch):
+    from cognishift.app.config import settings
+    out_dir = tmp_path / "output"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(settings, "sandbox_max_output_aggregate_bytes", 100)
+
+    (out_dir / "file1.txt").write_text("A" * 60, encoding="utf-8")
+    (out_dir / "file2.txt").write_text("B" * 60, encoding="utf-8")
+
+    promoted_names, promoted_ids = await validate_and_promote_outputs(
+        workspace_id=1,
+        run_id=10,
+        execution_id="sbx_agg_cap",
+        output_dir=out_dir
+    )
+
+    assert len(promoted_names) == 1
+    assert len(promoted_ids) == 1
+    assert ("file1.txt" in promoted_names) ^ ("file2.txt" in promoted_names)
 
 
 # -----------------------------------------------------------------------------

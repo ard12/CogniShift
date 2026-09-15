@@ -130,17 +130,18 @@ def authenticate_token(raw_token: str) -> Optional[User]:
     if not raw_token:
         return None
     incoming_hash = hash_token(raw_token)
+    incoming_lower_hash = hash_token(raw_token.lower())
     now = time.time()
     expired = [token_hash for token_hash, (_, expires_at) in EPHEMERAL_DEMO_SESSIONS.items() if expires_at <= now]
     for token_hash in expired:
         EPHEMERAL_DEMO_SESSIONS.pop(token_hash, None)
 
-    demo_session = EPHEMERAL_DEMO_SESSIONS.get(incoming_hash)
+    demo_session = EPHEMERAL_DEMO_SESSIONS.get(incoming_hash) or EPHEMERAL_DEMO_SESSIONS.get(incoming_lower_hash)
     if demo_session:
         return demo_session[0].model_copy(deep=True)
 
     for stored_hash, record in LOCAL_CREDENTIAL_STORE.items():
-        if secrets.compare_digest(stored_hash, incoming_hash):
+        if secrets.compare_digest(stored_hash, incoming_hash) or secrets.compare_digest(stored_hash, incoming_lower_hash):
             if not record.enabled:
                 return None
             return User(
@@ -149,6 +150,13 @@ def authenticate_token(raw_token: str) -> Optional[User]:
                 allowed_workspace_ids=record.allowed_workspace_ids
             )
     return None
+
+
+def is_ephemeral_demo_token(raw_token: str) -> bool:
+    """Return whether a credential belongs to a live loopback demo session."""
+    token_hash = hash_token(raw_token)
+    session = EPHEMERAL_DEMO_SESSIONS.get(token_hash)
+    return bool(session and session[1] > time.time())
 
 
 def create_ephemeral_demo_session(user: User, ttl_seconds: Optional[int] = None) -> tuple[str, int]:
@@ -178,15 +186,12 @@ async def get_current_user(request: Request) -> User:
     """
     auth_header = request.headers.get("Authorization", "").strip()
     api_key = request.headers.get("X-API-Key", "").strip()
-    query_token = request.query_params.get("token", "").strip()
     token = ""
 
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
     elif api_key:
         token = api_key
-    elif query_token:
-        token = query_token
 
     if not token:
         raise HTTPException(
@@ -203,6 +208,26 @@ async def get_current_user(request: Request) -> User:
             detail="Invalid or unrecognized authentication token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    request.state.identity_verified = True
+    request.state.device_trusted = False
+    request.state.device_id = None
+    if settings.trusted_device_required:
+        from cognishift.app.core.device_security import validate_device_session
+        device_id = validate_device_session(request.headers.get("X-Device-Session", "").strip(), user.user_id)
+        if not device_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "UNKNOWN_DEVICE",
+                    "title": "⚠ Unknown Device",
+                    "credentials": "Credentials Verified",
+                    "device": "Device Verification Failed",
+                    "action": "Administrator Approval Required",
+                },
+            )
+        request.state.device_trusted = True
+        request.state.device_id = device_id
 
     return user
 

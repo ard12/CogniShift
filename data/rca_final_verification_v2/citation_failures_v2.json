@@ -1,0 +1,16 @@
+{
+  "audit_timestamp": "2026-09-12T07:22:43Z",
+  "total_failures": 2,
+  "failures": [
+    {
+      "scenario_id": "RCA-02",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 4 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    },
+    {
+      "scenario_id": "RCA-02",
+      "citation": "MRPL_Unit01_SCADA_Continuous_Telemetry_48H_REV_B.xlsx | Page 4 | TEXT",
+      "reason": "Spreadsheet citation missing native sheet/row/col coordinates."
+    }
+  ]
+}

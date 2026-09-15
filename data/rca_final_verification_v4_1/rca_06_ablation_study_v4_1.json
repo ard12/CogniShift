@@ -1,0 +1,45 @@
+{
+  "study": "True Visual RCA 3-Condition Ablation Study (RCA-06)",
+  "evaluated_scenario": "RCA-06 (Hydrocracker R-301 / FV-302 P&ID Spatial Dependency)",
+  "condition_a_text_only": {
+    "executed_channels": [
+      "text"
+    ],
+    "visual_executed": false,
+    "spatial_relation_supported": false,
+    "claim_support_precision": 1.0,
+    "status": "PLAUSIBLE_HYPOTHESIS"
+  },
+  "condition_b_text_topology": {
+    "executed_channels": [
+      "text",
+      "topology"
+    ],
+    "visual_executed": false,
+    "spatial_relation_supported": false,
+    "spatial_leak_prevented": true,
+    "claim_support_precision": 1.0,
+    "status": "PLAUSIBLE_HYPOTHESIS"
+  },
+  "condition_c_full_multimodal": {
+    "executed_channels": [
+      "text",
+      "visual",
+      "topology"
+    ],
+    "visual_executed": true,
+    "visual_candidate_count": 5,
+    "visual_model": "Qdrant/colmodernvbert (ONNX Late-Interaction on CUDA)",
+    "visual_device": "cuda",
+    "visual_evidence_id": "E7",
+    "visual_inspector_executed": true,
+    "vlm_structured_observation": false,
+    "ocr_corroborated": true,
+    "primary_cause_references_visual_eid": true,
+    "spatial_relation_supported": false,
+    "claim_support_precision": 1.0,
+    "status": "PLAUSIBLE_HYPOTHESIS"
+  },
+  "ablation_verified": false,
+  "verification_verdict": "INVALID \u2014 ABLATION CONDITIONS NOT SATISFIED"
+}

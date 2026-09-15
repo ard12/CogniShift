@@ -4,23 +4,38 @@ Provides DockerPodmanBackend for real container execution and SimulatedSandboxBa
 Zero host-code execution fallback is guaranteed.
 """
 import os
+import json
 import time
 import shutil
 import asyncio
 import logging
+import hashlib
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 
 from cognishift.app.config import settings
 from cognishift.core.sandbox.schemas import (
     CodeExecutionRequest,
     CodeExecutionResult,
     SandboxStatus,
-    SandboxUnavailableError
+    SandboxUnavailableError,
+    ExecutionProvenance
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def read_bounded(stream, limit):
+    """Drain the pipe without retaining attacker-controlled unbounded output."""
+    retained = bytearray()
+    truncated = False
+    while chunk := await stream.read(8192):
+        remaining = max(0, limit - len(retained))
+        retained.extend(chunk[:remaining])
+        truncated = truncated or len(chunk) > remaining
+    return bytes(retained), truncated
 
 
 class SandboxBackend(ABC):
@@ -59,11 +74,16 @@ class DockerPodmanBackend(SandboxBackend):
             return False
         try:
             proc = await asyncio.create_subprocess_exec(
-                self.runtime_bin, "--version",
+                self.runtime_bin, "info",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            await proc.communicate()
+            try:
+                await asyncio.wait_for(proc.communicate(), timeout=5)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                return False
             return proc.returncode == 0
         except Exception:
             return False
@@ -84,7 +104,13 @@ class DockerPodmanBackend(SandboxBackend):
         else:
             image_ref = settings.sandbox_image
 
+        code_sha256 = hashlib.sha256(request.code.encode("utf-8")).hexdigest()
+        staged_script = source_dir / request.entrypoint
+        staged_code_sha256 = hashlib.sha256(staged_script.read_bytes()).hexdigest() if staged_script.exists() else ""
+        started_at_iso = datetime.now(timezone.utc).isoformat()
+
         # Construct explicit argument vector (NEVER shell=True)
+        # Use as_posix() on Windows host paths for Docker CLI volume mounting
         argv = [
             self.runtime_bin, "run",
             "--rm",
@@ -98,9 +124,9 @@ class DockerPodmanBackend(SandboxBackend):
             "--memory", f"{request.memory_mb}m",
             "--memory-swap", f"{request.memory_mb}m",
             "--pids-limit", str(settings.sandbox_pid_limit),
-            "-v", f"{str(source_dir.resolve())}:/workspace/source:ro",
-            "-v", f"{str(input_dir.resolve())}:/workspace/input:ro",
-            "-v", f"{str(output_dir.resolve())}:/workspace/output:rw",
+            "-v", f"{source_dir.resolve().as_posix()}:/workspace/source:ro",
+            "-v", f"{input_dir.resolve().as_posix()}:/workspace/input:ro",
+            "-v", f"{output_dir.resolve().as_posix()}:/workspace/output:rw",
             "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m",
             "-w", "/workspace/source",
             "--name", container_name,
@@ -116,19 +142,45 @@ class DockerPodmanBackend(SandboxBackend):
                 stderr=asyncio.subprocess.PIPE
             )
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    proc.communicate(),
+                captured = await asyncio.wait_for(
+                    asyncio.gather(
+                        read_bounded(proc.stdout, settings.sandbox_stdout_limit),
+                        read_bounded(proc.stderr, settings.sandbox_stderr_limit),
+                        proc.wait(),
+                    ),
                     timeout=request.timeout_seconds
                 )
+                (stdout_bytes, stdout_truncated), (stderr_bytes, stderr_truncated), _ = captured
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 exit_code = proc.returncode or 0
+                completed_at_iso = datetime.now(timezone.utc).isoformat()
 
                 # Truncate output streams to server limits
-                stdout_truncated = len(stdout_bytes) > settings.sandbox_stdout_limit
-                stderr_truncated = len(stderr_bytes) > settings.sandbox_stderr_limit
-
                 stdout_clean = stdout_bytes[:settings.sandbox_stdout_limit].decode("utf-8", errors="replace")
                 stderr_clean = stderr_bytes[:settings.sandbox_stderr_limit].decode("utf-8", errors="replace")
+
+                stdout_sha256 = hashlib.sha256(stdout_bytes).hexdigest()
+                stderr_sha256 = hashlib.sha256(stderr_bytes).hexdigest()
+
+                # Collect output files and their SHA-256 hashes
+                artifact_sha256s: Dict[str, str] = {}
+                output_filenames: List[str] = []
+                if output_dir.exists():
+                    try:
+                        for of in sorted(output_dir.iterdir()):
+                            try:
+                                if of.is_symlink():
+                                    continue
+                                if of.is_file():
+                                    output_filenames.append(of.name)
+                                    try:
+                                        artifact_sha256s[of.name] = hashlib.sha256(of.read_bytes()).hexdigest()
+                                    except Exception:
+                                        pass
+                            except OSError:
+                                continue
+                    except OSError:
+                        pass
 
                 # Check if execution failed due to image missing locally (--pull=never)
                 if exit_code != 0 and (
@@ -150,6 +202,27 @@ class DockerPodmanBackend(SandboxBackend):
                 else:
                     status = SandboxStatus.RUNTIME_ERROR
 
+                prov = ExecutionProvenance(
+                    execution_id=request.execution_id,
+                    backend="docker",
+                    backend_verified=True,
+                    container_runtime=self.runtime,
+                    image_name=settings.sandbox_image,
+                    image_digest=settings.sandbox_image_digest or "",
+                    code_sha256=code_sha256,
+                    staged_code_sha256=staged_code_sha256,
+                    command=argv,
+                    started_at=started_at_iso,
+                    completed_at=completed_at_iso,
+                    exit_code=exit_code,
+                    stdout_sha256=stdout_sha256,
+                    stderr_sha256=stderr_sha256,
+                    artifact_ids=[],
+                    artifact_sha256s=artifact_sha256s,
+                    simulated=False,
+                    failure_reason=stderr_clean if exit_code != 0 else None
+                )
+
                 return CodeExecutionResult(
                     execution_id=request.execution_id,
                     status=status,
@@ -159,17 +232,51 @@ class DockerPodmanBackend(SandboxBackend):
                     stdout_truncated=stdout_truncated,
                     stderr_truncated=stderr_truncated,
                     duration_ms=duration_ms,
-                    timed_out=False
+                    timed_out=False,
+                    output_files=output_filenames,
+                    provenance=prov,
+                    error_message=stderr_clean if exit_code != 0 else None
                 )
 
             except asyncio.TimeoutError:
                 duration_ms = int((time.perf_counter() - start_time) * 1000)
                 # Explicitly kill and purge container
                 try:
-                    await asyncio.create_subprocess_exec(self.runtime_bin, "kill", container_name)
-                    await asyncio.create_subprocess_exec(self.runtime_bin, "rm", "-f", container_name)
+                    cleanup = await asyncio.create_subprocess_exec(
+                        self.runtime_bin, "rm", "-f", container_name,
+                        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+                    )
+                    try:
+                        await asyncio.wait_for(cleanup.wait(), timeout=10)
+                    except asyncio.TimeoutError:
+                        cleanup.kill()
+                        await cleanup.wait()
                 except Exception as k_err:
                     logger.warning(f"Error killing timed-out container {container_name}: {k_err}")
+                if proc.returncode is None:
+                    proc.kill()
+                await proc.communicate()
+
+                prov = ExecutionProvenance(
+                    execution_id=request.execution_id,
+                    backend="docker",
+                    backend_verified=True,
+                    container_runtime=self.runtime,
+                    image_name=settings.sandbox_image,
+                    image_digest=settings.sandbox_image_digest or "",
+                    code_sha256=code_sha256,
+                    staged_code_sha256=staged_code_sha256,
+                    command=argv,
+                    started_at=started_at_iso,
+                    completed_at=datetime.now(timezone.utc).isoformat(),
+                    exit_code=-1,
+                    stdout_sha256="",
+                    stderr_sha256="",
+                    artifact_ids=[],
+                    artifact_sha256s={},
+                    simulated=False,
+                    failure_reason=f"Execution exceeded hard timeout limit of {request.timeout_seconds}s."
+                )
 
                 return CodeExecutionResult(
                     execution_id=request.execution_id,
@@ -179,6 +286,7 @@ class DockerPodmanBackend(SandboxBackend):
                     stderr=f"Execution exceeded hard timeout limit of {request.timeout_seconds}s.",
                     duration_ms=duration_ms,
                     timed_out=True,
+                    provenance=prov,
                     error_message=f"Timeout limit of {request.timeout_seconds}s exceeded."
                 )
 
@@ -186,6 +294,19 @@ class DockerPodmanBackend(SandboxBackend):
             raise
         except Exception as e:
             duration_ms = int((time.perf_counter() - start_time) * 1000)
+            prov = ExecutionProvenance(
+                execution_id=request.execution_id,
+                backend="docker",
+                backend_verified=False,
+                code_sha256=code_sha256,
+                staged_code_sha256=staged_code_sha256,
+                command=argv,
+                started_at=started_at_iso,
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                exit_code=-1,
+                simulated=False,
+                failure_reason=str(e)
+            )
             return CodeExecutionResult(
                 execution_id=request.execution_id,
                 status=SandboxStatus.INTERNAL_ERROR,
@@ -193,6 +314,7 @@ class DockerPodmanBackend(SandboxBackend):
                 stderr=str(e),
                 duration_ms=duration_ms,
                 timed_out=False,
+                provenance=prov,
                 error_message=f"Sandbox internal error: {str(e)}"
             )
 
@@ -246,25 +368,197 @@ class SimulatedSandboxBackend(SandboxBackend):
                 error_message="Process exited with return code 1."
             )
 
-        # Default Success Simulation:
+        # Validate input_requirement contract
+        input_req = getattr(request, "input_requirement", "none") or "none"
+        input_dir = staging_dir / "input"
+        staged_files = [f for f in input_dir.iterdir() if f.is_file()] if input_dir.exists() else []
+
+        if input_req in ("file", "tabular", "numeric_series") and not staged_files:
+            return CodeExecutionResult(
+                execution_id=request.execution_id,
+                status=SandboxStatus.VALIDATION_FAILED,
+                exit_code=1,
+                stderr=f"Contract validation failed: input_requirement='{input_req}' but zero input files staged.",
+                duration_ms=20,
+                timed_out=False,
+                error_message=f"Missing required '{input_req}' input file."
+            )
+
+        # Default Success Simulation (Dynamic, Data-Grounded):
         if request.promote_outputs or "GENERATE_OUTPUT" in code_str:
-            # Create a safe simulated output file in output directory
-            sim_file = output_dir / "telemetry_summary.csv"
-            sim_file.write_text("Sensor,Value,Unit\nPT-101,102.5,PSI\nTT-101,68.4,C\n", encoding="utf-8")
+            from cognishift.core.document_insights import extract_document_insights, clean_numeric_value
+
+            is_financial = any(w in code_str.lower() for w in ["financial", "revenue", "ebitda", "pat", "cagr", "grm", "profit", "balance", "p&l"])
+            wants_chart = any(w in code_str.lower() for w in ["chart", "plot", "matplotlib", "seaborn", "savefig", ".png"])
+            wants_telemetry_csv = "telemetry_summary.csv" in code_str or ("telemetry" in code_str.lower() and not is_financial)
+
+            # 1. Inspect real staged input file if available
+            doc_insights = None
+            if staged_files:
+                target_input = staged_files[0]
+                try:
+                    doc_insights = extract_document_insights(target_input, query_hint=code_str)
+                except Exception as ex:
+                    logger.warning(f"Error extracting insights in simulated sandbox: {ex}")
+
+            if input_req in ("tabular", "numeric_series"):
+                if not doc_insights or not doc_insights.get("table_rows"):
+                    return CodeExecutionResult(
+                        execution_id=request.execution_id,
+                        status=SandboxStatus.VALIDATION_FAILED,
+                        exit_code=1,
+                        stderr=f"Contract validation failed: input_requirement='{input_req}' but staged input has no tabular data rows.",
+                        duration_ms=25,
+                        timed_out=False,
+                        error_message=f"No tabular data rows found in staged input for '{input_req}' contract."
+                    )
+
+            # 2. Emit telemetry_summary.csv strictly when appropriate (never in financial runs!)
+            if wants_telemetry_csv and not is_financial:
+                sim_file = output_dir / "telemetry_summary.csv"
+                if doc_insights and doc_insights.get("table_rows"):
+                    headers = doc_insights.get("table_headers", ["Sensor", "Value", "Unit"])
+                    lines = [",".join(headers)]
+                    for r in doc_insights["table_rows"][:20]:
+                        lines.append(",".join(str(c) for c in r))
+                    sim_file.write_text("\n".join(lines), encoding="utf-8")
+                else:
+                    logger.warning("Simulated sandbox: No staged telemetry tabular data found. Failing closed without fake rows.")
+
+            # 3. Dynamic Chart Generation
+            if wants_chart:
+                chart_filename = "financial_chart.png" if (is_financial and "telemetry_chart.png" not in code_str) else "telemetry_chart.png"
+                if "financial_chart.png" in code_str:
+                    chart_filename = "financial_chart.png"
+                chart_file = output_dir / chart_filename
+
+                try:
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    import matplotlib.pyplot as plt
+                    import numpy as np
+
+                    if doc_insights and doc_insights.get("chart_data"):
+                        cdata = doc_insights["chart_data"]
+                        if cdata.get("type") == "financial_multi_panel" and is_financial:
+                            x_labels = cdata["x_labels"]
+                            series = cdata["series"]
+                            grm = cdata.get("grm")
+
+                            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
+                            x = np.arange(len(x_labels))
+                            width = 0.25
+
+                            colors = ['#1F4E79', '#2CA02C', '#FF7F0E']
+                            for s_idx, (s_name, s_vals) in enumerate(series.items()):
+                                pos = x + (s_idx - 1) * width
+                                ax1.bar(pos, [v / 1000 if max(s_vals, default=0) > 1000 else v for v in s_vals],
+                                        width, label=s_name, color=colors[s_idx % len(colors)])
+
+                            ax1.set_xticks(x)
+                            ax1.set_xticklabels(x_labels, fontweight='bold')
+                            ax1.set_ylabel('Amount (k Cr)' if any(max(v, default=0) > 1000 for v in series.values()) else 'Value', fontweight='bold')
+                            ax1.set_title(f"{doc_insights['filename']} Performance", fontweight='bold', pad=10)
+                            ax1.legend(frameon=True)
+                            ax1.grid(axis='y', linestyle=':', alpha=0.6)
+
+                            if grm and any(grm):
+                                ax2.plot(x_labels, grm, color='#9467BD', marker='o', linewidth=2.5, label='GRM ($/bbl)')
+                                ax2.set_ylabel('GRM ($/bbl)', color='#9467BD', fontweight='bold')
+                                ax2.set_title('Margin & Performance Metrics', fontweight='bold', pad=10)
+                                ax2.legend(loc='upper left')
+                                ax2.grid(True, linestyle=':', alpha=0.5)
+                            else:
+                                ax2.set_title('Summary Metrics', fontweight='bold')
+
+                            plt.tight_layout()
+                            plt.savefig(str(chart_file))
+                            plt.close()
+
+                        elif cdata.get("series"):
+                            # General numeric bar chart
+                            fig, ax = plt.subplots(figsize=(8, 4.5), dpi=120)
+                            x_labels = cdata.get("x_labels", [])
+                            series = cdata["series"]
+                            for s_name, s_vals in list(series.items())[:3]:
+                                ax.plot(x_labels[:len(s_vals)], s_vals, marker='o', label=s_name)
+                            ax.set_title(f"Data Series - {doc_insights['filename']}", fontweight='bold')
+                            ax.legend()
+                            ax.grid(True, linestyle=':', alpha=0.5)
+                            plt.tight_layout()
+                            plt.savefig(str(chart_file))
+                            plt.close()
+                except Exception as e:
+                    logger.warning(f"Error generating simulated chart: {e}")
+
+                # 4. Generate metrics.json from actual extracted metrics
+                metrics_data: Dict[str, Any] = {
+                    "analysis_status": "SUCCESS",
+                    "source_file": doc_insights["filename"] if doc_insights else "simulated_run"
+                }
+                if doc_insights and doc_insights.get("metrics"):
+                    for m_name, m_val in doc_insights["metrics"].items():
+                        metrics_data[f"{m_name}_latest"] = m_val.get("latest")
+                if doc_insights and doc_insights.get("growth"):
+                    metrics_data.update(doc_insights["growth"])
+                metrics_data["summary"] = "Quantitative document analysis completed in isolated sandbox."
+                (output_dir / "metrics.json").write_text(json.dumps(metrics_data, indent=2), encoding="utf-8")
+
+            if "telemetry_data.xlsx" in code_str or "openpyxl" in code_str:
+                excel_file = output_dir / "telemetry_data.xlsx"
+                try:
+                    import openpyxl
+                    wb = openpyxl.Workbook()
+                    ws = wb.active
+                    ws.title = "Data_Export"
+                    if doc_insights and doc_insights.get("table_headers"):
+                        ws.append(doc_insights["table_headers"])
+                        for r in doc_insights.get("table_rows", [])[:50]:
+                            ws.append(r)
+                        wb.save(excel_file)
+                    else:
+                        logger.warning("Simulated sandbox: No tabular data to export to telemetry_data.xlsx. Skipping fake export.")
+                except Exception:
+                    pass
+
+        code_sha256 = hashlib.sha256(request.code.encode("utf-8")).hexdigest()
+        prov = ExecutionProvenance(
+            execution_id=request.execution_id,
+            backend="simulated",
+            backend_verified=False,
+            container_runtime="none",
+            code_sha256=code_sha256,
+            staged_code_sha256="",
+            command=[],
+            exit_code=0,
+            simulated=True,
+            failure_reason=None
+        )
 
         return CodeExecutionResult(
             execution_id=request.execution_id,
             status=SandboxStatus.SUCCESS,
             exit_code=0,
-            stdout=f"[SIMULATED SANDBOX] Execution of '{request.entrypoint}' completed successfully with exit code 0.",
+            stdout=f"[SIMULATED SANDBOX] Execution of '{request.entrypoint}' completed with exit code 0.",
             stderr="",
             duration_ms=45,
-            timed_out=False
+            timed_out=False,
+            provenance=prov
         )
 
 
-def get_sandbox_backend() -> SandboxBackend:
-    """Factory to retrieve the appropriate sandbox backend based on configuration."""
-    if settings.operating_mode == "simulated" or settings.sandbox_runtime == "simulated":
+def get_sandbox_backend(allow_simulation: bool = False) -> SandboxBackend:
+    """
+    Factory to retrieve the appropriate sandbox backend based on configuration.
+    Mandatory Truth Constraint:
+    Simulation is strictly restricted to test fixtures passing allow_simulation=True.
+    Normal and demo execution profiles NEVER fall back to simulation.
+    """
+    if allow_simulation:
         return SimulatedSandboxBackend()
+    if not shutil.which(settings.sandbox_runtime):
+        raise SandboxUnavailableError(
+            f"Container runtime '{settings.sandbox_runtime}' is not installed or available on host. "
+            f"Host code execution fallback is strictly prohibited by security policy."
+        )
     return DockerPodmanBackend()

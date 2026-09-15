@@ -1,0 +1,9 @@
+{
+  "verified_at": "2026-09-12T14:05:33.913629+00:00",
+  "probe_run_id": 101012,
+  "final_step_tool_call_attempts": 1,
+  "final_step_tool_call_interceptions": 1,
+  "final_step_tool_call_executions": 0,
+  "interception_status": "INTERCEPTED_AND_PREVENTED",
+  "verdict": "FINAL_STEP_INTERCEPTION_COUNTERS_VERIFIED"
+}

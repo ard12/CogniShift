@@ -1,0 +1,56 @@
+{
+  "mean_normal_latency_ms": 115901.6,
+  "mean_ood_latency_ms": 474.1,
+  "mean_total_latency_ms": 99411.96,
+  "scenarios": [
+    {
+      "scenario_id": "RCA-01",
+      "total_ms": 187428.6,
+      "retrieval_ms": 4.34,
+      "reasoning_ms": 145569.87,
+      "synthesis_ms": 13.85
+    },
+    {
+      "scenario_id": "RCA-02",
+      "total_ms": 106766.43,
+      "retrieval_ms": 3.64,
+      "reasoning_ms": 105997.84,
+      "synthesis_ms": 3.93
+    },
+    {
+      "scenario_id": "RCA-03",
+      "total_ms": 72023.9,
+      "retrieval_ms": 3.42,
+      "reasoning_ms": 71500.05,
+      "synthesis_ms": 0.76
+    },
+    {
+      "scenario_id": "RCA-04",
+      "total_ms": 474.1,
+      "retrieval_ms": 0.0,
+      "reasoning_ms": 474.1,
+      "synthesis_ms": 0.0
+    },
+    {
+      "scenario_id": "RCA-05",
+      "total_ms": 75786.56,
+      "retrieval_ms": 3.29,
+      "reasoning_ms": 75297.6,
+      "synthesis_ms": 1.64
+    },
+    {
+      "scenario_id": "RCA-06",
+      "total_ms": 201622.4,
+      "retrieval_ms": 3524.83,
+      "reasoning_ms": 164543.68,
+      "synthesis_ms": 3.96
+    },
+    {
+      "scenario_id": "RCA-07",
+      "total_ms": 51781.71,
+      "retrieval_ms": 4.44,
+      "reasoning_ms": 51185.65,
+      "synthesis_ms": 0.17
+    }
+  ]
+}

@@ -137,4 +137,3 @@ def test_validate_tool_call_aliases():
     assert res2.valid is True
     assert res2.validated_parameters["chamber_id"] == "Reactor-B"
     assert "Emergency pressure relief" in res2.validated_parameters["reason"]
-

@@ -44,12 +44,14 @@ async def test_aud004_resume_completed_run_strictly_enforces_cas_invariant():
     await init_db()
     async with get_db() as db:
         await db.execute("INSERT OR IGNORE INTO workspaces (id, name) VALUES (999, 'Test WS')")
+        await db.execute("INSERT OR IGNORE INTO agent_definitions (id, workspace_id, name) VALUES (1, 999, 'Test Agent')")
         await db.execute(
             """INSERT OR REPLACE INTO agent_runs 
                (id, workspace_id, agent_id, status, user_id, result_text, model_name)
                VALUES (99901, 999, 1, 'completed', 'operator', 'Already finished result', 'llama3.2:3b')"""
         )
         await db.commit()
+
 
     with pytest.raises(HTTPException) as exc_info:
         await resume_agent_run(99901)

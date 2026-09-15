@@ -4,10 +4,12 @@ from cognishift.app.config import settings
 
 async def init_db() -> None:
     """Initialize the database by creating all required tables."""
-    async with aiosqlite.connect(settings.database_path) as db:
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(settings.database_path, timeout=30.0) as db:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA synchronous=NORMAL")
         await db.execute("PRAGMA busy_timeout=30000")
+        await db.execute("PRAGMA foreign_keys = ON")
         
         await db.execute('''
             CREATE TABLE IF NOT EXISTS workspaces (
@@ -69,8 +71,8 @@ async def init_db() -> None:
         await db.execute('''
             CREATE TABLE IF NOT EXISTS agent_runs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                workspace_id INTEGER NOT NULL, 
-                agent_id INTEGER NOT NULL, 
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id), 
+                agent_id INTEGER NOT NULL REFERENCES agent_definitions(id), 
                 user_id TEXT DEFAULT 'operator', 
                 input_text TEXT, 
                 input_type TEXT DEFAULT 'text', 
@@ -84,6 +86,7 @@ async def init_db() -> None:
                 started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
                 completed_at TIMESTAMP, 
                 error_message TEXT,
+                routing_info TEXT,
                 structured_plan TEXT
             )
         ''')
@@ -132,6 +135,107 @@ async def init_db() -> None:
         ''')
 
         await db.execute('''
+            CREATE TABLE IF NOT EXISTS trusted_devices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                display_name TEXT,
+                public_key_jwk TEXT NOT NULL,
+                key_fingerprint TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                approved_by TEXT,
+                approved_at TIMESTAMP,
+                last_verified_at TIMESTAMP,
+                last_ip TEXT,
+                previous_ip TEXT,
+                revoked_at TIMESTAMP,
+                blocked_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, device_id)
+            )
+        ''')
+
+        # Idempotent migration for trusted_devices columns
+        trusted_device_columns = {
+            row[1]: row for row in await (await db.execute("PRAGMA table_info(trusted_devices)")).fetchall()
+        }
+        if "id" not in trusted_device_columns:
+            await db.execute("ALTER TABLE trusted_devices RENAME TO trusted_devices_migration_legacy")
+            await db.execute('''
+                CREATE TABLE trusted_devices (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    device_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    display_name TEXT,
+                    public_key_jwk TEXT NOT NULL,
+                    key_fingerprint TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    approved_by TEXT,
+                    approved_at TIMESTAMP,
+                    last_verified_at TIMESTAMP,
+                    last_ip TEXT,
+                    previous_ip TEXT,
+                    revoked_at TIMESTAMP,
+                    blocked_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, device_id)
+                )
+            ''')
+            await db.execute('''
+                INSERT INTO trusted_devices (
+                    device_id, user_id, display_name, public_key_jwk, key_fingerprint,
+                    status, approved_by, approved_at, last_verified_at, created_at
+                )
+                SELECT device_id, user_id, display_name, public_key_jwk, key_fingerprint,
+                       status, approved_by, approved_at, last_verified_at, created_at
+                FROM trusted_devices_migration_legacy
+            ''')
+            await db.execute("DROP TABLE trusted_devices_migration_legacy")
+        else:
+            if "last_ip" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN last_ip TEXT")
+            if "previous_ip" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN previous_ip TEXT")
+            if "revoked_at" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN revoked_at TIMESTAMP")
+            if "blocked_at" not in trusted_device_columns:
+                await db.execute("ALTER TABLE trusted_devices ADD COLUMN blocked_at TIMESTAMP")
+
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id, status)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_trusted_devices_fingerprint ON trusted_devices(key_fingerprint)")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS device_challenges (
+                challenge_id TEXT PRIMARY KEY,
+                device_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                key_fingerprint TEXT,
+                challenge_b64 TEXT NOT NULL,
+                expires_at REAL NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        challenge_cols = {
+            row[1]: row for row in await (await db.execute("PRAGMA table_info(device_challenges)")).fetchall()
+        }
+        if "key_fingerprint" not in challenge_cols:
+            await db.execute("ALTER TABLE device_challenges ADD COLUMN key_fingerprint TEXT")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS active_device_sessions (
+                session_hash TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                key_fingerprint TEXT NOT NULL,
+                expires_at REAL NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_device_sessions_user_dev ON active_device_sessions(user_id, device_id)")
+
+        await db.execute('''
             CREATE TABLE IF NOT EXISTS graph_nodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
@@ -170,6 +274,28 @@ async def init_db() -> None:
                 metadata TEXT DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(workspace_id, relative_path)
+            )
+        ''')
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS pending_tasks (
+                id TEXT PRIMARY KEY,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                user_id TEXT NOT NULL,
+                originating_run_id INTEGER REFERENCES agent_runs(id),
+                intent TEXT NOT NULL,
+                requested_goal TEXT NOT NULL,
+                source_references TEXT DEFAULT '{}',
+                proposed_steps TEXT DEFAULT '[]',
+                confirmation_required INTEGER DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'AWAITING_CONFIRMATION',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                version INTEGER DEFAULT 1,
+                execution_started_at TEXT,
+                execution_completed_at TEXT,
+                resulting_run_id INTEGER REFERENCES agent_runs(id)
             )
         ''')
         
@@ -217,6 +343,28 @@ async def init_db() -> None:
             )
         ''')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_doc_pages_source ON document_pages(source_id, processing_version)")
+
+        # Phase 8 Hybrid Multimodal Visual Index Metadata Ledger
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS document_page_visual_index (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                source_id INTEGER NOT NULL REFERENCES knowledge_sources(id) ON DELETE CASCADE,
+                processing_version TEXT NOT NULL,
+                page_number INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                checksum TEXT NOT NULL,
+                dpi INTEGER NOT NULL DEFAULT 150,
+                width INTEGER,
+                height INTEGER,
+                vector_file_path TEXT NOT NULL,
+                token_count INTEGER NOT NULL DEFAULT 0,
+                vector_dim INTEGER NOT NULL DEFAULT 128,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(workspace_id, source_id, processing_version, page_number)
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_dpvi_ws_src_ver ON document_page_visual_index(workspace_id, source_id, processing_version)")
         
         # Phase 6 Bounded Network Audit Ledger
         await db.execute('''
@@ -233,6 +381,63 @@ async def init_db() -> None:
                 reason TEXT NOT NULL
             )
         ''')
+
+        # Sovereign Security Notifications & Mailbox
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS offline_security_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_type TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                sender TEXT NOT NULL,
+                recipients TEXT NOT NULL,
+                body_text TEXT NOT NULL,
+                body_html TEXT,
+                composition_mode TEXT NOT NULL,
+                evidence_pack_json TEXT NOT NULL,
+                related_user TEXT,
+                related_ip TEXT,
+                related_device_id TEXT,
+                related_run_id INTEGER,
+                is_read INTEGER DEFAULT 0,
+                eml_path TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_security_alerts_created ON offline_security_alerts(created_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_security_alerts_unread ON offline_security_alerts(is_read, created_at DESC)")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notification_citations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER NOT NULL REFERENCES offline_security_alerts(id) ON DELETE CASCADE,
+                citation_index INTEGER NOT NULL,
+                citation_class TEXT NOT NULL,
+                display_label TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                page_number INTEGER,
+                validated INTEGER NOT NULL DEFAULT 1,
+                metadata TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notification_citations_alert ON notification_citations(alert_id)")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notification_outbox (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dedup_key TEXT UNIQUE,
+                event_type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                retry_count INTEGER DEFAULT 0,
+                evidence_json TEXT NOT NULL,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                sent_at TIMESTAMP
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notification_outbox_status ON notification_outbox(status)")
+
         # Phase 7 Safe Migration: Dual Four-Eyes Approval columns
         for col, col_def in [
             ("reviewed_by_2", "TEXT"),
@@ -244,12 +449,120 @@ async def init_db() -> None:
             except Exception:
                 pass
 
+        for table, col, col_def in [
+            ("workspaces", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ("agent_definitions", "updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+            except Exception:
+                pass
+
+        try:
+            await db.execute("ALTER TABLE agent_runs ADD COLUMN routing_info TEXT")
+        except Exception:
+            pass
+
+        # Temporary Sovereign Authorizations Engine
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS temporary_authorizations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                permit_code TEXT UNIQUE NOT NULL,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id),
+                user_id TEXT NOT NULL,
+                trusted_device_id TEXT,
+                action TEXT NOT NULL,
+                resource TEXT NOT NULL,
+                max_uses INTEGER NOT NULL DEFAULT 1,
+                uses INTEGER NOT NULL DEFAULT 0,
+                valid_from TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+                requested_by TEXT NOT NULL,
+                first_approver TEXT,
+                first_approved_at TEXT,
+                second_approver TEXT,
+                second_approved_at TEXT,
+                admin_override INTEGER DEFAULT 0,
+                consumed_at TEXT,
+                artifact_id INTEGER REFERENCES workspace_artifacts(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_temp_auth_code ON temporary_authorizations(permit_code)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_temp_auth_user_status ON temporary_authorizations(user_id, status)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_temp_auth_status ON temporary_authorizations(status)")
+
+        # Durable Post-Approval Job Queue (Reliable restart/crash recovery)
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS post_approval_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                permit_id INTEGER NOT NULL REFERENCES temporary_authorizations(id) ON DELETE CASCADE,
+                correlation_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                artifact_path TEXT,
+                artifact_id INTEGER REFERENCES workspace_artifacts(id) ON DELETE SET NULL,
+                alert_id INTEGER REFERENCES offline_security_alerts(id),
+                error_message TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_post_approval_status ON post_approval_jobs(status, created_at)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_post_approval_permit ON post_approval_jobs(permit_id)")
+
+        # Multi-Recipient Sovereign Mail Delivery & Read State Ledger
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notification_recipient_deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER NOT NULL REFERENCES offline_security_alerts(id) ON DELETE CASCADE,
+                recipient_email TEXT NOT NULL,
+                recipient_user_id TEXT,
+                is_read INTEGER DEFAULT 0,
+                read_at TEXT,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_user_read ON notification_recipient_deliveries(recipient_user_id, is_read)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_user_created ON notification_recipient_deliveries(recipient_user_id, created_at DESC)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_notif_recip_alert ON notification_recipient_deliveries(alert_id)")
+
+        # Genuine User Mail & Internal Attachments
+        alert_cols = {
+            row[1]: row for row in await (await db.execute("PRAGMA table_info(offline_security_alerts)")).fetchall()
+        }
+        if "sender_user_id" not in alert_cols:
+            await db.execute("ALTER TABLE offline_security_alerts ADD COLUMN sender_user_id TEXT")
+        if "is_user_mail" not in alert_cols:
+            await db.execute("ALTER TABLE offline_security_alerts ADD COLUMN is_user_mail INTEGER DEFAULT 0")
+        if "delivery_status" not in alert_cols:
+            await db.execute("ALTER TABLE offline_security_alerts ADD COLUMN delivery_status TEXT DEFAULT 'DELIVERED'")
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS mail_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER REFERENCES offline_security_alerts(id) ON DELETE CASCADE,
+                uploader_user_id TEXT,
+                filename TEXT NOT NULL,
+                content_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                storage_path TEXT NOT NULL,
+                sha256_hash TEXT NOT NULL,
+                artifact_id INTEGER REFERENCES workspace_artifacts(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL
+            )
+        ''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_mail_attachments_alert ON mail_attachments(alert_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_mail_attachments_uploader ON mail_attachments(uploader_user_id)")
+
         await db.commit()
 
 @asynccontextmanager
 async def get_db():
     """Context manager that yields an aiosqlite connection with Row factory."""
-    async with aiosqlite.connect(settings.database_path) as db:
+    async with aiosqlite.connect(settings.database_path, timeout=30.0) as db:
         await db.execute("PRAGMA foreign_keys = ON;")
         await db.execute("PRAGMA busy_timeout = 30000;")
         await db.execute("PRAGMA synchronous = NORMAL;")

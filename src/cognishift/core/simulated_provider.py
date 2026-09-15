@@ -14,7 +14,11 @@ class SimulatedProvider(ModelProvider):
     ) -> ModelResponse:
         """Return a simulated text response adhering to the structured AgentAction protocol."""
         chosen_model = model_name or "simulated-text"
-        prompt_lower = prompt.lower()
+        target_text = prompt
+        if "Operator Current Input:" in prompt:
+            parts = prompt.split("Operator Current Input:", 1)
+            target_text = parts[1].split("\n\n", 1)[0]
+        prompt_lower = target_text.lower()
         
         # 1. Explanatory or refusal queries must strictly return natural prose (ZERO tool calls)
         if (
@@ -63,7 +67,7 @@ class SimulatedProvider(ModelProvider):
                 '{\n'
                 '  "action": "tool_call",\n'
                 '  "tool_name": "check_temperature",\n'
-                '  "parameters": {"sensor_id": "TT-101"},\n'
+                '  "parameters": {"sensor_id": "TT-204"},\n'
                 '  "reason": "Verify discharge temperature telemetry"\n'
                 '}\n'
                 '```'
@@ -76,7 +80,7 @@ class SimulatedProvider(ModelProvider):
                 '{\n'
                 '  "action": "tool_call",\n'
                 '  "tool_name": "restart_component",\n'
-                '  "parameters": {"component_id": "PUMP-101"},\n'
+                '  "parameters": {"component_id": "P-101A", "reason": "Restart stalled pump unit"},\n'
                 '  "reason": "Restart stalled pump unit"\n'
                 '}\n'
                 '```'

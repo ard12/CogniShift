@@ -1,11 +1,12 @@
 import ipaddress
-from typing import List
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from cognishift.app.config import settings
-from cognishift.app.core.auth import User, create_ephemeral_demo_session, get_current_user
+from cognishift.app.core.auth import User, authenticate_token, create_ephemeral_demo_session, get_current_user, refresh_credential_store_if_changed
+from cognishift.app.core.device_security import begin_challenge, verify_challenge
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -36,6 +37,30 @@ class DemoSessionResponse(BaseModel):
     expires_in_seconds: int
 
 
+class DeviceChallengeRequest(BaseModel):
+    device_id: str
+    display_name: str = "Local browser"
+    public_key_jwk: Dict[str, Any]
+
+
+class DeviceChallengeResponse(BaseModel):
+    status: str
+    challenge_id: str
+    challenge: str
+
+
+class DeviceVerifyRequest(BaseModel):
+    device_id: str
+    challenge_id: str
+    signature: str
+
+
+class DeviceVerifyResponse(BaseModel):
+    device_session: str
+    expires_in_seconds: int
+    device_status: str = "trusted"
+
+
 DEMO_PERSONAS = {
     "operator": User(user_id="operator_sam", role="operator", allowed_workspace_ids=[1]),
     "supervisor": User(user_id="supervisor_jane", role="supervisor", allowed_workspace_ids=[1, 2]),
@@ -45,14 +70,75 @@ DEMO_PERSONAS = {
 
 def _is_loopback(request: Request) -> bool:
     host = request.client.host if request.client else ""
+    if not host:
+        return False
     try:
-        return ipaddress.ip_address(host).is_loopback
+        if ipaddress.ip_address(host).is_loopback:
+            return True
     except ValueError:
-        return host.lower() == "localhost"
+        if host.lower() == "localhost":
+            return True
+    try:
+        import socket
+        local_ips = set(socket.gethostbyname_ex(socket.gethostname())[2])
+        if host in local_ips:
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def _demo_mode_enabled() -> bool:
     return settings.cognishift_demo_mode and settings.operating_mode.lower() == "local"
+
+
+def _credential_user(request: Request) -> User:
+    auth_header = request.headers.get("Authorization", "").strip()
+    token = auth_header[7:].strip() if auth_header.startswith("Bearer ") else request.headers.get("X-API-Key", "").strip()
+    refresh_credential_store_if_changed()
+    user = authenticate_token(token)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or unrecognized authentication token.")
+    return user
+
+
+@router.post("/device/challenge", response_model=DeviceChallengeResponse)
+async def create_device_challenge(payload: DeviceChallengeRequest, request: Request):
+    """Verify credentials, then challenge an approved browser-held public key."""
+    user = _credential_user(request)
+    client_ip = request.client.host if request.client else None
+    result = await begin_challenge(
+        user.user_id,
+        user.role,
+        payload.device_id,
+        payload.display_name,
+        payload.public_key_jwk,
+        is_loopback=_is_loopback(request),
+        client_ip=client_ip,
+    )
+    if result["status"] != "challenge":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "UNKNOWN_DEVICE",
+                "title": "⚠ Unknown Device",
+                "credentials": "Credentials Verified",
+                "device": "Device Verification Failed",
+                "action": "Administrator Approval Required",
+                "device_status": result.get("status", "unknown_device"),
+            },
+        )
+    return DeviceChallengeResponse(**result)
+
+
+@router.post("/device/verify", response_model=DeviceVerifyResponse)
+async def complete_device_challenge(payload: DeviceVerifyRequest, request: Request):
+    user = _credential_user(request)
+    try:
+        session = await verify_challenge(user.user_id, payload.device_id, payload.challenge_id, payload.signature)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    return DeviceVerifyResponse(device_session=session, expires_in_seconds=settings.device_session_ttl_seconds)
 
 
 @router.get("/me", response_model=UserProfileResponse)
@@ -77,11 +163,10 @@ async def list_demo_personas():
 
 @router.get("/demo-status", response_model=DemoModeResponse)
 async def get_demo_status(request: Request):
-    """Advertise demo convenience login only to a loopback browser."""
-    enabled = _demo_mode_enabled() and _is_loopback(request)
+    """Advertise demo convenience login only to a loopback browser (permanently disabled for sovereign evaluation)."""
     return DemoModeResponse(
-        enabled=enabled,
-        session_ttl_seconds=settings.demo_session_ttl_seconds if enabled else 0,
+        enabled=False,
+        session_ttl_seconds=0,
     )
 
 

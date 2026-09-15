@@ -118,12 +118,19 @@ async def retire_and_purge_old_generations(workspace_id: int, source_id: int, ac
         )
         await db.commit()
 
+    # Clean old visual vectors from VisualVectorStore
+    try:
+        from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+        await get_visual_vector_store().purge_old_generations(workspace_id, source_id, active_version)
+    except Exception as e:
+        logger.warning(f"Failed to purge old visual vectors for source {source_id}: {e}")
+
 
 async def idempotent_delete_source(workspace_id: int, source_id: int) -> bool:
     """
-    Idempotent deletion lifecycle across SQLite, ChromaDB, and disk:
+    Idempotent deletion lifecycle across SQLite, ChromaDB, VisualVectorStore, and disk:
     1. Mark source as 'deleting'.
-    2. Purge all chunks for source_id from ChromaDB.
+    2. Purge all chunks for source_id from ChromaDB and VisualVectorStore.
     3. Delete DB rows (pages, jobs, knowledge_source).
     4. Delete uploaded file from workspace uploads/.
     Safe to retry if any intermediate step crashes.
@@ -141,7 +148,7 @@ async def idempotent_delete_source(workspace_id: int, source_id: int) -> bool:
         row = await cursor.fetchone()
         local_path = row["local_path"] if row and row["local_path"] else None
 
-    # Step 2: Purge Chroma
+    # Step 2a: Purge Chroma
     collection_name = f"workspace_{workspace_id}"
     try:
         collection = chroma_client.get_collection(name=collection_name)
@@ -149,6 +156,13 @@ async def idempotent_delete_source(workspace_id: int, source_id: int) -> bool:
         await asyncio.to_thread(collection.delete, where={"source_id": sid_int})
     except Exception as e:
         logger.warning(f"Chroma delete during source purge: {e}")
+
+    # Step 2b: Purge VisualVectorStore
+    try:
+        from cognishift.core.visual_rag.vector_store import get_visual_vector_store
+        await get_visual_vector_store().purge_source(workspace_id, source_id)
+    except Exception as e:
+        logger.warning(f"VisualVectorStore purge during source delete: {e}")
 
     # Step 3: Delete DB records
     async with get_db() as db:

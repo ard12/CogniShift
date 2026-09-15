@@ -4,7 +4,9 @@ Enforces strict 1-based page boundary preservation, rich metadata formatting,
 and untrusted data tagging to prevent prompt injection from documents.
 """
 import html
-from typing import List, Dict, Any, Tuple
+import re
+from pathlib import Path
+from typing import List, Dict, Any, Tuple, Optional, Set
 from cognishift.core.document_processing.schemas import ExtractedPage, ExtractionMethod
 
 
@@ -96,12 +98,95 @@ class PageAwareChunker:
         return chunk_texts, chunk_ids, metadatas
 
 
+def _get_locator_key(meta: Dict[str, Any]) -> Tuple[Any, ...]:
+    fname = str(meta.get("filename") or meta.get("document") or "").lower()
+    doc_type = str(meta.get("document_type") or "").lower()
+    slide = meta.get("slide_number")
+    if slide is not None or meta.get("locator_kind") == "slide" or fname.endswith(".pptx") or doc_type == "pptx":
+        slide_val = slide if slide is not None else (meta.get("page") or meta.get("page_number") or 1)
+        return ("slide", int(slide_val))
+
+    sheet = meta.get("sheet_name")
+    r_start = meta.get("row_start")
+    r_end = meta.get("row_end")
+    sec = meta.get("section_heading") or meta.get("section")
+    page = meta.get("page") or meta.get("page_number")
+    if sheet or (r_start is not None and r_end is not None):
+        return ("sheet", str(sheet or "").lower(), r_start, r_end)
+    if sec and (fname.endswith(".docx") or doc_type == "docx"):
+        return ("section", str(sec).lower())
+    if sec:
+        return ("section", str(sec).lower(), int(page) if page else None)
+    return ("page", int(page) if page else 1)
+
+
 def format_grounded_citation(metadata: Dict[str, Any]) -> str:
-    """Formats human-facing citation string with document, page, and extraction method."""
-    filename = metadata.get("filename", "Document")
-    page = metadata.get("page", 1)
-    method = metadata.get("extraction_method", "native").upper()
-    return f"[{filename} | Page {page} | {method}]"
+    """Formats human-facing citation string with document, page/sheet/section/slide, and extraction method."""
+    filename = (
+        metadata.get("filename")
+        or metadata.get("document")
+        or metadata.get("document_name")
+        or metadata.get("original_filename")
+        or metadata.get("name")
+        or "Document"
+    )
+    fname_clean = Path(filename).name if ("/" in filename or "\\" in filename) else filename
+    method = str(metadata.get("extraction_method", "native")).upper()
+    doc_type = str(metadata.get("document_type", "")).lower()
+
+    # 1. PPTX presentation slide citations: [Doc.pptx | Slide N | TEXT/VISUAL/BOTH]
+    slide = metadata.get("slide_number")
+    if slide is not None or fname_clean.lower().endswith(".pptx") or doc_type == "pptx":
+        slide_idx = int(slide) if slide is not None else int(metadata.get("page") or 1)
+        ch_raw = str(metadata.get("channel") or "").upper()
+        if ch_raw in ("BOTH", "HYBRID"):
+            channel = "BOTH"
+        elif ch_raw == "VISUAL" or "VISUAL" in method:
+            channel = "VISUAL"
+        else:
+            channel = "TEXT"
+        return f"[{fname_clean} | Slide {slide_idx} | {channel}]"
+
+    sheet = metadata.get("sheet_name")
+    r_start = metadata.get("row_start")
+    r_end = metadata.get("row_end")
+    c_start = metadata.get("col_start")
+    c_end = metadata.get("col_end")
+    sec = metadata.get("section_heading") or metadata.get("section")
+    page = metadata.get("page") or metadata.get("page_number")
+
+    if fname_clean.endswith(".csv") or doc_type == "csv" or metadata.get("source_type") == "csv":
+        if r_start is not None and r_end is not None:
+            return f"[{fname_clean} | Rows {r_start}-{r_end}]"
+        return f"[{fname_clean} | Rows]"
+
+    if sheet or (r_start is not None and r_end is not None):
+        parts = []
+        if sheet:
+            parts.append(f"Sheet: {sheet}")
+        if r_start is not None and r_end is not None:
+            parts.append(f"Rows {r_start}-{r_end}")
+        if c_start and c_end:
+            parts.append(f"Cols {c_start}:{c_end}")
+        coords = " | ".join(parts) if parts else "Sheet 1"
+        return f"[{fname_clean} | {coords} | SPREADSHEET]"
+
+    # 2. DOCX section / rendered page citations
+    if fname_clean.lower().endswith(".docx") or doc_type == "docx":
+        channel = "VISUAL" if metadata.get("channel") == "visual" or "VISUAL" in method else "TEXT"
+        if channel == "VISUAL" and page:
+            return f"[{fname_clean} | Page {page} | VISUAL]"
+        if sec:
+            return f"[{fname_clean} | Section: {sec} | TEXT]"
+        return f"[{fname_clean} | Section: General | TEXT]"
+
+    if sec:
+        p_str = f"Rendered Page {page}" if page else ""
+        coords = " | ".join(filter(None, [f"Section: {sec}", p_str]))
+        return f"[{fname_clean} | {coords} | {method}]"
+
+    page_num = page or 1
+    return f"[{fname_clean} | Page {page_num} | {method}]"
 
 
 def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
@@ -111,8 +196,354 @@ def wrap_document_data_for_prompt(text: str, metadata: Dict[str, Any]) -> str:
     Escapes both metadata attributes and body text to prevent XML delimiter breakout.
     Defense-in-depth data demarcation only; deterministic authorization is enforced separately.
     """
-    src = html.escape(str(metadata.get("filename", "unknown")), quote=True)
-    page = html.escape(str(metadata.get("page", 1)), quote=True)
+    raw_fname = (
+        metadata.get("filename")
+        or metadata.get("document")
+        or metadata.get("document_name")
+        or metadata.get("original_filename")
+        or metadata.get("name")
+        or "unknown"
+    )
+    src = html.escape(str(raw_fname), quote=True)
+    page_val = metadata.get("page") or metadata.get("page_number") or 1
+    page = html.escape(str(page_val), quote=True)
     method = html.escape(str(metadata.get("extraction_method", "native")), quote=True)
     safe_text = html.escape(text, quote=False)
     return f'<document_context source="{src}" page="{page}" method="{method}">\n{safe_text}\n</document_context>'
+
+
+def extract_and_normalize_citations(text: str = "", model_citations: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """
+    Extracts citations from text and/or model_citations list and normalizes them into structured dictionaries:
+    [{"filename": str, "page": int, "locator_key": tuple, "method": Optional[str], "citation_str": str}]
+    """
+    candidates: List[str] = []
+    if model_citations:
+        for c in model_citations:
+            if isinstance(c, str) and c.strip():
+                candidates.append(c.strip())
+
+    if text:
+        # Match bracketed citations including .pptx
+        bracketed = re.findall(r"\[([^\]]*?(?:\.pdf|\.csv|\.xlsx|\.docx|\.pptx|\.png|\.jpg|\.txt)[^\]]*?)\]", text, re.IGNORECASE)
+        candidates.extend(bracketed)
+        # Also match standard [file | Page X] or [file | Slide X] even without known extension
+        bracketed_generic = re.findall(r"\[([^\]]*?\|\s*(?:Page|Slide)\s*\d+[^\]]*?)\]", text, re.IGNORECASE)
+        candidates.extend(bracketed_generic)
+
+    results: List[Dict[str, Any]] = []
+    seen: Set[Tuple[str, Any]] = set()
+
+    for item in candidates:
+        raw = item.strip().strip("[]").strip()
+        if not raw:
+            continue
+
+        parts = [p.strip() for p in re.split(r"\s*[|;,]\s*", raw) if p.strip()]
+        if not parts:
+            continue
+
+        filename = parts[0]
+        page: Optional[int] = None
+        slide: Optional[int] = None
+        sheet: Optional[str] = None
+        r_start: Optional[int] = None
+        r_end: Optional[int] = None
+        sec: Optional[str] = None
+        method: Optional[str] = None
+
+        for p in parts[1:]:
+            slide_match = re.search(r"slide\s*(\d+)", p, re.IGNORECASE)
+            if slide_match:
+                slide = int(slide_match.group(1))
+
+            page_match = re.search(r"(?:rendered\s+page|page|p\.)\s*(\d+)", p, re.IGNORECASE)
+            if page_match:
+                page = int(page_match.group(1))
+
+            sheet_match = re.search(r"sheet:\s*([^|]+)", p, re.IGNORECASE)
+            if sheet_match:
+                sheet = sheet_match.group(1).strip()
+
+            rows_match = re.search(r"rows?\s*(\d+)\s*[-:]\s*(\d+)", p, re.IGNORECASE)
+            if rows_match:
+                r_start = int(rows_match.group(1))
+                r_end = int(rows_match.group(2))
+
+            sec_match = re.search(r"section:\s*([^|]+)", p, re.IGNORECASE)
+            if sec_match:
+                sec = sec_match.group(1).strip()
+
+            if p.upper() in ("NATIVE", "OCR", "TABLE", "SPREADSHEET", "VISION", "HYBRID", "DOCUMENT", "TEXT", "VISUAL", "PRESENTATION"):
+                method = p.upper()
+
+        if page is None and slide is None and not sheet and not sec:
+            sm = re.search(r"slide\s*(\d+)", raw, re.IGNORECASE)
+            if sm:
+                slide = int(sm.group(1))
+            else:
+                pm = re.search(r"(?:page|p\.)\s*(\d+)", raw, re.IGNORECASE)
+                if pm:
+                    page = int(pm.group(1))
+                else:
+                    page = 1
+
+        clean_filename = Path(filename).name if ("/" in filename or "\\" in filename) else filename
+
+        if clean_filename.lower().endswith(".pptx") or slide is not None:
+            slide_val = slide if slide is not None else (page if page is not None else 1)
+            loc_key = ("slide", slide_val)
+            channel = "VISUAL" if method == "VISUAL" else "TEXT"
+            canonical = f"[{clean_filename} | Slide {slide_val} | {channel}]"
+        elif sheet or (r_start is not None and r_end is not None):
+            loc_key = ("sheet", (sheet or "").lower(), r_start, r_end)
+            coords = []
+            if sheet:
+                coords.append(f"Sheet: {sheet}")
+            if r_start is not None and r_end is not None:
+                coords.append(f"Rows {r_start}-{r_end}")
+            c_str = " | ".join(coords)
+            canonical = f"[{clean_filename} | {c_str} | {method or 'SPREADSHEET'}]"
+        elif clean_filename.lower().endswith(".docx"):
+            if (method or "").upper() == "VISUAL" and page is not None:
+                loc_key = ("page", page)
+                canonical = f"[{clean_filename} | Page {page} | VISUAL]"
+            elif sec:
+                loc_key = ("section", sec.lower())
+                canonical = f"[{clean_filename} | Section: {sec} | TEXT]"
+            else:
+                loc_key = ("section", "general")
+                canonical = f"[{clean_filename} | Section: General | TEXT]"
+        elif sec:
+            loc_key = ("section", sec.lower(), page)
+            p_str = f"Rendered Page {page}" if page else ""
+            coords = " | ".join(filter(None, [f"Section: {sec}", p_str]))
+            canonical = f"[{clean_filename} | {coords} | {method or 'DOCUMENT'}]"
+        else:
+            page_val = page if page is not None else 1
+            loc_key = ("page", page_val)
+            canonical = f"[{clean_filename} | Page {page_val} | {method}]" if method else f"[{clean_filename} | Page {page_val}]"
+
+        key = (clean_filename.lower(), loc_key)
+        if key not in seen:
+            seen.add(key)
+            results.append({
+                "filename": clean_filename,
+                "page": page if page is not None else 1,
+                "slide_number": slide,
+                "sheet_name": sheet,
+                "row_start": r_start,
+                "row_end": r_end,
+                "section_heading": sec,
+                "method": method,
+                "locator_key": loc_key,
+                "citation_str": canonical
+            })
+
+    return results
+
+
+def reconcile_citations_against_evidence(
+    text: str = "",
+    model_citations: Optional[List[str]] = None,
+    retrieved_evidence: Optional[List[Dict[str, Any]]] = None,
+    fallback_to_evidence_if_empty: bool = True
+) -> Tuple[List[Dict[str, Any]], str]:
+    """
+    Reconciles model citations against authoritative retrieved evidence chunks.
+    Preserves multiple pages of the same document (e.g. Page 16 and Page 32) without collapsing.
+    Eliminates page hallucinations by snapping to retrieved pages.
+    Deduplicates and canonicalizes citations.
+    Returns (verified_citations, sources_used_string).
+    """
+    if not retrieved_evidence:
+        extracted = extract_and_normalize_citations(text, model_citations)
+        if extracted:
+            sources_str = ", ".join(c["citation_str"] for c in extracted)
+            return extracted, sources_str
+        return [], "None (No matching manual found)"
+
+    exact_map: Dict[Tuple[str, Any], Dict[str, Any]] = {}
+    file_to_chunks: Dict[str, List[Dict[str, Any]]] = {}
+
+    for meta in retrieved_evidence:
+        fname = (
+            meta.get("filename")
+            or meta.get("document")
+            or meta.get("document_name")
+            or meta.get("original_filename")
+            or meta.get("name")
+            or "Document"
+        )
+        fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
+        loc_key = _get_locator_key(meta)
+        canonical = format_grounded_citation(meta)
+        page = int(meta.get("page") or meta.get("page_number") or 1)
+        method = str(meta.get("extraction_method", "native")).upper()
+
+        info = {
+            "filename": fname_clean,
+            "page": page,
+            "locator_key": loc_key,
+            "method": method,
+            "citation_str": canonical,
+            "meta": meta
+        }
+        exact_map[(fname_clean.lower(), loc_key)] = info
+        exact_map[(fname_clean.lower(), ("page", page))] = info
+        file_to_chunks.setdefault(fname_clean.lower(), []).append(info)
+
+    extracted_candidates = extract_and_normalize_citations(text, model_citations)
+    verified: List[Dict[str, Any]] = []
+    seen: Set[Tuple[str, Any]] = set()
+
+    for cand in extracted_candidates:
+        cfname = cand["filename"].lower()
+        cloc_key = cand.get("locator_key")
+        cpage = cand["page"]
+
+        # Exact match check: filename AND (locator_key OR exact page)
+        matched_info = exact_map.get((cfname, cloc_key)) or exact_map.get((cfname, ("page", cpage)))
+        if matched_info:
+            seen_key = (matched_info["filename"].lower(), matched_info["locator_key"])
+            if seen_key not in seen:
+                seen.add(seen_key)
+                verified.append(matched_info)
+            continue
+
+        # Document match with different/hallucinated page - snap to closest retrieved page
+        matched_doc_key = None
+        if cfname in file_to_chunks:
+            matched_doc_key = cfname
+        else:
+            for known_doc in file_to_chunks:
+                if cfname in known_doc or known_doc in cfname:
+                    matched_doc_key = known_doc
+                    break
+
+        if matched_doc_key:
+            chunks = file_to_chunks[matched_doc_key]
+            best_chunk = chunks[0]
+            if len(chunks) > 1:
+                best_chunk = min(chunks, key=lambda c: abs(c["page"] - cpage))
+            page_diff = abs(best_chunk["page"] - cpage)
+            if bool(model_citations) or page_diff <= 2:
+                seen_key = (best_chunk["filename"].lower(), best_chunk["locator_key"])
+                if seen_key not in seen:
+                    seen.add(seen_key)
+                    verified.append(best_chunk)
+                continue
+
+    # Fallback to retrieved evidence only if model omitted citations entirely
+    if not verified and fallback_to_evidence_if_empty and not extracted_candidates:
+        for meta in retrieved_evidence:
+            fname = (
+                meta.get("filename")
+                or meta.get("document")
+                or meta.get("document_name")
+                or meta.get("original_filename")
+                or meta.get("name")
+                or "Document"
+            )
+            fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
+            loc_key = _get_locator_key(meta)
+            canonical = format_grounded_citation(meta)
+            seen_key = (fname_clean.lower(), loc_key)
+            if seen_key not in seen:
+                seen.add(seen_key)
+                page = int(meta.get("page") or meta.get("page_number") or 1)
+                method = str(meta.get("extraction_method", "native")).upper()
+                verified.append({
+                    "filename": fname_clean,
+                    "page": page,
+                    "locator_key": loc_key,
+                    "method": method,
+                    "citation_str": canonical,
+                    "meta": meta
+                })
+
+    sources_used = ", ".join(c["citation_str"] for c in verified) if verified else "None (No matching manual found)"
+    return verified, sources_used
+
+
+def reconcile_citations_in_text(
+    text: str,
+    verified_citations: List[Dict[str, Any]],
+    retrieved_evidence: Optional[List[Dict[str, Any]]] = None
+) -> str:
+    """
+    Rewrites any hallucinated or malformed bracketed citations inside text
+    to authoritative retrieved filenames and page numbers.
+    The model is never permitted to dictate page numbers.
+    """
+    if not text:
+        return text
+
+    # Build reference lookup from verified citations and retrieved evidence
+    ref_map: Dict[str, Dict[str, Any]] = {}
+    if verified_citations:
+        for c in verified_citations:
+            ref_map[c["filename"].lower()] = c
+    if retrieved_evidence:
+        for meta in retrieved_evidence:
+            fname = (
+                meta.get("filename")
+                or meta.get("document")
+                or meta.get("document_name")
+                or meta.get("original_filename")
+                or meta.get("name")
+                or ""
+            )
+            if fname:
+                fname_clean = Path(fname).name if ("/" in fname or "\\" in fname) else fname
+                if fname_clean.lower() not in ref_map:
+                    p = int(meta.get("page") or meta.get("page_number") or 1)
+                    ref_map[fname_clean.lower()] = {
+                        "filename": fname_clean,
+                        "page": p,
+                        "method": str(meta.get("extraction_method", "native")).upper()
+                    }
+
+    def _replace_cite(match: re.Match) -> str:
+        raw = match.group(1).strip()
+        parts = [p.strip() for p in re.split(r"\s*[|;,]\s*", raw) if p.strip()]
+        if not parts:
+            return match.group(0)
+        cand_fname = parts[0]
+        cand_clean = Path(cand_fname).name if ("/" in cand_fname or "\\" in cand_fname) else cand_fname
+
+        # Lookup in ref_map
+        matched_info = None
+        if cand_clean.lower() in ref_map:
+            matched_info = ref_map[cand_clean.lower()]
+        else:
+            for k, info in ref_map.items():
+                if cand_clean.lower() in k or k in cand_clean.lower():
+                    matched_info = info
+                    break
+
+        if matched_info:
+            fn = matched_info['filename']
+            if fn.lower().endswith(".pptx") or matched_info.get("slide_number") is not None:
+                s = matched_info.get("slide_number") or matched_info.get("page") or 1
+                m = matched_info.get("method") or "TEXT"
+                return f"[{fn} | Slide {s} | {m}]"
+            elif fn.lower().endswith(".docx"):
+                m = matched_info.get("method") or "TEXT"
+                if m == "VISUAL" and matched_info.get("page"):
+                    return f"[{fn} | Page {matched_info['page']} | VISUAL]"
+                sec = matched_info.get("section_heading") or "General"
+                return f"[{fn} | Section: {sec} | TEXT]"
+
+            p = matched_info["page"]
+            m = matched_info.get("method")
+            if m:
+                return f"[{fn} | Page {p} | {m}]"
+            return f"[{fn} | Page {p}]"
+
+        return match.group(0)
+
+    pattern = r"\[([^\]]+?(?:\.pdf|\.csv|\.xlsx|\.docx|\.pptx|\.png|\.jpg|\.txt)[^\]]*?)\]"
+    return re.sub(pattern, _replace_cite, text, flags=re.IGNORECASE)
+
+

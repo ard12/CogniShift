@@ -3783,7 +3783,7 @@ print("Analysis script finished with returncode 0.")
                     if tool_name_clean not in [t.lower() for t in allowed_tool_names]:
                         current_step.status = "failed"
                         current_step.error_message = f"Tool '{action.tool_name}' is not in allowed tools list."
-                        current_step.observation = f"Unauthorized tool attempt: {action.tool_name}"
+                        current_step.observation = f"Tool '{action.tool_name}' is not in allowed tools list."
                         await log_event(db, run_id, "tool_unauthorized", current_step.error_message)
                         plan.advance_to_next_step()
                         continue

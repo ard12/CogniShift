@@ -16,10 +16,23 @@ from cognishift.core.network.client import get_sovereign_async_client, get_sover
 from cognishift.core.network.schemas import NetworkPolicyViolation
 from cognishift.core.ollama_provider import OllamaProvider
 from cognishift.core.providers import ProviderError
-from cognishift.app.db.database import get_db
+from cognishift.app.db.database import get_db, init_db
+
+try:
+    httpx.get("http://127.0.0.1:11434/api/tags", timeout=1.0)
+    has_ollama = True
+except Exception:
+    has_ollama = False
+require_ollama = pytest.mark.skipif(not has_ollama, reason="Local Ollama is not running")
+
+
+@pytest.fixture(autouse=True)
+async def setup_enforcement_db():
+    await init_db()
 
 
 @pytest.mark.asyncio
+@require_ollama
 async def test_real_ollama_loopback_allowed():
     """Verify real local Ollama query succeeds via SovereignAsyncClient and logs event."""
     async with get_sovereign_async_client(component="test_ollama_loopback") as client:
@@ -99,6 +112,7 @@ def test_real_fastembed_offline_fails_closed_when_cache_missing(tmp_path):
 
 
 @pytest.mark.asyncio
+@require_ollama
 async def test_real_missing_ollama_model_fails_closed_without_pull():
     """Verify requesting an unregistered model fails closed without triggering pull."""
     provider = OllamaProvider()

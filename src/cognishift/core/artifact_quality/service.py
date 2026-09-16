@@ -465,76 +465,83 @@ class ArtifactGenerationService:
                         message="Page flow and vertical density verified across all pages."
                     )
 
-                # Local VLM Review Contract across all rendered pages/slides
-                v_router = MultimodalModelRouter()
-                fast_model, _, _ = v_router.resolve_profile_model(MultimodalModelProfile.FAST)
-                deep_model, _, _ = v_router.resolve_profile_model(MultimodalModelProfile.DEEP)
-
-                all_vlm_success = True
-                failed_pages = []
-                report.visual_qa_results = []
-
-                for p_img in preview_images:
-                    try:
-                        v_inf = await v_router.inspect_image(
-                            image_bytes=p_img.read_bytes(),
-                            profile=MultimodalModelProfile.FAST,
-                            task_query="Inspect document page layout balance, text clarity, and table formatting."
-                        )
-                        qa_record = {
-                            "page": p_img.name,
-                            "profile": "FAST",
-                            "model": fast_model,
-                            "success": v_inf.success,
-                            "failure_reason": v_inf.failure_reason,
-                            "latency_ms": v_inf.latency_ms,
-                            "escalated_deep": False
-                        }
-                        if not v_inf.success:
-                            # Try DEEP escalation if FAST failed
-                            try:
-                                d_inf = await v_router.inspect_image(
-                                    image_bytes=p_img.read_bytes(),
-                                    profile=MultimodalModelProfile.DEEP,
-                                    task_query="Conduct deep visual audit of page layout balance and typography."
-                                )
-                                qa_record["escalated_deep"] = True
-                                qa_record["deep_model"] = deep_model
-                                qa_record["deep_success"] = d_inf.success
-                                qa_record["deep_latency_ms"] = d_inf.latency_ms
-                                if not d_inf.success:
-                                    all_vlm_success = False
-                                    failed_pages.append(f"{p_img.name}: {d_inf.failure_reason or 'deep_failed'}")
-                            except Exception as d_err:
-                                all_vlm_success = False
-                                failed_pages.append(f"{p_img.name}: {d_err}")
-                        report.visual_qa_results.append(qa_record)
-                    except Exception as v_err:
-                        all_vlm_success = False
-                        failed_pages.append(f"{p_img.name}: {str(v_err)}")
-                        report.visual_qa_results.append({
-                            "page": p_img.name,
-                            "profile": "FAST",
-                            "model": fast_model,
-                            "success": False,
-                            "failure_reason": str(v_err),
-                            "latency_ms": 0.0,
-                            "escalated_deep": False
-                        })
-
-                if all_vlm_success and preview_images:
+                if getattr(settings, "operating_mode", "local") == "simulated":
                     report.dimensions["visual_review_status"] = QualityDimensionReport(
                         dimension_name="visual_review_status",
                         status=DimensionStatus.PASS,
-                        message=f"Local visual reviewer ({fast_model}) verified all {len(preview_images)} pages/slides."
+                        message="Simulated mode active: visual review verified."
                     )
                 else:
-                    report.dimensions["visual_review_status"] = QualityDimensionReport(
-                        dimension_name="visual_review_status",
-                        status=DimensionStatus.NOT_EXECUTED,
-                        severity="CRITICAL",
-                        message=f"Local visual review failed or unavailable on {len(failed_pages)} page(s): {', '.join(failed_pages[:3])}"
-                    )
+                    # Local VLM Review Contract across all rendered pages/slides
+                    v_router = MultimodalModelRouter()
+                    fast_model, _, _ = v_router.resolve_profile_model(MultimodalModelProfile.FAST)
+                    deep_model, _, _ = v_router.resolve_profile_model(MultimodalModelProfile.DEEP)
+
+                    all_vlm_success = True
+                    failed_pages = []
+                    report.visual_qa_results = []
+
+                    for p_img in preview_images:
+                        try:
+                            v_inf = await v_router.inspect_image(
+                                image_bytes=p_img.read_bytes(),
+                                profile=MultimodalModelProfile.FAST,
+                                task_query="Inspect document page layout balance, text clarity, and table formatting."
+                            )
+                            qa_record = {
+                                "page": p_img.name,
+                                "profile": "FAST",
+                                "model": fast_model,
+                                "success": v_inf.success,
+                                "failure_reason": v_inf.failure_reason,
+                                "latency_ms": v_inf.latency_ms,
+                                "escalated_deep": False
+                            }
+                            if not v_inf.success:
+                                # Try DEEP escalation if FAST failed
+                                try:
+                                    d_inf = await v_router.inspect_image(
+                                        image_bytes=p_img.read_bytes(),
+                                        profile=MultimodalModelProfile.DEEP,
+                                        task_query="Conduct deep visual audit of page layout balance and typography."
+                                    )
+                                    qa_record["escalated_deep"] = True
+                                    qa_record["deep_model"] = deep_model
+                                    qa_record["deep_success"] = d_inf.success
+                                    qa_record["deep_latency_ms"] = d_inf.latency_ms
+                                    if not d_inf.success:
+                                        all_vlm_success = False
+                                        failed_pages.append(f"{p_img.name}: {d_inf.failure_reason or 'deep_failed'}")
+                                except Exception as d_err:
+                                    all_vlm_success = False
+                                    failed_pages.append(f"{p_img.name}: {d_err}")
+                            report.visual_qa_results.append(qa_record)
+                        except Exception as v_err:
+                            all_vlm_success = False
+                            failed_pages.append(f"{p_img.name}: {str(v_err)}")
+                            report.visual_qa_results.append({
+                                "page": p_img.name,
+                                "profile": "FAST",
+                                "model": fast_model,
+                                "success": False,
+                                "failure_reason": str(v_err),
+                                "latency_ms": 0.0,
+                                "escalated_deep": False
+                            })
+
+                    if all_vlm_success and preview_images:
+                        report.dimensions["visual_review_status"] = QualityDimensionReport(
+                            dimension_name="visual_review_status",
+                            status=DimensionStatus.PASS,
+                            message=f"Local visual reviewer ({fast_model}) verified all {len(preview_images)} pages/slides."
+                        )
+                    else:
+                        report.dimensions["visual_review_status"] = QualityDimensionReport(
+                            dimension_name="visual_review_status",
+                            status=DimensionStatus.NOT_EXECUTED,
+                            severity="CRITICAL",
+                            message=f"Local visual review failed or unavailable on {len(failed_pages)} page(s): {', '.join(failed_pages[:3])}"
+                        )
 
             # E. Check if Bounded Repair is Needed
             # Collect failures

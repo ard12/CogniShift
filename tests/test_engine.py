@@ -10,7 +10,13 @@ from fastapi.testclient import TestClient
 from cognishift.app.main import app
 from cognishift.app.config import settings
 from cognishift.app.db.database import get_db, init_db
-from cognishift.core.engine import execute_agent_run, resume_agent_run, parse_tool_call
+from cognishift.core.engine import (
+    execute_agent_run,
+    resume_agent_run,
+    parse_tool_call,
+)
+from cognishift.core.retriever import retrieve_context, MAX_DISTANCE_THRESHOLD
+from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture(autouse=True)
@@ -246,7 +252,16 @@ async def test_resume_after_rejection():
 
 def test_runs_api_endpoints():
     """Test full HTTP REST endpoints for Runs API."""
-    from tests.conftest import TEST_OPERATOR_TOKEN
+    try:
+        from tests.conftest import TEST_OPERATOR_TOKEN
+    except ImportError:
+        import importlib.util
+        from pathlib import Path
+        conftest_path = Path(__file__).parent / "conftest.py"
+        spec = importlib.util.spec_from_file_location("local_conftest", conftest_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        TEST_OPERATOR_TOKEN = getattr(mod, "TEST_OPERATOR_TOKEN", "mock_token")
     client = TestClient(app)
 
     auth_headers = {"Authorization": f"Bearer {TEST_OPERATOR_TOKEN}"}

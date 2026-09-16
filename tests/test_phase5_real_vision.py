@@ -18,6 +18,14 @@ from cognishift.core.document_processing.vision_service import VisionProcessingS
 from cognishift.core.model_router import route_model, TaskClassification
 from cognishift.core.providers import get_provider
 from cognishift.core.ollama_provider import OllamaProvider
+import httpx
+
+try:
+    httpx.get("http://127.0.0.1:11434/api/tags", timeout=1.0)
+    has_ollama = True
+except Exception:
+    has_ollama = False
+require_ollama = pytest.mark.skipif(not has_ollama, reason="Local Ollama is not running")
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +36,7 @@ def ensure_local_mode(monkeypatch):
 
 
 @pytest.mark.asyncio
+@require_ollama
 async def test_real_vision_model_availability():
     """Confirms local Ollama service is reachable and hosts the vision model."""
     provider = OllamaProvider()
@@ -55,6 +64,7 @@ async def test_real_vision_router_selected_identity():
 
 
 @pytest.mark.asyncio
+@require_ollama
 async def test_real_vision_inference_with_local_ollama():
     """
     Submits a real synthetic gauge image to local Moondream via Ollama.

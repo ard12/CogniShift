@@ -16,6 +16,10 @@ from cognishift.core.document_processing.service import DocumentProcessingServic
 from cognishift.core.document_processing.lifecycle import idempotent_delete_source
 from cognishift.core.retriever import retrieve_context
 from cognishift.app.db.database import get_db, init_db
+import importlib.util
+
+has_rapidocr = importlib.util.find_spec("rapidocr_onnxruntime") is not None
+require_rapidocr = pytest.mark.skipif(not has_rapidocr, reason="RapidOCR is not installed")
 
 
 @pytest.fixture(autouse=True)
@@ -25,6 +29,7 @@ async def setup_db():
 
 
 @pytest.mark.asyncio
+@require_rapidocr
 async def test_real_rapidocr_extracts_known_scanned_fixture():
     """
     Empirically verifies that the live local RapidOCR engine recognizes text
@@ -61,6 +66,7 @@ async def test_real_rapidocr_extracts_known_scanned_fixture():
 
 
 @pytest.mark.asyncio
+@require_rapidocr
 async def test_real_rapidocr_full_service_pipeline(tmp_path):
     """
     End-to-end integration: Image file -> RapidOCR -> Page chunks -> Chroma -> Retrieval.

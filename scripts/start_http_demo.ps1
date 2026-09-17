@@ -6,7 +6,16 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 Set-Location $ProjectRoot
-
+ 
+if (-not (Test-Path "frontend\dist\index.html")) {
+    Write-Host "Frontend production bundle not found in frontend/dist. Building Vite UI..." -ForegroundColor Yellow
+    if (Get-Command npm -ErrorAction SilentlyContinue) {
+        npm --prefix frontend run build
+    } else {
+        Write-Host "WARNING: 'npm' not found in PATH. Please run 'npm run build' in frontend/ to serve the UI." -ForegroundColor Yellow
+    }
+}
+ 
 $port = 8000
 $occupied = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
     Where-Object { $_.State -eq 'Listen' } |

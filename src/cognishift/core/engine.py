@@ -4543,3 +4543,17 @@ async def resume_agent_run(run_id: int) -> RunResponse:
 
         else:
             raise HTTPException(status_code=400, detail=f"Unknown approval status: {approval['status']}")
+
+
+def _operator_retrieval_top_k(query: str, allowed_source_ids: Optional[List[int]] = None) -> int:
+    """Return retrieval top_k slots: one slot per authorized source for multi-source/overview queries, else default 3."""
+    clean = (query or "").lower()
+    try:
+        from cognishift.core.retrieval.text_retriever import is_workspace_evidence_overview_query
+        is_overview = is_workspace_evidence_overview_query(clean)
+    except Exception:
+        is_overview = False
+
+    if is_overview or any(w in clean for w in ["what evidence", "evidence available", "correlate", "overview"]):
+        return len(allowed_source_ids) if allowed_source_ids else 5
+    return 3

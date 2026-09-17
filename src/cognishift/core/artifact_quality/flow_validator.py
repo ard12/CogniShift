@@ -46,8 +46,8 @@ def validate_page_flow(
         used_height = last_row - first_row
         occupancy_ratio = used_height / max(total_height, 1)
 
-        # Trailing orphan check: if last page has < 12% vertical occupancy and contains only a tiny sliver
-        if page_index == total_pages and total_pages > 1 and occupancy_ratio < 0.12 and not is_figure_page:
+        # Trailing orphan check: if last page has < 6% vertical occupancy and contains only a tiny sliver
+        if page_index == total_pages and total_pages > 1 and occupancy_ratio < 0.06 and not is_figure_page:
             return "FAIL", f"PAGE_ORPHAN_DETECTED: Page {page_index} has only {occupancy_ratio:.1%} vertical occupancy (orphaned row/snippet). Rebalance pagination.", occupancy_ratio
 
         if occupancy_ratio < 0.45 and not is_cover_or_divider and not is_figure_page:

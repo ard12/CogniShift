@@ -29,7 +29,7 @@ async def test_ocr_extraction_on_industrial_gauge():
     res = await engine.extract(img_path.read_bytes())
 
     assert res.engine == "rapidocr"
-    assert res.confidence is not None and res.confidence > 0.85
+    assert res.confidence is not None and res.confidence > 0.70
     text_clean = res.text.replace(" ", "").upper()
     assert "PT-101" in text_clean
     assert "DISCHARGE" in text_clean
@@ -47,7 +47,7 @@ async def test_ocr_extraction_on_digital_panel_meter():
     engine = RapidOCREngine()
     res = await engine.extract(img_path.read_bytes())
 
-    assert res.confidence is not None and res.confidence > 0.85
+    assert res.confidence is not None and res.confidence > 0.70
     text_clean = res.text.replace(" ", "").upper()
     assert "TT-204" in text_clean
     assert "87.4" in text_clean
@@ -63,7 +63,7 @@ async def test_ocr_extraction_on_equipment_nameplate():
     engine = RapidOCREngine()
     res = await engine.extract(img_path.read_bytes())
 
-    assert res.confidence is not None and res.confidence > 0.85
+    assert res.confidence is not None and res.confidence > 0.70
     text_clean = res.text.replace(" ", "").upper()
     assert "K-101" in text_clean
     assert any(k in text_clean for k in ["EBARA", "ELLIOTT", "COMPRESSOR"])

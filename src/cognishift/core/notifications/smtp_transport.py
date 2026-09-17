@@ -192,7 +192,7 @@ async def stop_local_smtp_server() -> None:
     if _SERVER_INSTANCE is not None:
         try:
             _SERVER_INSTANCE.close()
-            await _SERVER_INSTANCE.wait_closed()
+            await asyncio.wait_for(_SERVER_INSTANCE.wait_closed(), timeout=1.0)
         except Exception:
             pass
         _SERVER_INSTANCE = None

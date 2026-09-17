@@ -21,6 +21,11 @@ async def setup_test_environment():
             VALUES (5, 'restart_component', 'Restart Component', 'sensitive', 1, 'restart_component')
         """)
         await db.execute("""
+            INSERT OR IGNORE INTO agent_definitions
+            (id, workspace_id, name, system_instructions)
+            VALUES (1, 1, 'Test Agent', 'instructions')
+        """)
+        await db.execute("""
             INSERT OR REPLACE INTO agent_runs
             (id, workspace_id, agent_id, status, user_id)
             VALUES (1, 1, 1, 'paused', 'op_tester')
